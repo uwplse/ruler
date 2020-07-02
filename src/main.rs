@@ -65,24 +65,6 @@ impl SampleData {
     }
 }
 
-fn mk_recexpr<'a>(node: &Math, mut mk: impl FnMut(Id) -> &'a RecExpr) -> RecExpr {
-    fn build(to: &mut RecExpr, from: &[Math]) -> Id {
-        let last = from.last().unwrap().clone();
-        let new_node = last.map_children(|id| {
-            let i = id as usize + 1;
-            build(to, &from[0..i])
-        });
-        to.add(new_node)
-    }
-
-    let mut expr = RecExpr::default();
-    let node = node
-        .clone()
-        .map_children(|id| build(&mut expr, mk(id).as_ref()));
-    expr.add(node);
-    expr
-}
-
 impl Analysis<Math> for Sampler {
     type Data = SampleData;
 
@@ -98,7 +80,7 @@ impl Analysis<Math> for Sampler {
 
         SampleData {
             depth: 1 + enode.fold(0, |depth, id| depth.max(egraph[id].data.depth)),
-            expr: mk_recexpr(enode, |id| &egraph[id].data.expr),
+            expr: enode.to_recexpr(|id| egraph[id].data.expr.as_ref()),
             samples,
         }
     }
@@ -147,8 +129,8 @@ fn eval(node: &Math, get: impl Fn(&Id) -> Constant) -> Constant {
 
 fn generalize(expr: &RecExpr, map: &mut HashMap<Symbol, Var>) -> Pattern {
     let alpha = b"abcdefghijklmnopqrstuvwxyz";
-    let nodes = expr
-        .nodes
+    let nodes: Vec<_> = expr
+        .as_ref()
         .iter()
         .map(|n| match n {
             Math::Var(sym) => {
@@ -165,7 +147,7 @@ fn generalize(expr: &RecExpr, map: &mut HashMap<Symbol, Var>) -> Pattern {
         })
         .collect();
 
-    Pattern::new(PatternAst { nodes })
+    Pattern::from(PatternAst::from(nodes))
 }
 
 fn generalize_to_rewrite(lhs: &RecExpr, rhs: &RecExpr) -> Option<Rewrite> {

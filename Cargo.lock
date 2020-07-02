@@ -15,6 +15,7 @@ checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 [[package]]
 name = "egg"
 version = "0.5.1-dev"
+source = "git+https://github.com/mwillsey/egg?rev=7b3a8a0306aeaa9e85fa8904ccd270101a01cca0#7b3a8a0306aeaa9e85fa8904ccd270101a01cca0"
 dependencies = [
  "indexmap",
  "instant",
