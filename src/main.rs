@@ -2,7 +2,10 @@ use egg::*;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    fmt::Display,
+};
 
 type EGraph = egg::EGraph<Math, Sampler>;
 type RecExpr = egg::RecExpr<Math>;
@@ -21,7 +24,7 @@ define_language! {
     }
 }
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 struct Sampler {
     n_samples: usize,
     vars: HashMap<egg::Symbol, Vec<Constant>>,
@@ -194,7 +197,103 @@ fn add_something(rng: &mut impl Rng, egraph: &mut EGraph) {
     egraph.add(node);
 }
 
+struct Equality {
+    lhs: Pattern,
+    rhs: Pattern,
+    rewrites: Vec<egg::Rewrite<Math, ()>>,
+}
+
+impl Display for Equality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.rewrites.len() {
+            1 => write!(f, "{}", self.rewrites[1].long_name()),
+            2 => write!(f, "{} <=> {}", self.lhs, self.rhs),
+            n => panic!("unexpected len {}", n),
+        }
+    }
+}
+
+impl Equality {
+    fn new(lhs: Pattern, rhs: Pattern) -> Self {
+        let mut rewrites = vec![];
+
+        let name = format!("{} => {}", lhs, rhs);
+        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, lhs.clone(), rhs.clone()) {
+            rewrites.push(rw)
+        }
+
+        let name = format!("{} => {}", rhs, lhs);
+        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, rhs.clone(), lhs.clone()) {
+            rewrites.push(rw)
+        }
+
+        Self { rewrites, lhs, rhs }
+    }
+}
+
 fn main() {
+    env_logger::init();
+
+    let mut rewrites = vec![
+        Equality::new("(* ?a ?b)".parse().unwrap(), "(* ?b ?a)".parse().unwrap()),
+        Equality::new(
+            "(+ ?a ?b)".parse().unwrap(),
+            "(* 1 (+ ?a ?b))".parse().unwrap(),
+        ),
+        Equality::new("(* ?a 1)".parse().unwrap(), "?a".parse().unwrap()),
+    ];
+
+    minimize_equalities(&mut rewrites);
+}
+
+fn minimize_equalities(equalities: &mut Vec<Equality>) -> Vec<Equality> {
+    let mut removed = vec![];
+
+    'outer: while equalities.len() > 1 {
+        for (i, eq) in equalities.iter().enumerate() {
+            let other_eqs = equalities
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| i != *j)
+                .flat_map(|(_, eq)| &eq.rewrites);
+            let runner = egg::Runner::default()
+                .with_expr(&instantiate(&eq.lhs))
+                .with_expr(&instantiate(&eq.rhs))
+                .with_iter_limit(3)
+                .run(other_eqs);
+            let are_same = |a, b| runner.egraph.find(a) == runner.egraph.find(b);
+            if are_same(runner.roots[0], runner.roots[1]) {
+                println!("Removing {}", eq);
+                removed.push(equalities.remove(i));
+                continue 'outer;
+            }
+        }
+
+        break
+    }
+
+    return removed
+}
+
+fn instantiate(pat: &Pattern) -> RecExpr {
+    let nodes: Vec<_> = pat
+        .ast
+        .as_ref()
+        .iter()
+        .map(|n| match n {
+            ENodeOrVar::ENode(n) => n.clone(),
+            ENodeOrVar::Var(v) => {
+                let s = v.to_string();
+                assert!(s.starts_with('?'));
+                Math::Var(s[1..].into())
+            }
+        })
+        .collect();
+
+    RecExpr::from(nodes)
+}
+
+pub fn do_it() {
     let n_samples = 50;
     let n_vars = 3;
     let interesting = vec![0, 1];
@@ -221,6 +320,7 @@ fn main() {
 
     let vars: Vec<_> = sampler.vars.keys().copied().collect();
 
+    let mut iters_for_rewrites = vec![];
     let mut rewrites: Vec<Rewrite> = vec![];
 
     let mut egraph = EGraph::new(sampler.clone());
@@ -231,15 +331,15 @@ fn main() {
         egraph.add(Math::Var(var));
     }
 
-    for i in 0..300 {
-        println!(
-            "iter {}, r={}, n={}, e={}",
+    for i in 0..100 {
+        print!(
+            "\riter {}, r={}, n={}, e={}",
             i,
             rewrites.len(),
             egraph.total_number_of_nodes(),
             egraph.number_of_classes()
         );
-        for _ in 0..10 {
+        for _ in 0..i {
             add_something(rng, &mut egraph);
         }
 
@@ -248,6 +348,7 @@ fn main() {
             egraph = Runner::new(sampler.clone())
                 .with_egraph(egraph)
                 .with_iter_limit(2)
+                .with_scheduler(SimpleScheduler)
                 .run(&rewrites)
                 .egraph;
         }
@@ -256,7 +357,7 @@ fn main() {
         let mut to_union = vec![];
         for c1 in egraph.classes() {
             for c2 in egraph.classes() {
-                if c1.id != c2.id && c1.data.samples == c2.data.samples {
+                if c1.id < c2.id && c1.data.samples == c2.data.samples {
                     to_union.push((c1.id, c2.id))
                 }
             }
@@ -267,22 +368,37 @@ fn main() {
         for (id1, id2) in to_union {
             let data1 = &egraph[id1].data;
             let data2 = &egraph[id2].data;
-            let lhs = data1.expr.clone();
-            let rhs = data2.expr.clone();
+            let mut ext = Extractor::new(&egraph, AstSize);
+            let lhs = ext.find_best(id1).1;
+            let rhs = ext.find_best(id2).1;
+            // let lhs = data1.expr.clone();
+            // let rhs = data2.expr.clone();
             let depth1 = data1.depth;
             let depth2 = data2.depth;
             let (_, did_something) = egraph.union(id1, id2);
-            if did_something && depth1 <= max_depth && depth2 < max_depth {
+            if did_something && depth1 <= max_depth && depth2 <= max_depth {
                 if let Some(rw) = generalize_to_rewrite(&lhs, &rhs) {
                     if rewrites.iter().find(|r| r.name() == rw.name()).is_none() {
                         println!("Learned rewrite: {}", rw.name());
-                        rewrites.push(rw)
+                        rewrites.push(rw);
+                        iters_for_rewrites.push(i);
+                        egraph = Runner::new(sampler.clone())
+                            .with_egraph(egraph)
+                            .with_iter_limit(5)
+                            .run(&rewrites)
+                            .egraph;
                     }
                 }
                 if let Some(rw) = generalize_to_rewrite(&rhs, &lhs) {
                     if rewrites.iter().find(|r| r.name() == rw.name()).is_none() {
                         println!("Learned rewrite: {}", rw.name());
-                        rewrites.push(rw)
+                        rewrites.push(rw);
+                        iters_for_rewrites.push(i);
+                        egraph = Runner::new(sampler.clone())
+                            .with_egraph(egraph)
+                            .with_iter_limit(5)
+                            .run(&rewrites)
+                            .egraph;
                     }
                 }
             }
@@ -290,8 +406,8 @@ fn main() {
     }
 
     println!("Found {} rewrites:", rewrites.len());
-    for rw in &rewrites {
-        println!("  {}", rw.long_name());
+    for (rw, i) in rewrites.iter().zip(&iters_for_rewrites) {
+        println!("{:4}: {}", i, rw.long_name());
     }
     // for class in egraph.classes() {
     //     println!("{}: {}", class.id, class.data.expr)
