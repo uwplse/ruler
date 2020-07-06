@@ -13,5 +13,5 @@ rand_pcg = "0.2"
 rand = { version = "0.7", default-features = false, features = ["std"] }
 
 # egg = "0.5"
-egg = { git = "https://github.com/mwillsey/egg", rev = "ff6b879e0408aaa8769697c37026d65c0ba5f1a2" }
-# egg = { path = "/Users/mwillsey/src/egg" }
+# egg = { git = "https://github.com/mwillsey/egg", rev = "ff6b879e0408aaa8769697c37026d65c0ba5f1a2" }
+egg = { path = "/Users/mwillsey/src/egg" }
