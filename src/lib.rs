@@ -11,7 +11,7 @@ where
     L: Language + 'static,
     A: Analysis<L> + Clone,
 {
-    type Value: Hash + PartialEq + Eq + Clone + Debug;
+    type Value: Hash + PartialEq + Eq + Clone + Debug + PartialOrd + Ord;
 
     fn value_to_node(val: &Self::Value) -> Option<L>;
     fn symbol_to_node(sym: Symbol) -> L;
@@ -19,18 +19,10 @@ where
 
     fn make_node(&mut self, egraph: &EGraph<L, A>) -> L;
     fn initial_egraph(&mut self, params: &SynthesisParams<L, A>) -> EGraph<L, A>;
-    fn eval(
-        &mut self,
-        enode: &L,
-        egraph: &EGraph<L, A>,
-        values: &HashMap<Id, Self::Value>,
-    ) -> Self::Value;
+    fn eval(&mut self, enode: &L, egraph: &EGraph<L, A>, values: &HashMap<Id, Self::Value>) -> Self::Value;
 
     fn instantiate(pattern: &Pattern<L>) -> RecExpr<L> {
-        let nodes: Vec<_> = pattern
-            .ast
-            .as_ref()
-            .iter()
+        let nodes: Vec<_> = pattern.ast.as_ref().iter()
             .map(|n| match n {
                 ENodeOrVar::ENode(n) => n.clone(),
                 ENodeOrVar::Var(v) => {
@@ -46,9 +38,7 @@ where
 
     fn generalize(expr: &RecExpr<L>, map: &mut HashMap<Symbol, Var>) -> Pattern<L> {
         let alpha = b"abcdefghijklmnopqrstuvwxyz";
-        let nodes: Vec<_> = expr
-            .as_ref()
-            .iter()
+        let nodes: Vec<_> = expr.as_ref().iter()
             .map(|n| match Self::node_to_symbol(n) {
                 Some(sym) => {
                     let var = if let Some(var) = map.get(&sym) {
@@ -67,13 +57,8 @@ where
         Pattern::from(PatternAst::from(nodes))
     }
 
-    fn minimize_equalities(
-        &mut self,
-        analysis: A,
-        equalities: &mut Vec<Equality<L, A>>,
-    ) -> Vec<Equality<L, A>> {
+    fn minimize_equalities(&mut self, analysis: A, equalities: &mut Vec<Equality<L, A>>) -> Vec<Equality<L, A>> {
         let mut removed = vec![];
-
         'outer: while equalities.len() > 1 {
             for (i, eq) in equalities.iter().enumerate() {
                 let other_eqs = equalities
@@ -102,8 +87,6 @@ where
         return removed;
     }
 
-    // fn mk_signatures(&mut self, sigs: HashMap<Id, Signature<L>>, )
-
     fn run(&mut self, mut params: SynthesisParams<L, A>) -> Vec<Equality<L, A>> {
         let mut egraph = self.initial_egraph(&params);
         let mut values: HashMap<Id, Self::Value> = Default::default();
@@ -124,22 +107,8 @@ where
             }
 
             // update id_to_val based on the egraph modifications
-            values = values
-                .into_iter()
-                .map(|(id, val)| (egraph.find(id), val))
-                .collect();
+            values = values.into_iter().map(|(id, val)| (egraph.find(id), val)).collect();
 
-            // assert_eq!(values.len(), egraph.number_of_classes());
-
-            // for class in egraph.classes() {
-            //     assert!(
-            //         values.contains_key(&class.id),
-            //         "values doesn't contain {:?}",
-            //         class
-            //     );
-            // }
-            //
-            
             for class in egraph.classes() {
                 if !values.contains_key(&class.id) {
                     let node = class
@@ -151,13 +120,14 @@ where
                 }
             }
 
-
+            let mut ctr = 0;
             // create the new nodes before adding to make sure they refer to existing nodes
             let to_add: Vec<(L, Self::Value)> = (0..params.additions_per_iteration)
                 .map(|_| {
                     let n = self.make_node(&egraph);
-                    println!("evaling {:?}", n);
+                    println!("{}, evaling {:?}",ctr, n);
                     let val = self.eval(&n, &egraph, &values);
+                    ctr = ctr + 1;
                     (n, val)
                 })
                 .collect();
@@ -198,30 +168,6 @@ where
                 .map(|(id, sig)| (egraph.find(id), sig))
                 .collect();
 
-            // let mut new_values = vec![];
-            // // compute new values, since nodes have been added
-            // for class in egraph.classes() {
-            //     if !values.contains_key(&class.id) {
-            //         // TODO passing the egraph here is a hack
-            //         let node = class
-            //             .iter()
-            //             .find(|n| n.children().iter().all(|id| values.contains_key(&egraph.find(*id))))
-            //             .unwrap_or_else(|| panic!("failed to find node for class {:?}", class));
-            //         let val = self.eval(node, &egraph, &values);
-            //         new_values.push((class.id, val));
-            //     }
-            // }
-
-            // // add the new_values to values map, doing const addition on the way
-            // for (mut id, val) in new_values {
-            //     if let Some(node) = Self::value_to_node(&val) {
-            //         let added = egraph.add(node);
-            //         id = egraph.union(id, added).0;
-            //     }
-            //     values.insert(id, val);
-            // }
-            // egraph.rebuild();
-
             // group things by value
             let mut groups: HashMap<Self::Value, Vec<Id>> = Default::default();
             for (id, val) in values.drain() {
@@ -229,11 +175,6 @@ where
                 groups.entry(val).or_default().push(egraph.find(id));
             }
             assert!(groups.len() <= egraph.number_of_classes());
-            // assert_eq!(
-            //     egraph.number_of_classes(),
-            //     groups.values().map(|ids| ids.len()).sum(),
-            //     "sum failed"
-            // );
 
             let mut ext = Extractor::new(&egraph, AstSize);
             for ids in groups.values_mut() {
@@ -282,17 +223,6 @@ where
     }
 }
 
-// impl<A> SynthesisLanguage<A> for SymbolLang
-// where
-//     A: Analysis<SymbolLang>,
-// {
-//     fn make_from_symbol(sym: Symbol) -> Self {
-//         SymbolLang::leaf(sym)
-//     }
-//     fn add_something<R: Rng>(_rng: &mut impl Rng, _egraph: &mut EGraph<Self, A>) {
-//         unimplemented!()
-//     }
-// }
 
 fn fold1<T, F>(iter: impl IntoIterator<Item = T>, f: F) -> T
 where
@@ -319,141 +249,6 @@ impl<L, A> SynthesisParams<L, A> {
 struct Signature<L> {
     samples: Vec<L>,
 }
-
-// impl<L: Language> Signature<L> {
-//     fn constant(&self) -> Option<L> {
-
-//     }
-// }
-
-// impl<L, A> SynthesisContext<L, A>
-// where
-//     L: SynthesisLanguage<A>,
-//     A: Analysis<L> + Clone,
-// {
-
-//     fn run(&mut self, egraph: &mut EGraph<L, A>) {
-//         for iter in 0..self.iterations {
-
-//             // print!(
-//             //     "\riter {}, r={}, n={}, e={}",
-//             //     iter,
-//             //     rewrites.len(),
-//             //     egraph.total_number_of_nodes(),
-//             //     egraph.number_of_classes()
-//             // );
-//             //
-//             for _ in 0..i {
-//                 egraph.add()
-//             }
-
-//             // egraph.rebuild();
-//             // if !rewrites.is_empty() {
-//             //     egraph = Runner::new(sampler.clone())
-//             //         .with_egraph(egraph)
-//             //         .with_iter_limit(2)
-//             //         .with_scheduler(SimpleScheduler)
-//             //         .run(&rewrites)
-//             //         .egraph;
-//             // }
-
-//             // find new equalities
-//             // let mut to_union = vec![];
-//             // for c1 in egraph.classes() {
-//             //     for c2 in egraph.classes() {
-//             //         if c1.id < c2.id && c1.data.samples == c2.data.samples {
-//             //             to_union.push((c1.id, c2.id))
-//             //         }
-//             //     }
-//             // }
-
-//             // let max_depth = 3;
-
-//             // for (id1, id2) in to_union {
-//             //     let data1 = &egraph[id1].data;
-//             //     let data2 = &egraph[id2].data;
-//             //     let mut ext = Extractor::new(&egraph, AstSize);
-//             //     let lhs = ext.find_best(id1).1;
-//             //     let rhs = ext.find_best(id2).1;
-//             //     // let lhs = data1.expr.clone();
-//             //     // let rhs = data2.expr.clone();
-//             //     let depth1 = data1.depth;
-//             //     let depth2 = data2.depth;
-//             //     let (_, did_something) = egraph.union(id1, id2);
-//             //     if did_something && depth1 <= max_depth && depth2 <= max_depth {
-//             //         if let Some(rw) = generalize_to_rewrite(&lhs, &rhs) {
-//             //             if rewrites.iter().find(|r| r.name() == rw.name()).is_none() {
-//             //                 println!("Learned rewrite: {}", rw.name());
-//             //                 rewrites.push(rw);
-//             //                 iters_for_rewrites.push(i);
-//             //                 egraph = Runner::new(sampler.clone())
-//             //                     .with_egraph(egraph)
-//             //                     .with_iter_limit(5)
-//             //                     .run(&rewrites)
-//             //                     .egraph;
-//             //             }
-//             //         }
-//             //         if let Some(rw) = generalize_to_rewrite(&rhs, &lhs) {
-//             //             if rewrites.iter().find(|r| r.name() == rw.name()).is_none() {
-//             //                 println!("Learned rewrite: {}", rw.name());
-//             //                 rewrites.push(rw);
-//             //                 iters_for_rewrites.push(i);
-//             //                 egraph = Runner::new(sampler.clone())
-//             //                     .with_egraph(egraph)
-//             //                     .with_iter_limit(5)
-//             //                     .run(&rewrites)
-//             //                     .egraph;
-//             //             }
-//             //         }
-//             //     }
-//             // }
-//         }
-//     }
-// }
-
-// fn generalize_to_rewrite(lhs: &RecExpr, rhs: &RecExpr) -> Option<Rewrite> {
-//     let mut map = HashMap::default();
-//     let lhs = generalize(lhs, &mut map);
-//     let rhs = generalize(rhs, &mut map);
-//     let name = format!("{} => {}", lhs, rhs);
-//     if let Ok(rw) = Rewrite::new(name.clone(), name.clone(), lhs, rhs) {
-//         Some(rw)
-//     } else {
-//         println!("Failed to create rewrite for {}", name);
-//         None
-//     }
-// }
-
-// fn add_something(rng: &mut impl Rng, egraph: &mut EGraph) {
-//     let var_classes: Vec<_> = egraph
-//         .classes()
-//         .filter(|c| c.iter().any(|n| matches!(n, Math::Var(_))))
-//         .collect();
-//     let classes: Vec<_> = egraph
-//         .classes()
-//         .filter(|c| c.data.depth < 3 && c.data.constant().map_or(true, |n| -2 <= n && n <= 2))
-//         .collect();
-//     let max_depth = 1 + classes.iter().map(|c| c.data.depth).max().unwrap();
-//     macro_rules! mk {
-//         () => {
-//             if rng.gen_bool(0.3) {
-//                 var_classes.choose(rng).unwrap().id
-//             } else {
-//                 classes
-//                     .choose(rng)
-//                     // .choose_weighted(rng, |c| (max_depth - c.data.depth).pow(2))
-//                     .unwrap()
-//                     .id
-//             }
-//         };
-//     }
-//     let p: f32 = rng.gen();
-//     let node = match p {
-//         _ if p < 0.5 => Math::Add([mk!(), mk!()]),
-//         _ => Math::Mul([mk!(), mk!()]),
-//     };
-//     egraph.add(node);
-// }
 
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
@@ -493,138 +288,3 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
     }
 }
 
-// fn main() {
-//     env_logger::init();
-
-//     let mut eqs: Vec<Equality<SymbolLang, ()>> = vec![
-//         Equality::new("(* ?a ?b)".parse().unwrap(), "(* ?b ?a)".parse().unwrap()),
-//         Equality::new(
-//             "(+ ?a ?b)".parse().unwrap(),
-//             "(* 1 (+ ?a ?b))".parse().unwrap(),
-//         ),
-//         Equality::new("(* ?a 1)".parse().unwrap(), "?a".parse().unwrap()),
-//     ];
-
-//     // minimize_equalities(&mut eqs, ());
-// }
-
-// pub fn do_it() {
-//     let n_samples = 50;
-//     let n_vars = 3;
-//     let interesting = vec![0, 1];
-
-//     assert!(n_samples > interesting.len());
-//     let n_to_sample = n_samples - interesting.len();
-
-//     let rng = &mut rand_pcg::Pcg64::seed_from_u64(0xc0ffee);
-
-//     let mut mk_samples = || -> Vec<Constant> {
-//         let mut samples = interesting.clone();
-//         samples.extend((0..n_to_sample).map(|_| rng.gen::<Constant>()));
-//         assert_eq!(samples.len(), n_samples);
-//         samples
-//     };
-
-//     let sampler = Sampler {
-//         n_samples,
-//         eqs: Default::default(),
-//         vars: (0..n_vars)
-//             .map(|i| (format!("x{}", i).into(), mk_samples()))
-//             .collect(),
-//     };
-
-//     let vars: Vec<_> = sampler.vars.keys().copied().collect();
-
-//     let mut iters_for_rewrites = vec![];
-//     let mut rewrites: Vec<Rewrite> = vec![];
-
-//     let mut egraph = EGraph::new(sampler.clone());
-//     for c in &interesting {
-//         egraph.add(Math::Num(*c));
-//     }
-//     for var in vars {
-//         egraph.add(Math::Var(var));
-//     }
-
-//     for i in 0..100 {
-//         print!(
-//             "\riter {}, r={}, n={}, e={}",
-//             i,
-//             rewrites.len(),
-//             egraph.total_number_of_nodes(),
-//             egraph.number_of_classes()
-//         );
-//         for _ in 0..i {
-//             add_something(rng, &mut egraph);
-//         }
-
-//         egraph.rebuild();
-//         if !rewrites.is_empty() {
-//             egraph = Runner::new(sampler.clone())
-//                 .with_egraph(egraph)
-//                 .with_iter_limit(2)
-//                 .with_scheduler(SimpleScheduler)
-//                 .run(&rewrites)
-//                 .egraph;
-//         }
-
-//         // find new equalities
-//         let mut to_union = vec![];
-//         for c1 in egraph.classes() {
-//             for c2 in egraph.classes() {
-//                 if c1.id < c2.id && c1.data.samples == c2.data.samples {
-//                     to_union.push((c1.id, c2.id))
-//                 }
-//             }
-//         }
-
-//         let max_depth = 3;
-
-//         for (id1, id2) in to_union {
-//             let data1 = &egraph[id1].data;
-//             let data2 = &egraph[id2].data;
-//             let mut ext = Extractor::new(&egraph, AstSize);
-//             let lhs = ext.find_best(id1).1;
-//             let rhs = ext.find_best(id2).1;
-//             // let lhs = data1.expr.clone();
-//             // let rhs = data2.expr.clone();
-//             let depth1 = data1.depth;
-//             let depth2 = data2.depth;
-//             let (_, did_something) = egraph.union(id1, id2);
-//             if did_something && depth1 <= max_depth && depth2 <= max_depth {
-//                 if let Some(rw) = generalize_to_rewrite(&lhs, &rhs) {
-//                     if rewrites.iter().find(|r| r.name() == rw.name()).is_none() {
-//                         println!("Learned rewrite: {}", rw.name());
-//                         rewrites.push(rw);
-//                         iters_for_rewrites.push(i);
-//                         egraph = Runner::new(sampler.clone())
-//                             .with_egraph(egraph)
-//                             .with_iter_limit(5)
-//                             .run(&rewrites)
-//                             .egraph;
-//                     }
-//                 }
-//                 if let Some(rw) = generalize_to_rewrite(&rhs, &lhs) {
-//                     if rewrites.iter().find(|r| r.name() == rw.name()).is_none() {
-//                         println!("Learned rewrite: {}", rw.name());
-//                         rewrites.push(rw);
-//                         iters_for_rewrites.push(i);
-//                         egraph = Runner::new(sampler.clone())
-//                             .with_egraph(egraph)
-//                             .with_iter_limit(5)
-//                             .run(&rewrites)
-//                             .egraph;
-//                     }
-//                 }
-//             }
-//         }
-//     }
-
-//     println!("Found {} rewrites:", rewrites.len());
-//     for (rw, i) in rewrites.iter().zip(&iters_for_rewrites) {
-//         println!("{:4}: {}", i, rw.long_name());
-//     }
-//     // for class in egraph.classes() {
-//     //     println!("{}: {}", class.id, class.data.expr)
-//     // }
-// }
