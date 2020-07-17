@@ -1,26 +1,27 @@
 use egg::*;
-use rand::{seq::SliceRandom, Rng, SeedableRng};
-use rand_pcg::Pcg64;
+use rand::{seq::SliceRandom, Rng};
+use rand::prelude::*;
 use ruler::{SynthesisParams, Synthesizer, Sample};
 use std::{ collections::{HashMap}};
-use ordered_float::NotNan;
+use num_bigint::BigInt;
+use num_bigint::{ToBigInt, RandBigInt};
 
 type EGraph = egg::EGraph<Math, ()>;
-type Constant = ordered_float::NotNan<f32>;
+type Constant = BigInt;
 
 define_language! {
     enum Math {
-        "+" = FAdd([Id; 2]),
-        "-" = FSub([Id; 2]),
-        "+" = FMul([Id; 2]),
-        "/" = FDiv([Id; 2]),
-        FNum(Constant),
-        FVar(egg::Symbol),
+        "+" = BAdd([Id; 2]),
+        "-" = BSub([Id; 2]),
+        "+" = BMul([Id; 2]),
+        "/" = BDiv([Id; 2]),
+        BNum(Constant),
+        BVar(egg::Symbol),
     }
 }
 
 struct MathSynth {
-    rng: Pcg64,
+    rng: ThreadRng,
     n_samples: usize,
     n_variables: usize,
     constants: Vec<Constant>,
@@ -29,49 +30,37 @@ struct MathSynth {
 impl Sample<MathSynth, Constant> for MathSynth {
     fn get_random_vec(&mut self) -> Vec<Constant> {
         let mut vec = Vec::with_capacity(self.n_samples);
-        vec.extend((vec.len()..self.n_samples).map(|_| NotNan::from(self.rng.gen::<f32>())));
+        vec.extend((vec.len()..self.n_samples).map(|_| self.rng.gen_bigint(1000)));
         vec
     }
 }
 
-#[inline(always)]
-fn eval_one(node: &Math, get: impl Fn(&Id) -> Constant) -> Constant {
-    match node {
-        Math::FAdd([a, b]) => get(a) + get(b),
-        Math::FSub([a, b]) => get(a) - get(b),
-        Math::FMul([a, b]) => get(a) * get(b),
-        Math::FDiv([a, b]) => get(a) / get(b),
-        Math::FNum(n) => n.clone(),
-        Math::FVar(v) => unreachable!("Shouldn't be asked to eval a var: {}", v),
-    }
-}
 
 impl Synthesizer<Math, ()> for MathSynth {
+
     type CharacteristicVector = Vec<Constant>;
     fn value_to_node(val: &Self::CharacteristicVector) -> Option<Math> {
-        let n = val[0];
-        if val[1..].iter().all(|x| x == &n) {
-            Some(Math::FNum(n))
+        let n = &val[0];
+        if val[1..].iter().all(|x| x == n) {
+            Some(Math::BNum(n.clone()))
         } else {
             None
         }
     }
 
     fn symbol_to_node(sym: Symbol) -> Math {
-        Math::FVar(sym)
+        Math::BVar(sym)
     }
 
     fn node_to_symbol(node: &Math) -> Option<Symbol> {
         match node {
-            Math::FVar(sym) => Some(*sym),
+            Math::BVar(sym) => Some(*sym),
             _ => None
         }
     }
 
-    // pick an operator at random, and two arguments and add it to the EGraph
     fn make_node(&mut self, egraph: &egg::EGraph<Math, ()>) -> Math {
         let classes: Vec<_> = egraph.classes().collect();
-        let p: f32 = self.rng.gen();
         macro_rules! mk {
             () => {
                 // if true, generate two random new variable
@@ -85,48 +74,59 @@ impl Synthesizer<Math, ()> for MathSynth {
                 }
             };
         }
-        // make a node randomly
-        // this isn't great, need better statistics
+        let p: f32 = self.rng.gen();
+        // either make an Add node or a Mul node, randomly
         match p {
-            _ if p < 0.25 => Math::FAdd([mk!(), mk!()]),
-            _ if p >= 0.25 && p < 0.50 => Math::FSub([mk!(), mk!()]),
-            _ if p >= 0.50 && p < 0.75 => Math::FMul([mk!(), mk!()]),
-            _ => Math::FDiv([mk!(), mk!()]),
+            _ if p < 0.25 => Math::BAdd([mk!(), mk!()]),
+            _ if p >= 0.25 && p < 0.50 => Math::BSub([mk!(), mk!()]),
+            _ if p >= 0.50 && p < 0.75 => Math::BMul([mk!(), mk!()]),
+            _ => Math::BDiv([mk!(), mk!()]),
         }
     }
 
-    // in the beginning just add the variables and constants to the EGraph
     fn initial_egraph(&mut self, params: &SynthesisParams<Math, ()>) -> EGraph {
         let mut egraph = EGraph::default();
         for i in 0..self.n_variables {
-            egraph.add(Math::FVar(format!("x{}", i).into()));
+            egraph.add(Math::BVar(format!("x{}", i).into()));
         }
         for n in &self.constants {
-            egraph.add(Math::FNum(*n));
+            egraph.add(Math::BNum(n.clone()));
         }
         egraph
     }
 
     fn eval(&mut self, enode: &Math, egraph: &EGraph, values: &HashMap<Id, Self::CharacteristicVector>) -> Self::CharacteristicVector {
         match enode {
-            Math::FVar(_) => {
+            Math::BVar(_) => {
                 self.get_random_vec()
             }
-            n => (0..self.n_samples).map(|i| eval_one(n, |id| { values[&egraph.find(*id)][i] })).collect(),
+            n => (0..self.n_samples).map(|i| eval_one(n, |id| { values[&egraph.find(*id)][i].clone() })).collect(),
         }
     }
 }
 
+#[inline(always)]
+fn eval_one(node: &Math, get: impl Fn(&Id) -> Constant) -> Constant {
+    match node {
+        Math::BAdd([a, b]) => get(a) + get(b),
+        Math::BSub([a, b]) => get(a) - get(b),
+        Math::BMul([a, b]) => get(a) * get(b),
+        Math::BDiv([a, b]) => get(a) / get(b),
+        Math::BNum(n) => n.clone(),
+        Math::BVar(v) => unreachable!("Shouldn't be asked to eval a var: {}", v),
+    }
+}
+
 #[test]
-fn synth_f32() {
+fn synth_bigint() {
     env_logger::init();
 
     let mut synth =
         MathSynth {
-            rng: Pcg64::seed_from_u64(0),
+            rng: rand::thread_rng(),
             n_samples: 50,
             n_variables: 3,
-            constants: vec![NotNan::from(1.0 as f32), NotNan::from(0.0 as f32)]};
+            constants: vec![ToBigInt::to_bigint(&0).unwrap(), ToBigInt::to_bigint(&1).unwrap()]};
 
     let params =
         SynthesisParams {

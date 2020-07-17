@@ -6,20 +6,21 @@ use std::{
     hash::Hash,
 };
 
-pub trait Synthesizer<L, A>
-where
-    L: Language + 'static,
-    A: Analysis<L> + Clone,
-{
-    type Value: Hash + PartialEq + Eq + Clone + Debug + PartialOrd + Ord;
+pub trait Sample<T, C> {
+    fn get_random_vec(&mut self) -> Vec<C>;
+}
 
-    fn value_to_node(val: &Self::Value) -> Option<L>;
+pub trait Synthesizer<L, A>
+where L: Language + 'static, A: Analysis<L> + Clone {
+    type CharacteristicVector: Hash + PartialEq + Eq + Clone + Debug + PartialOrd + Ord;
+
+    fn value_to_node(val: &Self::CharacteristicVector) -> Option<L>;
     fn symbol_to_node(sym: Symbol) -> L;
     fn node_to_symbol(node: &L) -> Option<Symbol>;
 
     fn make_node(&mut self, egraph: &EGraph<L, A>) -> L;
     fn initial_egraph(&mut self, params: &SynthesisParams<L, A>) -> EGraph<L, A>;
-    fn eval(&mut self, enode: &L, egraph: &EGraph<L, A>, values: &HashMap<Id, Self::Value>) -> Self::Value;
+    fn eval(&mut self, enode: &L, egraph: &EGraph<L, A>, values: &HashMap<Id, Self::CharacteristicVector>) -> Self::CharacteristicVector;
 
     fn instantiate(pattern: &Pattern<L>) -> RecExpr<L> {
         let nodes: Vec<_> = pattern.ast.as_ref().iter()
@@ -89,7 +90,7 @@ where
 
     fn run(&mut self, mut params: SynthesisParams<L, A>) -> Vec<Equality<L, A>> {
         let mut egraph = self.initial_egraph(&params);
-        let mut values: HashMap<Id, Self::Value> = Default::default();
+        let mut values: HashMap<Id, Self::CharacteristicVector> = Default::default();
 
         // initialize values map
         for class in egraph.classes() {
@@ -122,7 +123,7 @@ where
 
             let mut ctr = 0;
             // create the new nodes before adding to make sure they refer to existing nodes
-            let to_add: Vec<(L, Self::Value)> = (0..params.additions_per_iteration)
+            let to_add: Vec<(L, Self::CharacteristicVector)> = (0..params.additions_per_iteration)
                 .map(|_| {
                     let n = self.make_node(&egraph);
                     println!("{}, evaling {:?}",ctr, n);
@@ -169,7 +170,7 @@ where
                 .collect();
 
             // group things by value
-            let mut groups: HashMap<Self::Value, Vec<Id>> = Default::default();
+            let mut groups: HashMap<Self::CharacteristicVector, Vec<Id>> = Default::default();
             for (id, val) in values.drain() {
                 assert_eq!(id, egraph.find(id));
                 groups.entry(val).or_default().push(egraph.find(id));
@@ -225,8 +226,7 @@ where
 
 
 fn fold1<T, F>(iter: impl IntoIterator<Item = T>, f: F) -> T
-where
-    F: FnMut(T, T) -> T,
+where F: FnMut(T, T) -> T,
 {
     let mut iter = iter.into_iter();
     let first = iter.next().expect("can't be empty");

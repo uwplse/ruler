@@ -18,5 +18,5 @@ egg = { git = "https://github.com/mwillsey/egg", rev = "6e80da67aeabaf5692ca9a33
 
 [dev-dependencies]
 ordered-float = "1.0"
-
-
+num-bigint = { version = "0.3", features = ["rand"] }
+num-rational = "0.3"
