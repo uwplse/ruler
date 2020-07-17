@@ -16,80 +16,13 @@ define_language! {
     }
 }
 
-pub struct SynthParam {
-    rng: RefCell<Pcg64>,
-    n_samples: usize,
-    iter : usize
+
+#[derive(Default, Clone)]
+pub struct SynthAnalysis {
+    n_samples : usize
 }
 
-
-#[derive(Default)]
-pub struct RuleSynth;
-
-// impl SimpleMath ...
-fn get_const (node: &SimpleMath) -> Constant {
-    match node {
-        SimpleMath::Num(n) => *n,
-        _ => unreachable!("get_const: not a constant")
-    }
-}
-
-// fn eval_lang(node: &SimpleMath, get: impl Fn(Id) -> SimpleMath) -> Constant {
-//     match node {
-//         SimpleMath::Add([a, b]) => eval_lang(&get(*a), get) + eval_lang(&get(*b), get),
-//         SimpleMath::Sub([a, b]) => eval_lang(&get(*a), get) - eval_lang(&get(*b), get),
-//         SimpleMath::Mul([a, b]) => eval_lang(&get(*a), get) * eval_lang(&get(*b), get),
-//         SimpleMath::Div([a, b]) => eval_lang(&get(*a), get) / eval_lang(&get(*b), get),
-//         SimpleMath::Num(n) => *n,
-//         SimpleMath::Var(v) => unreachable!("Shouldn't be asked to eval a var: {}", v),
-//     }
-// }
-
-impl SynthParam {
-    fn gen_random_vec(&self) -> Vec<Constant> {
-        let n = self.n_samples;
-        let mut vec = Vec::with_capacity(n);
-        let rng = self.rng.borrow_mut();
-        for i in 0..n {
-            vec.push(rng.gen::<Constant>());
-        }
-        vec
-    }
-
-    // imple SynthParam
-    fn gen_const_vec(&self, v: Constant) -> Vec<Constant> {
-        let n = self.n_samples;
-        let mut vec = Vec::with_capacity(n);
-        for i in 0..n {
-            vec.push(v);
-        }
-        vec
-    }
-}
-
-fn add_vec(v1: Vec<i32>, v2: Vec<i32>) -> Vec<i32> {
-    assert_eq! (v1.len(), v2.len());
-    v1.iter().zip(v2.iter()).map(|(&x, &y)| x + y).collect()
-}
-
-fn sub_vec(v1: Vec<i32>, v2: Vec<i32>) -> Vec<i32> {
-    assert_eq! (v1.len(), v2.len());
-    v1.iter().zip(v2.iter()).map(|(&x, &y)| x - y).collect()
-}
-
-fn mul_vec(v1: Vec<i32>, v2: Vec<i32>) -> Vec<i32> {
-    assert_eq! (v1.len(), v2.len());
-    v1.iter().zip(v2.iter()).map(|(&x, &y)| x * y).collect()
-}
-
-fn div_vec(v1: Vec<i32>, v2: Vec<i32>) -> Vec<i32> {
-    assert_eq! (v1.len(), v2.len());
-    v1.iter().zip(v2.iter()).map(|(&x, &y)| x / y).collect()
-}
-
-
-
-impl Analysis<SimpleMath> for SynthParam {
+impl Analysis<SimpleMath> for SynthAnalysis {
 
     // doesnt need to be option
     type Data = Vec<Constant>;
@@ -101,45 +34,99 @@ impl Analysis<SimpleMath> for SynthParam {
 
     fn make(egraph: &EGraph<SimpleMath, Self>, enode: &SimpleMath) -> Self::Data {
         let x = |i: &Id| egraph[*i].data.iter().copied();
-        // let params : &mut SynthParam = &mut SynthParam {rng: Pcg64::seed_from_u64(0), n_samples: 50};
         let params = &egraph.analysis;
         match enode {
-            SimpleMath::Num(n) => params.gen_const_vec(*n),
-            SimpleMath::Var(_) => params.gen_random_vec(),
-            SimpleMath::Add([a, b]) => x(a).zip(x(b)).map(|(x, y)| x + y).collect(),
-            SimpleMath::Sub([a, b]) => x(a).zip(x(b)).map(|(x, y)| x - y).collect(),
-            SimpleMath::Mul([a, b]) => x(a).zip(x(b)).map(|(x, y)| x * y).collect(),
+            SimpleMath::Num(n) => (0..params.n_samples).map(|_| *n).collect(),
+            SimpleMath::Var(_) => vec![],
+            SimpleMath::Add([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_add(y)).collect(),
+            SimpleMath::Sub([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_sub(y)).collect(),
+            SimpleMath::Mul([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_mul(y)).collect(),
             // SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| x / y).collect(),
         }
     }
 
     fn modify(egraph: &mut EGraph<SimpleMath, Self>, id: Id) {
-        // shouldn't do anything I think?
-        // actually it should add a new enoe is cv is constants
+        let cv = &egraph[id].data;
+        if cv.is_empty() {
+            return;
+        }
+        if cv.iter().all(|x| *x == cv[0]) {
+            let added = egraph.add(SimpleMath::Num(cv[0]));
+            egraph.union(id, added);
+        }
     }
 }
 
-// fn find_equiv (egraph: &mut EGraph<SimpleMath, RuleSynth>, i1: Id, i2: Id) -> () {
-//     let vec1 = egraph[i1].data.as_ref();
-//     let vec2 = egraph[i2].data.as_ref();
-//     if vec1 == vec2 {
-//         egraph.union(i1, i2);
-//         print!("rule learned");
-//     }
-// }
 
 
-fn find_equiv (egraph: EGraph<SimpleMath, SynthParam>) {
-   for i in 0..egraph.analysis 
+pub struct SynthParam {
+    rng : Pcg64,
+    n_iter : usize,
+    n_samples : usize,
+    variables : Vec<egg::Symbol>,
+    consts : Vec<Constant>,
 }
 
-fn main() {
-    let mut egraph = EGraph::<SimpleMath, RuleSynth>::default();
-    let v1 = egraph.add_expr(&"x1".parse().unwrap());
-    let v2 = egraph.add_expr(&"x2".parse().unwrap());
-    let plus1 = egraph.add_expr(&"(+ x1 x2)".parse().unwrap());
-    let plus2 = egraph.add_expr(&"(+ x2 x1)".parse().unwrap());
+
+impl SynthParam {
+    fn mk_egraph(&mut self) -> EGraph<SimpleMath, SynthAnalysis> {
+        let mut egraph = EGraph::new(SynthAnalysis{n_samples : self.n_samples});
+        let rng = &mut self.rng;
+        for var in &self.variables {
+           let id = egraph.add(SimpleMath::Var(*var));
+           egraph[id].data = (0..self.n_samples).map(|_| rng.gen::<Constant>()).collect();
+        }
+        for c in &self.consts {
+           let id = egraph.add(SimpleMath::Num(*c));
+        }
+        egraph
+    }
+    fn run(&mut self) {
+        let mut rules = vec! [];
+        let mut eg = self.mk_egraph();
+        for iter in 0..self.n_iter {
+            // part 1: add an operator to the egraph with all possible children
+            let mut enodes_to_add = vec![];
+            for i in eg.classes() {
+                for j in eg.classes() {
+                   enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
+                }
+            }
+            for enode in enodes_to_add {
+                eg.add(enode);
+            }
+            // part 2: run the current rules.
+            let runner : Runner<SimpleMath, SynthAnalysis, ()> = Runner::new(eg.analysis.clone()).with_egraph(eg);
+            eg = runner.run(&rules).egraph;
+            // part 3: discover rules
+            let ids : Vec<Id> = eg.classes().map(|c| c.id).collect();
+            let mut extract = Extractor::new(&eg, AstSize);
+            let mut to_union = vec![];
+            for &i in &ids {
+                for &j in &ids {
+                    if i < j && eg[i].data == eg[j].data {
+                        to_union.push((i, j));
+                        let (cost1, expr1) = extract.find_best(i);
+                        let (cost2, expr2) = extract.find_best(j);
+                        println!("{} = {}", expr1, expr2);
+                    }
+                }
+            }
+        }
+    }
 }
+
+
+ fn main() {
+     let mut param = SynthParam {
+         rng : SeedableRng::seed_from_u64(5),
+         n_iter : 1,
+         n_samples : 25,
+         variables : vec!["x".into(), "y".into(), "z".into()],
+         consts : vec![0, 1],
+     };
+     param.run()
+ }
 
 
 
