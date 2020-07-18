@@ -1,10 +1,11 @@
 use egg::*;
+use indexmap::IndexMap;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
-use indexmap::IndexMap;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
+    time::Duration,
 };
 
 type Constant = i32;
@@ -14,6 +15,7 @@ define_language! {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
+        "~" = Neg(Id),
         // "/" = Div([Id; 2]),
         Num(Constant),
         Var(egg::Symbol),
@@ -47,6 +49,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
             SimpleMath::Add([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_add(y)).collect(),
             SimpleMath::Sub([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_sub(y)).collect(),
             SimpleMath::Mul([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_mul(y)).collect(),
+            SimpleMath::Neg(a) => x(a).map(|x| -x).collect(),
             // SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| x / y).collect(),
         }
     }
@@ -111,6 +114,10 @@ fn minimize_equalities(
 ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
     let mut all_removed = vec![];
 
+    // dedup based on name
+    let mut set = HashSet::new();
+    equalities.retain(|eq| set.insert(eq.name.clone()));
+
     // TODO we probably want some better heuristic on how general a rule is
     // reversing the equalities puts the new ones first,
     // since we want to remove them first
@@ -159,9 +166,9 @@ fn minimize_equalities(
 
             if !to_remove.is_empty() {
                 println!("  Removed {} rules", to_remove.len());
-                // for name in to_remove {
-                //     println!("  removed {}", name);
-                // }
+                for name in to_remove {
+                    println!("  removed {}", name);
+                }
             }
         }
 
@@ -201,9 +208,14 @@ impl SynthParam {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         for iter in 0..self.n_iter {
-            // part 1: add an operator to the egraph with all possible children
+            println!(
+                "iter {} phase 1: adding ops over {} eclasses",
+                iter,
+                eg.number_of_classes()
+            );
             let mut enodes_to_add = vec![];
             for i in eg.classes() {
+                // enodes_to_add.push(SimpleMath::Neg(i.id));
                 for j in eg.classes() {
                     enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
                     enodes_to_add.push(SimpleMath::Sub([i.id, j.id]));
@@ -214,18 +226,35 @@ impl SynthParam {
                 eg.add(enode);
             }
 
-            // part 2: run the current rules.
+            println!(
+                "iter {} phase 2: running rules, n={}, e={}",
+                iter,
+                eg.total_size(),
+                eg.number_of_classes()
+            );
             let rules = equalities.iter().flat_map(|eq| &eq.rewrites);
             let runner: Runner<SimpleMath, SynthAnalysis, ()> =
                 Runner::new(eg.analysis.clone()).with_egraph(eg);
-            eg = runner.run(rules).egraph;
+            eg = runner
+                .with_time_limit(Duration::from_secs(20))
+                .with_node_limit(usize::MAX)
+                .with_iter_limit(3)
+                .run(rules)
+                .egraph;
+            println!(
+                "       phase 2: running rules, n={}, e={}",
+                eg.total_size(),
+                eg.number_of_classes()
+            );
 
-            // part 3: discover rules
+            println!("iter {} phase 3: discover rules", iter);
+            println!("       phase 3: grouping");
             let mut by_cvec: IndexMap<&[Constant], Vec<Id>> = IndexMap::new();
             for class in eg.classes() {
                 by_cvec.entry(&class.data).or_default().push(class.id);
             }
 
+            println!("       phase 3: scanning {} groups", by_cvec.len());
             let mut to_union = vec![];
             let mut extract = Extractor::new(&eg, AstSize);
             for ids in by_cvec.values() {
@@ -240,19 +269,25 @@ impl SynthParam {
                     let pat2 = generalize(&expr2, names);
 
                     if let Some(eq) = Equality::new(pat1, pat2) {
-                        if equalities.iter().find(|eq2| eq.name == eq2.name).is_none() {
-                            println!("Learning {}", eq);
-                            equalities.push(eq);
-                        }
+                        equalities.push(eq);
                     }
                 }
             }
 
+            println!("       phase 3: performing {} unions", to_union.len());
             for (i, j) in to_union {
                 eg.union(i, j);
             }
 
+            let eq_len = equalities.len();
+            println!("iter {} phase 4: minimize {} rules", iter, eq_len);
             minimize_equalities(eg.analysis.clone(), &mut equalities);
+            println!(
+                "iter {} phase 4: minimized {} to {} rules",
+                iter,
+                eq_len,
+                equalities.len()
+            );
 
             println!("After iter {}, I know these equalities:", iter);
             for eq in &equalities {
