@@ -214,25 +214,28 @@ impl SynthParam {
             eg = runner.run(rules).egraph;
 
             // part 3: discover rules
-            let ids: Vec<Id> = eg.classes().map(|c| c.id).collect();
-            let mut extract = Extractor::new(&eg, AstSize);
+            let mut by_cvec: HashMap<&[Constant], Vec<Id>> = HashMap::new();
+            for class in eg.classes() {
+                by_cvec.entry(&class.data).or_default().push(class.id);
+            }
+
             let mut to_union = vec![];
-            for &i in &ids {
-                for &j in &ids {
-                    if i < j && eg[i].data == eg[j].data {
-                        to_union.push((i, j));
-                        let (_cost1, expr1) = extract.find_best(i);
-                        let (_cost2, expr2) = extract.find_best(j);
+            let mut extract = Extractor::new(&eg, AstSize);
+            for ids in by_cvec.values() {
+                for win in ids.windows(2) {
+                    let (i, j) = (win[0], win[1]);
+                    to_union.push((i, j));
+                    let (_cost1, expr1) = extract.find_best(i);
+                    let (_cost2, expr2) = extract.find_best(j);
 
-                        let names = &mut HashMap::default();
-                        let pat1 = generalize(&expr1, names);
-                        let pat2 = generalize(&expr2, names);
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr1, names);
+                    let pat2 = generalize(&expr2, names);
 
-                        if let Some(eq) = Equality::new(pat1, pat2) {
-                            if equalities.iter().find(|eq2| eq.name == eq2.name).is_none() {
-                                println!("Learning {}", eq);
-                                equalities.push(eq);
-                            }
+                    if let Some(eq) = Equality::new(pat1, pat2) {
+                        if equalities.iter().find(|eq2| eq.name == eq2.name).is_none() {
+                            println!("Learning {}", eq);
+                            equalities.push(eq);
                         }
                     }
                 }
