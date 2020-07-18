@@ -199,6 +199,10 @@ impl SynthParam {
                 }
             }
 
+            for (i, j) in to_union {
+                eg.union(i, j);
+            }
+
             minimize_equalities(eg.analysis.clone(), &mut equalities);
 
             println!("After iter {}, I know these equalities:", iter);
