@@ -2,8 +2,8 @@ use egg::*;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 
 use rand_pcg::Pcg64;
-use ruler::{SynthesisParams, Synthesizer, Sample};
-use std::{ collections::{HashMap}};
+use ruler::{Sample, SynthesisParams, Synthesizer};
+use std::collections::HashMap;
 
 type EGraph = egg::EGraph<Math, ()>;
 type Constant = i32;
@@ -51,7 +51,7 @@ impl Synthesizer<Math, ()> for MathSynth {
     fn node_to_symbol(node: &Math) -> Option<Symbol> {
         match node {
             Math::Var(sym) => Some(*sym),
-            _ => None
+            _ => None,
         }
     }
 
@@ -91,12 +91,17 @@ impl Synthesizer<Math, ()> for MathSynth {
         egraph
     }
 
-    fn eval(&mut self, enode: &Math, egraph: &EGraph, values: &HashMap<Id, Self::CharacteristicVector>) -> Self::CharacteristicVector {
+    fn eval(
+        &mut self,
+        enode: &Math,
+        egraph: &EGraph,
+        values: &HashMap<Id, Self::CharacteristicVector>,
+    ) -> Self::CharacteristicVector {
         match enode {
-            Math::Var(_) => {
-                self.get_random_vec()
-            }
-            n => (0..self.n_samples).map(|i| eval_one(n, |id| { values[&egraph.find(*id)][i] })).collect(),
+            Math::Var(_) => self.get_random_vec(),
+            n => (0..self.n_samples)
+                .map(|i| eval_one(n, |id| values[&egraph.find(*id)][i]))
+                .collect(),
         }
     }
 }
@@ -115,11 +120,18 @@ fn eval_one(node: &Math, get: impl Fn(&Id) -> Constant) -> Constant {
 fn synth_integer() {
     env_logger::init();
 
-    let mut synth = MathSynth {rng: Pcg64::seed_from_u64(0), n_samples: 50, n_variables: 3, constants: vec![0, 1]};
+    let mut synth = MathSynth {
+        rng: Pcg64::seed_from_u64(0),
+        n_samples: 50,
+        n_variables: 3,
+        constants: vec![0, 1],
+    };
 
-    let params = SynthesisParams {iterations: 4, additions_per_iteration: 100, eqs: vec![]};
+    let params = SynthesisParams {
+        iterations: 4,
+        additions_per_iteration: 100,
+        eqs: vec![],
+    };
 
     synth.run(params);
 }
-
-

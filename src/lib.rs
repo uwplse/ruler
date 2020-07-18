@@ -11,7 +11,10 @@ pub trait Sample<T, C> {
 }
 
 pub trait Synthesizer<L, A>
-where L: Language + 'static, A: Analysis<L> + Clone {
+where
+    L: Language + 'static,
+    A: Analysis<L> + Clone,
+{
     type CharacteristicVector: Hash + PartialEq + Eq + Clone + Debug + PartialOrd + Ord;
 
     fn value_to_node(val: &Self::CharacteristicVector) -> Option<L>;
@@ -20,10 +23,18 @@ where L: Language + 'static, A: Analysis<L> + Clone {
 
     fn make_node(&mut self, egraph: &EGraph<L, A>) -> L;
     fn initial_egraph(&mut self, params: &SynthesisParams<L, A>) -> EGraph<L, A>;
-    fn eval(&mut self, enode: &L, egraph: &EGraph<L, A>, values: &HashMap<Id, Self::CharacteristicVector>) -> Self::CharacteristicVector;
+    fn eval(
+        &mut self,
+        enode: &L,
+        egraph: &EGraph<L, A>,
+        values: &HashMap<Id, Self::CharacteristicVector>,
+    ) -> Self::CharacteristicVector;
 
     fn instantiate(pattern: &Pattern<L>) -> RecExpr<L> {
-        let nodes: Vec<_> = pattern.ast.as_ref().iter()
+        let nodes: Vec<_> = pattern
+            .ast
+            .as_ref()
+            .iter()
             .map(|n| match n {
                 ENodeOrVar::ENode(n) => n.clone(),
                 ENodeOrVar::Var(v) => {
@@ -39,7 +50,9 @@ where L: Language + 'static, A: Analysis<L> + Clone {
 
     fn generalize(expr: &RecExpr<L>, map: &mut HashMap<Symbol, Var>) -> Pattern<L> {
         let alpha = b"abcdefghijklmnopqrstuvwxyz";
-        let nodes: Vec<_> = expr.as_ref().iter()
+        let nodes: Vec<_> = expr
+            .as_ref()
+            .iter()
             .map(|n| match Self::node_to_symbol(n) {
                 Some(sym) => {
                     let var = if let Some(var) = map.get(&sym) {
@@ -58,7 +71,11 @@ where L: Language + 'static, A: Analysis<L> + Clone {
         Pattern::from(PatternAst::from(nodes))
     }
 
-    fn minimize_equalities(&mut self, analysis: A, equalities: &mut Vec<Equality<L, A>>) -> Vec<Equality<L, A>> {
+    fn minimize_equalities(
+        &mut self,
+        analysis: A,
+        equalities: &mut Vec<Equality<L, A>>,
+    ) -> Vec<Equality<L, A>> {
         let mut removed = vec![];
         'outer: while equalities.len() > 1 {
             for (i, eq) in equalities.iter().enumerate() {
@@ -108,13 +125,20 @@ where L: Language + 'static, A: Analysis<L> + Clone {
             }
 
             // update id_to_val based on the egraph modifications
-            values = values.into_iter().map(|(id, val)| (egraph.find(id), val)).collect();
+            values = values
+                .into_iter()
+                .map(|(id, val)| (egraph.find(id), val))
+                .collect();
 
             for class in egraph.classes() {
                 if !values.contains_key(&class.id) {
                     let node = class
                         .iter()
-                        .find(|n| n.children().iter().all(|id| values.contains_key(&egraph.find(*id))))
+                        .find(|n| {
+                            n.children()
+                                .iter()
+                                .all(|id| values.contains_key(&egraph.find(*id)))
+                        })
                         .unwrap_or_else(|| panic!("failed to find node for class {:?}", class));
                     let val = self.eval(node, &egraph, &values);
                     values.insert(class.id, val);
@@ -126,7 +150,7 @@ where L: Language + 'static, A: Analysis<L> + Clone {
             let to_add: Vec<(L, Self::CharacteristicVector)> = (0..params.additions_per_iteration)
                 .map(|_| {
                     let n = self.make_node(&egraph);
-                    println!("{}, evaling {:?}",ctr, n);
+                    println!("{}, evaling {:?}", ctr, n);
                     let val = self.eval(&n, &egraph, &values);
                     ctr = ctr + 1;
                     (n, val)
@@ -148,7 +172,11 @@ where L: Language + 'static, A: Analysis<L> + Clone {
                 if !values.contains_key(&class.id) {
                     let node = class
                         .iter()
-                        .find(|n| n.children().iter().all(|id| values.contains_key(&egraph.find(*id))))
+                        .find(|n| {
+                            n.children()
+                                .iter()
+                                .all(|id| values.contains_key(&egraph.find(*id)))
+                        })
                         .unwrap_or_else(|| panic!("failed to find node for class {:?}", class));
                     let val = self.eval(node, &egraph, &values);
                     values.insert(class.id, val);
@@ -183,16 +211,16 @@ where L: Language + 'static, A: Analysis<L> + Clone {
                 ids.dedup();
                 let len = ids.len();
 
-                for i in 0..len-1 {
+                for i in 0..len - 1 {
                     let j = i + 1;
                     // for j in i + 1..len {
-                        let var_map = &mut HashMap::default();
-                        let pat1 = Self::generalize(&ext.find_best(ids[i]).1, var_map);
-                        let pat2 = Self::generalize(&ext.find_best(ids[j]).1, var_map);
-                        if let Some(eq) = Equality::new(pat1, pat2) {
-                            println!("Learning {}", eq);
-                            params.eqs.push(eq);
-                        }
+                    let var_map = &mut HashMap::default();
+                    let pat1 = Self::generalize(&ext.find_best(ids[i]).1, var_map);
+                    let pat2 = Self::generalize(&ext.find_best(ids[j]).1, var_map);
+                    if let Some(eq) = Equality::new(pat1, pat2) {
+                        println!("Learning {}", eq);
+                        params.eqs.push(eq);
+                    }
                     // }
                 }
             }
@@ -224,9 +252,9 @@ where L: Language + 'static, A: Analysis<L> + Clone {
     }
 }
 
-
 fn fold1<T, F>(iter: impl IntoIterator<Item = T>, f: F) -> T
-where F: FnMut(T, T) -> T,
+where
+    F: FnMut(T, T) -> T,
 {
     let mut iter = iter.into_iter();
     let first = iter.next().expect("can't be empty");
@@ -287,4 +315,3 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
         }
     }
 }
-

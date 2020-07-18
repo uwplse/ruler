@@ -1,10 +1,10 @@
 use egg::*;
-use rand::{seq::SliceRandom, Rng};
-use rand::prelude::*;
-use ruler::{SynthesisParams, Synthesizer, Sample};
-use std::{ collections::{HashMap}};
 use num_bigint::BigInt;
-use num_bigint::{ToBigInt, RandBigInt};
+use num_bigint::{RandBigInt, ToBigInt};
+use rand::prelude::*;
+use rand::{seq::SliceRandom, Rng};
+use ruler::{Sample, SynthesisParams, Synthesizer};
+use std::collections::HashMap;
 
 type EGraph = egg::EGraph<Math, ()>;
 type Constant = BigInt;
@@ -35,9 +35,7 @@ impl Sample<MathSynth, Constant> for MathSynth {
     }
 }
 
-
 impl Synthesizer<Math, ()> for MathSynth {
-
     type CharacteristicVector = Vec<Constant>;
     fn value_to_node(val: &Self::CharacteristicVector) -> Option<Math> {
         let n = &val[0];
@@ -55,7 +53,7 @@ impl Synthesizer<Math, ()> for MathSynth {
     fn node_to_symbol(node: &Math) -> Option<Symbol> {
         match node {
             Math::BVar(sym) => Some(*sym),
-            _ => None
+            _ => None,
         }
     }
 
@@ -95,12 +93,17 @@ impl Synthesizer<Math, ()> for MathSynth {
         egraph
     }
 
-    fn eval(&mut self, enode: &Math, egraph: &EGraph, values: &HashMap<Id, Self::CharacteristicVector>) -> Self::CharacteristicVector {
+    fn eval(
+        &mut self,
+        enode: &Math,
+        egraph: &EGraph,
+        values: &HashMap<Id, Self::CharacteristicVector>,
+    ) -> Self::CharacteristicVector {
         match enode {
-            Math::BVar(_) => {
-                self.get_random_vec()
-            }
-            n => (0..self.n_samples).map(|i| eval_one(n, |id| { values[&egraph.find(*id)][i].clone() })).collect(),
+            Math::BVar(_) => self.get_random_vec(),
+            n => (0..self.n_samples)
+                .map(|i| eval_one(n, |id| values[&egraph.find(*id)][i].clone()))
+                .collect(),
         }
     }
 }
@@ -121,18 +124,21 @@ fn eval_one(node: &Math, get: impl Fn(&Id) -> Constant) -> Constant {
 fn synth_bigint() {
     env_logger::init();
 
-    let mut synth =
-        MathSynth {
-            rng: rand::thread_rng(),
-            n_samples: 50,
-            n_variables: 3,
-            constants: vec![ToBigInt::to_bigint(&0).unwrap(), ToBigInt::to_bigint(&1).unwrap()]};
+    let mut synth = MathSynth {
+        rng: rand::thread_rng(),
+        n_samples: 50,
+        n_variables: 3,
+        constants: vec![
+            ToBigInt::to_bigint(&0).unwrap(),
+            ToBigInt::to_bigint(&1).unwrap(),
+        ],
+    };
 
-    let params =
-        SynthesisParams {
-            iterations: 1,
-            additions_per_iteration: 100,
-            eqs: vec![]};
+    let params = SynthesisParams {
+        iterations: 1,
+        additions_per_iteration: 100,
+        eqs: vec![],
+    };
 
     synth.run(params);
 }

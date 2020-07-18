@@ -1,9 +1,9 @@
 use egg::*;
+use ordered_float::NotNan;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
-use ruler::{SynthesisParams, Synthesizer, Sample};
-use std::{ collections::{HashMap}};
-use ordered_float::NotNan;
+use ruler::{Sample, SynthesisParams, Synthesizer};
+use std::collections::HashMap;
 
 type EGraph = egg::EGraph<Math, ()>;
 type Constant = ordered_float::NotNan<f32>;
@@ -64,7 +64,7 @@ impl Synthesizer<Math, ()> for MathSynth {
     fn node_to_symbol(node: &Math) -> Option<Symbol> {
         match node {
             Math::FVar(sym) => Some(*sym),
-            _ => None
+            _ => None,
         }
     }
 
@@ -107,12 +107,17 @@ impl Synthesizer<Math, ()> for MathSynth {
         egraph
     }
 
-    fn eval(&mut self, enode: &Math, egraph: &EGraph, values: &HashMap<Id, Self::CharacteristicVector>) -> Self::CharacteristicVector {
+    fn eval(
+        &mut self,
+        enode: &Math,
+        egraph: &EGraph,
+        values: &HashMap<Id, Self::CharacteristicVector>,
+    ) -> Self::CharacteristicVector {
         match enode {
-            Math::FVar(_) => {
-                self.get_random_vec()
-            }
-            n => (0..self.n_samples).map(|i| eval_one(n, |id| { values[&egraph.find(*id)][i] })).collect(),
+            Math::FVar(_) => self.get_random_vec(),
+            n => (0..self.n_samples)
+                .map(|i| eval_one(n, |id| values[&egraph.find(*id)][i]))
+                .collect(),
         }
     }
 }
@@ -121,18 +126,18 @@ impl Synthesizer<Math, ()> for MathSynth {
 fn synth_f32() {
     env_logger::init();
 
-    let mut synth =
-        MathSynth {
-            rng: Pcg64::seed_from_u64(0),
-            n_samples: 50,
-            n_variables: 3,
-            constants: vec![NotNan::from(1.0 as f32), NotNan::from(0.0 as f32)]};
+    let mut synth = MathSynth {
+        rng: Pcg64::seed_from_u64(0),
+        n_samples: 50,
+        n_variables: 3,
+        constants: vec![NotNan::from(1.0 as f32), NotNan::from(0.0 as f32)],
+    };
 
-    let params =
-        SynthesisParams {
-            iterations: 1,
-            additions_per_iteration: 100,
-            eqs: vec![]};
+    let params = SynthesisParams {
+        iterations: 1,
+        additions_per_iteration: 100,
+        eqs: vec![],
+    };
 
     synth.run(params);
 }
