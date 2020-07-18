@@ -110,6 +110,7 @@ fn minimize_equalities(
 ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
     let mut all_removed = vec![];
 
+    // TODO we probably want some better heuristic on how general a rule is
     // reversing the equalities puts the new ones first,
     // since we want to remove them first
     equalities.reverse();
