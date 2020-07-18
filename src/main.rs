@@ -1,7 +1,7 @@
 use egg::*;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
-use std::cell::RefCell;
+use std::{collections::HashMap, fmt::Display};
 
 type Constant = i32;
 
@@ -55,6 +55,29 @@ impl Analysis<SimpleMath> for SynthAnalysis {
     }
 }
 
+fn generalize(expr: &RecExpr<SimpleMath>, map: &mut HashMap<Symbol, Var>) -> Pattern<SimpleMath> {
+    let alpha = b"abcdefghijklmnopqrstuvwxyz";
+    let nodes: Vec<_> = expr
+        .as_ref()
+        .iter()
+        .map(|n| match n {
+            SimpleMath::Var(sym) => {
+                let var = if let Some(var) = map.get(&sym) {
+                    *var
+                } else {
+                    let var = format!("?{}", alpha[map.len()] as char).parse().unwrap();
+                    map.insert(*sym, var);
+                    var
+                };
+                ENodeOrVar::Var(var)
+            }
+            n => ENodeOrVar::ENode(n.clone()),
+        })
+        .collect();
+
+    Pattern::from(PatternAst::from(nodes))
+}
+
 pub struct SynthParam {
     rng: Pcg64,
     n_iter: usize,
@@ -79,7 +102,7 @@ impl SynthParam {
         egraph
     }
     fn run(&mut self) {
-        let mut rules = vec![];
+        let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         for iter in 0..self.n_iter {
             // part 1: add an operator to the egraph with all possible children
@@ -92,10 +115,13 @@ impl SynthParam {
             for enode in enodes_to_add {
                 eg.add(enode);
             }
+
             // part 2: run the current rules.
+            let rules = equalities.iter().flat_map(|eq| &eq.rewrites);
             let runner: Runner<SimpleMath, SynthAnalysis, ()> =
                 Runner::new(eg.analysis.clone()).with_egraph(eg);
-            eg = runner.run(&rules).egraph;
+            eg = runner.run(rules).egraph;
+
             // part 3: discover rules
             let ids: Vec<Id> = eg.classes().map(|c| c.id).collect();
             let mut extract = Extractor::new(&eg, AstSize);
@@ -104,12 +130,73 @@ impl SynthParam {
                 for &j in &ids {
                     if i < j && eg[i].data == eg[j].data {
                         to_union.push((i, j));
-                        let (cost1, expr1) = extract.find_best(i);
-                        let (cost2, expr2) = extract.find_best(j);
-                        println!("{} = {}", expr1, expr2);
+                        let (_cost1, expr1) = extract.find_best(i);
+                        let (_cost2, expr2) = extract.find_best(j);
+
+                        let names = &mut HashMap::default();
+                        let pat1 = generalize(&expr1, names);
+                        let pat2 = generalize(&expr2, names);
+
+                        if let Some(eq) = Equality::new(pat1, pat2) {
+                            println!("Learning {}", eq);
+                            if equalities.iter().find(|eq2| eq.name == eq2.name).is_none() {
+                                equalities.push(eq);
+                            }
+                        }
                     }
                 }
             }
+
+            println!("After iter {}, I know these equalities:", iter);
+            for eq in &equalities {
+                println!("  {}", eq);
+            }
+        }
+    }
+}
+
+struct Equality<L, A> {
+    lhs: Pattern<L>,
+    rhs: Pattern<L>,
+    name: String,
+    rewrites: Vec<egg::Rewrite<L, A>>,
+}
+
+impl<L: Language, A> Display for Equality<L, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
+    fn new(lhs: Pattern<L>, rhs: Pattern<L>) -> Option<Self> {
+        let mut rewrites = vec![];
+
+        let name = format!("{} => {}", lhs, rhs);
+        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, lhs.clone(), rhs.clone()) {
+            rewrites.push(rw)
+        }
+
+        let name = format!("{} => {}", rhs, lhs);
+        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, rhs.clone(), lhs.clone()) {
+            rewrites.push(rw)
+        }
+
+        let name = match rewrites.len() {
+            1 => format!("{}", rewrites[0].long_name()),
+            2 => format!("{} <=> {}", lhs, rhs),
+            n => panic!("unexpected len {}", n),
+        };
+
+        if rewrites.is_empty() {
+            None
+        } else {
+            Some(Self {
+                rewrites,
+                lhs,
+                rhs,
+                name,
+            })
         }
     }
 }
@@ -117,7 +204,7 @@ impl SynthParam {
 fn main() {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
-        n_iter: 1,
+        n_iter: 2,
         n_samples: 25,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![0, 1],
