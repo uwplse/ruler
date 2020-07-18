@@ -12,9 +12,8 @@ env_logger = { version = "0.7", default-features = false }
 rand_pcg = "0.2"
 rand = { version = "0.7", default-features = false, features = ["std"] }
 
-# egg = "0.5"
-egg = { git = "https://github.com/mwillsey/egg", rev = "6e80da67aeabaf5692ca9a339495b073ef73322f" }
-# egg = { path = "/Users/mwillsey/src/egg" }
+egg = "0.6"
+indexmap = "1"
 
 [dev-dependencies]
 ordered-float = "1.0"

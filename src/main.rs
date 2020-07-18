@@ -1,6 +1,7 @@
 use egg::*;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
+use indexmap::IndexMap;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -215,7 +216,7 @@ impl SynthParam {
             eg = runner.run(rules).egraph;
 
             // part 3: discover rules
-            let mut by_cvec: HashMap<&[Constant], Vec<Id>> = HashMap::new();
+            let mut by_cvec: IndexMap<&[Constant], Vec<Id>> = IndexMap::new();
             for class in eg.classes() {
                 by_cvec.entry(&class.data).or_default().push(class.id);
             }
