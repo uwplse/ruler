@@ -78,6 +78,58 @@ fn generalize(expr: &RecExpr<SimpleMath>, map: &mut HashMap<Symbol, Var>) -> Pat
     Pattern::from(PatternAst::from(nodes))
 }
 
+fn instantiate(pattern: &Pattern<SimpleMath>) -> RecExpr<SimpleMath> {
+    let nodes: Vec<_> = pattern
+        .ast
+        .as_ref()
+        .iter()
+        .map(|n| match n {
+            ENodeOrVar::ENode(n) => n.clone(),
+            ENodeOrVar::Var(v) => {
+                let s = v.to_string();
+                assert!(s.starts_with('?'));
+                SimpleMath::Var(s[1..].into())
+            }
+        })
+        .collect();
+
+    RecExpr::from(nodes)
+}
+
+fn minimize_equalities(
+    analysis: SynthAnalysis,
+    equalities: &mut Vec<Equality<SimpleMath, SynthAnalysis>>,
+) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+    let mut removed = vec![];
+
+    'outer: while equalities.len() > 1 {
+        for (i, eq) in equalities.iter().enumerate() {
+            let other_eqs = equalities
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| i != *j)
+                .flat_map(|(_, eq)| &eq.rewrites);
+            println!("minimizing");
+            let runner: Runner<_, _, ()> = Runner::new(analysis.clone())
+                .with_expr(&instantiate(&eq.lhs))
+                .with_expr(&instantiate(&eq.rhs))
+                .with_node_limit(3000)
+                .with_iter_limit(3)
+                .run(other_eqs);
+            let are_same = |a, b| runner.egraph.find(a) == runner.egraph.find(b);
+            if are_same(runner.roots[0], runner.roots[1]) {
+                println!("Removing {}", eq);
+                removed.push(equalities.remove(i));
+                continue 'outer;
+            }
+        }
+
+        break;
+    }
+
+    return removed;
+}
+
 pub struct SynthParam {
     rng: Pcg64,
     n_iter: usize,
@@ -146,6 +198,8 @@ impl SynthParam {
                     }
                 }
             }
+
+            minimize_equalities(eg.analysis.clone(), &mut equalities);
 
             println!("After iter {}, I know these equalities:", iter);
             for eq in &equalities {
