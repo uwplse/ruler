@@ -114,6 +114,11 @@ fn minimize_equalities(
     // TODO we probably want some better heuristic on how general a rule is
     // reversing the equalities puts the new ones first,
     // since we want to remove them first
+    equalities.sort_by_key(|eq| {
+        let l = eq.lhs.ast.as_ref().len();
+        let r = eq.rhs.ast.as_ref().len();
+        (l.min(r), l.max(r))
+    });
     equalities.reverse();
 
     let mut granularity = equalities.len() / 2;
