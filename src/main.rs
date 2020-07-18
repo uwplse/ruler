@@ -1,7 +1,10 @@
 use egg::*;
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 type Constant = i32;
 
@@ -26,7 +29,11 @@ impl Analysis<SimpleMath> for SynthAnalysis {
     type Data = Vec<Constant>;
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
-        assert_eq!(to, &from);
+        // only do assertions on non-empty vecs
+        // there may be "bad" merges during minimization, that's ok
+        if !to.is_empty() && !from.is_empty() {
+            assert_eq!(to, &from);
+        }
         false
     }
 
@@ -48,8 +55,9 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         if cv.is_empty() {
             return;
         }
-        if cv.iter().all(|x| *x == cv[0]) {
-            let added = egraph.add(SimpleMath::Num(cv[0]));
+        let first = cv[0];
+        if cv.iter().all(|x| *x == first) {
+            let added = egraph.add(SimpleMath::Num(first));
             egraph.union(id, added);
         }
     }
@@ -100,34 +108,64 @@ fn minimize_equalities(
     analysis: SynthAnalysis,
     equalities: &mut Vec<Equality<SimpleMath, SynthAnalysis>>,
 ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-    let mut removed = vec![];
+    let mut all_removed = vec![];
 
-    'outer: while equalities.len() > 1 {
-        for (i, eq) in equalities.iter().enumerate() {
-            let other_eqs = equalities
-                .iter()
-                .enumerate()
-                .filter(|(j, _)| i != *j)
-                .flat_map(|(_, eq)| &eq.rewrites);
-            println!("minimizing");
-            let runner: Runner<_, _, ()> = Runner::new(analysis.clone())
-                .with_expr(&instantiate(&eq.lhs))
-                .with_expr(&instantiate(&eq.rhs))
+    // reversing the equalities puts the new ones first,
+    // since we want to remove them first
+    equalities.reverse();
+
+    let mut granularity = equalities.len() / 2;
+    while granularity > 0 {
+        let mut i = 0;
+        while i + granularity < equalities.len() {
+            let (before, tail) = equalities.split_at(i);
+            let (test, after) = tail.split_at(granularity);
+            i += granularity;
+
+            println!("Minimizing with granularity {}", granularity);
+
+            let mut runner: Runner<_, _, ()> = Runner::new(analysis.clone())
                 .with_node_limit(3000)
-                .with_iter_limit(3)
-                .run(other_eqs);
-            let are_same = |a, b| runner.egraph.find(a) == runner.egraph.find(b);
-            if are_same(runner.roots[0], runner.roots[1]) {
-                println!("Removing {}", eq);
-                removed.push(equalities.remove(i));
-                continue 'outer;
+                .with_iter_limit(5);
+
+            // Add the eqs to test in to the egraph
+            for eq in test {
+                runner = runner
+                    .with_expr(&instantiate(&eq.lhs))
+                    .with_expr(&instantiate(&eq.rhs));
+            }
+
+            let rewrites = before.iter().chain(after).flat_map(|eq| &eq.rewrites);
+            runner = runner.run(rewrites);
+
+            let mut to_remove = HashSet::new();
+            for (eq, roots) in test.iter().zip(runner.roots.chunks(2)) {
+                if runner.egraph.find(roots[0]) == runner.egraph.find(roots[1]) {
+                    to_remove.insert(eq.name.clone());
+                }
+            }
+
+            let (removed, kept) = equalities
+                .drain(..)
+                .partition(|eq| to_remove.contains(&eq.name));
+            *equalities = kept;
+            all_removed.extend(removed);
+
+            if !to_remove.is_empty() {
+                println!("Removed {} rules", to_remove.len());
+                // for name in to_remove {
+                //     println!("  removed {}", name);
+                // }
             }
         }
 
-        break;
+        granularity /= 2;
     }
 
-    return removed;
+    // reverse the list back
+    equalities.reverse();
+
+    return all_removed;
 }
 
 pub struct SynthParam {
@@ -149,7 +187,7 @@ impl SynthParam {
             egraph[id].data = (0..self.n_samples).map(|_| rng.gen::<Constant>()).collect();
         }
         for c in &self.consts {
-            let id = egraph.add(SimpleMath::Num(*c));
+            egraph.add(SimpleMath::Num(*c));
         }
         egraph
     }
@@ -162,6 +200,8 @@ impl SynthParam {
             for i in eg.classes() {
                 for j in eg.classes() {
                     enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
+                    enodes_to_add.push(SimpleMath::Sub([i.id, j.id]));
+                    enodes_to_add.push(SimpleMath::Mul([i.id, j.id]));
                 }
             }
             for enode in enodes_to_add {
@@ -190,8 +230,8 @@ impl SynthParam {
                         let pat2 = generalize(&expr2, names);
 
                         if let Some(eq) = Equality::new(pat1, pat2) {
-                            println!("Learning {}", eq);
                             if equalities.iter().find(|eq2| eq.name == eq2.name).is_none() {
+                                println!("Learning {}", eq);
                                 equalities.push(eq);
                             }
                         }
@@ -240,15 +280,23 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
             rewrites.push(rw)
         }
 
-        let name = match rewrites.len() {
-            1 => format!("{}", rewrites[0].long_name()),
-            2 => format!("{} <=> {}", lhs, rhs),
-            n => panic!("unexpected len {}", n),
-        };
-
         if rewrites.is_empty() {
             None
         } else {
+            let name = match rewrites.len() {
+                1 => format!("{}", rewrites[0].long_name()),
+                2 => {
+                    // canonicalize the name, as we use it for dedup
+                    let l_str = format!("{}", lhs);
+                    let r_str = format!("{}", rhs);
+                    if l_str < r_str {
+                        format!("{} <=> {}", l_str, r_str)
+                    } else {
+                        format!("{} <=> {}", r_str, l_str)
+                    }
+                }
+                n => panic!("unexpected len {}", n),
+            };
             Some(Self {
                 rewrites,
                 lhs,
@@ -265,7 +313,7 @@ fn main() {
         n_iter: 2,
         n_samples: 25,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![0, 1],
+        consts: vec![-1, 0, 1],
     };
     param.run()
 }
