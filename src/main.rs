@@ -205,7 +205,7 @@ impl SynthParam {
         }
         egraph
     }
-    fn run(&mut self) {
+    fn run(&mut self) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         for iter in 0..self.n_iter {
@@ -258,12 +258,19 @@ impl SynthParam {
             println!("       phase 3: scanning {} groups", by_cvec.len());
             let mut to_union = vec![];
             let mut extract = Extractor::new(&eg, AstSize);
+
             for ids in by_cvec.values() {
-                for win in ids.windows(2) {
-                    let (i, j) = (win[0], win[1]);
-                    to_union.push((i, j));
-                    let (_cost1, expr1) = extract.find_best(i);
-                    let (_cost2, expr2) = extract.find_best(j);
+                let cross = ids
+                    .iter()
+                    .flat_map(|id1|
+                        ids
+                            .iter()
+                            .filter_map(move |id2| if id1 > id2 { Some((id1, id2)) } else { None }));
+
+                for (i, j) in cross {
+                    to_union.push((i.clone(), j.clone()));
+                    let (_cost1, expr1) = extract.find_best(i.clone());
+                    let (_cost2, expr2) = extract.find_best(j.clone());
 
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
