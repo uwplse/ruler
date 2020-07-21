@@ -2,14 +2,123 @@ use egg::*;
 use indexmap::IndexMap;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
+use rand::distributions::{Distribution, Standard};
+use std::num::ParseIntError;
+use std::num::Wrapping;
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     fmt::Display,
+    str::FromStr,
     time::Duration,
+    ops::Neg, ops::Add, ops::Sub, ops::Mul, ops::Div,
     io::{self, Write},
 };
 
-type Constant = i32;
+// type Constant = i32;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum Values {
+    Constant(i32),
+    Poison
+}
+
+fn get_num (v: Values) -> i32 {
+    match v {
+        Values::Poison => panic!("Not a number!"),
+        Values::Constant(n) => n
+    }
+}
+
+impl FromStr for Values {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Poison" => Ok(Values::Poison),
+            _ => Ok(Values::Constant(i32::from_str(s).unwrap()))
+        }
+    }
+}
+
+
+impl Display for Values {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Values::Poison => write!(f, "Poison"),
+            Values::Constant(c) => write!(f, "{}" , c)
+        }
+    }
+}
+
+
+impl Neg for Values {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        if self == Values::Poison {
+            Values::Poison
+        } else {
+            -self
+        }
+    }
+}
+
+
+impl Add for Values {
+    type Output = Self;
+
+    fn add(self, b: Self) -> Self {
+        if self == Values::Poison || b == Values::Poison {
+            Values::Poison
+        } else {
+            Values::Constant(get_num(self).wrapping_add(get_num(b)))
+        }
+    }
+}
+
+impl Sub for Values {
+    type Output = Self;
+
+    fn sub(self, b: Self) -> Self {
+        if self == Values::Poison || b == Values::Poison {
+            Values::Poison
+        } else {
+            Values::Constant(get_num(self).wrapping_sub(get_num(b)))
+        }
+    }
+}
+
+impl Mul for Values {
+    type Output = Self;
+
+    fn mul(self, b: Self) -> Self {
+        if self == Values::Poison || b == Values::Poison {
+            Values::Poison
+        } else {
+            Values::Constant(get_num(self).wrapping_mul(get_num(b)))
+        }
+    }
+}
+
+impl Div for Values {
+    type Output = Self;
+
+    fn div(self, b: Self) -> Self {
+        if self == Values::Poison || b == Values::Poison  || b == Values::Constant(0) {
+            Values::Poison
+        } else {
+            Values::Constant(get_num(self).wrapping_div(get_num(b)))
+        }
+    }
+}
+
+impl Distribution<Values> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Values {
+        let rand_i32 = rng.gen();
+        Values::Constant(rand_i32)
+    }
+}
 
 define_language! {
     enum SimpleMath {
@@ -17,11 +126,12 @@ define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "~" = Neg(Id),
-        // "/" = Div([Id; 2]),
-        Num(Constant),
+        "/" = Div([Id; 2]),
+        Num(Values),
         Var(egg::Symbol),
     }
 }
+
 
 #[derive(Default, Clone)]
 pub struct SynthAnalysis {
@@ -29,8 +139,7 @@ pub struct SynthAnalysis {
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
-    // doesnt need to be option
-    type Data = Vec<Constant>;
+    type Data = Vec<Values>;
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
         // only do assertions on non-empty vecs
@@ -47,11 +156,11 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         match enode {
             SimpleMath::Num(n) => (0..params.n_samples).map(|_| *n).collect(),
             SimpleMath::Var(_) => vec![],
-            SimpleMath::Add([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_add(y)).collect(),
-            SimpleMath::Sub([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_sub(y)).collect(),
-            SimpleMath::Mul([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.wrapping_mul(y)).collect(),
             SimpleMath::Neg(a) => x(a).map(|x| -x).collect(),
-            // SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| x / y).collect(),
+            SimpleMath::Add([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.add(y)).collect(),
+            SimpleMath::Sub([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.sub(y)).collect(),
+            SimpleMath::Mul([a, b]) => x(a).zip(x(b)).map(|(x, y)| x.mul(y)).collect(),
+            SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| x / y).collect(),
         }
     }
 
@@ -184,7 +293,6 @@ fn minimize_equalities(
 
 fn cartesian_product<T : Clone>(lists: &Vec<Vec<T>>) -> Vec<Vec<T>> {
     let mut res = vec![];
- 
     let mut list_iter = lists.iter();
     if let Some(first_list) = list_iter.next() {
         for i in first_list.clone() {
@@ -242,7 +350,7 @@ pub struct SynthParam {
     n_iter: usize,
     n_samples: usize,
     variables: Vec<egg::Symbol>,
-    consts: Vec<Constant>,
+    consts: Vec<Values>,
 }
 
 impl SynthParam {
@@ -253,7 +361,7 @@ impl SynthParam {
         let rng = &mut self.rng;
         for var in &self.variables {
             let id = egraph.add(SimpleMath::Var(*var));
-            egraph[id].data = (0..self.n_samples).map(|_| rng.gen::<Constant>()).collect();
+            egraph[id].data = (0..self.n_samples).map(|_| rng.gen::<Values>()).collect();
         }
         for c in &self.consts {
             egraph.add(SimpleMath::Num(*c));
@@ -276,6 +384,16 @@ impl SynthParam {
                     enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
                     enodes_to_add.push(SimpleMath::Sub([i.id, j.id]));
                     enodes_to_add.push(SimpleMath::Mul([i.id, j.id]));
+                    let zero: Pattern<SimpleMath> = "0".parse().unwrap();
+                    let matches = zero.search_eclass(&eg, j.id);
+                    match matches {
+                        None => {
+                            println!("adding div since not 0");
+                            enodes_to_add.push(SimpleMath::Div([i.id, j.id]))},
+                         _ => {
+                             println!("not adding div since 0");
+                             ()},
+                    }
                 }
             }
             for enode in enodes_to_add {
@@ -305,7 +423,7 @@ impl SynthParam {
 
             println!("iter {} phase 3: discover rules", iter);
             println!("       phase 3: grouping");
-            let mut by_cvec: IndexMap<&[Constant], Vec<Id>> = IndexMap::new();
+            let mut by_cvec: IndexMap<&[Values], Vec<Id>> = IndexMap::new();
             for class in eg.classes() {
                 by_cvec.entry(&class.data).or_default().push(class.id);
             }
@@ -427,34 +545,37 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
     }
 }
 
-fn main() -> io::Result<()> {
+fn main() {
+    //-> io::Result<()> {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 2,
-        n_samples: 25,
+        n_samples: 5,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![-1, 0, 1],
+        consts: vec![Values::Constant(-1), Values::Constant(0), Values::Constant(1)],
     };
 
-    let eqs = param.run();
-    let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
+    param.run();
 
-    println!("Entering simplification loop...");
-    let stdin = io::stdin();
-    loop {
-        print!("Input expression: ");
-        io::stdout().flush()?;
-        let mut expr_str = String::new();
-        stdin.read_line(&mut expr_str)?;
+    // let eqs = param.run();
+    // let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
 
-        let runner : Runner<SimpleMath, SynthAnalysis, ()> =
-            Runner::default()
-            .with_expr(&expr_str.parse().unwrap())
-            .run(rules.clone());
-        
-        let mut ext = Extractor::new(&runner.egraph, AstSize);
-        let (_, simp_expr) = ext.find_best(runner.roots[0]);
-        println!("Simplified result: {}", simp_expr);
-        println!();
-    }
+    // println!("Entering simplification loop...");
+    // let stdin = io::stdin();
+    // loop {
+    //     print!("Input expression: ");
+    //     io::stdout().flush()?;
+    //     let mut expr_str = String::new();
+    //     stdin.read_line(&mut expr_str)?;
+
+    //     let runner : Runner<SimpleMath, SynthAnalysis, ()> =
+    //         Runner::default()
+    //         .with_expr(&expr_str.parse().unwrap())
+    //         .run(rules.clone());
+
+    //     let mut ext = Extractor::new(&runner.egraph, AstSize);
+    //     let (_, simp_expr) = ext.find_best(runner.roots[0]);
+    //     println!("Simplified result: {}", simp_expr);
+    //     println!();
+    // }
 }
