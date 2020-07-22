@@ -357,3 +357,51 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+
+    fn check_proves<L, A>(eqs: &[Equality<L, A>], a: &str, b: &str)
+    where
+        L: Language,
+        A: Analysis<L> + Default,
+    {
+        let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
+        let runner: Runner<L, A, ()> = Runner::default()
+            .with_expr(&a.parse().unwrap())
+            .with_expr(&b.parse().unwrap())
+            .with_hook(|runner| {
+                if runner.egraph.find(runner.roots[0]) == runner.egraph.find(runner.roots[1]) {
+                    Err(format!("Done early"))
+                } else {
+                    Ok(())
+                }
+            })
+            .run(rules);
+
+        let id_a = runner.egraph.find(runner.roots[0]);
+        let id_b = runner.egraph.find(runner.roots[1]);
+
+        if id_a != id_b {
+            panic!("Failed to simplify {} => {}", a, b)
+        }
+    }
+
+    #[test]
+    fn super_simple() {
+        let mut param = SynthParam {
+            rng: SeedableRng::seed_from_u64(5),
+            n_iter: 1,
+            n_samples: 25,
+            variables: vec!["x".into(), "y".into(), "z".into()],
+            consts: vec![-1, 0, 1],
+        };
+
+        let eqs = param.run();
+
+        check_proves(&eqs, "(+ 0 a)", "a");
+        check_proves(&eqs, "(+ a b)", "(+ b a)");
+    }
+}
