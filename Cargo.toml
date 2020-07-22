@@ -14,8 +14,3 @@ rand = { version = "0.7", default-features = false, features = ["std"] }
 
 egg = "0.6"
 indexmap = "1"
-
-[dev-dependencies]
-ordered-float = "1.0"
-num-bigint = { version = "0.3", features = ["rand"] }
-num-rational = "0.3"
