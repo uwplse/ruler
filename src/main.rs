@@ -16,7 +16,7 @@ define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "~" = Neg(Id),
-        "/" = Div([Id; 2]),
+        // "/" = Div([Id; 2]),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -50,7 +50,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
             SimpleMath::Add([a, b]) => x(a).zip(x(b)).map(|(x, y)| Some(x?.wrapping_add(y?))).collect(),
             SimpleMath::Sub([a, b]) => x(a).zip(x(b)).map(|(x, y)| Some(x?.wrapping_sub(y?))).collect(),
             SimpleMath::Mul([a, b]) => x(a).zip(x(b)).map(|(x, y)| Some(x?.wrapping_mul(y?))).collect(),
-            SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| if y? != 0 {Some(x? / y?)} else {None}).collect(),
+            // SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| if y? != 0 {Some(x? / y?)} else {None}).collect(),
         }
     }
 
@@ -181,59 +181,6 @@ fn minimize_equalities(
     return all_removed;
 }
 
-fn cartesian_product<T : Clone>(lists: &Vec<Vec<T>>) -> Vec<Vec<T>> {
-    let mut res = vec![];
-    let mut list_iter = lists.iter();
-    if let Some(first_list) = list_iter.next() {
-        for i in first_list.clone() {
-            res.push(vec![i]);
-        }
-    }
-    for l in list_iter {
-        let mut tmp = vec![];
-        for r in res {
-            for el in l.clone() {
-                let mut tmp_el = r.clone();
-                tmp_el.push(el);
-                tmp.push(tmp_el);
-            }
-        }
-        res = tmp;
-    }
-    res
-}
-
-fn extract_all_exps(egraph : &EGraph<SimpleMath, SynthAnalysis>,
-                    memo : &mut HashMap<Id, Vec<Vec<SimpleMath>>>,
-                    root : Id) -> Vec<Vec<SimpleMath>> {
-    let mut exps = vec!();
-    if memo.contains_key(&root) {
-        return memo[&root].clone();
-    } else {
-        // Memo handles cycles naturally
-        memo.insert(root, vec!());
-    }
-
-    for n in egraph[root].iter() {
-        if n.is_leaf() {
-            return vec!(vec!(n.clone()));
-        } else {
-            let mut child_nodes = vec!();
-
-            n.for_each(|c| child_nodes.push(extract_all_exps(egraph, memo, c)));
-
-            let poss_exps = cartesian_product(&child_nodes);
-            for child_list in poss_exps {
-                let mut exp_nodes = child_list.concat();
-                exp_nodes.push(n.clone());
-                exps.push(exp_nodes);
-            }
-        }
-    }
-
-    memo.insert(root, exps.clone());
-    exps
-}
 
 pub struct SynthParam {
     rng: Pcg64,
@@ -258,7 +205,7 @@ impl SynthParam {
         }
         egraph
     }
-    fn run(&mut self) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+    fn run(&mut self) {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         for iter in 0..self.n_iter {
@@ -274,7 +221,7 @@ impl SynthParam {
                     enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
                     enodes_to_add.push(SimpleMath::Sub([i.id, j.id]));
                     enodes_to_add.push(SimpleMath::Mul([i.id, j.id]));
-                    enodes_to_add.push(SimpleMath::Div([i.id, j.id]));
+                    // enodes_to_add.push(SimpleMath::Div([i.id, j.id]));
                 }
             }
             for enode in enodes_to_add {
@@ -314,17 +261,11 @@ impl SynthParam {
             let mut extract = Extractor::new(&eg, AstSize);
 
             for ids in by_cvec.values() {
-                let cross = ids
-                    .iter()
-                    .flat_map(|id1|
-                        ids
-                            .iter()
-                            .filter_map(move |id2| if id1 > id2 { Some((id1, id2)) } else { None }));
-
-                for (i, j) in cross {
-                    to_union.push((i.clone(), j.clone()));
-                    let (_cost1, expr1) = extract.find_best(i.clone());
-                    let (_cost2, expr2) = extract.find_best(j.clone());
+                for win in ids.windows(2) {
+                    let (i, j) = (win[0], win[1]);
+                    to_union.push((i, j));
+                    let (_cost1, expr1) = extract.find_best(i);
+                    let (_cost2, expr2) = extract.find_best(j);
 
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
@@ -333,18 +274,6 @@ impl SynthParam {
                     if let Some(eq) = Equality::new(pat1, pat2) {
                         equalities.push(eq);
                     }
-
-                    // for exp1 in extract_all_exps(&eg, &mut exp_memo, i.clone()) {
-                    //     for exp2 in extract_all_exps(&eg, &mut exp_memo, j.clone()) {
-                    //         let names = &mut HashMap::default();
-                    //         let pat1 = generalize(&RecExpr::from(exp1.clone()), names);
-                    //         let pat2 = generalize(&RecExpr::from(exp2), names);
-
-                    //         if let Some(eq) = Equality::new(pat1, pat2) {
-                    //             equalities.push(eq);
-                    //         }
-                    //     }
-                    // }
                 }
             }
 
@@ -355,7 +284,7 @@ impl SynthParam {
 
             let eq_len = equalities.len();
             println!("iter {} phase 4: minimize {} rules", iter, eq_len);
-            // minimize_equalities(eg.analysis.clone(), &mut equalities);
+            minimize_equalities(eg.analysis.clone(), &mut equalities);
             println!(
                 "iter {} phase 4: minimized {} to {} rules",
                 iter,
@@ -368,7 +297,6 @@ impl SynthParam {
                 println!("  {}", eq);
             }
         }
-        equalities
     }
 }
 
@@ -427,36 +355,13 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
 }
 
 fn main() {
-    //-> io::Result<()> {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 2,
-        n_samples: 15,
+        n_samples: 25,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![-1, 0, 1],
     };
 
     param.run();
-
-    // let eqs = param.run();
-    // let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
-
-    // println!("Entering simplification loop...");
-    // let stdin = io::stdin();
-    // loop {
-    //     print!("Input expression: ");
-    //     io::stdout().flush()?;
-    //     let mut expr_str = String::new();
-    //     stdin.read_line(&mut expr_str)?;
-
-    //     let runner : Runner<SimpleMath, SynthAnalysis, ()> =
-    //         Runner::default()
-    //         .with_expr(&expr_str.parse().unwrap())
-    //         .run(rules.clone());
-
-    //     let mut ext = Extractor::new(&runner.egraph, AstSize);
-    //     let (_, simp_expr) = ext.find_best(runner.roots[0]);
-    //     println!("Simplified result: {}", simp_expr);
-    //     println!();
-    // }
 }
