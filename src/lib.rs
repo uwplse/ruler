@@ -46,9 +46,18 @@ impl Analysis<SimpleMath> for SynthAnalysis {
             SimpleMath::Num(n) => (0..params.n_samples).map(|_| Some(*n)).collect(),
             SimpleMath::Var(_) => vec![],
             SimpleMath::Neg(a) => x(a).map(|x| Some(-x?)).collect(),
-            SimpleMath::Add([a, b]) => x(a).zip(x(b)).map(|(x, y)| Some(x?.wrapping_add(y?))).collect(),
-            SimpleMath::Sub([a, b]) => x(a).zip(x(b)).map(|(x, y)| Some(x?.wrapping_sub(y?))).collect(),
-            SimpleMath::Mul([a, b]) => x(a).zip(x(b)).map(|(x, y)| Some(x?.wrapping_mul(y?))).collect(),
+            SimpleMath::Add([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| Some(x?.wrapping_add(y?)))
+                .collect(),
+            SimpleMath::Sub([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| Some(x?.wrapping_sub(y?)))
+                .collect(),
+            SimpleMath::Mul([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| Some(x?.wrapping_mul(y?)))
+                .collect(),
             // SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| if y? != 0 {Some(x? / y?)} else {None}).collect(),
         }
     }
@@ -196,7 +205,9 @@ impl SynthParam {
         let rng = &mut self.rng;
         for var in &self.variables {
             let id = egraph.add(SimpleMath::Var(*var));
-            egraph[id].data = (0..self.n_samples).map(|_| Some(rng.gen::<Constant>())).collect();
+            egraph[id].data = (0..self.n_samples)
+                .map(|_| Some(rng.gen::<Constant>()))
+                .collect();
         }
         for c in &self.consts {
             egraph.add(SimpleMath::Num(*c));
