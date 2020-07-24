@@ -132,10 +132,11 @@ fn minimize_equalities(
     while granularity > 0 {
         println!("Minimizing with granularity {}...", granularity);
         let mut i = 0;
+        let mut last_removed_len = 0;
         while i + granularity < equalities.len() {
             let (before, tail) = equalities.split_at(i);
             let (test, after) = tail.split_at(granularity);
-            i += granularity;
+            i += granularity - last_removed_len;
 
             let mut runner: Runner<_, _, ()> = Runner::new(analysis.clone())
                 .with_node_limit(3000)
@@ -164,6 +165,7 @@ fn minimize_equalities(
             *equalities = kept;
             all_removed.extend(removed);
 
+            last_removed_len = to_remove.len();
             if !to_remove.is_empty() {
                 println!("  Removed {} rules", to_remove.len());
                 for name in to_remove {
