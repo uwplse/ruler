@@ -64,6 +64,11 @@ impl Analysis<SimpleMath> for SynthAnalysis {
             let added = egraph.add(SimpleMath::Num(first));
             egraph.union(id, added);
         }
+
+        // pruning seems to be pretty important for avoiding silly associativity cycles
+        if egraph[id].iter().any(|n| n.is_leaf()) {
+            egraph[id].nodes.retain(|n| n.is_leaf())
+        }
     }
 }
 
