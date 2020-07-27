@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use rand::Rng;
 use rand_pcg::Pcg64;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
     time::Duration,
 };
@@ -63,6 +63,11 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         if cv.iter().all(|x| *x == first) {
             let added = egraph.add(SimpleMath::Num(first));
             egraph.union(id, added);
+        }
+
+        // pruning seems to be pretty important for avoiding silly associativity cycles
+        if egraph[id].iter().any(|n| n.is_leaf()) {
+            egraph[id].nodes.retain(|n| n.is_leaf())
         }
     }
 }
@@ -210,23 +215,29 @@ impl SynthParam {
     pub fn run(&mut self) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
+
+        // we will only operate on the ids that we added
+        let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
+
         for iter in 0..self.n_iter {
+            my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
+
             println!(
                 "iter {} phase 1: adding ops over {} eclasses",
                 iter,
-                eg.number_of_classes()
+                my_ids.len(),
             );
             let mut enodes_to_add = vec![];
-            for i in eg.classes() {
-                // enodes_to_add.push(SimpleMath::Neg(i.id));
-                for j in eg.classes() {
-                    enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
-                    enodes_to_add.push(SimpleMath::Sub([i.id, j.id]));
-                    enodes_to_add.push(SimpleMath::Mul([i.id, j.id]));
+            for &i in &my_ids {
+                // enodes_to_add.push(SimpleMath::Neg(i));
+                for &j in &my_ids {
+                    enodes_to_add.push(SimpleMath::Add([i, j]));
+                    enodes_to_add.push(SimpleMath::Sub([i, j]));
+                    enodes_to_add.push(SimpleMath::Mul([i, j]));
                 }
             }
             for enode in enodes_to_add {
-                eg.add(enode);
+                my_ids.insert(eg.add(enode));
             }
 
             println!(
@@ -242,6 +253,7 @@ impl SynthParam {
                 .with_time_limit(Duration::from_secs(20))
                 .with_node_limit(usize::MAX)
                 .with_iter_limit(3)
+                .with_scheduler(SimpleScheduler)
                 .run(rules)
                 .egraph;
             println!(
@@ -250,11 +262,15 @@ impl SynthParam {
                 eg.number_of_classes()
             );
 
+            my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
+
             println!("iter {} phase 3: discover rules", iter);
             println!("       phase 3: grouping");
             let mut by_cvec: IndexMap<&[Constant], Vec<Id>> = IndexMap::new();
             for class in eg.classes() {
-                by_cvec.entry(&class.data).or_default().push(class.id);
+                if my_ids.contains(&class.id) {
+                    by_cvec.entry(&class.data).or_default().push(class.id);
+                }
             }
 
             println!("       phase 3: scanning {} groups", by_cvec.len());
