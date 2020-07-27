@@ -149,17 +149,16 @@ fn minimize_equalities(
 
             // Add the eqs to test in to the egraph
             for eq in test {
-                runner = runner
-                    .with_expr(&instantiate(&eq.lhs))
-                    .with_expr(&instantiate(&eq.rhs));
+                runner = runner.with_expr(&instantiate(&eq.lhs));
             }
 
             let rewrites = before.iter().chain(after).map(|eq| &eq.rewrite);
             runner = runner.run(rewrites);
 
             let mut to_remove = HashSet::new();
-            for (eq, roots) in test.iter().zip(runner.roots.chunks(2)) {
-                if runner.egraph.find(roots[0]) == runner.egraph.find(roots[1]) {
+            for (eq, &root) in test.iter().zip(&runner.roots) {
+                let rhs_id = runner.egraph.add_expr(&instantiate(&eq.rhs));
+                if runner.egraph.find(root) == rhs_id {
                     to_remove.insert(eq.name.clone());
                 }
             }
@@ -361,7 +360,7 @@ mod tests {
         L: Language,
         A: Analysis<L> + Default,
     {
-        let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
+        let rules = eqs.iter().map(|eq| &eq.rewrite);
         let runner: Runner<L, A, ()> = Runner::default()
             .with_expr(&a.parse().unwrap())
             .with_expr(&b.parse().unwrap())
