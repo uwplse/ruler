@@ -242,6 +242,7 @@ impl SynthParam {
                 .with_time_limit(Duration::from_secs(20))
                 .with_node_limit(usize::MAX)
                 .with_iter_limit(3)
+                .with_scheduler(SimpleScheduler)
                 .run(rules)
                 .egraph;
             println!(
