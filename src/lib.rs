@@ -212,7 +212,21 @@ impl SynthParam {
     }
 
     pub fn run(&mut self) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-        let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
+        let consts = std::mem::take(&mut self.consts);
+
+        println!("Finding variable only equalities...");
+        let var_only_eqs = self.run_with_eqs(vec![]);
+
+        println!("Finding equalities with constants...");
+        self.n_iter = 1;
+        self.consts = consts;
+        self.run_with_eqs(var_only_eqs)
+    }
+
+    pub fn run_with_eqs(
+        &mut self,
+        mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>>,
+    ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut eg = self.mk_egraph();
 
         // we will only operate on the ids that we added
