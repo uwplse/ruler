@@ -149,17 +149,16 @@ fn minimize_equalities(
 
             // Add the eqs to test in to the egraph
             for eq in test {
-                runner = runner
-                    .with_expr(&instantiate(&eq.lhs))
-                    .with_expr(&instantiate(&eq.rhs));
+                runner = runner.with_expr(&instantiate(&eq.lhs));
             }
 
-            let rewrites = before.iter().chain(after).flat_map(|eq| &eq.rewrites);
+            let rewrites = before.iter().chain(after).map(|eq| &eq.rewrite);
             runner = runner.run(rewrites);
 
             let mut to_remove = HashSet::new();
-            for (eq, roots) in test.iter().zip(runner.roots.chunks(2)) {
-                if runner.egraph.find(roots[0]) == runner.egraph.find(roots[1]) {
+            for (eq, &root) in test.iter().zip(&runner.roots) {
+                let rhs_id = runner.egraph.add_expr(&instantiate(&eq.rhs));
+                if runner.egraph.find(root) == rhs_id {
                     to_remove.insert(eq.name.clone());
                 }
             }
@@ -246,7 +245,7 @@ impl SynthParam {
                 eg.total_size(),
                 eg.number_of_classes()
             );
-            let rules = equalities.iter().flat_map(|eq| &eq.rewrites);
+            let rules = equalities.iter().map(|eq| &eq.rewrite);
             let runner: Runner<SimpleMath, SynthAnalysis, ()> =
                 Runner::new(eg.analysis.clone()).with_egraph(eg);
             eg = runner
@@ -291,10 +290,12 @@ impl SynthParam {
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
                     let pat2 = generalize(&expr2, names);
+                    equalities.extend(Equality::new(pat1, pat2));
 
-                    if let Some(eq) = Equality::new(pat1, pat2) {
-                        equalities.push(eq);
-                    }
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr2, names);
+                    let pat2 = generalize(&expr1, names);
+                    equalities.extend(Equality::new(pat1, pat2));
                 }
             }
 
@@ -326,53 +327,26 @@ pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
     pub name: String,
-    pub rewrites: Vec<egg::Rewrite<L, A>>,
+    pub rewrite: egg::Rewrite<L, A>,
 }
 
 impl<L: Language, A> Display for Equality<L, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
+        write!(f, "{}", self.rewrite.name())
     }
 }
 
 impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
     fn new(lhs: Pattern<L>, rhs: Pattern<L>) -> Option<Self> {
-        let mut rewrites = vec![];
-
         let name = format!("{} => {}", lhs, rhs);
-        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, lhs.clone(), rhs.clone()) {
-            rewrites.push(rw)
-        }
-
-        let name = format!("{} => {}", rhs, lhs);
-        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, rhs.clone(), lhs.clone()) {
-            rewrites.push(rw)
-        }
-
-        if rewrites.is_empty() {
-            None
-        } else {
-            let name = match rewrites.len() {
-                1 => format!("{}", rewrites[0].long_name()),
-                2 => {
-                    // canonicalize the name, as we use it for dedup
-                    let l_str = format!("{}", lhs);
-                    let r_str = format!("{}", rhs);
-                    if l_str < r_str {
-                        format!("{} <=> {}", l_str, r_str)
-                    } else {
-                        format!("{} <=> {}", r_str, l_str)
-                    }
-                }
-                n => panic!("unexpected len {}", n),
-            };
-            Some(Self {
-                rewrites,
+        egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone())
+            .ok()
+            .map(|rewrite| Self {
                 lhs,
                 rhs,
+                rewrite,
                 name,
             })
-        }
     }
 }
 
@@ -386,7 +360,7 @@ mod tests {
         L: Language,
         A: Analysis<L> + Default,
     {
-        let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
+        let rules = eqs.iter().map(|eq| &eq.rewrite);
         let runner: Runner<L, A, ()> = Runner::default()
             .with_expr(&a.parse().unwrap())
             .with_expr(&b.parse().unwrap())

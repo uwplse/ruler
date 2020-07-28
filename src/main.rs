@@ -13,7 +13,7 @@ fn main() -> io::Result<()> {
     };
 
     let eqs = param.run();
-    let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
+    let rules = eqs.iter().map(|eq| &eq.rewrite);
 
     println!("Entering simplification loop...");
     let stdin = io::stdin();
