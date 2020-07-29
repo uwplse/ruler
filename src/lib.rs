@@ -66,9 +66,9 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         }
 
         // pruning seems to be pretty important for avoiding silly associativity cycles
-        if egraph[id].iter().any(|n| n.is_leaf()) {
-            egraph[id].nodes.retain(|n| n.is_leaf())
-        }
+        // if egraph[id].iter().any(|n| n.is_leaf()) {
+        //     egraph[id].nodes.retain(|n| n.is_leaf())
+        // }
     }
 }
 
@@ -163,15 +163,6 @@ impl SynthParam {
             }
 
             loop {
-                let other_ids: Vec<Id> = eg
-                    .classes()
-                    .map(|c| c.id)
-                    .filter(|id| !my_ids.contains(id))
-                    .collect();
-                for &id in &other_ids {
-                    eg[id].nodes.truncate(1);
-                }
-
                 eg.rebuild();
                 println!(
                     "iter {} phase 2: running rules, n={}, e={}",
@@ -179,13 +170,13 @@ impl SynthParam {
                     eg.total_size(),
                     eg.number_of_classes()
                 );
-                let rules = equalities.iter().map(|eq| &eq.rewrite);
+                let rules = equalities.iter().map(|eq| &eq.no_add_rewrite);
                 let runner: Runner<SimpleMath, SynthAnalysis, ()> =
                     Runner::new(eg.analysis.clone()).with_egraph(eg);
                 eg = runner
                     .with_time_limit(Duration::from_secs(20))
                     .with_node_limit(usize::MAX)
-                    .with_iter_limit(3)
+                    .with_iter_limit(100)
                     .with_scheduler(SimpleScheduler)
                     .run(rules)
                     .egraph;
@@ -248,12 +239,20 @@ impl SynthParam {
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
                     let pat2 = generalize(&expr2, names);
-                    equalities.extend(Equality::new(pat1, pat2));
+                    if let Some(eq) = Equality::new(pat1, pat2) {
+                        if equalities.iter().all(|e| e.name != eq.name) {
+                            equalities.push(eq)
+                        }
+                    }
 
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr2, names);
                     let pat2 = generalize(&expr1, names);
-                    equalities.extend(Equality::new(pat1, pat2));
+                    if let Some(eq) = Equality::new(pat1, pat2) {
+                        if equalities.iter().all(|e| e.name != eq.name) {
+                            equalities.push(eq)
+                        }
+                    }
 
                     eg.union(id1, id2);
                 } else {
@@ -275,6 +274,7 @@ pub struct Equality<L, A> {
     pub rhs: Pattern<L>,
     pub name: String,
     pub rewrite: egg::Rewrite<L, A>,
+    pub no_add_rewrite: egg::Rewrite<L, A>,
 }
 
 impl<L: Language, A> Display for Equality<L, A> {
@@ -286,14 +286,50 @@ impl<L: Language, A> Display for Equality<L, A> {
 impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
     fn new(lhs: Pattern<L>, rhs: Pattern<L>) -> Option<Self> {
         let name = format!("{} => {}", lhs, rhs);
-        egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone())
-            .ok()
-            .map(|rewrite| Self {
-                lhs,
-                rhs,
-                rewrite,
-                name,
-            })
+
+        let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone()).ok()?;
+
+        let no_add_rhs = NoAddPatternApplier(rhs.clone());
+        let no_add =
+            egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), no_add_rhs).unwrap();
+
+        Some(Self {
+            lhs,
+            rhs,
+            rewrite: rw,
+            no_add_rewrite: no_add,
+            name,
+        })
+    }
+}
+
+struct NoAddPatternApplier<L>(Pattern<L>);
+
+impl<L, A> egg::Applier<L, A> for NoAddPatternApplier<L>
+where
+    L: Language,
+    A: Analysis<L>,
+{
+    fn apply_one(&self, egraph: &mut EGraph<L, A>, _eclass: Id, subst: &Subst) -> Vec<Id> {
+        let mut so_far: Vec<Id> = vec![];
+        for node in self.0.ast.as_ref() {
+            let id = match node {
+                ENodeOrVar::ENode(n) => {
+                    match egraph.lookup(n.clone().map_children(|i| so_far[usize::from(i)])) {
+                        Some(id) => id,
+                        None => return vec![],
+                    }
+                }
+                ENodeOrVar::Var(v) => subst[*v],
+            };
+            so_far.push(id);
+        }
+
+        vec![*so_far.last().unwrap()]
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        self.0.vars()
     }
 }
 
