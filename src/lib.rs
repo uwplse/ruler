@@ -233,11 +233,11 @@ impl SynthParam {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         for iter in 0..self.n_iter {
-            // println!(
-            //     "iter {} phase 1: adding ops over {} eclasses",
-            //     iter,
-            //     eg.number_of_classes()
-            // );
+            println!(
+                "iter {} phase 1: adding ops over {} eclasses",
+                iter,
+                eg.number_of_classes()
+            );
             let mut enodes_to_add = vec![];
             for i in eg.classes() {
                 enodes_to_add.push(SimpleMath::Neg(i.id));
@@ -282,9 +282,9 @@ impl SynthParam {
                 }
             }
 
-            for (cvec, ids) in by_cvec.clone() {
-                println!("len: {}, cvec: {:?}", ids.len(), cvec);
-            }
+            // for (cvec, ids) in by_cvec.clone() {
+            //     println!("len: {}, cvec: {:?}", ids.len(), cvec);
+            // }
 
             println!("       phase 3: scanning {} groups", by_cvec.len());
             let mut to_union = vec![];
