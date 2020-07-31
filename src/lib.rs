@@ -1,6 +1,6 @@
 use egg::*;
 use indexmap::IndexMap;
-use rand::Rng;
+use rand::{Rng, seq::SliceRandom};
 use rand_pcg::Pcg64;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
@@ -15,8 +15,8 @@ define_language! {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
+        "/" = Div([Id; 2]),
         "~" = Neg(Id),
-        // "/" = Div([Id; 2]),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -24,7 +24,7 @@ define_language! {
 
 #[derive(Default, Clone)]
 pub struct SynthAnalysis {
-    n_samples: usize,
+    cvec_len: usize,
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
@@ -43,7 +43,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         let x = |i: &Id| egraph[*i].data.iter().copied();
         let params = &egraph.analysis;
         match enode {
-            SimpleMath::Num(n) => (0..params.n_samples).map(|_| Some(*n)).collect(),
+            SimpleMath::Num(n) => (0..params.cvec_len).map(|_| Some(*n)).collect(),
             SimpleMath::Var(_) => vec![],
             SimpleMath::Neg(a) => x(a).map(|x| Some(-x?)).collect(),
             SimpleMath::Add([a, b]) => x(a)
@@ -58,7 +58,10 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| Some(x?.wrapping_mul(y?)))
                 .collect(),
-            // SimpleMath::Div([a, b]) => x(a).zip(x(b)).map(|(x, y)| if y? != 0 {Some(x? / y?)} else {None}).collect(),
+            SimpleMath::Div([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| if y? != 0 {Some(x? / y?)} else {None})
+                .collect(),
         }
     }
 
@@ -68,7 +71,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
             return;
         }
         let first = cv[0];
-        if cv.iter().all(|x| *x == first) {
+        if cv.iter().all(|x| *x == first && *x != None) {
             let added = egraph.add(SimpleMath::Num(first.unwrap()));
             egraph.union(id, added);
         }
@@ -141,6 +144,8 @@ fn minimize_equalities(
     });
     equalities.reverse();
 
+    // equalities
+
     let mut granularity = equalities.len() / 2;
     while granularity > 0 {
         println!("Minimizing with granularity {}...", granularity);
@@ -151,14 +156,13 @@ fn minimize_equalities(
             let (test, after) = tail.split_at(granularity);
             i += granularity - last_removed_len;
 
-            let mut runner: Runner<_, _, ()> = Runner::new(analysis.clone())
-                .with_node_limit(3000)
-                .with_iter_limit(5);
+            let mut runner: Runner<_, _, ()> = Runner::new(analysis.clone());
 
             // Add the eqs to test in to the egraph
             for eq in test {
                 runner = runner.with_expr(&instantiate(&eq.lhs));
             }
+
 
             let rewrites = before.iter().chain(after).map(|eq| &eq.rewrite);
             runner = runner.run(rewrites);
@@ -206,14 +210,18 @@ pub struct SynthParam {
 impl SynthParam {
     fn mk_egraph(&mut self) -> EGraph<SimpleMath, SynthAnalysis> {
         let mut egraph = EGraph::new(SynthAnalysis {
-            n_samples: self.n_samples,
+            cvec_len: self.n_samples + self.consts.len(),
         });
         let rng = &mut self.rng;
+        let const_options : Vec<Option<i32>> = self.consts.iter().map(|x| Some(*x)).collect();
         for var in &self.variables {
             let id = egraph.add(SimpleMath::Var(*var));
-            egraph[id].data = (0..self.n_samples)
+            let mut cvec : Vec<Option<Constant>> = (0..self.n_samples)
                 .map(|_| Some(rng.gen::<Constant>()))
                 .collect();
+            cvec.append(&mut const_options.clone());
+            cvec.shuffle(rng);
+            egraph[id].data = cvec;
         }
         for c in &self.consts {
             egraph.add(SimpleMath::Num(*c));
@@ -251,12 +259,13 @@ impl SynthParam {
                 my_ids.len(),
             );
             let mut enodes_to_add = vec![];
-            for &i in &my_ids {
-                // enodes_to_add.push(SimpleMath::Neg(i));
-                for &j in &my_ids {
-                    enodes_to_add.push(SimpleMath::Add([i, j]));
-                    enodes_to_add.push(SimpleMath::Sub([i, j]));
-                    enodes_to_add.push(SimpleMath::Mul([i, j]));
+            for i in eg.classes() {
+                enodes_to_add.push(SimpleMath::Neg(i.id));
+                for j in eg.classes() {
+                    enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
+                    enodes_to_add.push(SimpleMath::Sub([i.id, j.id]));
+                    enodes_to_add.push(SimpleMath::Mul([i.id, j.id]));
+                    enodes_to_add.push(SimpleMath::Div([i.id, j.id]));
                 }
             }
             for enode in enodes_to_add {
@@ -292,9 +301,15 @@ impl SynthParam {
             let mut by_cvec: IndexMap<&[Option<Constant>], Vec<Id>> = IndexMap::new();
             for class in eg.classes() {
                 if my_ids.contains(&class.id) {
-                    by_cvec.entry(&class.data).or_default().push(class.id);
+                      if class.data.iter().all(|x| *x != None) {
+                        by_cvec.entry(&class.data).or_default().push(class.id);
+                    }
                 }
             }
+
+            // for (cvec, ids) in by_cvec.clone() {
+            //     println!("len: {}, cvec: {:?}", ids.len(), cvec);
+            // }
 
             println!("       phase 3: scanning {} groups", by_cvec.len());
             let mut to_union = vec![];
