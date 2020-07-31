@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use rand::Rng;
 use rand_pcg::Pcg64;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
     time::Duration,
 };
@@ -71,6 +71,11 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         if cv.iter().all(|x| *x == first) {
             let added = egraph.add(SimpleMath::Num(first.unwrap()));
             egraph.union(id, added);
+        }
+
+        // pruning seems to be pretty important for avoiding silly associativity cycles
+        if egraph[id].iter().any(|n| n.is_leaf()) {
+            egraph[id].nodes.retain(|n| n.is_leaf())
         }
     }
 }
@@ -140,10 +145,11 @@ fn minimize_equalities(
     while granularity > 0 {
         println!("Minimizing with granularity {}...", granularity);
         let mut i = 0;
+        let mut last_removed_len = 0;
         while i + granularity < equalities.len() {
             let (before, tail) = equalities.split_at(i);
             let (test, after) = tail.split_at(granularity);
-            i += granularity;
+            i += granularity - last_removed_len;
 
             let mut runner: Runner<_, _, ()> = Runner::new(analysis.clone())
                 .with_node_limit(3000)
@@ -151,17 +157,16 @@ fn minimize_equalities(
 
             // Add the eqs to test in to the egraph
             for eq in test {
-                runner = runner
-                    .with_expr(&instantiate(&eq.lhs))
-                    .with_expr(&instantiate(&eq.rhs));
+                runner = runner.with_expr(&instantiate(&eq.lhs));
             }
 
-            let rewrites = before.iter().chain(after).flat_map(|eq| &eq.rewrites);
+            let rewrites = before.iter().chain(after).map(|eq| &eq.rewrite);
             runner = runner.run(rewrites);
 
             let mut to_remove = HashSet::new();
-            for (eq, roots) in test.iter().zip(runner.roots.chunks(2)) {
-                if runner.egraph.find(roots[0]) == runner.egraph.find(roots[1]) {
+            for (eq, &root) in test.iter().zip(&runner.roots) {
+                let rhs_id = runner.egraph.add_expr(&instantiate(&eq.rhs));
+                if runner.egraph.find(root) == rhs_id {
                     to_remove.insert(eq.name.clone());
                 }
             }
@@ -172,6 +177,7 @@ fn minimize_equalities(
             *equalities = kept;
             all_removed.extend(removed);
 
+            last_removed_len = to_remove.len();
             if !to_remove.is_empty() {
                 println!("  Removed {} rules", to_remove.len());
                 for name in to_remove {
@@ -216,25 +222,45 @@ impl SynthParam {
     }
 
     pub fn run(&mut self) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-        let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
+        let consts = std::mem::take(&mut self.consts);
+
+        println!("Finding variable only equalities...");
+        let var_only_eqs = self.run_with_eqs(vec![]);
+
+        println!("Finding equalities with constants...");
+        self.n_iter = 1;
+        self.consts = consts;
+        self.run_with_eqs(var_only_eqs)
+    }
+
+    pub fn run_with_eqs(
+        &mut self,
+        mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>>,
+    ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut eg = self.mk_egraph();
+
+        // we will only operate on the ids that we added
+        let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
+
         for iter in 0..self.n_iter {
+            my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
+
             println!(
                 "iter {} phase 1: adding ops over {} eclasses",
                 iter,
-                eg.number_of_classes()
+                my_ids.len(),
             );
             let mut enodes_to_add = vec![];
-            for i in eg.classes() {
-                // enodes_to_add.push(SimpleMath::Neg(i.id));
-                for j in eg.classes() {
-                    enodes_to_add.push(SimpleMath::Add([i.id, j.id]));
-                    enodes_to_add.push(SimpleMath::Sub([i.id, j.id]));
-                    enodes_to_add.push(SimpleMath::Mul([i.id, j.id]));
+            for &i in &my_ids {
+                // enodes_to_add.push(SimpleMath::Neg(i));
+                for &j in &my_ids {
+                    enodes_to_add.push(SimpleMath::Add([i, j]));
+                    enodes_to_add.push(SimpleMath::Sub([i, j]));
+                    enodes_to_add.push(SimpleMath::Mul([i, j]));
                 }
             }
             for enode in enodes_to_add {
-                eg.add(enode);
+                my_ids.insert(eg.add(enode));
             }
 
             println!(
@@ -243,13 +269,14 @@ impl SynthParam {
                 eg.total_size(),
                 eg.number_of_classes()
             );
-            let rules = equalities.iter().flat_map(|eq| &eq.rewrites);
+            let rules = equalities.iter().map(|eq| &eq.rewrite);
             let runner: Runner<SimpleMath, SynthAnalysis, ()> =
                 Runner::new(eg.analysis.clone()).with_egraph(eg);
             eg = runner
                 .with_time_limit(Duration::from_secs(20))
                 .with_node_limit(usize::MAX)
                 .with_iter_limit(3)
+                .with_scheduler(SimpleScheduler)
                 .run(rules)
                 .egraph;
             println!(
@@ -258,11 +285,15 @@ impl SynthParam {
                 eg.number_of_classes()
             );
 
+            my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
+
             println!("iter {} phase 3: discover rules", iter);
             println!("       phase 3: grouping");
             let mut by_cvec: IndexMap<&[Option<Constant>], Vec<Id>> = IndexMap::new();
             for class in eg.classes() {
-                by_cvec.entry(&class.data).or_default().push(class.id);
+                if my_ids.contains(&class.id) {
+                    by_cvec.entry(&class.data).or_default().push(class.id);
+                }
             }
 
             println!("       phase 3: scanning {} groups", by_cvec.len());
@@ -283,10 +314,12 @@ impl SynthParam {
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
                     let pat2 = generalize(&expr2, names);
+                    equalities.extend(Equality::new(pat1, pat2));
 
-                    if let Some(eq) = Equality::new(pat1, pat2) {
-                        equalities.push(eq);
-                    }
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr2, names);
+                    let pat2 = generalize(&expr1, names);
+                    equalities.extend(Equality::new(pat1, pat2));
                 }
             }
 
@@ -318,53 +351,26 @@ pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
     pub name: String,
-    pub rewrites: Vec<egg::Rewrite<L, A>>,
+    pub rewrite: egg::Rewrite<L, A>,
 }
 
 impl<L: Language, A> Display for Equality<L, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
+        write!(f, "{}", self.rewrite.name())
     }
 }
 
 impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
     fn new(lhs: Pattern<L>, rhs: Pattern<L>) -> Option<Self> {
-        let mut rewrites = vec![];
-
         let name = format!("{} => {}", lhs, rhs);
-        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, lhs.clone(), rhs.clone()) {
-            rewrites.push(rw)
-        }
-
-        let name = format!("{} => {}", rhs, lhs);
-        if let Ok(rw) = egg::Rewrite::new(name.clone(), name, rhs.clone(), lhs.clone()) {
-            rewrites.push(rw)
-        }
-
-        if rewrites.is_empty() {
-            None
-        } else {
-            let name = match rewrites.len() {
-                1 => format!("{}", rewrites[0].long_name()),
-                2 => {
-                    // canonicalize the name, as we use it for dedup
-                    let l_str = format!("{}", lhs);
-                    let r_str = format!("{}", rhs);
-                    if l_str < r_str {
-                        format!("{} <=> {}", l_str, r_str)
-                    } else {
-                        format!("{} <=> {}", r_str, l_str)
-                    }
-                }
-                n => panic!("unexpected len {}", n),
-            };
-            Some(Self {
-                rewrites,
+        egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone())
+            .ok()
+            .map(|rewrite| Self {
                 lhs,
                 rhs,
+                rewrite,
                 name,
             })
-        }
     }
 }
 
@@ -378,7 +384,7 @@ mod tests {
         L: Language,
         A: Analysis<L> + Default,
     {
-        let rules = eqs.iter().flat_map(|eq| &eq.rewrites);
+        let rules = eqs.iter().map(|eq| &eq.rewrite);
         let runner: Runner<L, A, ()> = Runner::default()
             .with_expr(&a.parse().unwrap())
             .with_expr(&b.parse().unwrap())
