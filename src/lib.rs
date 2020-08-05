@@ -1,5 +1,5 @@
 use egg::*;
-use rand::{Rng, prelude::SliceRandom};
+use rand::{prelude::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use std::{
     collections::{HashMap, HashSet},
@@ -257,6 +257,79 @@ impl SynthParam {
         egraph
     }
 
+    fn learn_rules(
+        &self,
+        eg: &EGraph<SimpleMath, SynthAnalysis>,
+        mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>>,
+        to_union: &mut std::vec::Vec<(egg::Id, egg::Id)>,
+    ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+        let mut extract = Extractor::new(&eg, AstSize);
+        let ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
+        for &i in &ids {
+            for &j in &ids {
+                if i < j && eg[i].data == eg[j].data {
+                    to_union.push((i, j));
+                    let (_cost1, expr1) = extract.find_best(i);
+                    let (_cost2, expr2) = extract.find_best(j);
+
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr1, names);
+                    let pat2 = generalize(&expr2, names);
+                    equalities.extend(Equality::new(pat1, pat2, None));
+                    println!("new rule: {} => {}", &expr2, &expr1);
+                } else if i < j && eg[i].data != eg[j].data {
+                    let diff_idxs: Vec<usize> = eg[i]
+                        .data
+                        .iter()
+                        .zip(eg[j].data.iter())
+                        .enumerate()
+                        .filter(|(_, (x, y))| x != y)
+                        .map(|(i, _)| i)
+                        .collect();
+                    let mut same_idxs: Vec<usize> = vec![];
+                    for i in 0..eg[j].data.len() {
+                        if !diff_idxs.contains(&i) {
+                            same_idxs.push(i)
+                        }
+                    }
+                    let ec_datas: Vec<(Id, Vec<Option<Constant>>)> =
+                        eg.classes().cloned().map(|c| (c.id, c.data)).collect();
+
+                    let pred = |ec_data: &Vec<Option<Constant>>| {
+                        diff_idxs
+                            .iter()
+                            .all(|i| ec_data[*i] == Some(Constant::Boolean(true)))
+                            && same_idxs
+                                .iter()
+                                .all(|i| ec_data[*i] == Some(Constant::Boolean(false)))
+                    };
+
+                    let cond = match ec_datas.iter().find(|(_, ec_data)| pred(ec_data)) {
+                        None => None,
+                        Some((id, _)) => Some(extract.find_best(*id).1),
+                    };
+
+                    let (_cost1, expr1) = extract.find_best(i);
+                    let (_cost2, expr2) = extract.find_best(j);
+
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr1, names);
+                    let pat2 = generalize(&expr2, names);
+
+                    if cond.is_none() {
+                        equalities.extend(Equality::new(pat1, pat2, None));
+                        println!("new rule: {} => {}", &expr2, &expr1);
+                    } else {
+                        let c = generalize(&cond.unwrap(), names);
+                        println!("new rule: {} => {} if {}", &expr2, &expr1, &c);
+                        equalities.extend(Equality::new(pat1, pat2, Some(c)));
+                    }
+                }
+            }
+        }
+        return equalities;
+    }
+
     pub fn run(&mut self) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
@@ -315,7 +388,7 @@ impl SynthParam {
                             .egraph;
 
                         eg.rebuild();
-                        
+
                         println!(
                             "       phase 2: after running {} rules, n={}, e={}",
                             &equalities.len(),
@@ -326,54 +399,8 @@ impl SynthParam {
                         println!("iter {} phase 3: discover rules", iter);
 
                         let mut to_union = vec![];
-                        let mut extract = Extractor::new(&eg, AstSize);
 
-                        let ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
-
-                        for &i in &ids {
-                            for &j in &ids {
-
-                                if i < j && eg[i].data == eg[j].data {
-                                    to_union.push((i, j));
-                                    let (_cost1, expr1) = extract.find_best(i);
-                                    let (_cost2, expr2) = extract.find_best(j);
-
-                                    let names = &mut HashMap::default();
-                                    let pat1 = generalize(&expr1, names);
-                                    let pat2 = generalize(&expr2, names);
-                                    equalities.extend(Equality::new(pat1, pat2));
-                                    println!("new rule: {} => {}", &expr2, &expr1);
-                                } else if i < j && eg[i].data != eg[j].data {
-                                    let diff_idxs: Vec<usize> = eg[i]
-                                        .data
-                                        .iter()
-                                        .zip(eg[j].data.iter())
-                                        .enumerate()
-                                        .filter(|(i, (x, y))| x != y)
-                                        .map(|(i, _)| i)
-                                        .collect();
-
-                                    let mut same_idxs: Vec<usize> = vec![];
-                                    for i in 0..eg[j].data.len() {
-                                        if !diff_idxs.contains(&i) {
-                                            same_idxs.push(i)
-                                        }
-                                    }
-
-                                    let ec_datas: Vec<(Id, Vec<Option<Constant>>)> =
-                                        eg.classes().cloned().map(|c| (c.id, c.data)).collect();
-
-                                    let found_pred = ec_datas.iter().find(|(ec_id, ec_data)| {
-                                        diff_idxs
-                                            .iter()
-                                            .all(|i| ec_data[*i] == Some(Constant::Boolean(true)))
-                                            && same_idxs.iter().all(|i| {
-                                                ec_data[*i] == Some(Constant::Boolean(false))
-                                            })
-                                    });
-                                }
-                            }
-                        }
+                        equalities = self.learn_rules(&eg, equalities, &mut to_union);
 
                         println!("       phase 3: performing {} unions", to_union.len());
                         for (i, j) in to_union {
@@ -418,6 +445,7 @@ impl SynthParam {
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
+    pub cond: Option<Pattern<L>>,
     pub name: String,
     pub rewrite: egg::Rewrite<L, A>,
     pub no_add_rewrite: egg::Rewrite<L, A>,
@@ -430,8 +458,13 @@ impl<L: Language, A> Display for Equality<L, A> {
 }
 
 impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
-    fn new(lhs: Pattern<L>, rhs: Pattern<L>) -> Option<Self> {
-        let name = format!("{} => {}", lhs, rhs);
+    fn new(lhs: Pattern<L>, rhs: Pattern<L>, cond: Option<Pattern<L>>) -> Option<Self> {
+        let name = if cond == None {
+            format!("{} => {}", lhs, rhs)
+        } else {
+            format!("{} => {} if {}", lhs, rhs, &cond.as_ref().unwrap())
+        };
+
         let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone()).ok()?;
 
         let no_add_rhs = NoAddPatternApplier(rhs.clone());
@@ -441,9 +474,10 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
         Some(Self {
             lhs,
             rhs,
+            cond,
+            name,
             rewrite: rw,
             no_add_rewrite: no_add,
-            name,
         })
     }
 }
