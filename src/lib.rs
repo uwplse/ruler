@@ -272,12 +272,14 @@ impl SynthParam {
                     let (_cost1, expr1) = extract.find_best(i);
                     let (_cost2, expr2) = extract.find_best(j);
 
+                    println!("same cvec for {} and {}", expr1, expr2);
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
                     let pat2 = generalize(&expr2, names);
                     equalities.extend(Equality::new(pat1, pat2, None));
                     println!("new rule: {} => {}", &expr2, &expr1);
                 } else if i < j && eg[i].data != eg[j].data {
+
                     let diff_idxs: Vec<usize> = eg[i]
                         .data
                         .iter()
@@ -312,14 +314,12 @@ impl SynthParam {
                     let (_cost1, expr1) = extract.find_best(i);
                     let (_cost2, expr2) = extract.find_best(j);
 
+                    println!("diff cvec for {} and {}", expr1, expr2);
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
                     let pat2 = generalize(&expr2, names);
 
-                    if cond.is_none() {
-                        equalities.extend(Equality::new(pat1, pat2, None));
-                        println!("new rule: {} => {}", &expr2, &expr1);
-                    } else {
+                    if cond.is_some() {
                         let c = generalize(&cond.unwrap(), names);
                         println!("new rule: {} => {} if {}", &expr2, &expr1, &c);
                         equalities.extend(Equality::new(pat1, pat2, Some(c)));
