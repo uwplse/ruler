@@ -451,14 +451,13 @@ impl SynthParam {
                                         .map(|(i, _)| i)
                                         .collect();
 
-                                    let same_idxs : Vec<usize> = eg[i]
-                                    .data
-                                    .iter()
-                                    .zip(eg[j].data.iter())
-                                    .enumerate()
-                                    .filter(|(i, (x, y))| x == y)
-                                    .map(|(i, _)| i)
-                                    .collect();
+                                    let mut same_idxs : Vec<usize> = vec![];
+                                    for i in 0..eg[j].data.len() {
+                                        if !diff_idxs.contains(&i) {
+                                            same_idxs.push(i)
+                                        }
+                                    };
+                                    
                                     let ec_datas: Vec<(Id, Vec<Option<Constant>>)> =
                                         eg.classes().cloned().map(|c| (c.id, c.data)).collect();
 
