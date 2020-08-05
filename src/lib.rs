@@ -1,9 +1,8 @@
 use egg::*;
-use indexmap::IndexMap;
-use rand::{seq::SliceRandom, Rng};
+use rand::{Rng, prelude::SliceRandom};
 use rand_pcg::Pcg64;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt::Display,
     fmt::Formatter,
     time::Duration,
@@ -17,7 +16,7 @@ pub enum Constant {
 
 impl Display for Constant {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match (self) {
+        match self {
             Constant::Number(n) => write!(f, "{}", n),
             Constant::Boolean(b) => write!(f, "{}", b),
         }
@@ -73,7 +72,6 @@ impl Analysis<SimpleMath> for SynthAnalysis {
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
         // only do assertions on non-empty vecs
-        // there may be "bad" merges during minimization, that's ok
         if !to.is_empty() && !from.is_empty() {
             assert_eq!(to, &from);
         }
@@ -190,7 +188,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        if y != Some(Constant::Number(0)) {
+                        if n2 != 0 {
                             Some(Constant::Number(n1 / n2))
                         } else {
                             None
@@ -202,19 +200,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         }
     }
 
-    fn modify(egraph: &mut EGraph<SimpleMath, Self>, id: Id) {
-        let cv = &egraph[id].data;
-        if cv.is_empty() {
-            return;
-        }
-        let first = cv[0];
-        if cv.iter().all(|x| *x == first)
-            && (first == Some(Constant::Boolean(false)) || first == Some(Constant::Boolean(true)))
-        {
-            let added = egraph.add(SimpleMath::Bool(first.unwrap()));
-            egraph.union(id, added);
-        }
-    }
+    fn modify(egraph: &mut EGraph<SimpleMath, Self>, id: Id) {}
 }
 
 fn generalize(expr: &RecExpr<SimpleMath>, map: &mut HashMap<Symbol, Var>) -> Pattern<SimpleMath> {
@@ -238,98 +224,6 @@ fn generalize(expr: &RecExpr<SimpleMath>, map: &mut HashMap<Symbol, Var>) -> Pat
         .collect();
 
     Pattern::from(PatternAst::from(nodes))
-}
-
-fn instantiate(pattern: &Pattern<SimpleMath>) -> RecExpr<SimpleMath> {
-    let nodes: Vec<_> = pattern
-        .ast
-        .as_ref()
-        .iter()
-        .map(|n| match n {
-            ENodeOrVar::ENode(n) => n.clone(),
-            ENodeOrVar::Var(v) => {
-                let s = v.to_string();
-                assert!(s.starts_with('?'));
-                SimpleMath::Var(s[1..].into())
-            }
-        })
-        .collect();
-
-    RecExpr::from(nodes)
-}
-
-fn minimize_equalities(
-    analysis: SynthAnalysis,
-    equalities: &mut Vec<Equality<SimpleMath, SynthAnalysis>>,
-) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-    let mut all_removed = vec![];
-
-    // dedup based on name
-    let mut set = HashSet::new();
-    equalities.retain(|eq| set.insert(eq.name.clone()));
-
-    // TODO we probably want some better heuristic on how general a rule is
-    // reversing the equalities puts the new ones first,
-    // since we want to remove them first
-    equalities.sort_by_key(|eq| {
-        let l = eq.lhs.ast.as_ref().len();
-        let r = eq.rhs.ast.as_ref().len();
-        (l.min(r), l.max(r))
-    });
-    equalities.reverse();
-
-    // equalities
-
-    let mut granularity = equalities.len() / 2;
-    while granularity > 0 {
-        println!("Minimizing with granularity {}...", granularity);
-        let mut i = 0;
-        let mut last_removed_len = 0;
-        while i + granularity < equalities.len() {
-            let (before, tail) = equalities.split_at(i);
-            let (test, after) = tail.split_at(granularity);
-            i += granularity - last_removed_len;
-
-            let mut runner: Runner<_, _, ()> = Runner::new(analysis.clone());
-
-            // Add the eqs to test in to the egraph
-            for eq in test {
-                runner = runner.with_expr(&instantiate(&eq.lhs));
-            }
-
-            let rewrites = before.iter().chain(after).map(|eq| &eq.rewrite);
-            runner = runner.run(rewrites);
-
-            let mut to_remove = HashSet::new();
-            for (eq, &root) in test.iter().zip(&runner.roots) {
-                let rhs_id = runner.egraph.add_expr(&instantiate(&eq.rhs));
-                if runner.egraph.find(root) == rhs_id {
-                    to_remove.insert(eq.name.clone());
-                }
-            }
-
-            let (removed, kept) = equalities
-                .drain(..)
-                .partition(|eq| to_remove.contains(&eq.name));
-            *equalities = kept;
-            all_removed.extend(removed);
-
-            last_removed_len = to_remove.len();
-            if !to_remove.is_empty() {
-                println!("  Removed {} rules", to_remove.len());
-                for name in to_remove {
-                    println!("  removed {}", name);
-                }
-            }
-        }
-
-        granularity /= 2;
-    }
-
-    // reverse the list back
-    equalities.reverse();
-
-    return all_removed;
 }
 
 pub struct SynthParam {
@@ -373,7 +267,7 @@ impl SynthParam {
             let num_ops = 4;
             let mut op_ctr = 0;
 
-            while op_ctr < (num_ops - 0) {
+            while op_ctr < (num_ops - 3) {
                 println!(
                     "iter {} phase 1: Currently there are {} eclasses",
                     iter,
@@ -382,7 +276,12 @@ impl SynthParam {
                 for &i in &cur_ids {
                     for &j in &cur_ids {
                         if op_ctr == 0 {
+                            let mut extract = Extractor::new(&eg, AstSize);
+                            let (_cost1, expr1) = extract.find_best(i);
+                            let (_cost2, expr2) = extract.find_best(j);
+                            println!("Adding neq over enodes {} {}", expr1, expr2);
                             eg.add(SimpleMath::Neq([i, j]));
+                            println!("Adding div over enodes {} {}", expr1, expr2);
                             eg.add(SimpleMath::Div([i, j]));
                         } else if op_ctr == 1 {
                             eg.add(SimpleMath::Add([i, j]));
@@ -415,6 +314,8 @@ impl SynthParam {
                             .run(rules)
                             .egraph;
 
+                        eg.rebuild();
+                        
                         println!(
                             "       phase 2: after running {} rules, n={}, e={}",
                             &equalities.len(),
@@ -431,6 +332,7 @@ impl SynthParam {
 
                         for &i in &ids {
                             for &j in &ids {
+
                                 if i < j && eg[i].data == eg[j].data {
                                     to_union.push((i, j));
                                     let (_cost1, expr1) = extract.find_best(i);
@@ -451,18 +353,24 @@ impl SynthParam {
                                         .map(|(i, _)| i)
                                         .collect();
 
-                                    let mut same_idxs : Vec<usize> = vec![];
+                                    let mut same_idxs: Vec<usize> = vec![];
                                     for i in 0..eg[j].data.len() {
                                         if !diff_idxs.contains(&i) {
                                             same_idxs.push(i)
                                         }
-                                    };
-                                    
+                                    }
+
                                     let ec_datas: Vec<(Id, Vec<Option<Constant>>)> =
                                         eg.classes().cloned().map(|c| (c.id, c.data)).collect();
 
-                                    let found_pred = ec_datas.iter().find(|(ec_id, ec_data)| 
-                                        diff_idxs.iter().all(|i| ec_data[*i] == Some(Constant::Boolean(true))) && same_idxs.iter().all(|i| ec_data[*i] == Some(Constant::Boolean(false))));
+                                    let found_pred = ec_datas.iter().find(|(ec_id, ec_data)| {
+                                        diff_idxs
+                                            .iter()
+                                            .all(|i| ec_data[*i] == Some(Constant::Boolean(true)))
+                                            && same_idxs.iter().all(|i| {
+                                                ec_data[*i] == Some(Constant::Boolean(false))
+                                            })
+                                    });
                                 }
                             }
                         }
