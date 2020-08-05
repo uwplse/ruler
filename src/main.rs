@@ -1,6 +1,7 @@
 use egg::*;
 use rand::SeedableRng;
 use ruler::*;
+use ruler::Constant;
 use std::io::{self, Write};
 
 fn main() -> io::Result<()> {
@@ -8,8 +9,8 @@ fn main() -> io::Result<()> {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 2,
         n_samples: 25,
-        variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![-1, 0, 1],
+        variables: vec!["x".into()],//, "y".into(), "z".into()],
+        consts: vec![Constant::Number(0), Constant::Number(1)],
     };
 
     let eqs = param.run();
