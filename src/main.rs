@@ -5,6 +5,7 @@ use ruler::Constant;
 use std::io::{self, Write};
 
 fn main() -> io::Result<()> {
+    let _ = env_logger::builder().try_init();
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 1,
