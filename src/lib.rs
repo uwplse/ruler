@@ -45,9 +45,9 @@ define_language! {
         "<>" = Neq([Id; 2]),
         "<=" = Leq([Id; 2]),
         ">=" = Geq([Id; 2]),
-        "==" = Eq([Id; 2]),
-        "<" = Le([Id; 2]),
-        ">" = Ge([Id; 2]),
+        // "==" = Eq([Id; 2]),
+        "<" = Lt([Id; 2]),
+        ">" = Gt([Id; 2]),
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
         "+" = Add([Id; 2]),
@@ -115,13 +115,13 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                     (_, _) => None,
                 })
                 .collect(),
-            SimpleMath::Eq([a, b]) => {
-                if x(a).zip(x(b)).all(|(x, y)| x == y) {
-                    vec![Some(Constant::Boolean(true)); x(a).len()]
-                } else {
-                    vec![Some(Constant::Boolean(false)); x(a).len()]
-                }
-            }
+            // SimpleMath::Eq([a, b]) => {
+            //     if x(a).zip(x(b)).all(|(x, y)| x == y) {
+            //         vec![Some(Constant::Boolean(true)); x(a).len()]
+            //     } else {
+            //         vec![Some(Constant::Boolean(false)); x(a).len()]
+            //     }
+            // }
             SimpleMath::Neq([a, b]) => {
                 if x(a).zip(x(b)).any(|(x, y)| x != y) {
                     vec![Some(Constant::Boolean(true)); x(a).len()]
@@ -143,14 +143,14 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                     vec![Some(Constant::Boolean(false)); x(a).len()]
                 }
             }
-            SimpleMath::Le([a, b]) => {
+            SimpleMath::Lt([a, b]) => {
                 if x(a).zip(x(b)).all(|(x, y)| x < y) {
                     vec![Some(Constant::Boolean(true)); x(a).len()]
                 } else {
                     vec![Some(Constant::Boolean(false)); x(a).len()]
                 }
             }
-            SimpleMath::Ge([a, b]) => {
+            SimpleMath::Gt([a, b]) => {
                 if x(a).zip(x(b)).all(|(x, y)| x > y) {
                     vec![Some(Constant::Boolean(true)); x(a).len()]
                 } else {
@@ -203,23 +203,6 @@ impl Analysis<SimpleMath> for SynthAnalysis {
     fn modify(egraph: &mut EGraph<SimpleMath, Self>, id: Id) {}
 }
 
-fn instantiate(pattern: &Pattern<SimpleMath>) -> RecExpr<SimpleMath> {
-    let nodes: Vec<_> = pattern
-        .ast
-        .as_ref()
-        .iter()
-        .map(|n| match n {
-            ENodeOrVar::ENode(n) => n.clone(),
-            ENodeOrVar::Var(v) => {
-                let s = v.to_string();
-                assert!(s.starts_with('?'));
-                SimpleMath::Var(s[1..].into())
-            }
-        })
-        .collect();
-
-    RecExpr::from(nodes)
-}
 
 fn generalize(expr: &RecExpr<SimpleMath>, map: &mut HashMap<Symbol, Var>) -> Pattern<SimpleMath> {
     let alpha = b"abcdefghijklmnopqrstuvwxyz";
@@ -244,10 +227,14 @@ fn generalize(expr: &RecExpr<SimpleMath>, map: &mut HashMap<Symbol, Var>) -> Pat
     Pattern::from(PatternAst::from(nodes))
 }
 
-fn remove_pred_rules(
-    analysis: SynthAnalysis,
-    equalities: &mut Vec<Equality<SimpleMath, SynthAnalysis>>,
-) {
+fn pattern_has_pred(pattern : &Pattern<SimpleMath>) -> bool {
+    use SimpleMath::*;
+    let mut nodes = pattern.ast.as_ref().iter();
+    nodes.any(|n| match n {
+        ENodeOrVar::Var(_) => false,
+        ENodeOrVar::ENode(en) => matches! (en, Neq(..) | And(..) | Or(..) | Bool(_) | Gt(..) | Geq(..) | Lt(..) | Leq(..) | Not(_))
+        }
+    )
 }
 
 pub struct SynthParam {
@@ -301,7 +288,9 @@ impl SynthParam {
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
                     let pat2 = generalize(&expr2, names);
-                    equalities.extend(Equality::new(pat1, pat2, None));
+                    if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                        equalities.extend(Equality::new(pat1, pat2, None));
+                    }
                     println!("new rule: {} => {}", &expr2, &expr1);
                 }
                 // i != j
@@ -331,12 +320,6 @@ impl SynthParam {
                         .map(|(i, _)| i)
                         .collect();
 
-                    for &i in &diff_idxs {
-                        println!("different in indices {}", &i);
-                    }
-                    for &i in &same_idxs {
-                        println!("same in indices {}", &i);
-                    }
 
                     let ec_datas: Vec<(Id, Vec<Option<Constant>>)> =
                         eg.classes().cloned().map(|c| (c.id, c.data)).collect();
@@ -358,15 +341,13 @@ impl SynthParam {
                     let (_cost1, expr1) = extract.find_best(i);
                     let (_cost2, expr2) = extract.find_best(j);
 
-                    println!();
                     println!("{}'s data:", expr1);
                     for &d in &eg[i].data {
-                        print!("{:?}", d);
+                        print!(" {:?}", d);
                     }
-                    println!();
                     println!("{}'s data:", expr2);
                     for &d in &eg[j].data {
-                        print!("{:?}", d);
+                        print!(" {:?}", d);
                     }
 
                     let names = &mut HashMap::default();
@@ -374,17 +355,11 @@ impl SynthParam {
                     let pat2 = generalize(&expr2, names);
 
                     if cond.is_some() {
-                        println!(
-                            "cond new rule: {} => {} if {}",
-                            &expr2,
-                            &expr1,
-                            cond.clone().unwrap()
-                        );
-                    }
-
-                    if cond.is_some() {
                         let c = generalize(&cond.unwrap(), names);
-                        equalities.extend(Equality::new(pat1, pat2, Some(c)));
+                        if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                            println!("new cond rule {} => {} if {}", pat1, pat2, c);
+                            equalities.extend(Equality::new(pat1, pat2, Some(c)));
+                        }
                     }
                 }
             }
@@ -435,7 +410,7 @@ impl SynthParam {
 
                         let mut set = HashSet::new();
                         equalities.retain(|eq| set.insert(eq.name.clone()));
-                        let rules = equalities.iter().map(|eq| &eq.no_add_rewrite);
+                        let rules = equalities.iter().map(|eq| &eq.rewrite);
 
                         eg.rebuild();
                         let runner: Runner<SimpleMath, SynthAnalysis, ()> =
@@ -506,7 +481,6 @@ pub struct Equality<L, A> {
     pub cond: Option<Pattern<L>>,
     pub name: String,
     pub rewrite: egg::Rewrite<L, A>,
-    pub no_add_rewrite: egg::Rewrite<L, A>,
 }
 
 impl<L: Language, A> Display for Equality<L, A> {
@@ -526,26 +500,17 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
 
             let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), applier).ok()?;
 
-            let no_add_rhs = NoAddPatternApplier(rhs.clone());
-            let no_add =
-                egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), no_add_rhs).unwrap();
-
             Some(Self {
                 lhs,
                 rhs,
                 cond : Some(cond),
                 name,
                 rewrite: rw,
-                no_add_rewrite: no_add,
             })
         } else {
             let name = format!("{} => {}", lhs, rhs);
             let applier = rhs.clone();
             let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), applier).ok()?;
-
-            let no_add_rhs = NoAddPatternApplier(rhs.clone());
-            let no_add =
-                egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), no_add_rhs).unwrap();
 
             Some(Self {
                 lhs,
@@ -553,41 +518,11 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
                 cond,
                 name,
                 rewrite: rw,
-                no_add_rewrite: no_add,
             })
         }
     }
 }
 
-struct NoAddPatternApplier<L>(Pattern<L>);
-
-impl<L, A> egg::Applier<L, A> for NoAddPatternApplier<L>
-where
-    L: Language,
-    A: Analysis<L>,
-{
-    fn apply_one(&self, egraph: &mut EGraph<L, A>, _eclass: Id, subst: &Subst) -> Vec<Id> {
-        let mut so_far: Vec<Id> = vec![];
-        for node in self.0.ast.as_ref() {
-            let id = match node {
-                ENodeOrVar::ENode(n) => {
-                    match egraph.lookup(n.clone().map_children(|i| so_far[usize::from(i)])) {
-                        Some(id) => id,
-                        None => return vec![],
-                    }
-                }
-                ENodeOrVar::Var(v) => subst[*v],
-            };
-            so_far.push(id);
-        }
-
-        vec![*so_far.last().unwrap()]
-    }
-
-    fn vars(&self) -> Vec<Var> {
-        self.0.vars()
-    }
-}
 
 #[cfg(test)]
 mod tests {
