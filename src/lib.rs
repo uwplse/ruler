@@ -324,12 +324,19 @@ impl SynthParam {
         for &i in &ids {
             for &j in &ids {
                 let mut i_nones: Vec<usize> = Vec::new();
-                let mut diffs : Vec<Option<Constant>> = Vec::new();
+                let mut diffs: Vec<Option<Constant>> = Vec::new();
                 if i < j
                     && eg[i].data != eg[j].data
                     && (eg[i].data.contains(&None) || eg[j].data.contains(&None))
                 {
-                    i_nones = eg[i].data.iter().zip(eg[j].data.iter()).enumerate().filter(|(_, (x, y))| *x == &None || *y == &None).map(|(i, _)| i).collect();
+                    i_nones = eg[i]
+                        .data
+                        .iter()
+                        .zip(eg[j].data.iter())
+                        .enumerate()
+                        .filter(|(_, (x, y))| *x == &None || *y == &None)
+                        .map(|(i, _)| i)
+                        .collect();
                     if eg[i]
                         .data
                         .iter()
