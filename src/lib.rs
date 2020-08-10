@@ -275,7 +275,7 @@ impl SynthParam {
         to_union: &mut std::vec::Vec<(egg::Id, egg::Id)>,
     ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut extract = Extractor::new(&eg, AstSize);
-        let ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
+        let ids: Vec<Id> = eg.classes().map(|c| c.id).collect();
 
         let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
 
@@ -308,7 +308,7 @@ impl SynthParam {
         }
 
         let only_diff_at_none_poses =
-            |(pos, (x, y)), none_poses: Vec<usize>| !none_poses.contains(&pos) && x == y;
+            |(pos, (x, y)), none_poses: Vec<usize>| none_poses.contains(&pos) || x == y;
 
         let ec_datas: Vec<(Vec<Option<Constant>>, Id)> =
             eg.classes().cloned().map(|c| (c.data, c.id)).collect();
@@ -323,13 +323,15 @@ impl SynthParam {
 
         for &i in &ids {
             for &j in &ids {
-                let mut i_nones: Vec<usize> = Vec::new();
                 let mut diffs: Vec<Option<Constant>> = Vec::new();
                 if i < j
                     && eg[i].data != eg[j].data
                     && (eg[i].data.contains(&None) || eg[j].data.contains(&None))
                 {
-                    i_nones = eg[i]
+                    let (_cost1, expr1) = extract.find_best(i);
+                    let (_cost2, expr2) = extract.find_best(j);
+                    println!("finding cond rule for {} and {}", expr1, expr2);
+                    let i_nones : Vec<usize> = eg[i]
                         .data
                         .iter()
                         .zip(eg[j].data.iter())
@@ -337,13 +339,13 @@ impl SynthParam {
                         .filter(|(_, (x, y))| *x == &None || *y == &None)
                         .map(|(i, _)| i)
                         .collect();
+                    println!("inones length = {}", i_nones.clone().len());
                     if eg[i]
                         .data
                         .iter()
                         .zip(eg[j].data.iter())
                         .enumerate()
-                        .all(|(i, (x, y))| only_diff_at_none_poses((i, (x, y)), i_nones.clone()))
-                    {
+                        .all(|(i, (x, y))| only_diff_at_none_poses((i, (x, y)), i_nones.clone())) {
                         for idx in 0..eg[j].data.len() {
                             if i_nones.contains(&idx) {
                                 diffs.push(Some(Constant::Boolean(false)));
@@ -351,27 +353,36 @@ impl SynthParam {
                                 diffs.push(Some(Constant::Boolean(true)));
                             }
                         }
-                    }
-                    let cond = match ec_datas
-                        .iter()
-                        .find(|(ec_data, id)| same_cvec(&ec_data, &diffs))
-                    {
-                        None => None,
-                        Some((d, id)) => Some(extract.find_best(*id).1),
-                    };
-                    let (_cost1, expr1) = extract.find_best(i);
-                    let (_cost2, expr2) = extract.find_best(j);
-
-                    let names = &mut HashMap::default();
-                    let pat1 = generalize(&expr1, names);
-                    let pat2 = generalize(&expr2, names);
-                    if cond.is_some() {
-                        let c = generalize(&cond.unwrap(), names);
-                        if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                            println!("new cond rule {} => {} if {}", pat1, pat2, c);
-                            equalities.extend(Equality::new(pat1, pat2, Some(c)));
+                    
+                        println!("diff cvec for {} {}", i, j);
+                        for d in &diffs {
+                            print!(" {:?} ", d);
                         }
+
+                       let cond = match ec_datas
+                           .iter()
+                           .find(|(ec_data, _)| same_cvec(&ec_data, &diffs))
+                       {
+                           None => None,
+                           Some((_, id)) => {
+                               println!("cond cvec {:?}", eg[*id].data);
+                               Some(extract.find_best(*id).1)}
+                       };
+                       let (_cost1, expr1) = extract.find_best(i);
+                       let (_cost2, expr2) = extract.find_best(j);
+
+                       let names = &mut HashMap::default();
+                       let pat1 = generalize(&expr1, names);
+                       let pat2 = generalize(&expr2, names);
+                       if cond.is_some() {
+                           let c = generalize(&cond.unwrap(), names);
+                           if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) && pattern_has_pred(&c){
+                               println!("new cond rule {} => {} if {}", pat1, pat2, c);
+                               equalities.extend(Equality::new(pat1, pat2, Some(c)));
+                           }
+                       }
                     }
+                    
                 }
             }
         }
