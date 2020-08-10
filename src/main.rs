@@ -9,9 +9,9 @@ fn main() -> io::Result<()> {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 1,
-        n_samples: 5,
-        variables: vec!["x".into()],//, "y".into(), "z".into()],
-        consts: vec![Constant::Number(0), Constant::Number(1)],
+        n_samples: 15,
+        variables: vec!["x".into(), "y".into(), "z".into()],
+        consts: vec![Constant::Number(0), Constant::Number(1)],// Constant::Boolean(true), Constant::Boolean(false)],
     };
 
     let eqs = param.run();
