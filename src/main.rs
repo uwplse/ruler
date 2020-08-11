@@ -11,7 +11,7 @@ fn main() -> io::Result<()> {
         n_iter: 1,
         n_samples: 15,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![Constant::Number(0), Constant::Number(1)],// Constant::Boolean(true), Constant::Boolean(false)],
+        consts: vec![Constant::Number(0), Constant::Number(1)]//, Constant::Boolean(false)] //, Constant::Boolean(true)],
     };
 
     let eqs = param.run();

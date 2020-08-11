@@ -318,6 +318,8 @@ impl SynthParam {
         let only_diff_at_none_poses =
             |(pos, (x, y)), none_poses: Vec<usize>| none_poses.contains(&pos) || x == y;
 
+        let all_false = |cvec : &Vec<Option<Constant>>| cvec.iter().all(|v| v == &Some(Constant::Boolean(false)));
+
         let ec_datas: Vec<(Vec<Option<Constant>>, Id)> =
             eg.classes().cloned().map(|c| (c.data, c.id)).collect();
 
@@ -361,7 +363,7 @@ impl SynthParam {
 
                         let cond = match ec_datas
                             .iter()
-                            .find(|(ec_data, _)| same_cvec(&ec_data, &agreement_vec))
+                            .find(|(ec_data, _)| same_cvec(&ec_data, &agreement_vec) && !all_false(&ec_data))
                         {
                             None => None,
                             Some((_, id)) => Some(extract.find_best(*id).1),
