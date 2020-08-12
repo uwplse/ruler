@@ -12,5 +12,6 @@ env_logger = { version = "0.7", default-features = false }
 rand_pcg = "0.2"
 rand = { version = "0.7", default-features = false, features = ["std"] }
 
-egg = "0.6"
+egg = { path = "/Users/cnandi/research/egg" }
+# egg = "0.6"
 indexmap = "1"

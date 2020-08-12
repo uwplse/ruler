@@ -310,6 +310,7 @@ impl SynthParam {
                 let pat1 = generalize(&expr1, names);
                 let pat2 = generalize(&expr2, names);
                 if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                    println!("Rule found {} => {}", pat1, pat2);
                     equalities.extend(Equality::new(pat1, pat2, None));
                 }
             }
@@ -401,7 +402,7 @@ impl SynthParam {
             let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
             let mut op_ctr = 0;
 
-            while op_ctr < num_ops - 0 {
+            while op_ctr < num_ops {
                 println!(
                     "iter {} phase 1: Currently there are {} eclasses",
                     iter,
@@ -410,29 +411,29 @@ impl SynthParam {
                 for &i in &cur_ids {
                     for &j in &cur_ids {
                         if op_ctr == 0 {
-                            if i != j {
-                                eg.add(SimpleMath::Neq([i, j]));
-                            }
+                            eg.add(SimpleMath::Add([i, j]));
                         } else if op_ctr == 1 {
-                            eg.add(SimpleMath::Div([i, j]));
+                            eg.add(SimpleMath::Sub([i, j]));
                         } else if op_ctr == 2 {
                             eg.add(SimpleMath::Mul([i, j]));
                         } else if op_ctr == 3 {
-                            eg.add(SimpleMath::Sub([i, j]));
+                            eg.add(SimpleMath::Div([i, j]));
                         } else if op_ctr == 4 {
-                            eg.add(SimpleMath::Add([i, j]));
-                        } else if op_ctr == 5 {
                             eg.add(SimpleMath::Not(i));
-                        } else if op_ctr == 6 {
+                        } else if op_ctr == 5 {
                             eg.add(SimpleMath::Leq([i, j]));
-                        } else if op_ctr == 7 {
+                        } else if op_ctr == 6 {
                             eg.add(SimpleMath::Geq([i, j]));
-                        } else if op_ctr == 8 {
+                        } else if op_ctr == 7 {
                             eg.add(SimpleMath::And([i, j]));
-                        } else if op_ctr == 9 {
+                        } else if op_ctr == 8 {
                             eg.add(SimpleMath::Or([i, j]));
-                        } else if op_ctr == 10 {
+                        } else if op_ctr == 9 {
                             eg.add(SimpleMath::Neg(i));
+                        } else if op_ctr == 10 {
+                            if i != j {
+                                eg.add(SimpleMath::Neq([i, j]));
+                            }
                         } else if op_ctr == 11 {
                             if i != j {
                                 eg.add(SimpleMath::Lt([i, j]));
@@ -538,6 +539,7 @@ impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
                     applier: rhs.clone(),
                     condition: ConditionEqual(cond.clone(), "true".parse().unwrap()),
                 };
+
 
             let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), applier).ok()?;
 
