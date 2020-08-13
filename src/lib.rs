@@ -257,7 +257,7 @@ impl SynthParam {
         let mut egraph = EGraph::new(SynthAnalysis {
             // for now just adding 0 and 1 forcefully to the cvecs for variables
             // to test conditional rules for division
-            cvec_len: self.n_samples + 2,
+            cvec_len: self.n_samples + self.consts.len(),
         });
         let rng = &mut self.rng;
         for var in &self.variables {
