@@ -50,6 +50,6 @@ fn main() {
             Err(_) => println!("Error while simplifying"),
         } 
     } else {
-        println!("USAGE: \n `cargo run` will run Ruler \n `cargo run simplify` : will allow simplifying an expression.");
+        println!("USAGE: \n `cargo run` will run Ruler \n `cargo run simplify` will allow simplifying an expression.");
     }
 }
