@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use rand::{prelude::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, BTreeSet},
     fmt::Display,
     fmt::Formatter,
     time::Duration,
@@ -65,6 +65,7 @@ define_language! {
 #[derive(Default, Clone)]
 pub struct SynthAnalysis {
     cvec_len: usize,
+    my_ids : BTreeSet<Id>,
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
@@ -258,6 +259,7 @@ impl SynthParam {
             // for now just adding 0 and 1 forcefully to the cvecs for variables
             // to test conditional rules for division
             cvec_len: self.n_samples + self.consts.len(),
+            my_ids : Default::default()
         });
         let rng = &mut self.rng;
         for var in &self.variables {
@@ -282,10 +284,10 @@ impl SynthParam {
         mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>>,
         to_union: &mut std::vec::Vec<(egg::Id, egg::Id)>,
     ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-        let mut extract = Extractor::new(&eg, AstSize);
-        let ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
 
+        let ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
         let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
+        let mut extract = Extractor::new(&eg, AstSize);
 
         for class in eg.classes() {
             if ids.contains(&class.id) {
