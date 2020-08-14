@@ -32,7 +32,7 @@ fn ruler(iter: usize, samples : usize) -> CVecStats {
 }
 
 fn nsamples_vs_exec_time() {
-    let cvec_lens = vec![10, 25, 50, 75, 100, 250, 500, 750, 1000];
+    let cvec_lens = vec![10, 20, 40, 60, 80, 100, 200, 400];//, 750, 1000];
     let iters = vec![1];
     let mut data = vec![];
     let outfile = std::fs::File::create("../../out/sample_vs_time.json").expect("failed to open file");
