@@ -22,7 +22,7 @@ fn ruler(iter: usize, samples : usize) -> CVecStats {
     };
 
     let before = Instant::now();
-    param.run();
+    param.run(false);
     let after = Instant::now();
     return CVecStats {
         niter : iter,
