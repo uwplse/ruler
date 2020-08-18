@@ -11,7 +11,7 @@
 
 ;; parse s-expr into language
 
-(require "herbie-rules.rkt")
+(require "inputs/herbie-rules.rkt")
 
 ;; run visitor over AST
 
