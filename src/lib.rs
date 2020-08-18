@@ -259,7 +259,7 @@ impl SynthParam {
             // for now just adding 0 and 1 forcefully to the cvecs for variables
             // to test conditional rules for division
             cvec_len: self.n_samples + self.consts.len(),
-            my_ids : Default::default()
+            my_ids : Default::default(),
         });
         let rng = &mut self.rng;
         for var in &self.variables {
@@ -272,6 +272,7 @@ impl SynthParam {
             cvec.shuffle(rng);
             egraph[id].data = cvec;
         }
+        // implicit sumbumption order here
         for n in &self.consts {
             egraph.add(SimpleMath::Num(*n));
         }
@@ -312,10 +313,20 @@ impl SynthParam {
                 let names = &mut HashMap::default();
                 let pat1 = generalize(&expr1, names);
                 let pat2 = generalize(&expr2, names);
+
+                // don't add rules over predicates
                 if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
                     println!("Rule found {} => {}", pat1, pat2);
                     equalities.extend(Equality::new(pat1, pat2, None));
                 }
+
+                // let names = &mut HashMap::default();
+                // let pat1 = generalize(&expr2, names);
+                // let pat2 = generalize(&expr1, names);
+                // if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                //     println!("Rule found {} => {}", pat1, pat2);
+                //     equalities.extend(Equality::new(pat1, pat2, None));
+                // }
             }
         }
 
@@ -422,7 +433,7 @@ impl SynthParam {
                     }
                 }
             }
-            
+
             println!(
                 "iter {} phase 2: before running rules, n={}, e={}",
                 iter,
@@ -476,14 +487,14 @@ impl SynthParam {
                 "       phase 3: number of eclasses after union : {}",
                 eg.number_of_classes()
             );
-            
+
             println!(
                 "iter {} phase 3: found {} new rules",
                 iter,
                 equalities.len()
             );
         }
-        
+
         let mut set = HashSet::new();
         equalities.retain(|eq| set.insert(eq.name.clone()));
         println!("Overall found the following {} rules", equalities.len());
@@ -617,7 +628,7 @@ impl SynthParam {
         }
         equalities
     }
-    
+
 }
 
 pub struct Equality<L, A> {
@@ -634,18 +645,59 @@ impl<L: Language, A> Display for Equality<L, A> {
     }
 }
 
-impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
-    fn new(lhs: Pattern<L>, rhs: Pattern<L>, cond: Option<Pattern<L>>) -> Option<Self> {
+
+// checking only the first element of the cvec
+fn cvec_all_num(data : &Vec<Option<Constant>>) -> bool {
+    match data[0] {
+        Some(Constant::Number(_)) => true,
+        Some(Constant::Boolean(_)) => false,
+        None => false
+    }
+}
+
+struct TypeBasedSearcher <F, S> {
+    filter : F,
+    searcher : S
+}
+
+impl<F, S, L, A> egg::Searcher<L, A> for TypeBasedSearcher<F, S>
+where
+    L : Language,
+    A : Analysis<L>,
+    S: Searcher<L, A>,
+    F: Fn(&EGraph<L, A>, Id) -> bool,
+{
+    fn search_eclass(&self, egraph: &EGraph<L, A>, eclass: Id) -> Option<SearchMatches> {
+        if (self.filter)(egraph, eclass) {
+            self.searcher.search_eclass(egraph, eclass)
+        } else {
+            None
+        }
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        self.searcher.vars()
+    }
+ }
+
+ impl Equality<SimpleMath, SynthAnalysis> {
+    fn new(lhs: Pattern<SimpleMath>, rhs: Pattern<SimpleMath>, cond: Option<Pattern<SimpleMath>>) -> Option<Self> {
         if let Some(cond) = cond {
             let name = format!("{} => {} if {}", lhs, rhs, cond);
-            let applier: ConditionalApplier<ConditionEqual<Pattern<L>, Pattern<L>>, Pattern<L>> =
-                ConditionalApplier {
-                    applier: rhs.clone(),
-                    condition: ConditionEqual(cond.clone(), "true".parse().unwrap()),
-                };
 
+            let f = |eg: &EGraph<_, SynthAnalysis>, id| cvec_all_num(&eg[id].data);
+            let searcher = TypeBasedSearcher {
+                filter: f,
+                searcher: lhs.clone(),
+            };
 
-            let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), applier).ok()?;
+            // let applier: ConditionalApplier<ConditionEqual<Pattern<SimpleMath>, Pattern<SimpleMath>>, Pattern<SimpleMath>> =
+            //     ConditionalApplier {
+            //         applier: rhs.clone(),
+            //         condition: ConditionEqual(cond.clone(), "true".parse().unwrap()),
+            //     };
+
+            let rw = egg::Rewrite::new(name.clone(), name.clone(), searcher, rhs.clone()).ok()?;
 
             Some(Self {
                 lhs,
