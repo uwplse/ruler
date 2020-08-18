@@ -2,3 +2,5 @@
 /out
 Cargo.lock
 *.bak
+*.dep
+*.zo
