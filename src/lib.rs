@@ -25,6 +25,7 @@ define_language! {
 #[derive(Default, Clone)]
 pub struct SynthAnalysis {
     n_samples: usize,
+    my_ids: BTreeSet<Id> 
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
@@ -107,6 +108,7 @@ impl SynthParam {
     fn mk_egraph(&mut self) -> EGraph<SimpleMath, SynthAnalysis> {
         let mut egraph = EGraph::new(SynthAnalysis {
             n_samples: self.n_samples,
+            my_ids: Default::default(),
         });
         let rng = &mut self.rng;
         for var in &self.variables {
@@ -171,6 +173,7 @@ impl SynthParam {
                     eg.number_of_classes()
                 );
                 let rules = equalities.iter().map(|eq| &eq.no_add_rewrite);
+                // let rules = equalities.iter().map(|eq| &eq.rewrite);
                 let runner: Runner<SimpleMath, SynthAnalysis, ()> =
                     Runner::new(eg.analysis.clone()).with_egraph(eg);
                 eg = runner
@@ -187,6 +190,7 @@ impl SynthParam {
                 );
 
                 my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
+                eg.analysis.my_ids = my_ids.clone();
 
                 println!("iter {} phase 3: discover rules", iter);
                 println!("       phase 3: grouping");
@@ -269,6 +273,33 @@ impl SynthParam {
     }
 }
 
+struct FilterSearcher<F, S> {
+    ecfilter: F,
+    searcher: S,
+}
+
+
+impl<F, S, L, A> egg::Searcher<L, A> for FilterSearcher<F, S>
+where
+    L: Language,
+    A: Analysis<L>,
+    S: Searcher<L, A>,
+    F: Fn(&EGraph<L, A>, Id) -> bool,
+{
+    fn search_eclass(&self, egraph: &EGraph<L, A>, eclass: Id) -> Option<SearchMatches> {
+        if (self.ecfilter)(egraph, eclass) {
+            self.searcher.search_eclass(egraph, eclass)
+        } else {
+            None
+        }
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        self.searcher.vars()
+    }
+}
+
+
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
@@ -283,11 +314,17 @@ impl<L: Language, A> Display for Equality<L, A> {
     }
 }
 
-impl<L: Language + 'static, A: Analysis<L>> Equality<L, A> {
-    fn new(lhs: Pattern<L>, rhs: Pattern<L>) -> Option<Self> {
+impl Equality<SimpleMath, SynthAnalysis> {
+    fn new(lhs: Pattern<SimpleMath>, rhs: Pattern<SimpleMath>) -> Option<Self> {
         let name = format!("{} => {}", lhs, rhs);
 
-        let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone()).ok()?;
+        let f = |eg: &EGraph<_, SynthAnalysis>, id| eg.analysis.my_ids.contains(&id);
+            let searcher = FilterSearcher {
+                ecfilter: f,
+                searcher: lhs.clone(),
+            };
+
+        let rw = egg::Rewrite::new(name.clone(), name.clone(), searcher, rhs.clone()).ok()?;
 
         let no_add_rhs = NoAddPatternApplier(rhs.clone());
         let no_add =
