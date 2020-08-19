@@ -37,9 +37,10 @@ fn main() {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 1,
-        n_samples: 15,
+        n_samples: 5,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![Constant::Number(0), Constant::Number(1)]//, Constant::Boolean(false)] //, Constant::Boolean(true)],
+        consts: vec![Constant::Number(0), Constant::Number(1)],//, Constant::Boolean(false)] //, Constant::Boolean(true)],
+        diff_thresh: 5
     };
 
     if args.len() < 2 {

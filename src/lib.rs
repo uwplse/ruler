@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use rand::{prelude::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use std::{
-    collections::{HashMap, HashSet, BTreeSet},
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
     fmt::Formatter,
     time::Duration,
@@ -65,7 +65,7 @@ define_language! {
 #[derive(Default, Clone)]
 pub struct SynthAnalysis {
     cvec_len: usize,
-    my_ids : BTreeSet<Id>,
+    my_ids: BTreeSet<Id>,
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
@@ -251,6 +251,7 @@ pub struct SynthParam {
     pub n_samples: usize,
     pub variables: Vec<egg::Symbol>,
     pub consts: Vec<Constant>,
+    pub diff_thresh : usize,
 }
 
 impl SynthParam {
@@ -259,7 +260,7 @@ impl SynthParam {
             // for now just adding 0 and 1 forcefully to the cvecs for variables
             // to test conditional rules for division
             cvec_len: self.n_samples + self.consts.len(),
-            my_ids : Default::default(),
+            my_ids: Default::default(),
         });
         let rng = &mut self.rng;
         for var in &self.variables {
@@ -281,13 +282,14 @@ impl SynthParam {
 
     fn learn_rules(
         &self,
-        conditional : bool,
+        conditional: bool,
+        // my_ids : &BTreeSet<Id>,
         eg: &EGraph<SimpleMath, SynthAnalysis>,
         mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>>,
         to_union: &mut std::vec::Vec<(egg::Id, egg::Id)>,
     ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-
         let ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
+
         let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
         let mut extract = Extractor::new(&eg, AstSize);
 
@@ -313,28 +315,38 @@ impl SynthParam {
                 let names = &mut HashMap::default();
                 let pat1 = generalize(&expr1, names);
                 let pat2 = generalize(&expr2, names);
-
                 // don't add rules over predicates
                 if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
                     println!("Rule found {} => {}", pat1, pat2);
                     equalities.extend(Equality::new(pat1, pat2, None));
                 }
 
-                // let names = &mut HashMap::default();
-                // let pat1 = generalize(&expr2, names);
-                // let pat2 = generalize(&expr1, names);
-                // if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                //     println!("Rule found {} => {}", pat1, pat2);
-                //     equalities.extend(Equality::new(pat1, pat2, None));
-                // }
+                let names = &mut HashMap::default();
+                let pat1 = generalize(&expr2, names);
+                let pat2 = generalize(&expr1, names);
+                // don't add rules over predicates
+                if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                    println!("Rule found {} => {}", pat1, pat2);
+                    equalities.extend(Equality::new(pat1, pat2, None));
+                }
             }
         }
 
         if conditional {
-            let only_diff_at_none_poses = |(pos, (x, y)), none_poses: Vec<usize>| none_poses.contains(&pos) || x == y;
-            let all_false = |cvec : &Vec<Option<Constant>>| cvec.iter().all(|v| v == &Some(Constant::Boolean(false)));
+            let only_diff_at_none_poses =
+                |(pos, (x, y)), none_poses: Vec<usize>| none_poses.contains(&pos) || x == y;
+
+            let all_false = |cvec: &Vec<Option<Constant>>| {
+                cvec.iter().all(|v| v == &Some(Constant::Boolean(false)))
+            };
+
+            let all_true = |cvec: &Vec<Option<Constant>>| {
+                cvec.iter().all(|v| v == &Some(Constant::Boolean(true)))
+            };
+
             let ec_datas: Vec<(Vec<Option<Constant>>, Id)> =
                 eg.classes().cloned().map(|c| (c.data, c.id)).collect();
+
             let same_cvec = |v1: &Vec<Option<Constant>>, v2: &Vec<Option<Constant>>| {
                 v1.iter().zip(v2.iter()).all(|(x, y)| match (x, y) {
                     (Some(Constant::Boolean(true)), Some(Constant::Boolean(true))) => true,
@@ -346,6 +358,7 @@ impl SynthParam {
             for &i in &ids {
                 for &j in &ids {
                     let mut agreement_vec: Vec<Option<Constant>> = Vec::new();
+
                     if i != j
                         && eg[i].data != eg[j].data
                         && (eg[i].data.contains(&None) || eg[j].data.contains(&None))
@@ -358,13 +371,9 @@ impl SynthParam {
                             .filter(|(_, (x, y))| *x == &None || *y == &None)
                             .map(|(i, _)| i)
                             .collect();
-                        if eg[i]
-                            .data
-                            .iter()
-                            .zip(eg[j].data.iter())
-                            .enumerate()
-                            .all(|(i, (x, y))| only_diff_at_none_poses((i, (x, y)), i_nones.clone()))
-                        {
+
+                        if eg[i].data.iter().zip(eg[j].data.iter()).enumerate().all(
+                            |(i, (x, y))| only_diff_at_none_poses((i, (x, y)), i_nones.clone()) && i_nones.clone().len() <= self.diff_thresh) {
                             for idx in 0..eg[j].data.len() {
                                 if i_nones.contains(&idx) {
                                     agreement_vec.push(Some(Constant::Boolean(false)));
@@ -373,26 +382,35 @@ impl SynthParam {
                                 }
                             }
 
-                            let cond = match ec_datas
-                                .iter()
-                                .find(|(ec_data, _)| same_cvec(&ec_data, &agreement_vec) && !all_false(&ec_data))
-                            {
+                            for ec_data in ec_datas.clone() {
+                                print!("cond: {}", extract.find_best(ec_data.1).1);
+                                for d in ec_data.0 {
+                                    if d != None  && (d.unwrap() == Constant::Boolean(true) || d.unwrap() == Constant::Boolean(false)) {
+                                        println!("val: {}", d.unwrap());
+                                    }
+                                }
+                            }
+                            let cond =
+                                match ec_datas.iter().find(|(ec_data, _)| {same_cvec(&ec_data, &agreement_vec) && !all_false(&ec_data) && !all_true(&ec_data)}) {
                                 None => None,
                                 Some((_, id)) => Some(extract.find_best(*id).1),
                             };
                             let (_cost1, expr1) = extract.find_best(i);
                             let (_cost2, expr2) = extract.find_best(j);
 
-                            let names = &mut HashMap::default();
-                            let pat1 = generalize(&expr1, names);
-                            let pat2 = generalize(&expr2, names);
                             if cond.is_some() {
-                                let c = generalize(&cond.unwrap(), names);
-                                if !pattern_has_pred(&pat1)
-                                    && !pattern_has_pred(&pat2)
-                                    && pattern_has_pred(&c)
-                                {
-                                    equalities.extend(Equality::new(pat1, pat2, Some(c)));
+                                let names = &mut HashMap::default();
+                                let c = generalize(&cond.clone().unwrap(), names);
+                                let pat1 = generalize(&expr1, names);
+                                let pat2 = generalize(&expr2, names);
+                                if pattern_has_pred(&c) && !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                                    equalities.extend(Equality::new(pat1, pat2, Some(c)))
+                                }
+                                let c = generalize(&cond.clone().unwrap(), names);
+                                let pat1 = generalize(&expr2, names);
+                                let pat2 = generalize(&expr1, names);
+                                if pattern_has_pred(&c.clone()) && !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                                    equalities.extend(Equality::new(pat1, pat2, Some(c)))
                                 }
                             }
                         }
@@ -402,118 +420,125 @@ impl SynthParam {
         }
         return equalities;
     }
-/*
-    pub fn run(&mut self, conds: bool) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-        let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
-        let mut eg = self.mk_egraph();
+    /*
+        pub fn run(&mut self, conds: bool) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+            let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
+            let mut eg = self.mk_egraph();
 
-        for iter in 0..self.n_iter {
-            let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
+            for iter in 0..self.n_iter {
+                let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
 
-            for &i in &cur_ids {
-                for &j in &cur_ids {
-                    eg.add(SimpleMath::Add([i, j]));
-                    eg.add(SimpleMath::Sub([i, j]));
-                    eg.add(SimpleMath::Mul([i, j]));
-                    eg.add(SimpleMath::Div([i, j]));
-                    eg.add(SimpleMath::Not(i));
-                    eg.add(SimpleMath::Leq([i, j]));
-                    eg.add(SimpleMath::Geq([i, j]));
-                    eg.add(SimpleMath::And([i, j]));
-                    eg.add(SimpleMath::Or([i, j]));
-                    eg.add(SimpleMath::Neg(i));
-                    if i != j {
-                        eg.add(SimpleMath::Neq([i, j]));
-                    }
-                    if i != j {
-                        eg.add(SimpleMath::Lt([i, j]));
-                    }
-                    if i != j {
-                        eg.add(SimpleMath::Gt([i, j]));
+                for &i in &cur_ids {
+                    for &j in &cur_ids {
+                        eg.add(SimpleMath::Add([i, j]));
+                        eg.add(SimpleMath::Sub([i, j]));
+                        eg.add(SimpleMath::Mul([i, j]));
+                        eg.add(SimpleMath::Div([i, j]));
+                        eg.add(SimpleMath::Not(i));
+                        eg.add(SimpleMath::Leq([i, j]));
+                        eg.add(SimpleMath::Geq([i, j]));
+                        eg.add(SimpleMath::And([i, j]));
+                        eg.add(SimpleMath::Or([i, j]));
+                        eg.add(SimpleMath::Neg(i));
+                        if i != j {
+                            eg.add(SimpleMath::Neq([i, j]));
+                        }
+                        if i != j {
+                            eg.add(SimpleMath::Lt([i, j]));
+                        }
+                        if i != j {
+                            eg.add(SimpleMath::Gt([i, j]));
+                        }
                     }
                 }
-            }
 
-            println!(
-                "iter {} phase 2: before running rules, n={}, e={}",
-                iter,
-                eg.total_size(),
-                eg.number_of_classes()
-            );
+                println!(
+                    "iter {} phase 2: before running rules, n={}, e={}",
+                    iter,
+                    eg.total_size(),
+                    eg.number_of_classes()
+                );
+
+                let mut set = HashSet::new();
+                equalities.retain(|eq| set.insert(eq.name.clone()));
+                let rules = equalities
+                    .iter()
+                    .filter(|eq| eq.cond == None)
+                    .map(|eq| &eq.rewrite);
+
+                eg.rebuild();
+
+                let runner: Runner<SimpleMath, SynthAnalysis, ()> =
+                    Runner::new(eg.analysis.clone()).with_egraph(eg);
+
+                eg = runner
+                    .with_time_limit(Duration::from_secs(20))
+                    .with_node_limit(usize::MAX)
+                    .with_iter_limit(100)
+                    .with_scheduler(SimpleScheduler)
+                    .run(rules)
+                    .egraph;
+
+                eg.rebuild();
+
+                println!(
+                    "       phase 2: after running {} rules, n={}, e={}",
+                    &equalities.len(),
+                    eg.total_size(),
+                    eg.number_of_classes()
+                );
+
+                println!("iter {} phase 3: discover rules", iter);
+
+                let mut to_union = vec![];
+
+                equalities = self.learn_rules(conds, &eg, equalities, &mut to_union);
+
+                println!("       phase 3: performing {} unions", to_union.len());
+                for (i, j) in to_union {
+                    eg.union(i, j);
+                }
+
+                eg.rebuild();
+
+                println!(
+                    "       phase 3: number of eclasses after union : {}",
+                    eg.number_of_classes()
+                );
+
+                println!(
+                    "iter {} phase 3: found {} new rules",
+                    iter,
+                    equalities.len()
+                );
+            }
 
             let mut set = HashSet::new();
             equalities.retain(|eq| set.insert(eq.name.clone()));
-            let rules = equalities
-                .iter()
-                .filter(|eq| eq.cond == None)
-                .map(|eq| &eq.rewrite);
-
-            eg.rebuild();
-
-            let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                Runner::new(eg.analysis.clone()).with_egraph(eg);
-
-            eg = runner
-                .with_time_limit(Duration::from_secs(20))
-                .with_node_limit(usize::MAX)
-                .with_iter_limit(100)
-                .with_scheduler(SimpleScheduler)
-                .run(rules)
-                .egraph;
-
-            eg.rebuild();
-
-            println!(
-                "       phase 2: after running {} rules, n={}, e={}",
-                &equalities.len(),
-                eg.total_size(),
-                eg.number_of_classes()
-            );
-
-            println!("iter {} phase 3: discover rules", iter);
-
-            let mut to_union = vec![];
-
-            equalities = self.learn_rules(conds, &eg, equalities, &mut to_union);
-
-            println!("       phase 3: performing {} unions", to_union.len());
-            for (i, j) in to_union {
-                eg.union(i, j);
+            println!("Overall found the following {} rules", equalities.len());
+            for eq in &equalities {
+                println!("{}", eq);
             }
-
-            eg.rebuild();
-
-            println!(
-                "       phase 3: number of eclasses after union : {}",
-                eg.number_of_classes()
-            );
-
-            println!(
-                "iter {} phase 3: found {} new rules",
-                iter,
-                equalities.len()
-            );
+            equalities
         }
-
-        let mut set = HashSet::new();
-        equalities.retain(|eq| set.insert(eq.name.clone()));
-        println!("Overall found the following {} rules", equalities.len());
-        for eq in &equalities {
-            println!("{}", eq);
-        }
-        equalities
-    }
-*/
+    */
 
     pub fn run(&mut self, conds: bool) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
+
+        let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
 
         // number of ops in the language
         let num_ops = 13;
 
         for iter in 0..self.n_iter {
             let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
+            my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
+
+            let added = my_ids.clone();
+            eg.analysis.my_ids = added.clone();
+
             let mut op_ctr = 0;
 
             while op_ctr < num_ops {
@@ -522,39 +547,58 @@ impl SynthParam {
                     iter,
                     cur_ids.len()
                 );
-                for &i in &cur_ids {
-                    for &j in &cur_ids {
+                // for &i in &cur_ids {
+                //     for &j in &cur_ids {
+                for &i in added.iter() {
+                    for &j in added.iter() {
+                        println!("my_ids: {}", my_ids.len());
+                        println!("added: {}", added.len());
+                        println!("cur_ids: {}", cur_ids.len());
+
                         if op_ctr == 0 {
-                            eg.add(SimpleMath::Add([i, j]));
+                            // eg.add(SimpleMath::Add([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::Add([i, j])));
                         } else if op_ctr == 1 {
-                            eg.add(SimpleMath::Sub([i, j]));
+                            // eg.add(SimpleMath::Sub([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::Sub([i, j])));
                         } else if op_ctr == 2 {
-                            eg.add(SimpleMath::Mul([i, j]));
+                            // eg.add(SimpleMath::Mul([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::Mul([i, j])));
                         } else if op_ctr == 3 {
-                            eg.add(SimpleMath::Div([i, j]));
+                            // eg.add(SimpleMath::Div([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::Div([i, j])));
                         } else if op_ctr == 4 {
-                            eg.add(SimpleMath::Not(i));
+                            // eg.add(SimpleMath::Not(i));
+                        my_ids.insert(eg.add(SimpleMath::Not(i)));
                         } else if op_ctr == 5 {
-                            eg.add(SimpleMath::Leq([i, j]));
+                            // eg.add(SimpleMath::Leq([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::Leq([i, j])));
                         } else if op_ctr == 6 {
-                            eg.add(SimpleMath::Geq([i, j]));
+                            // eg.add(SimpleMath::Geq([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::Geq([i, j])));
                         } else if op_ctr == 7 {
-                            eg.add(SimpleMath::And([i, j]));
+                            // eg.add(SimpleMath::And([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::And([i, j])));
                         } else if op_ctr == 8 {
-                            eg.add(SimpleMath::Or([i, j]));
+                            // eg.add(SimpleMath::Or([i, j]));
+                        my_ids.insert(eg.add(SimpleMath::Or([i, j])));
                         } else if op_ctr == 9 {
-                            eg.add(SimpleMath::Neg(i));
+                            // eg.add(SimpleMath::Neg(i));
+                        my_ids.insert(eg.add(SimpleMath::Neg(i)));
                         } else if op_ctr == 10 {
                             if i != j {
-                                eg.add(SimpleMath::Neq([i, j]));
+                                // eg.add(SimpleMath::Neq([i, j]));
+                                my_ids.insert(eg.add(SimpleMath::Neq([i, j])));
                             }
                         } else if op_ctr == 11 {
                             if i != j {
-                                eg.add(SimpleMath::Lt([i, j]));
+                                // eg.add(SimpleMath::Lt([i, j]));
+                                my_ids.insert(eg.add(SimpleMath::Lt([i, j])));
                             }
                         } else if op_ctr == 12 {
                             if i != j {
-                                eg.add(SimpleMath::Gt([i, j]));
+                                // eg.add(SimpleMath::Gt([i, j]));
+                                my_ids.insert(eg.add(SimpleMath::Gt([i, j])));
                             }
                         }
                         println!(
@@ -593,6 +637,7 @@ impl SynthParam {
                             eg.number_of_classes()
                         );
 
+                        my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
                         println!("iter {} phase 3: discover rules", iter);
 
                         let mut to_union = vec![];
@@ -628,7 +673,6 @@ impl SynthParam {
         }
         equalities
     }
-
 }
 
 pub struct Equality<L, A> {
@@ -645,30 +689,32 @@ impl<L: Language, A> Display for Equality<L, A> {
     }
 }
 
-
 // checking only the first element of the cvec
-fn cvec_all_num(data : &Vec<Option<Constant>>) -> bool {
+fn cvec_all_num(data: &Vec<Option<Constant>>) -> bool {
     match data[0] {
         Some(Constant::Number(_)) => true,
         Some(Constant::Boolean(_)) => false,
-        None => false
+        None => false,
     }
 }
 
-struct TypeBasedSearcher <F, S> {
-    filter : F,
-    searcher : S
+struct TypeBasedSearcher<F, G, S> {
+    typefilter: F,
+    ecfilter: G,
+    searcher: S,
 }
 
-impl<F, S, L, A> egg::Searcher<L, A> for TypeBasedSearcher<F, S>
+impl<F, G, S, L, A> egg::Searcher<L, A> for TypeBasedSearcher<F, G, S>
 where
-    L : Language,
-    A : Analysis<L>,
+    L: Language,
+    A: Analysis<L>,
     S: Searcher<L, A>,
     F: Fn(&EGraph<L, A>, Id) -> bool,
+    G: Fn(&EGraph<L, A>, Id) -> bool,
 {
     fn search_eclass(&self, egraph: &EGraph<L, A>, eclass: Id) -> Option<SearchMatches> {
-        if (self.filter)(egraph, eclass) {
+        if (self.typefilter)(egraph, eclass) {
+            // && (self.ecfilter)(egraph, eclass) {
             self.searcher.search_eclass(egraph, eclass)
         } else {
             None
@@ -678,19 +724,26 @@ where
     fn vars(&self) -> Vec<Var> {
         self.searcher.vars()
     }
- }
+}
 
- impl Equality<SimpleMath, SynthAnalysis> {
-    fn new(lhs: Pattern<SimpleMath>, rhs: Pattern<SimpleMath>, cond: Option<Pattern<SimpleMath>>) -> Option<Self> {
+impl Equality<SimpleMath, SynthAnalysis> {
+    fn new(
+        lhs: Pattern<SimpleMath>,
+        rhs: Pattern<SimpleMath>,
+        cond: Option<Pattern<SimpleMath>>,
+    ) -> Option<Self> {
         if let Some(cond) = cond {
             let name = format!("{} => {} if {}", lhs, rhs, cond);
 
             let f = |eg: &EGraph<_, SynthAnalysis>, id| cvec_all_num(&eg[id].data);
+            let g = |eg: &EGraph<_, SynthAnalysis>, id| eg.analysis.my_ids.contains(&id);
             let searcher = TypeBasedSearcher {
-                filter: f,
+                typefilter: f,
+                ecfilter: g,
                 searcher: lhs.clone(),
             };
 
+            // TODO: since we are not firing conditional rules
             // let applier: ConditionalApplier<ConditionEqual<Pattern<SimpleMath>, Pattern<SimpleMath>>, Pattern<SimpleMath>> =
             //     ConditionalApplier {
             //         applier: rhs.clone(),
@@ -708,8 +761,15 @@ where
             })
         } else {
             let name = format!("{} => {}", lhs, rhs);
+            let f = |eg: &EGraph<_, SynthAnalysis>, id| cvec_all_num(&eg[id].data);
+            let g = |eg: &EGraph<_, SynthAnalysis>, id| eg.analysis.my_ids.contains(&id);
+            let searcher = TypeBasedSearcher {
+                typefilter: f,
+                ecfilter: g,
+                searcher: lhs.clone(),
+            };
             let applier = rhs.clone();
-            let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), applier).ok()?;
+            let rw = egg::Rewrite::new(name.clone(), name.clone(), searcher, applier).ok()?;
 
             Some(Self {
                 lhs,
@@ -761,6 +821,7 @@ mod tests {
             n_samples: 25,
             variables: vec!["x".into(), "y".into(), "z".into()],
             consts: vec![Constant::Number(0), Constant::Number(1)],
+            diff_thresh: 5
         };
 
         let eqs = param.run(true);

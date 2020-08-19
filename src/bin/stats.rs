@@ -19,6 +19,7 @@ fn ruler(iter: usize, samples : usize) -> CVecStats {
         n_samples: samples,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![Constant::Number(0), Constant::Number(1)],
+        diff_thresh: 5
     };
 
     let before = Instant::now();
