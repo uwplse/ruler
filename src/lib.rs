@@ -1,3 +1,5 @@
+use std::io::Write;
+mod stats;
 use egg::*;
 use indexmap::IndexMap;
 use rand::{prelude::SliceRandom, Rng};
@@ -501,6 +503,9 @@ impl SynthParam {
         // number of ops in the language
         let num_ops = 13;
 
+        let mut eqsat_iter = 0;
+        let mut stats = stats::EgraphStats::new();
+
         for iter in 0..self.n_iter {
             let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
             let mut op_ctr = 0;
@@ -513,6 +518,8 @@ impl SynthParam {
                 );
                 for &i in &cur_ids {
                     for &j in &cur_ids {
+                        eqsat_iter = eqsat_iter + 1;
+
                         if op_ctr == 0 {
                             eg.add(SimpleMath::Add([i, j]));
                         } else if op_ctr == 1 {
@@ -553,6 +560,8 @@ impl SynthParam {
                             eg.number_of_classes()
                         );
 
+                        stats.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+
                         let mut set = HashSet::new();
                         equalities.retain(|eq| set.insert(eq.name.clone()));
                         let rules = equalities
@@ -582,6 +591,8 @@ impl SynthParam {
                             eg.number_of_classes()
                         );
 
+                        stats.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+
                         println!("iter {} phase 3: discover rules", iter);
 
                         let mut to_union = vec![];
@@ -609,12 +620,15 @@ impl SynthParam {
                 equalities.len()
             );
         }
+        stats.print();
+
         let mut set = HashSet::new();
         equalities.retain(|eq| set.insert(eq.name.clone()));
         println!("Overall found the following {} rules", equalities.len());
         for eq in &equalities {
             println!("{}", eq);
         }
+
         equalities
     }
     
