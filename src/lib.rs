@@ -324,7 +324,7 @@ impl Equality<SimpleMath, SynthAnalysis> {
                 searcher: lhs.clone(),
             };
 
-        let rw = egg::Rewrite::new(name.clone(), name.clone(), searcher, rhs.clone()).ok()?;
+        let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone()).ok()?;
 
         let no_add_rhs = NoAddPatternApplier(rhs.clone());
         let no_add =
