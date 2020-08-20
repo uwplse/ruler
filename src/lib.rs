@@ -25,7 +25,7 @@ define_language! {
 #[derive(Default, Clone)]
 pub struct SynthAnalysis {
     n_samples: usize,
-    my_ids: BTreeSet<Id> 
+    my_ids: BTreeSet<Id>,
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
@@ -278,7 +278,6 @@ struct FilterSearcher<F, S> {
     searcher: S,
 }
 
-
 impl<F, S, L, A> egg::Searcher<L, A> for FilterSearcher<F, S>
 where
     L: Language,
@@ -299,7 +298,6 @@ where
     }
 }
 
-
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
@@ -319,10 +317,10 @@ impl Equality<SimpleMath, SynthAnalysis> {
         let name = format!("{} => {}", lhs, rhs);
 
         let f = |eg: &EGraph<_, SynthAnalysis>, id| eg.analysis.my_ids.contains(&id);
-            let searcher = FilterSearcher {
-                ecfilter: f,
-                searcher: lhs.clone(),
-            };
+        let searcher = FilterSearcher {
+            ecfilter: f,
+            searcher: lhs.clone(),
+        };
 
         let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone()).ok()?;
 
