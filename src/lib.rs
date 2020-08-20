@@ -352,23 +352,30 @@ impl SynthParam {
                 })
             };
 
-            let is_valid = |cond_ec: &Id, expr1: RecExpr<SimpleMath>, expr2: RecExpr<SimpleMath>| {
-                let mut extract = Extractor::new(&eg, AstSize);
-                let mut c_vars : HashSet<&Symbol> = HashSet::new();
-                let mut e_vars : HashSet<&Symbol> = HashSet::new();
-                let c = extract.find_best(*cond_ec).1;
+            let is_valid =
+                |cond_ec: &Id, expr1: RecExpr<SimpleMath>, expr2: RecExpr<SimpleMath>| {
+                    let mut extract = Extractor::new(&eg, AstSize);
+                    let mut c_vars: HashSet<&Symbol> = HashSet::new();
+                    let mut e_vars: HashSet<&Symbol> = HashSet::new();
+                    let c = extract.find_best(*cond_ec).1;
 
-                c.as_ref().iter().for_each(|en| if let SimpleMath::Var(v) = en {
-                    c_vars.insert(v);
-                });
-                expr1.as_ref().iter().for_each(|en| if let SimpleMath::Var(v) = en {
-                    e_vars.insert(v);
-                });
-                expr2.as_ref().iter().for_each(|en| if let SimpleMath::Var(v) = en {
-                    e_vars.insert(v);
-                });
-                c_vars.iter().all(|cv| e_vars.contains(cv))
-            };
+                    c.as_ref().iter().for_each(|en| {
+                        if let SimpleMath::Var(v) = en {
+                            c_vars.insert(v);
+                        }
+                    });
+                    expr1.as_ref().iter().for_each(|en| {
+                        if let SimpleMath::Var(v) = en {
+                            e_vars.insert(v);
+                        }
+                    });
+                    expr2.as_ref().iter().for_each(|en| {
+                        if let SimpleMath::Var(v) = en {
+                            e_vars.insert(v);
+                        }
+                    });
+                    c_vars.iter().all(|cv| e_vars.contains(cv))
+                };
 
             for &i in &ids {
                 for &j in &ids {
