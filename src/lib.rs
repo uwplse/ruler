@@ -473,7 +473,7 @@ impl SynthParam {
 
             let mut op_ctr = 0;
 
-            while op_ctr < num_ops {
+            while op_ctr < num_ops - 10{
                 println!(
                     "iter {} phase 1: Currently there are {} eclasses",
                     iter,
@@ -623,7 +623,7 @@ impl<L: Language, A> Display for Equality<L, A> {
 }
 
 // checking only the first element of the cvec
-fn cvec_all_num(eg: &EGraph<SimpleMath, SynthAnalysis>, id: Id, data: &Vec<Option<Constant>>) -> bool {
+fn cvec_all_num(data: &Vec<Option<Constant>>) -> bool {
     if data.len() == 0 {
         // TODO: this is for the tests. Test expressions for testing Ruler may not have associated cvecs.
         // TODO: For now, just returning true.
@@ -675,7 +675,7 @@ impl Equality<SimpleMath, SynthAnalysis> {
             let name = format!("{} => {} if {}", lhs, rhs, cond);
 
             // only run rules over non-predicate expressions since we already filter out predicate rules
-            let f = |eg: &EGraph<_, SynthAnalysis>, id| cvec_all_num(&eg, id, &eg[id].data);
+            let f = |eg: &EGraph<_, SynthAnalysis>, id| cvec_all_num(&eg[id].data);
             let g = |eg: &EGraph<_, SynthAnalysis>, id| eg.analysis.my_ids.contains(&id);
             let searcher = TypeBasedSearcher {
                 typefilter: f,
@@ -700,7 +700,7 @@ impl Equality<SimpleMath, SynthAnalysis> {
         } else {
             let name = format!("{} => {}", lhs, rhs);
             // only run rules over non-predicate expressions since we already filter out predicate rules
-            let f = |eg: &EGraph<_, SynthAnalysis>, id| cvec_all_num(&eg, id, &eg[id].data);
+            let f = |eg: &EGraph<_, SynthAnalysis>, id| cvec_all_num(&eg[id].data);
             let g = |eg: &EGraph<_, SynthAnalysis>, id| eg.analysis.my_ids.contains(&id);
             let searcher = TypeBasedSearcher {
                 typefilter: f,
