@@ -251,7 +251,7 @@ pub struct SynthParam {
     pub n_samples: usize,
     pub variables: Vec<egg::Symbol>,
     pub consts: Vec<Constant>,
-    pub diff_thresh : usize,
+    pub diff_thresh: usize,
 }
 
 impl SynthParam {
@@ -340,10 +340,7 @@ impl SynthParam {
                 cvec.iter().all(|v| v == &Some(Constant::Boolean(false)))
             };
 
-            let all_true = |cvec: &Vec<Option<Constant>>| {
-                cvec.iter().all(|v| v == &Some(Constant::Boolean(true)))
-            };
-
+            // all eclass cvecs and Ids
             let ec_datas: Vec<(Vec<Option<Constant>>, Id)> =
                 eg.classes().cloned().map(|c| (c.data, c.id)).collect();
 
@@ -355,6 +352,24 @@ impl SynthParam {
                 })
             };
 
+            let is_valid = |cond_ec: &Id, expr1: RecExpr<SimpleMath>, expr2: RecExpr<SimpleMath>| {
+                let mut extract = Extractor::new(&eg, AstSize);
+                let mut c_vars : HashSet<&Symbol> = HashSet::new();
+                let mut e_vars : HashSet<&Symbol> = HashSet::new();
+                let c = extract.find_best(*cond_ec).1;
+
+                c.as_ref().iter().for_each(|en| if let SimpleMath::Var(v) = en {
+                    c_vars.insert(v);
+                });
+                expr1.as_ref().iter().for_each(|en| if let SimpleMath::Var(v) = en {
+                    e_vars.insert(v);
+                });
+                expr2.as_ref().iter().for_each(|en| if let SimpleMath::Var(v) = en {
+                    e_vars.insert(v);
+                });
+                c_vars.iter().all(|cv| e_vars.contains(cv))
+            };
+
             for &i in &ids {
                 for &j in &ids {
                     let mut agreement_vec: Vec<Option<Constant>> = Vec::new();
@@ -363,6 +378,7 @@ impl SynthParam {
                         && eg[i].data != eg[j].data
                         && (eg[i].data.contains(&None) || eg[j].data.contains(&None))
                     {
+                        // all indices where either cvecs have None
                         let i_nones: Vec<usize> = eg[i]
                             .data
                             .iter()
@@ -372,44 +388,55 @@ impl SynthParam {
                             .map(|(i, _)| i)
                             .collect();
 
+                        // if the cvecs are same everywhere else, then consider for potential conditional rule
                         if eg[i].data.iter().zip(eg[j].data.iter()).enumerate().all(
-                            |(i, (x, y))| only_diff_at_none_poses((i, (x, y)), i_nones.clone()) && i_nones.clone().len() <= self.diff_thresh) {
+                            |(i, (x, y))| only_diff_at_none_poses((i, (x, y)), i_nones.clone()),
+                        ) {
+                            // && i_nones.clone().len() <= self.diff_thresh) {
                             for idx in 0..eg[j].data.len() {
                                 if i_nones.contains(&idx) {
+                                    // cvecs disagree at None positions
                                     agreement_vec.push(Some(Constant::Boolean(false)));
                                 } else {
+                                    // cvecs agree elsewhere
                                     agreement_vec.push(Some(Constant::Boolean(true)));
                                 }
                             }
 
-                            for ec_data in ec_datas.clone() {
-                                print!("cond: {}", extract.find_best(ec_data.1).1);
-                                for d in ec_data.0 {
-                                    if d != None  && (d.unwrap() == Constant::Boolean(true) || d.unwrap() == Constant::Boolean(false)) {
-                                        println!("val: {}", d.unwrap());
-                                    }
-                                }
-                            }
-                            let cond =
-                                match ec_datas.iter().find(|(ec_data, _)| {same_cvec(&ec_data, &agreement_vec) && !all_false(&ec_data) && !all_true(&ec_data)}) {
+                            let (_cost1, expr1) = extract.find_best(i);
+                            let (_cost2, expr2) = extract.find_best(j);
+
+                            let cond = match ec_datas.iter().find(|(ec_data, cond_id)| {
+                                same_cvec(&ec_data, &agreement_vec)
+                                    && !all_false(&ec_data)
+                                    && (is_valid(cond_id, expr1.clone(), expr2.clone()))
+                            }) {
                                 None => None,
                                 Some((_, id)) => Some(extract.find_best(*id).1),
                             };
-                            let (_cost1, expr1) = extract.find_best(i);
-                            let (_cost2, expr2) = extract.find_best(j);
+
+                            //TODO: we will  likely need to do this, using inverse subsumption order
+                            //let cond = most_specific(conds);
 
                             if cond.is_some() {
                                 let names = &mut HashMap::default();
                                 let c = generalize(&cond.clone().unwrap(), names);
                                 let pat1 = generalize(&expr1, names);
                                 let pat2 = generalize(&expr2, names);
-                                if pattern_has_pred(&c) && !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                                if pattern_has_pred(&c)
+                                    && !pattern_has_pred(&pat1)
+                                    && !pattern_has_pred(&pat2)
+                                {
                                     equalities.extend(Equality::new(pat1, pat2, Some(c)))
                                 }
+                                let names = &mut HashMap::default();
                                 let c = generalize(&cond.clone().unwrap(), names);
                                 let pat1 = generalize(&expr2, names);
                                 let pat2 = generalize(&expr1, names);
-                                if pattern_has_pred(&c.clone()) && !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                                if pattern_has_pred(&c.clone())
+                                    && !pattern_has_pred(&pat1)
+                                    && !pattern_has_pred(&pat2)
+                                {
                                     equalities.extend(Equality::new(pat1, pat2, Some(c)))
                                 }
                             }
@@ -420,108 +447,6 @@ impl SynthParam {
         }
         return equalities;
     }
-    /*
-        pub fn run(&mut self, conds: bool) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-            let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
-            let mut eg = self.mk_egraph();
-
-            for iter in 0..self.n_iter {
-                let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
-
-                for &i in &cur_ids {
-                    for &j in &cur_ids {
-                        eg.add(SimpleMath::Add([i, j]));
-                        eg.add(SimpleMath::Sub([i, j]));
-                        eg.add(SimpleMath::Mul([i, j]));
-                        eg.add(SimpleMath::Div([i, j]));
-                        eg.add(SimpleMath::Not(i));
-                        eg.add(SimpleMath::Leq([i, j]));
-                        eg.add(SimpleMath::Geq([i, j]));
-                        eg.add(SimpleMath::And([i, j]));
-                        eg.add(SimpleMath::Or([i, j]));
-                        eg.add(SimpleMath::Neg(i));
-                        if i != j {
-                            eg.add(SimpleMath::Neq([i, j]));
-                        }
-                        if i != j {
-                            eg.add(SimpleMath::Lt([i, j]));
-                        }
-                        if i != j {
-                            eg.add(SimpleMath::Gt([i, j]));
-                        }
-                    }
-                }
-
-                println!(
-                    "iter {} phase 2: before running rules, n={}, e={}",
-                    iter,
-                    eg.total_size(),
-                    eg.number_of_classes()
-                );
-
-                let mut set = HashSet::new();
-                equalities.retain(|eq| set.insert(eq.name.clone()));
-                let rules = equalities
-                    .iter()
-                    .filter(|eq| eq.cond == None)
-                    .map(|eq| &eq.rewrite);
-
-                eg.rebuild();
-
-                let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                    Runner::new(eg.analysis.clone()).with_egraph(eg);
-
-                eg = runner
-                    .with_time_limit(Duration::from_secs(20))
-                    .with_node_limit(usize::MAX)
-                    .with_iter_limit(100)
-                    .with_scheduler(SimpleScheduler)
-                    .run(rules)
-                    .egraph;
-
-                eg.rebuild();
-
-                println!(
-                    "       phase 2: after running {} rules, n={}, e={}",
-                    &equalities.len(),
-                    eg.total_size(),
-                    eg.number_of_classes()
-                );
-
-                println!("iter {} phase 3: discover rules", iter);
-
-                let mut to_union = vec![];
-
-                equalities = self.learn_rules(conds, &eg, equalities, &mut to_union);
-
-                println!("       phase 3: performing {} unions", to_union.len());
-                for (i, j) in to_union {
-                    eg.union(i, j);
-                }
-
-                eg.rebuild();
-
-                println!(
-                    "       phase 3: number of eclasses after union : {}",
-                    eg.number_of_classes()
-                );
-
-                println!(
-                    "iter {} phase 3: found {} new rules",
-                    iter,
-                    equalities.len()
-                );
-            }
-
-            let mut set = HashSet::new();
-            equalities.retain(|eq| set.insert(eq.name.clone()));
-            println!("Overall found the following {} rules", equalities.len());
-            for eq in &equalities {
-                println!("{}", eq);
-            }
-            equalities
-        }
-    */
 
     pub fn run(&mut self, conds: bool) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
@@ -557,34 +482,34 @@ impl SynthParam {
 
                         if op_ctr == 0 {
                             // eg.add(SimpleMath::Add([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::Add([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::Add([i, j])));
                         } else if op_ctr == 1 {
                             // eg.add(SimpleMath::Sub([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::Sub([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::Sub([i, j])));
                         } else if op_ctr == 2 {
                             // eg.add(SimpleMath::Mul([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::Mul([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::Mul([i, j])));
                         } else if op_ctr == 3 {
                             // eg.add(SimpleMath::Div([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::Div([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::Div([i, j])));
                         } else if op_ctr == 4 {
                             // eg.add(SimpleMath::Not(i));
-                        my_ids.insert(eg.add(SimpleMath::Not(i)));
+                            my_ids.insert(eg.add(SimpleMath::Not(i)));
                         } else if op_ctr == 5 {
                             // eg.add(SimpleMath::Leq([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::Leq([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::Leq([i, j])));
                         } else if op_ctr == 6 {
                             // eg.add(SimpleMath::Geq([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::Geq([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::Geq([i, j])));
                         } else if op_ctr == 7 {
                             // eg.add(SimpleMath::And([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::And([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::And([i, j])));
                         } else if op_ctr == 8 {
                             // eg.add(SimpleMath::Or([i, j]));
-                        my_ids.insert(eg.add(SimpleMath::Or([i, j])));
+                            my_ids.insert(eg.add(SimpleMath::Or([i, j])));
                         } else if op_ctr == 9 {
                             // eg.add(SimpleMath::Neg(i));
-                        my_ids.insert(eg.add(SimpleMath::Neg(i)));
+                            my_ids.insert(eg.add(SimpleMath::Neg(i)));
                         } else if op_ctr == 10 {
                             if i != j {
                                 // eg.add(SimpleMath::Neq([i, j]));
@@ -610,6 +535,7 @@ impl SynthParam {
 
                         let mut set = HashSet::new();
                         equalities.retain(|eq| set.insert(eq.name.clone()));
+
                         let rules = equalities
                             .iter()
                             .filter(|eq| eq.cond == None)
@@ -743,14 +669,15 @@ impl Equality<SimpleMath, SynthAnalysis> {
                 searcher: lhs.clone(),
             };
 
-            // TODO: since we are not firing conditional rules
-            // let applier: ConditionalApplier<ConditionEqual<Pattern<SimpleMath>, Pattern<SimpleMath>>, Pattern<SimpleMath>> =
-            //     ConditionalApplier {
-            //         applier: rhs.clone(),
-            //         condition: ConditionEqual(cond.clone(), "true".parse().unwrap()),
-            //     };
+            let applier: ConditionalApplier<
+                ConditionEqual<Pattern<SimpleMath>, Pattern<SimpleMath>>,
+                Pattern<SimpleMath>,
+            > = ConditionalApplier {
+                applier: rhs.clone(),
+                condition: ConditionEqual(cond.clone(), "true".parse().unwrap()),
+            };
 
-            let rw = egg::Rewrite::new(name.clone(), name.clone(), searcher, rhs.clone()).ok()?;
+            let rw = egg::Rewrite::new(name.clone(), name.clone(), searcher, applier).ok()?;
 
             Some(Self {
                 lhs,
@@ -821,7 +748,7 @@ mod tests {
             n_samples: 25,
             variables: vec!["x".into(), "y".into(), "z".into()],
             consts: vec![Constant::Number(0), Constant::Number(1)],
-            diff_thresh: 5
+            diff_thresh: 5,
         };
 
         let eqs = param.run(true);
