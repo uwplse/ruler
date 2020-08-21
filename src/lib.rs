@@ -1,4 +1,3 @@
-
 mod metrics;
 use egg::*;
 use indexmap::IndexMap;
@@ -624,7 +623,7 @@ impl SynthParam {
         for eq in &equalities {
             println!("{}", eq);
         }
-      
+
         println!("\n");
         equalities
     }
