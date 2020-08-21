@@ -83,8 +83,12 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         let x = |i: &Id| egraph[*i].data.iter().copied();
         let params = &egraph.analysis;
         match enode {
-            SimpleMath::Num(n) => (0..params.cvec_len).map(|_| Some(Constant::Number(*n))).collect(),
-            SimpleMath::Bool(b) => (0..params.cvec_len).map(|_| Some(Constant::Boolean(*b))).collect(),
+            SimpleMath::Num(n) => (0..params.cvec_len)
+                .map(|_| Some(Constant::Number(*n)))
+                .collect(),
+            SimpleMath::Bool(b) => (0..params.cvec_len)
+                .map(|_| Some(Constant::Boolean(*b)))
+                .collect(),
             SimpleMath::Var(_) => vec![],
             SimpleMath::Not(a) => x(a)
                 .map(|x| match x {
@@ -475,7 +479,7 @@ impl SynthParam {
 
             let mut op_ctr = 0;
 
-            while op_ctr < num_ops - 10{
+            while op_ctr < num_ops - 10 {
                 println!(
                     "iter {} phase 1: Currently there are {} eclasses",
                     iter,
@@ -550,7 +554,6 @@ impl SynthParam {
                             .filter(|eq| eq.cond == None && eq.lhs.ast.as_ref().len() > 1)
                             .map(|eq| &eq.rewrite);
 
-                            
                         eg.rebuild();
 
                         let runner: Runner<SimpleMath, SynthAnalysis, ()> =
@@ -687,7 +690,10 @@ impl Equality<SimpleMath, SynthAnalysis> {
                 searcher: lhs.clone(),
             };
 
-            let applier: ConditionalApplier<ConditionEqual<Pattern<SimpleMath>, Pattern<SimpleMath>>, Pattern<SimpleMath>> = ConditionalApplier {
+            let applier: ConditionalApplier<
+                ConditionEqual<Pattern<SimpleMath>, Pattern<SimpleMath>>,
+                Pattern<SimpleMath>,
+            > = ConditionalApplier {
                 applier: rhs.clone(),
                 condition: ConditionEqual(cond.clone(), "true".parse().unwrap()),
             };
