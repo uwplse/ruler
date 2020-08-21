@@ -547,9 +547,10 @@ impl SynthParam {
 
                         let rules = equalities
                             .iter()
-                            .filter(|eq| eq.cond == None)
+                            .filter(|eq| eq.cond == None && eq.lhs.ast.as_ref().len() > 1)
                             .map(|eq| &eq.rewrite);
 
+                            
                         eg.rebuild();
 
                         let runner: Runner<SimpleMath, SynthAnalysis, ()> =
@@ -606,6 +607,7 @@ impl SynthParam {
         for eq in &equalities {
             println!("{}", eq);
         }
+        println!("\n");
         equalities
     }
 }
@@ -730,11 +732,11 @@ mod tests {
 
     fn check_proves<L, A>(eqs: &[Equality<L, A>], a: &str, b: &str)
     where
-        L: Language,
-        A: Analysis<L> + Default,
+        L: Language + 'static,
+        A: Analysis<L> + Default + 'static,
     {
         let rules = eqs.iter().map(|eq| &eq.rewrite);
-        let mut runner: Runner<L, A, ()> = Runner::default()
+        let runner: Runner<L, A, ()> = Runner::default()
             .with_expr(&a.parse().unwrap())
             .with_expr(&b.parse().unwrap())
             .with_hook(|runner| {
@@ -745,12 +747,11 @@ mod tests {
                 }
             })
             .run(rules);
-        runner.egraph.rebuild();
         let id_a = runner.egraph.find(runner.roots[0]);
         let id_b = runner.egraph.find(runner.roots[1]);
 
         if id_a != id_b {
-            panic!("Failed to simplify {} => {}", a, b)
+            panic!("Failed to simplify {} => {}, {}, {}", a, b, id_a, id_b);
         }
     }
 
@@ -767,7 +768,7 @@ mod tests {
 
         let eqs = param.run(false);
 
-        // check_proves(&eqs, "(+ a b)", "(+ b a)");
+        check_proves(&eqs, "(+ a b)", "(+ b a)");
         check_proves(&eqs, "(+ a 0)", "a");
         check_proves(&eqs, "(+ 0 a)", "a");
     }
