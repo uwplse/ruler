@@ -1,5 +1,5 @@
-use std::io::Write;
-mod stats;
+
+mod metrics;
 use egg::*;
 use indexmap::IndexMap;
 use rand::{prelude::SliceRandom, Rng};
@@ -504,7 +504,7 @@ impl SynthParam {
         let num_ops = 13;
 
         let mut eqsat_iter = 0;
-        let mut stats = stats::EgraphStats::new();
+        let mut metrics = metrics::EgraphStats::new();
 
         for iter in 0..self.n_iter {
             let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
@@ -560,7 +560,7 @@ impl SynthParam {
                             eg.number_of_classes()
                         );
 
-                        stats.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+                        metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
 
                         let mut set = HashSet::new();
                         equalities.retain(|eq| set.insert(eq.name.clone()));
@@ -591,7 +591,7 @@ impl SynthParam {
                             eg.number_of_classes()
                         );
 
-                        stats.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+                        metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
 
                         println!("iter {} phase 3: discover rules", iter);
 
@@ -620,7 +620,7 @@ impl SynthParam {
                 equalities.len()
             );
         }
-        stats.print();
+        metrics.print_to_file();
 
         let mut set = HashSet::new();
         equalities.retain(|eq| set.insert(eq.name.clone()));
