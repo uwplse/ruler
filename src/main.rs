@@ -1,11 +1,11 @@
 use egg::*;
 use rand::SeedableRng;
-use ruler::*;
 use ruler::Constant;
+use ruler::*;
 use std::env;
 use std::io::{self, Write};
 
-fn simplify (mut param : SynthParam) -> std::io::Result<()> {
+fn simplify(mut param: SynthParam) -> std::io::Result<()> {
     let eqs = param.run(true);
     let rules = eqs.iter().map(|eq| &eq.rewrite);
     println!("Entering simplification loop...");
@@ -16,21 +16,20 @@ fn simplify (mut param : SynthParam) -> std::io::Result<()> {
         match io::stdin().read_line(&mut expr_str) {
             Ok(_) => {
                 let runner: Runner<SimpleMath, SynthAnalysis, ()> = Runner::default()
-                .with_expr(&expr_str.parse().unwrap())
-                .run(rules.clone());
-    
+                    .with_expr(&expr_str.parse().unwrap())
+                    .run(rules.clone());
+
                 let mut ext = Extractor::new(&runner.egraph, AstSize);
                 let (_, simp_expr) = ext.find_best(runner.roots[0]);
                 println!("Simplified result: {}", simp_expr);
                 println!();
-                }
-            Err(_) => println!("failed to read expression"),   
+            }
+            Err(_) => println!("failed to read expression"),
         }
     }
 }
 
 fn main() {
-
     let _ = env_logger::builder().try_init();
     let args: Vec<String> = env::args().collect();
 
@@ -39,8 +38,8 @@ fn main() {
         n_iter: 2,
         n_samples: 5,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![Constant::Number(0), Constant::Number(1)],//, Constant::Boolean(false)] //, Constant::Boolean(true)],
-        diff_thresh: 5
+        consts: vec![Constant::Number(0), Constant::Number(1)], //, Constant::Boolean(false)] //, Constant::Boolean(true)],
+        diff_thresh: 5,
     };
 
     if args.len() < 2 {
@@ -48,9 +47,9 @@ fn main() {
     } else if args.len() >= 2 && args[1] == "simplify" {
         let res = simplify(param);
         match res {
-            Ok (_) => println!(),
+            Ok(_) => println!(),
             Err(_) => println!("Error while simplifying"),
-        } 
+        }
     } else {
         println!("USAGE: \n `cargo run` will run Ruler \n `cargo run simplify` will allow simplifying an expression.");
     }
