@@ -56,8 +56,8 @@ define_language! {
         "/" = Div([Id; 2]),
         "~" = Neg(Id),
         "!" = Not(Id),
-        Bool(Constant),
-        Num(Constant),
+        Bool(bool),
+        Num(i32),
         Var(egg::Symbol),
     }
 }
@@ -83,8 +83,8 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         let x = |i: &Id| egraph[*i].data.iter().copied();
         let params = &egraph.analysis;
         match enode {
-            SimpleMath::Num(n) => (0..params.cvec_len).map(|_| Some(*n)).collect(),
-            SimpleMath::Bool(b) => (0..params.cvec_len).map(|_| Some(*b)).collect(),
+            SimpleMath::Num(n) => (0..params.cvec_len).map(|_| Some(Constant::Number(*n))).collect(),
+            SimpleMath::Bool(b) => (0..params.cvec_len).map(|_| Some(Constant::Boolean(*b))).collect(),
             SimpleMath::Var(_) => vec![],
             SimpleMath::Not(a) => x(a)
                 .map(|x| match x {
@@ -275,7 +275,9 @@ impl SynthParam {
         }
         // implicit sumbumption order here
         for n in &self.consts {
-            egraph.add(SimpleMath::Num(*n));
+            if let Constant::Number(num) = n {
+                egraph.add(SimpleMath::Num(*num));
+            }
         }
         egraph
     }
@@ -732,10 +734,6 @@ mod tests {
         A: Analysis<L> + Default,
     {
         let rules = eqs.iter().map(|eq| &eq.rewrite);
-        println!("RULES:");
-        for r in rules.clone() {
-            println!("rule: {}", r.name());
-        }
         let mut runner: Runner<L, A, ()> = Runner::default()
             .with_expr(&a.parse().unwrap())
             .with_expr(&b.parse().unwrap())
@@ -771,6 +769,6 @@ mod tests {
 
         // check_proves(&eqs, "(+ a b)", "(+ b a)");
         check_proves(&eqs, "(+ a 0)", "a");
-        // check_proves(&eqs, "(+ 0 a)", "a");
+        check_proves(&eqs, "(+ 0 a)", "a");
     }
 }
