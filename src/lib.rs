@@ -1,3 +1,5 @@
+
+mod metrics;
 use egg::*;
 use indexmap::IndexMap;
 use rand::{prelude::SliceRandom, Rng};
@@ -470,6 +472,9 @@ impl SynthParam {
         // number of ops in the language
         let num_ops = 13;
 
+        let mut eqsat_iter = 0;
+        let mut metrics = metrics::EgraphStats::new();
+
         for iter in 0..self.n_iter {
             let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
             my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
@@ -485,6 +490,7 @@ impl SynthParam {
                     iter,
                     cur_ids.len()
                 );
+
                 // for &i in &cur_ids {
                 //     for &j in &cur_ids {
                 for &i in added.iter() {
@@ -492,6 +498,7 @@ impl SynthParam {
                         println!("my_ids: {}", my_ids.len());
                         println!("added: {}", added.len());
                         println!("cur_ids: {}", cur_ids.len());
+                        eqsat_iter = eqsat_iter + 1;
 
                         if op_ctr == 0 {
                             // eg.add(SimpleMath::Add([i, j]));
@@ -546,6 +553,8 @@ impl SynthParam {
                             eg.number_of_classes()
                         );
 
+                        metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+
                         let mut set = HashSet::new();
                         equalities.retain(|eq| set.insert(eq.name.clone()));
 
@@ -576,7 +585,10 @@ impl SynthParam {
                             eg.number_of_classes()
                         );
 
+                        metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+
                         my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
+
                         println!("iter {} phase 3: discover rules", iter);
 
                         let mut to_union = vec![];
@@ -604,12 +616,15 @@ impl SynthParam {
                 equalities.len()
             );
         }
+        metrics.print_to_file();
+
         let mut set = HashSet::new();
         equalities.retain(|eq| set.insert(eq.name.clone()));
         println!("Overall found the following {} rules", equalities.len());
         for eq in &equalities {
             println!("{}", eq);
         }
+      
         println!("\n");
         equalities
     }
