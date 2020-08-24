@@ -140,20 +140,25 @@
 
 (define-type info-acc
   ;; todo technically might need scoping 
-  [info (count number?) (unique-vars list?) (num-ops number?)])
+  [info (count number?) (unique-vars list?) (num-vars number?) (num-ops number?) (num-consts number?)])
 
 (define print-json-info
-  (λ (rule-name info)
-    (foldr (λ (x acc) (string-append x acc))
-           ""
-           (list "\"" (symbol->string rule-name) "\"" ": {"
-                 "\"num_nodes\": " (number->string (info-count info)) ","
-                 "\"unique_vars\": [" (string-join
-                                       (map (λ(x) (string-append "\"" (symbol->string x) "\""))
-                                            (info-unique-vars info))
-                                       ",") "],"
-                                            "\"num_ops\": " (number->string (info-num-ops info)) "}"
-                                            ))))
+  (λ (rule-name info-tuple)
+    (local [(define depth (depth-val (first info-tuple)))
+            (define info (second info-tuple))]
+      (foldr (λ (x acc) (string-append x acc))
+             ""
+             (list "\"" (symbol->string rule-name) "\"" ": {"
+                   "\"num_nodes\": " (number->string (info-count info)) ","
+                   "\"depth\": " (number->string depth) ","
+                   "\"unique_vars\": [" (string-join
+                                         (map (λ(x) (string-append "\"" (symbol->string x) "\""))
+                                              (info-unique-vars info))
+                                         ",") "],"
+                                              "\"num_consts\": " (number->string (info-num-consts info)) ","
+                                              "\"num_vars\": " (number->string (info-num-vars info)) ","
+                                              "\"num_ops\": " (number->string (info-num-ops info)) "}"
+                                              )))))
 
     
 (define run
@@ -170,8 +175,15 @@
                                                          (info-unique-vars acc))]
                                            [else (info-unique-vars acc)])
                                          (type-case Type (node-type node)
+                                           [Variable (name) (+ (info-num-vars acc) 1)]
+                                           [else (info-num-ops acc)])
+                                         (type-case Type (node-type node)
                                            [Operator (type) (+ (info-num-ops acc) 1)]
-                                           [else (info-num-ops acc)]))))
+                                           [If () (+ (info-num-ops acc) 1)]
+                                           [else (info-num-ops acc)])
+                                         (type-case Type (node-type node)
+                                           [Constant (type) (+ (info-num-consts acc) 1)]
+                                           [else (info-num-consts acc)]))))
             (define run-rec
               (λ (node node-info todo acc)
                 ;; todo need some end condition stuff
@@ -183,13 +195,11 @@
                                                      empty
                                                      (rest todo))))]
                   (if (empty? new-todo)
-                      (run-analysis node acc)
+                      (list node-info (run-analysis node acc))
                       (run-rec (worklist-node (first new-todo)) (worklist-info (first new-todo))
                                new-todo
                                (run-analysis node acc))))))]
-      (run-rec node (depth 0) empty (info 0 empty 0)))))
-
-;; todo need to also dump depth
+      (run-rec node (depth 0) empty (info 0 empty 0 0 0)))))
 
 
 (define run-rule
@@ -206,11 +216,26 @@
      (print-json-info 'right (run (rule-right ast)))
      "}")))
 
-;; parse and rul
+;; parse and run
 (define parse-and-run-all
   (λ (all-rules)
     (map run-rule
          (map parse-ast all-rules))))
+
+(define parse-and-print-all-by-category
+  (λ (all-rules)
+    (string-append
+     "["
+     (string-join
+       (map (λ(ruleset)
+              (string-append
+               "{\"ruleset\": \""
+               (car ruleset)
+               "\", \"rules\": "
+              (parse-and-print-all (cdr ruleset))
+              "}")) all-rules)
+       ",")
+     "]")))
 
 (define parse-and-print-all
   (λ (all-rules)
@@ -236,9 +261,11 @@
               (node (Operator (Minus)) (list (node (Variable 'foo) empty)
                                              (node (Constant 3) empty))))))
 
+;; no longer function
 ;;(test (run basic-math) (info 3 '() 1))
 ;;(test (run var-eq) (info 3 '(bar 'foo) 1))
 ;;(test (run multi-var-eq) (info 5 '('foo) 2))
 
-(display (parse-and-print-all all-rules))
+;;(display (parse-and-print-all all-rules))
+(display (parse-and-print-all-by-category all-rules-by-category))
 
