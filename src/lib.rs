@@ -478,7 +478,11 @@ impl SynthParam {
         return equalities;
     }
 
-    pub fn run(&mut self, conditional: bool) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+    pub fn run(
+        &mut self,
+        conditional: bool,
+        eqsat: bool,
+    ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
 
@@ -629,18 +633,21 @@ impl SynthParam {
 
                         eg.rebuild();
 
-                        let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                            Runner::new(eg.analysis.clone()).with_egraph(eg);
+                        if !eqsat {
+                            let runner: Runner<SimpleMath, SynthAnalysis, ()> =
+                                Runner::new(eg.analysis.clone()).with_egraph(eg);
+                            // todo why not just collect time information in stats struct?
 
-                        eg = runner
-                            .with_time_limit(Duration::from_secs(20))
-                            .with_node_limit(usize::MAX)
-                            .with_iter_limit(100)
-                            .with_scheduler(SimpleScheduler)
-                            .run(rules)
-                            .egraph;
+                            eg = runner
+                                .with_time_limit(Duration::from_secs(20))
+                                .with_node_limit(usize::MAX)
+                                .with_iter_limit(100)
+                                .with_scheduler(SimpleScheduler)
+                                .run(rules)
+                                .egraph;
 
-                        eg.rebuild();
+                            eg.rebuild();
+                        }
 
                         println!(
                             "       phase 2: after running {} rules, n={}, e={}",
