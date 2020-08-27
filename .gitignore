@@ -1,3 +1,6 @@
 /target
 /out
 Cargo.lock
+*.bak
+*.dep
+*.zo
