@@ -21,7 +21,7 @@ struct TimingData {
 }
 
 pub struct TimeHolder {
-    pub before: Instant
+    pub before: Instant,
 }
 
 impl EgraphStats {
@@ -41,7 +41,9 @@ impl EgraphStats {
     }
 
     pub fn start(&mut self) -> TimeHolder {
-        TimeHolder { before: Instant::now() }
+        TimeHolder {
+            before: Instant::now(),
+        }
     }
 
     pub fn stop(&mut self, timer: TimeHolder) {

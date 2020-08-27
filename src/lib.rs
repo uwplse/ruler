@@ -907,7 +907,7 @@ mod tests {
             diff_thresh: 5,
         };
 
-        let eqs = param.run(false);
+        let eqs = param.run(false, true);
 
         check_proves(&eqs, "(+ a b)", "(+ b a)");
         check_proves(&eqs, "(+ a 0)", "a");

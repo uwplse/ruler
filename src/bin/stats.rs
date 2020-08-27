@@ -15,7 +15,7 @@ struct CVecStats {
 #[derive(Serialize, Deserialize)]
 struct EqsatStats {
     eqsat_on: bool,
-    time: Duration
+    time: Duration,
 }
 
 fn ruler(iter: usize, samples: usize) -> CVecStats {
