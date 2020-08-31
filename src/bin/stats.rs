@@ -123,7 +123,7 @@ fn var_rule_ruler(iter: usize, num_vars: usize, num_op: usize) -> VarRuleStats {
 fn var_const_rule_time() {
     let iters = vec![1, 2];
     let num_vars = vec![1, 2, 3];
-    let num_ops = vec![1, 2, 3];
+    let num_ops = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
     let mut data = vec![];
     let outfile =
         std::fs::File::create("../../out/var_rule_vs_time.json").expect("failed to open file");
