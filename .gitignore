@@ -1,3 +1,5 @@
 /target
 /out
 Cargo.lock
+.DS_Store
+out/
