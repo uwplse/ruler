@@ -108,6 +108,80 @@ fn instantiate(pattern: &Pattern<SimpleMath>) -> RecExpr<SimpleMath> {
     RecExpr::from(nodes)
 }
 
+fn subsumption_filter(
+    analysis: SynthAnalysis,
+    equalities: &mut Vec<Equality<SimpleMath, SynthAnalysis>>,
+) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+    let mut eg = EGraph::new(analysis);
+
+    let mut ids = vec![];
+    for eq in equalities.iter() {
+        ids.push(eg.add_expr(&instantiate(&eq.lhs)));
+        ids.push(eg.add_expr(&instantiate(&eq.rhs)));
+    }
+
+    // For each expression, what does it subsume?
+    let mut subsume : HashMap<Id, Vec<Id>> = HashMap::default();
+    let id_pairs : Vec<(Id, Id)> = ids.chunks(2).map(|chunk|
+        if let [lhs_id, rhs_id] = chunk {
+            (*lhs_id, *rhs_id) 
+        } else {
+            panic!();
+        }
+    ).collect();
+
+    let ids_and_eqs = equalities.iter().zip(id_pairs.clone());
+    for (eq, (lhs_id, rhs_id)) in ids_and_eqs {
+        for mat in eq.lhs.search(&eg) {
+            subsume.entry(lhs_id).or_default().push(mat.eclass);
+        }
+        for mat in eq.rhs.search(&eg) {
+            subsume.entry(rhs_id).or_default().push(mat.eclass);
+        }
+    }
+
+    let mut lhs_to_rhs : HashMap<Id, Id> = HashMap::default();
+    for eq_ids in ids.chunks(2) {
+        if let [lhs_id, rhs_id] = eq_ids {
+            lhs_to_rhs.insert(*lhs_id, *rhs_id);
+        }
+    }
+
+    // Keep only the eqs that are not subsumed by another eq
+    let mut candidates : HashSet<Id> = HashSet::default();
+    candidates.extend(id_pairs.iter().map(|(lhs_id, _)| lhs_id));
+    for (lhs_id, rhs_id) in id_pairs.clone() {
+        if !candidates.contains(&lhs_id) {
+            continue;
+        }
+
+        let subvec = subsume.get(&lhs_id);
+        if subvec.is_some() {
+            for sub_id in subvec.unwrap() {
+                let sub_rhs_id = lhs_to_rhs.get(sub_id);
+                if sub_rhs_id.is_some() {
+                    let sub_rhs_subvec = subsume.get(sub_rhs_id.unwrap());
+                    if sub_rhs_subvec.is_some() && sub_rhs_subvec.unwrap().contains(&rhs_id) {
+                        candidates.remove(sub_id);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut removed_eqs : Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
+    let mut index = 0;
+    for (lhs_id, _) in id_pairs {
+        if !candidates.contains(&lhs_id) {
+            removed_eqs.push(equalities.remove(index));
+        } else {
+            index = index + 1;
+        }
+    }
+
+    removed_eqs
+}
+
 fn minimize_equalities(
     analysis: SynthAnalysis,
     equalities: &mut Vec<Equality<SimpleMath, SynthAnalysis>>,
@@ -289,7 +363,8 @@ impl SynthParam {
 
             let eq_len = equalities.len();
             println!("iter {} phase 4: minimize {} rules", iter, eq_len);
-            minimize_equalities(eg.analysis.clone(), &mut equalities);
+            // minimize_equalities(eg.analysis.clone(), &mut equalities);
+            subsumption_filter(eg.analysis.clone(), &mut equalities);
             println!(
                 "iter {} phase 4: minimized {} to {} rules",
                 iter,
