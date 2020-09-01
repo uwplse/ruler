@@ -436,7 +436,6 @@ impl SynthParam {
         mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>>,
         to_union: &mut std::vec::Vec<(egg::Id, egg::Id)>,
     ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-        
         let mut ids: BTreeSet<Id> = BTreeSet::new();
         for a in added {
             ids.insert(*a);
@@ -498,7 +497,11 @@ impl SynthParam {
         return clean_eg;
     }
 
-    pub fn run(&mut self, num_ops: usize, _conditional: bool) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+    pub fn run(
+        &mut self,
+        num_ops: usize,
+        _conditional: bool,
+    ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut added = Vec::new();
         let mut eg = self.mk_egraph(&mut added);
@@ -669,7 +672,6 @@ impl SynthParam {
 
                         println!("       phase 3: performing {} unions", to_union.len());
 
-
                         for (i, j) in to_union {
                             eg.union(i, j);
                         }
@@ -795,7 +797,7 @@ impl Equality<SimpleMath, SynthAnalysis> {
                 typefilter: f,
                 searcher: lhs.clone(),
             };
-            
+
             let applier = rhs.clone();
             let rw = egg::Rewrite::new(name.clone(), name.clone(), searcher, applier).ok()?;
 
