@@ -9,7 +9,7 @@ fn main() -> io::Result<()> {
         n_iter: 2,
         n_samples: 25,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![-1, 0, 1],
+        consts: vec![0, 1],
     };
 
     let eqs = param.run();

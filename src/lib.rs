@@ -121,17 +121,29 @@ impl SynthParam {
         egraph
     }
 
+    pub fn update_clean_egraph(
+        &mut self,
+        tainted_eg: EGraph<SimpleMath, SynthAnalysis>,
+        mut clean_eg: EGraph<SimpleMath, SynthAnalysis>,
+    ) -> EGraph<SimpleMath, SynthAnalysis> {
+        let clean_ids: Vec<Id> = clean_eg.classes().map(|ec| ec.id).collect();
+        for id in clean_ids {
+            clean_eg.union(id, tainted_eg.find(id));
+        }
+        return clean_eg;
+    }
+
     pub fn run(&mut self) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-        // self.run_with_eqs(vec![])
-        let consts = std::mem::take(&mut self.consts);
+        self.run_with_eqs(vec![])
+        // let consts = std::mem::take(&mut self.consts);
 
-        println!("Finding variable only equalities...");
-        let var_only_eqs = self.run_with_eqs(vec![]);
+        // println!("Finding variable only equalities...");
+        // let var_only_eqs = self.run_with_eqs(vec![]);
 
-        println!("Finding equalities with constants...");
-        self.n_iter = 1;
-        self.consts = consts;
-        self.run_with_eqs(var_only_eqs)
+        // println!("Finding equalities with constants...");
+        // self.n_iter = 1;
+        // self.consts = consts;
+        // self.run_with_eqs(var_only_eqs)
     }
 
     pub fn run_with_eqs(
@@ -155,8 +167,9 @@ impl SynthParam {
             for &i in &my_ids {
                 // enodes_to_add.push(SimpleMath::Neg(i));
                 for &j in &my_ids {
+                    enodes_to_add.push(SimpleMath::Neg(i));
                     enodes_to_add.push(SimpleMath::Add([i, j]));
-                    // enodes_to_add.push(SimpleMath::Sub([i, j]));
+                    enodes_to_add.push(SimpleMath::Sub([i, j]));
                     enodes_to_add.push(SimpleMath::Mul([i, j]));
                 }
             }
@@ -166,31 +179,30 @@ impl SynthParam {
 
             loop {
                 eg.rebuild();
+
+                let rules = equalities.iter().map(|eq| &eq.rewrite);
+
+                let mut tainted_eg = eg.clone();
                 println!(
-                    "iter {} phase 2: running rules, n={}, e={}",
-                    iter,
-                    eg.total_size(),
-                    eg.number_of_classes()
+                    "       phase 2: running rules on tainted eg, n={}, e={}",
+                    tainted_eg.total_size(),
+                    tainted_eg.number_of_classes()
                 );
-                let rules = equalities.iter().map(|eq| &eq.no_add_rewrite);
-                // let rules = equalities.iter().map(|eq| &eq.rewrite);
+
                 let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                    Runner::new(eg.analysis.clone()).with_egraph(eg);
-                eg = runner
+                    Runner::new(tainted_eg.analysis.clone()).with_egraph(tainted_eg);
+
+                tainted_eg = runner
                     .with_time_limit(Duration::from_secs(20))
                     .with_node_limit(usize::MAX)
-                    .with_iter_limit(100)
+                    .with_iter_limit(5)
                     .with_scheduler(SimpleScheduler)
                     .run(rules)
                     .egraph;
-                println!(
-                    "       phase 2: running rules, n={}, e={}",
-                    eg.total_size(),
-                    eg.number_of_classes()
-                );
+
+                eg = self.update_clean_egraph(tainted_eg, eg);
 
                 my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
-                eg.analysis.my_ids = my_ids.clone();
 
                 println!("iter {} phase 3: discover rules", iter);
                 println!("       phase 3: grouping");
@@ -303,7 +315,6 @@ pub struct Equality<L, A> {
     pub rhs: Pattern<L>,
     pub name: String,
     pub rewrite: egg::Rewrite<L, A>,
-    pub no_add_rewrite: egg::Rewrite<L, A>,
 }
 
 impl<L: Language, A> Display for Equality<L, A> {
@@ -316,23 +327,12 @@ impl Equality<SimpleMath, SynthAnalysis> {
     fn new(lhs: Pattern<SimpleMath>, rhs: Pattern<SimpleMath>) -> Option<Self> {
         let name = format!("{} => {}", lhs, rhs);
 
-        let f = |eg: &EGraph<_, SynthAnalysis>, id| eg.analysis.my_ids.contains(&id);
-        let searcher = FilterSearcher {
-            ecfilter: f,
-            searcher: lhs.clone(),
-        };
-
         let rw = egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), rhs.clone()).ok()?;
-
-        let no_add_rhs = NoAddPatternApplier(rhs.clone());
-        let no_add =
-            egg::Rewrite::new(name.clone(), name.clone(), lhs.clone(), no_add_rhs).unwrap();
 
         Some(Self {
             lhs,
             rhs,
             rewrite: rw,
-            no_add_rewrite: no_add,
             name,
         })
     }
