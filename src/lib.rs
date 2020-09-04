@@ -73,7 +73,6 @@ define_language! {
 #[derive(Default, Clone)]
 pub struct SynthAnalysis {
     cvec_len: usize,
-    my_ids: BTreeSet<Id>,
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
@@ -268,17 +267,15 @@ pub struct SynthParam {
 }
 
 impl SynthParam {
-    fn mk_egraph(&mut self, added: &mut Vec<Id>) -> EGraph<SimpleMath, SynthAnalysis> {
+    fn mk_egraph(&mut self) -> EGraph<SimpleMath, SynthAnalysis> {
         let mut egraph = EGraph::new(SynthAnalysis {
             // for now just adding 0 and 1 forcefully to the cvecs for variables
             // to test conditional rules for division
             cvec_len: self.n_samples + self.consts.len(),
-            my_ids: Default::default(),
         });
         let rng = &mut self.rng;
         for var in &self.variables {
             let id = egraph.add(SimpleMath::Var(*var));
-            added.push(id);
             let mut cvec: Vec<Option<Constant>> = (0..self.n_samples)
                 .map(|_| Some(Constant::Number(rng.gen::<i32>())))
                 .collect();
@@ -290,7 +287,7 @@ impl SynthParam {
         // implicit sumbumption order here
         for n in &self.consts {
             if let Constant::Number(num) = n {
-                added.push(egraph.add(SimpleMath::Num(*num)));
+                egraph.add(SimpleMath::Num(*num));
             }
         }
         egraph
@@ -428,63 +425,6 @@ impl SynthParam {
         return equalities;
     }
 
-    fn learn_rules(
-        &self,
-        iter: usize,
-        added: &Vec<Id>,
-        eg: &EGraph<SimpleMath, SynthAnalysis>,
-        mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>>,
-        to_union: &mut std::vec::Vec<(egg::Id, egg::Id)>,
-    ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
-        let mut ids: BTreeSet<Id> = BTreeSet::new();
-        for a in added {
-            ids.insert(*a);
-        }
-        ids = ids.into_iter().map(|id| eg.find(id)).collect();
-
-        let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
-        let mut extract = Extractor::new(&eg, AstSize);
-
-        for id in ids {
-            if !eg[id].data.contains(&None) {
-                // the ids corresponding to a specific cvec key in this hash map are for normal rewrites and can be unioned.
-                by_cvec_some.entry(&eg[id].data).or_default().push(id);
-            }
-        }
-
-        for ids in by_cvec_some.values() {
-            let cross = ids.iter().flat_map(|id1| {
-                ids.iter()
-                    .filter_map(move |id2| if id1 > id2 { Some((id1, id2)) } else { None })
-            });
-            for (i, j) in cross {
-                to_union.push((i.clone(), j.clone()));
-                let (_cost1, expr1) = extract.find_best(i.clone());
-                let (_cost2, expr2) = extract.find_best(j.clone());
-
-                let names = &mut HashMap::default();
-                let pat1 = generalize(&expr1, names);
-                let pat2 = generalize(&expr2, names);
-                // don't add rules over predicates
-                if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                    println!("Rule found {} => {}", pat1, pat2);
-                    equalities.extend(Equality::new(pat1, pat2, None));
-                }
-
-                let names = &mut HashMap::default();
-                let pat1 = generalize(&expr2, names);
-                let pat2 = generalize(&expr1, names);
-                // don't add rules over predicates
-                if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                    println!("Rule found {} => {}", pat1, pat2);
-                    equalities.extend(Equality::new(pat1, pat2, None));
-                }
-            }
-        }
-
-        return equalities;
-    }
-
     pub fn update_clean_egraph(
         &mut self,
         tainted_eg: EGraph<SimpleMath, SynthAnalysis>,
@@ -503,212 +443,246 @@ impl SynthParam {
         _conditional: bool,
     ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
-        let mut added = Vec::new();
-        let mut eg = self.mk_egraph(&mut added);
+        let mut eg = self.mk_egraph();
+        let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
 
         let mut eqsat_iter = 0;
         let mut metrics = metrics::EgraphStats::new();
 
         for iter in 0..self.n_iter {
-            let cur_ids: Vec<Id> = eg.classes().map(|c| eg.find(c.id)).collect();
-            let mut op_ctr = 0;
+            my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
 
-            while op_ctr < num_ops {
+            println!(
+                "iter {} phase 1: adding ops over {} eclasses",
+                iter,
+                my_ids.len(),
+            );
+            let mut enodes_to_add = vec![];
+
+            for &i in &my_ids {
+                for &j in &my_ids {
+                    eqsat_iter = eqsat_iter + 1;
+
+                    if find_type(&eg, i) == ExprType::Number
+                        && find_type(&eg, j) == ExprType::Number
+                    {
+                        enodes_to_add.push(SimpleMath::Add([i, j]));
+                    }
+                    if find_type(&eg, i) == ExprType::Number
+                        && find_type(&eg, j) == ExprType::Number
+                    {
+                        enodes_to_add.push(SimpleMath::Sub([i, j]));
+                    }
+                    if find_type(&eg, i) == ExprType::Number
+                        && find_type(&eg, j) == ExprType::Number
+                    {
+                        enodes_to_add.push(SimpleMath::Mul([i, j]));
+                    }
+                    /*
+                    if find_type(&eg, i) == ExprType::Number
+                        && find_type(&eg, j) == ExprType::Number
+                    {
+                        enodes_to_add.push(SimpleMath::Div([i, j]));
+                    }
+                    if find_type(&eg, i) == ExprType::Boolean {
+                        enodes_to_add.push(SimpleMath::Not(i));
+                    }
+                    if find_type(&eg, i) == ExprType::Number
+                        && find_type(&eg, j) == ExprType::Number
+                    {
+                        enodes_to_add.push(SimpleMath::Leq([i, j]));
+                    }
+                    if find_type(&eg, i) == ExprType::Number
+                        && find_type(&eg, j) == ExprType::Number
+                    {
+                        enodes_to_add.push(SimpleMath::Geq([i, j]));
+                    }
+                    if find_type(&eg, i) == ExprType::Boolean
+                        && find_type(&eg, j) == ExprType::Boolean
+                    {
+                        enodes_to_add.push(SimpleMath::And([i, j]));
+                    }
+                    if find_type(&eg, i) == ExprType::Boolean
+                        && find_type(&eg, j) == ExprType::Boolean
+                    {
+                        enodes_to_add.push(SimpleMath::Or([i, j]));
+                    }
+                    if find_type(&eg, i) == ExprType::Number {
+                        enodes_to_add.push(SimpleMath::Neg(i));
+                    }
+                    if i != j {
+                        if find_type(&eg, i) == ExprType::Number
+                            && find_type(&eg, j) == ExprType::Number
+                        {
+                            enodes_to_add.push(SimpleMath::Neq([i, j]));
+                        } else if find_type(&eg, i) == ExprType::Boolean
+                            && find_type(&eg, j) == ExprType::Boolean
+                        {
+                            enodes_to_add.push(SimpleMath::Neq([i, j]));
+                        }
+                    }
+                    if i != j {
+                        if find_type(&eg, i) == ExprType::Number
+                            && find_type(&eg, j) == ExprType::Number
+                        {
+                            enodes_to_add.push(SimpleMath::Lt([i, j]));
+                        }
+                    }
+                    if i != j {
+                        if find_type(&eg, i) == ExprType::Number
+                            && find_type(&eg, j) == ExprType::Number
+                        {
+                            enodes_to_add.push(SimpleMath::Gt([i, j]));
+                        }
+                    } */
+                }
+            }
+
+            for enode in enodes_to_add {
+                my_ids.insert(eg.add(enode));
+            }
+
+            loop {
+                eg.rebuild();
+
+                let mut tainted_eg = eg.clone();
+
                 println!(
-                    "iter {} phase 1: Currently there are {} eclasses",
+                    "iter {} phase 2: before running rules, n={}, e={}",
                     iter,
-                    cur_ids.len()
+                    tainted_eg.total_size(),
+                    tainted_eg.number_of_classes()
                 );
 
-                for &i in &cur_ids {
-                    for &j in &cur_ids {
-                        eqsat_iter = eqsat_iter + 1;
+                metrics.record(
+                    eqsat_iter,
+                    tainted_eg.total_size(),
+                    tainted_eg.number_of_classes(),
+                );
 
-                        if op_ctr == 0 {
-                            if find_type(&eg, i) == ExprType::Number
-                                && find_type(&eg, j) == ExprType::Number
-                            {
-                                let id = eg.add(SimpleMath::Add([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 1 {
-                            if find_type(&eg, i) == ExprType::Number
-                                && find_type(&eg, j) == ExprType::Number
-                            {
-                                let id = eg.add(SimpleMath::Sub([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 2 {
-                            if find_type(&eg, i) == ExprType::Number
-                                && find_type(&eg, j) == ExprType::Number
-                            {
-                                let id = eg.add(SimpleMath::Mul([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 3 {
-                            if find_type(&eg, i) == ExprType::Number
-                                && find_type(&eg, j) == ExprType::Number
-                            {
-                                let id = eg.add(SimpleMath::Div([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 4 {
-                            if find_type(&eg, i) == ExprType::Boolean {
-                                let id = eg.add(SimpleMath::Not(i));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 5 {
-                            if find_type(&eg, i) == ExprType::Number
-                                && find_type(&eg, j) == ExprType::Number
-                            {
-                                let id = eg.add(SimpleMath::Leq([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 6 {
-                            if find_type(&eg, i) == ExprType::Number
-                                && find_type(&eg, j) == ExprType::Number
-                            {
-                                let id = eg.add(SimpleMath::Geq([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 7 {
-                            if find_type(&eg, i) == ExprType::Boolean
-                                && find_type(&eg, j) == ExprType::Boolean
-                            {
-                                let id = eg.add(SimpleMath::And([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 8 {
-                            if find_type(&eg, i) == ExprType::Boolean
-                                && find_type(&eg, j) == ExprType::Boolean
-                            {
-                                let id = eg.add(SimpleMath::Or([i, j]));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 9 {
-                            if find_type(&eg, i) == ExprType::Number {
-                                let id = eg.add(SimpleMath::Neg(i));
-                                added.push(id);
-                            }
-                        } else if op_ctr == 10 {
-                            if i != j {
-                                if find_type(&eg, i) == ExprType::Number
-                                    && find_type(&eg, j) == ExprType::Number
-                                {
-                                    let id = eg.add(SimpleMath::Neq([i, j]));
-                                    added.push(id);
-                                } else if find_type(&eg, i) == ExprType::Boolean
-                                    && find_type(&eg, j) == ExprType::Boolean
-                                {
-                                    let id = eg.add(SimpleMath::Neq([i, j]));
-                                    added.push(id);
-                                }
-                            }
-                        } else if op_ctr == 11 {
-                            if i != j {
-                                if find_type(&eg, i) == ExprType::Number
-                                    && find_type(&eg, j) == ExprType::Number
-                                {
-                                    let id = eg.add(SimpleMath::Lt([i, j]));
-                                    added.push(id);
-                                }
-                            }
-                        } else if op_ctr == 12 {
-                            if i != j {
-                                if find_type(&eg, i) == ExprType::Number
-                                    && find_type(&eg, j) == ExprType::Number
-                                {
-                                    let id = eg.add(SimpleMath::Gt([i, j]));
-                                    added.push(id);
-                                }
-                            }
-                        }
-                        println!(
-                            "iter {} phase 2: before running rules, n={}, e={}",
-                            iter,
-                            eg.total_size(),
-                            eg.number_of_classes()
-                        );
+                let mut set = HashSet::new();
+                equalities.retain(|eq| set.insert(eq.name.clone()));
 
-                        metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+                let rules = equalities
+                    .iter()
+                    .filter(|eq| eq.cond == None)
+                    .map(|eq| &eq.rewrite);
 
-                        let mut set = HashSet::new();
-                        equalities.retain(|eq| set.insert(eq.name.clone()));
+                eg.rebuild();
 
-                        let rules = equalities
-                            .iter()
-                            .filter(|eq| eq.cond == None)
-                            .map(|eq| &eq.rewrite);
+                let runner: Runner<SimpleMath, SynthAnalysis, ()> =
+                    Runner::new(tainted_eg.analysis.clone()).with_egraph(tainted_eg);
 
-                        eg.rebuild();
+                tainted_eg = runner
+                    .with_time_limit(Duration::from_secs(20))
+                    .with_node_limit(usize::MAX)
+                    .with_iter_limit(5)
+                    .with_scheduler(SimpleScheduler)
+                    .run(rules)
+                    .egraph;
 
-                        let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                            Runner::new(eg.analysis.clone()).with_egraph(eg);
+                eg = self.update_clean_egraph(tainted_eg, eg);
 
-                        eg = runner
-                            .with_time_limit(Duration::from_secs(20))
-                            .with_node_limit(usize::MAX)
-                            .with_iter_limit(100)
-                            .with_scheduler(SimpleScheduler)
-                            .run(rules)
-                            .egraph;
+                my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
 
-                        eg.rebuild();
+                println!(
+                    "       phase 2: after running {} rules, n={}, e={}",
+                    &equalities.len(),
+                    eg.total_size(),
+                    eg.number_of_classes()
+                );
 
-                        println!(
-                            "       phase 2: after running {} rules, n={}, e={}",
-                            &equalities.len(),
-                            eg.total_size(),
-                            eg.number_of_classes()
-                        );
+                metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
 
-                        metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
-
-                        println!("iter {} phase 3: discover rules", iter);
-
-                        let mut to_union = vec![];
-
-                        equalities = self.learn_rules(iter, &added, &eg, equalities, &mut to_union);
-
-                        println!("       phase 3: performing {} unions", to_union.len());
-
-                        for (i, j) in to_union {
-                            eg.union(i, j);
-                        }
-
-                        eg.rebuild();
-
-                        println!(
-                            "       phase 3: number of eclasses after union : {}",
-                            eg.number_of_classes()
-                        );
+                println!("iter {} phase 3: discover rules", iter);
+                let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
+                for class in eg.classes() {
+                    if !eg[class.id].data.contains(&None) && my_ids.contains(&class.id) {
+                        // the ids corresponding to a specific cvec key in this hash map are for normal rewrites and can be unioned.
+                        by_cvec_some
+                            .entry(&eg[class.id].data)
+                            .or_default()
+                            .push(class.id);
                     }
                 }
-                op_ctr += 1;
+
+                let pattern_cost = |pat: &RecExpr<SimpleMath>| {
+                    let mut n_consts = 0;
+                    let mut vars = HashSet::new();
+                    for node in pat.as_ref() {
+                        match node {
+                            SimpleMath::Num(..) => n_consts += 1,
+                            SimpleMath::Var(v) => {
+                                vars.insert(v);
+                            }
+                            _ => (),
+                        }
+                    }
+                    (-(vars.len() as isize), n_consts, pat.as_ref().len())
+                };
+
+                let mut extract = Extractor::new(&eg, AstSize);
+
+                let best = by_cvec_some
+                    .values_mut()
+                    .filter(|ids| ids.len() > 1)
+                    .map(|ids| {
+                        let mut extracted: Vec<_> = ids
+                            .iter()
+                            .map(|i| {
+                                let expr = extract.find_best(*i).1;
+                                (pattern_cost(&expr), *i, expr)
+                            })
+                            .collect();
+                        extracted.sort_by(|a, b| a.0.cmp(&b.0).reverse());
+                        // return the two cheapest things
+                        (extracted.pop().unwrap(), extracted.pop().unwrap())
+                    })
+                    .min_by_key(|((cost1, _, _), (cost2, _, _))| {
+                        // cost1.max(cost2).clone()
+                        (cost1.0 + cost2.0, cost1.1 + cost2.1, cost1.2 + cost2.2)
+                    });
+
+                if let Some(((_, id1, expr1), (_, id2, expr2))) = best {
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr1, names);
+                    let pat2 = generalize(&expr2, names);
+                    if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                        if let Some(eq) = Equality::new(pat1, pat2, None) {
+                            if equalities.iter().all(|e| e.name != eq.name) {
+                                equalities.push(eq)
+                            }
+                        }
+                    }
+
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr2, names);
+                    let pat2 = generalize(&expr1, names);
+                    if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                        if let Some(eq) = Equality::new(pat1, pat2, None) {
+                            if equalities.iter().all(|e| e.name != eq.name) {
+                                equalities.push(eq)
+                            }
+                        }
+                    }
+                    eg.union(id1, id2);
+                } else {
+                    break;
+                }
             }
-            println!(
-                "iter {} phase 3: found {} new rules",
-                iter,
-                equalities.len()
-            );
-        }
 
+            println!("After iter {}, I know these equalities:", iter);
+            for eq in &equalities {
+                println!("  {}", eq);
+            }
+        }
         // println!("eclasses: {}, hashcons: {}, enodes: {}, myids: {}", eg.number_of_classes(), eg.total_number_of_nodes(), eg.total_size(), my_ids.len());
-        let cond_rws = self.learn_cond_rules(_conditional, &eg, added);
-        equalities.extend(cond_rws);
-
-        metrics.print_to_file();
-
-        let mut set = HashSet::new();
-        equalities.retain(|eq| set.insert(eq.name.clone()));
-
-        println!("Overall found the following {} rules", equalities.len());
-        for eq in &equalities {
-            println!("{}", eq);
-        }
+        // let cond_rws = self.learn_cond_rules(_conditional, &eg, added);
+        // equalities.extend(cond_rws); 
         equalities
     }
 }
+
 
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
