@@ -128,37 +128,12 @@ fn subsumption_filter(
     }
 
     eg.rebuild();
-
-    // println!("NUM NODES: {} {}", eg.number_of_classes(), eg.total_size());
-
-    // For each expression, what does it subsume?
-    // let mut subsume : HashMap<Id, Vec<Id>> = HashMap::default();
-    // let id_pairs : Vec<(Id, Id)> = ids.chunks(2).map(|chunk|
-    //     if let [lhs_id, rhs_id] = chunk {
-    //         (*lhs_id, *rhs_id) 
-    //     } else {
-    //         panic!();
-    //     }
-    // ).collect();
-
-    // println!("ID_PAIRS: {:?}", id_pairs);
-
-    // println!("PRINTING EXPRESSIONS:");
-    // let mut extract = Extractor::new(&eg, AstSize);
-    // for ec in eg.classes() {
-    //     let (_, expr) = extract.find_best(ec.id);
-    //     println!("{} : {}", ec.id, expr);
-    // }
-
-    // let ids_and_eqs = equalities.iter().zip(id_pairs.clone());
-
-    // let mut lhs_to_rhs : HashMap<Id, Id> = HashMap::default();
+    
     let mut lhs_to_eqs : HashMap<Id, Vec<(Id, usize)>> = HashMap::default();
     let mut eq_index = 0;
     for chunk in ids.chunks(2) {
         if let [lhs_id, rhs_id] = chunk {
             lhs_to_eqs.entry(*lhs_id).or_default().push((*rhs_id, eq_index));
-            // lhs_to_rhs.insert(*lhs_id, *rhs_id);
             eq_index = eq_index + 1;
         }
     }
@@ -207,69 +182,6 @@ fn subsumption_filter(
 
     println!("NUM REMOVED: {}", removed_eqs.len());
     removed_eqs
-
-    // let mut visited_ids : HashSet<Id> = HashSet::default();
-    // for (eq, (lhs_id, rhs_id)) in ids_and_eqs {
-    //     if !visited_ids.contains(&lhs_id) {
-    //         println!("SUB ITER: {} {}", lhs_id, eq.lhs);
-    //         println!("SUB SEARCH LEN: {}", eq.lhs.search(&eg).len());
-    //         for mat in eq.lhs.search(&eg) {
-    //             println!("hello {} {}", lhs_id, mat.eclass);
-    //             subsume.entry(lhs_id).or_default().push(mat.eclass);
-    //         }
-    //         visited_ids.insert(lhs_id);
-    //     }
-    //     if !visited_ids.contains(&rhs_id) {
-    //         println!("SUB ITER: {} {}", rhs_id, eq.rhs);
-    //         println!("SUB SEARCH LEN: {}", eq.rhs.search(&eg).len());
-    //         for mat in eq.rhs.search(&eg) {
-    //             println!("hello {} {}", rhs_id, mat.eclass);
-    //             subsume.entry(rhs_id).or_default().push(mat.eclass);
-    //         }
-    //         visited_ids.insert(rhs_id);
-    //     }
-    // }
-    // println!("EQS LEN: {}", id_pairs.len());
-    // println!("SUB LEN: {}", subsume.len());
-
-    // // Keep only the eqs that are not subsumed by another eq
-    // let mut candidates : HashSet<Id> = HashSet::default();
-    // candidates.extend(id_pairs.iter().map(|(lhs_id, _)| lhs_id));
-    // for (lhs_id, rhs_id) in id_pairs.clone() {
-    //     if !candidates.contains(&lhs_id) {
-    //         continue;
-    //     }
-
-    //     // TODO: This is a contravariant check
-    //     // lhs = rhs
-    //     // -> sub1 = sub_rhs
-    //     //           <- rhs
-    //     let subvec = subsume.get(&lhs_id);
-    //     if subvec.is_some() {
-    //         for sub_id in subvec.unwrap() {
-    //             let sub_rhs_id = lhs_to_rhs.get(sub_id);
-    //             if sub_rhs_id.is_some() {
-    //                 let sub_rhs_subvec = subsume.get(sub_rhs_id.unwrap());
-    //                 if sub_rhs_subvec.is_some() && sub_rhs_subvec.unwrap().contains(&rhs_id) {
-    //                     candidates.remove(sub_id);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // let mut removed_eqs : Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
-    // let mut index = 0;
-    // for (lhs_id, _) in id_pairs {
-    //     if !candidates.contains(&lhs_id) {
-    //         removed_eqs.push(equalities.remove(index));
-    //     } else {
-    //         index = index + 1;
-    //     }
-    // }
-
-    // println!("NUM REMOVED: {}", removed_eqs.len());
-    // removed_eqs
 }
 
 fn minimize_equalities(
