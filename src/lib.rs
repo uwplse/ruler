@@ -559,8 +559,8 @@ impl SynthParam {
 
                 metrics.record(
                     eqsat_iter,
-                    tainted_eg.total_size(),
                     tainted_eg.number_of_classes(),
+                    tainted_eg.total_size(),
                 );
 
                 let mut set = HashSet::new();
@@ -595,7 +595,7 @@ impl SynthParam {
                     eg.number_of_classes()
                 );
 
-                metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
+                metrics.record(eqsat_iter, eg.number_of_classes(), eg.total_size());
 
                 println!("iter {} phase 3: discover rules", iter);
                 let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
