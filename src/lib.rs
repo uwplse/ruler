@@ -458,6 +458,8 @@ impl SynthParam {
                 my_ids.len(),
             );
             let mut enodes_to_add = vec![];
+            // TODO probably a better way, like with a maaping
+            let mut expr_added = vec![];
 
             for &i in &my_ids {
                 for &j in &my_ids {
@@ -467,19 +469,23 @@ impl SynthParam {
                         && find_type(&eg, j) == ExprType::Number
                     {
                         enodes_to_add.push(SimpleMath::Add([i, j]));
+                        expr_added.push(format!("(+ {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
                         enodes_to_add.push(SimpleMath::Sub([i, j]));
+                        expr_added.push(format!("(- {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
                         enodes_to_add.push(SimpleMath::Mul([i, j]));
+                        expr_added.push(format!("(* {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number {
                         enodes_to_add.push(SimpleMath::Neg(i));
+                        expr_added.push(format!("(- {})", i))
                     }
                     /*
                     if find_type(&eg, i) == ExprType::Number
@@ -545,6 +551,14 @@ impl SynthParam {
                 my_ids.insert(eg.add(enode));
             }
 
+            metrics.log_event_metrics(
+                eqsat_iter,
+                eg.number_of_classes(),
+                eg.total_size(),
+                metrics::EventType::AddedNodes,
+                metrics::Content::Nodes(expr_added),
+            );
+
             loop {
                 eg.rebuild();
 
@@ -595,7 +609,15 @@ impl SynthParam {
                     eg.number_of_classes()
                 );
 
+                // TODO parameterize metrics Vec<Equality>SimpleMath, SynthAnaylsis (equalities)
                 metrics.record(eqsat_iter, eg.number_of_classes(), eg.total_size());
+                metrics.log_event_metrics(
+                    eqsat_iter,
+                    eg.number_of_classes(),
+                    eg.total_size(),
+                    metrics::EventType::FoundRules,
+                    metrics::Content::Rules(equalities.clone().into_iter().map(|d| d.name).collect()),
+                );
 
                 println!("iter {} phase 3: discover rules", iter);
                 let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
@@ -679,14 +701,16 @@ impl SynthParam {
                 println!("  {}", eq);
             }
         }
+        
+        metrics.print_to_file();
         // println!("eclasses: {}, hashcons: {}, enodes: {}, myids: {}", eg.number_of_classes(), eg.total_number_of_nodes(), eg.total_size(), my_ids.len());
         // let cond_rws = self.learn_cond_rules(_conditional, &eg, added);
-        // equalities.extend(cond_rws); 
+        // equalities.extend(cond_rws);
         equalities
     }
 }
 
-
+#[derive(Clone)]
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,

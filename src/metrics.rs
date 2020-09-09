@@ -1,9 +1,20 @@
+// TODO generalize this
+//use crate::SimpleMath;
 use serde::Deserialize;
 use serde::Serialize;
 
 #[derive(Serialize, Deserialize)]
 pub enum EventType {
+    AddedNodes,
+    FoundRules,
+}
 
+#[derive(Serialize, Deserialize)]
+pub enum Content {
+    Comment(String),
+    // TODO generalize this
+    Nodes(Vec<String>),
+    Rules(Vec<String>)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -17,7 +28,7 @@ struct EgraphStatsData {
     eclasses: usize,
     enodes: usize,
     event: Option<EventType>,
-    notes: Option<String>,
+    note: Option<Content>,
 }
 
 impl EgraphStats {
@@ -32,12 +43,18 @@ impl EgraphStats {
             eqsat_iter,
             eclasses,
             enodes,
-            event: None, notes: None,
-        })
+            event: None, note: None
+        });
     }
 
-    pub fn log_event_metrics(&mut self, eqsat_iter: i32, eclasses: usize, enodes: usize, event: EventType, notes: String) {
-
+    pub fn log_event_metrics(&mut self, eqsat_iter: i32, eclasses: usize, enodes: usize, event: EventType, note: Content) {
+        self.data_points.push(EgraphStatsData {
+            eqsat_iter,
+            eclasses,
+            enodes,
+            event: Some(event),
+            note: Some(note)
+        });
     }
 
     pub fn print_to_file(&self) {
