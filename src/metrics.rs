@@ -2,6 +2,11 @@ use serde::Deserialize;
 use serde::Serialize;
 
 #[derive(Serialize, Deserialize)]
+pub enum EventType {
+
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct EgraphStats {
     data_points: Vec<EgraphStatsData>,
 }
@@ -11,6 +16,8 @@ struct EgraphStatsData {
     eqsat_iter: i32,
     eclasses: usize,
     enodes: usize,
+    event: Option<EventType>,
+    notes: Option<String>,
 }
 
 impl EgraphStats {
@@ -25,7 +32,12 @@ impl EgraphStats {
             eqsat_iter,
             eclasses,
             enodes,
+            event: None, notes: None,
         })
+    }
+
+    pub fn log_event_metrics(&mut self, eqsat_iter: i32, eclasses: usize, enodes: usize, event: EventType, notes: String) {
+
     }
 
     pub fn print_to_file(&self) {
