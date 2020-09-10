@@ -8,6 +8,7 @@ use std::{
     fmt::Display,
     fmt::Formatter,
     time::Duration,
+    time::Instant,
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -446,8 +447,7 @@ impl SynthParam {
         let mut eg = self.mk_egraph();
         let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
 
-        let mut eqsat_iter = 0;
-        let mut metrics = metrics::EgraphStats::new();
+        let mut metrics = metrics::RulerProfile::new();
 
         for iter in 0..self.n_iter {
             my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
@@ -459,10 +459,9 @@ impl SynthParam {
             );
             let mut enodes_to_add = vec![];
 
+            let before = Instant::now();
             for &i in &my_ids {
                 for &j in &my_ids {
-                    eqsat_iter = eqsat_iter + 1;
-
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
@@ -478,9 +477,9 @@ impl SynthParam {
                     {
                         enodes_to_add.push(SimpleMath::Mul([i, j]));
                     }
-                    if find_type(&eg, i) == ExprType::Number {
-                        enodes_to_add.push(SimpleMath::Neg(i));
-                    }
+                    // if find_type(&eg, i) == ExprType::Number {
+                    //     enodes_to_add.push(SimpleMath::Neg(i));
+                    // }
                     /*
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
@@ -544,11 +543,14 @@ impl SynthParam {
             for enode in enodes_to_add {
                 my_ids.insert(eg.add(enode));
             }
+            let adding_exprs = Instant::now().duration_since(before);
 
+            let mut nloop = 0;
             loop {
-                eg.rebuild();
-
+                nloop += 1;
+                let before = Instant::now();
                 let mut tainted_eg = eg.clone();
+                let cloning_pristine = Instant::now().duration_since(before);
 
                 println!(
                     "iter {} phase 2: before running rules, n={}, e={}",
@@ -557,12 +559,7 @@ impl SynthParam {
                     tainted_eg.number_of_classes()
                 );
 
-                metrics.record(
-                    eqsat_iter,
-                    tainted_eg.total_size(),
-                    tainted_eg.number_of_classes(),
-                );
-
+                let before = Instant::now();
                 let mut set = HashSet::new();
                 equalities.retain(|eq| set.insert(eq.name.clone()));
 
@@ -571,11 +568,12 @@ impl SynthParam {
                     .filter(|eq| eq.cond == None)
                     .map(|eq| &eq.rewrite);
 
-                eg.rebuild();
+                let clean_rules = Instant::now().duration_since(before);
 
                 let runner: Runner<SimpleMath, SynthAnalysis, ()> =
                     Runner::new(tainted_eg.analysis.clone()).with_egraph(tainted_eg);
 
+                let before = Instant::now();
                 tainted_eg = runner
                     .with_time_limit(Duration::from_secs(20))
                     .with_node_limit(usize::MAX)
@@ -584,7 +582,13 @@ impl SynthParam {
                     .run(rules)
                     .egraph;
 
+                let tainted_eqsat = Instant::now().duration_since(before);
+
+                let before = Instant::now();
                 eg = self.update_clean_egraph(tainted_eg, eg);
+                let update_pristine = Instant::now().duration_since(before);
+
+                eg.rebuild();
 
                 my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
 
@@ -595,9 +599,8 @@ impl SynthParam {
                     eg.number_of_classes()
                 );
 
-                metrics.record(eqsat_iter, eg.total_size(), eg.number_of_classes());
-
                 println!("iter {} phase 3: discover rules", iter);
+                let before = Instant::now();
                 let mut by_cvec_some: IndexMap<&Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
                 for class in eg.classes() {
                     if !eg[class.id].data.contains(&None) && my_ids.contains(&class.id) {
@@ -608,6 +611,7 @@ impl SynthParam {
                             .push(class.id);
                     }
                 }
+                let cvec_grouping = Instant::now().duration_since(before);
 
                 let pattern_cost = |pat: &RecExpr<SimpleMath>| {
                     let mut n_consts = 0;
@@ -625,6 +629,9 @@ impl SynthParam {
                 };
 
                 let mut extract = Extractor::new(&eg, AstSize);
+
+                let before = Instant::now();
+                let mut learn_a_rule = Duration::new(0, 0);
 
                 let best = by_cvec_some
                     .values_mut()
@@ -669,9 +676,23 @@ impl SynthParam {
                         }
                     }
                     eg.union(id1, id2);
+                    learn_a_rule = Instant::now().duration_since(before);
                 } else {
                     break;
                 }
+                metrics.record(
+                    iter,
+                    adding_exprs,
+                    nloop,
+                    cloning_pristine,
+                    clean_rules,
+                    tainted_eqsat,
+                    update_pristine,
+                    cvec_grouping,
+                    learn_a_rule,
+                    eg.total_size(),
+                    eg.total_number_of_nodes(),
+                );
             }
 
             println!("After iter {}, I know these equalities:", iter);
@@ -679,13 +700,13 @@ impl SynthParam {
                 println!("  {}", eq);
             }
         }
+        metrics.print_to_file();
         // println!("eclasses: {}, hashcons: {}, enodes: {}, myids: {}", eg.number_of_classes(), eg.total_number_of_nodes(), eg.total_size(), my_ids.len());
         // let cond_rws = self.learn_cond_rules(_conditional, &eg, added);
-        // equalities.extend(cond_rws); 
+        // equalities.extend(cond_rws);
         equalities
     }
 }
-
 
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
