@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::time::{Duration};
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
 struct TimeStats {
@@ -52,17 +52,16 @@ impl RulerProfile {
             cvec_grouping,
             learn_a_rule,
             eclasses,
-            enodes
+            enodes,
         })
     }
 
     pub fn print_to_file(&self) {
-        let root_dir= env!("CARGO_MANIFEST_DIR");
-        let out_dir : String = root_dir.to_string() + "/out";
-        let json_path : String = out_dir.clone() + "/ruler_profile.json";
+        let root_dir = env!("CARGO_MANIFEST_DIR");
+        let out_dir: String = root_dir.to_string() + "/out";
+        let json_path: String = out_dir.clone() + "/ruler_profile.json";
         std::fs::create_dir_all(out_dir).expect("could not create dir");
-        let outfile =
-            std::fs::File::create(json_path).expect("failed to open file");
+        let outfile = std::fs::File::create(json_path).expect("failed to open file");
         serde_json::to_writer_pretty(outfile, &self.ruler_profile).unwrap();
     }
 }
