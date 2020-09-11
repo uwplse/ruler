@@ -2,7 +2,7 @@ import json
 import csv
 
 def time(d, nm):
-    return d[nm]['secs'] + (d[nm]['nanos'] / 1000000000)
+    return (float(d[nm]['secs']) + (float(d[nm]['nanos']) / float(1000000000)))
 
 def ruler_profiler(p):
     with open(p) as f:
