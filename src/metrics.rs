@@ -13,8 +13,13 @@ struct TimeStats {
     pub update_pristine: Duration,
     pub cvec_grouping: Duration,
     pub learn_a_rule: Duration,
-    pub eclasses: usize,
-    pub enodes: usize,
+    pub before_eqsat_eclasses: usize,
+    pub before_eqsat_enodes: usize,
+    pub before_cvec_eclasses: usize,
+    pub before_cvec_enodes: usize,
+    pub after_cvec_eclasses: usize,
+    pub after_cvec_enodes: usize,
+    pub learned_rule: String,
 }
 
 pub struct RulerProfile {
@@ -38,8 +43,13 @@ impl RulerProfile {
         update_pristine: Duration,
         cvec_grouping: Duration,
         learn_a_rule: Duration,
-        eclasses: usize,
-        enodes: usize,
+        before_eqsat_eclasses: usize,
+        before_eqsat_enodes: usize,
+        before_cvec_eclasses: usize,
+        before_cvec_enodes: usize,
+        after_cvec_eclasses: usize,
+        after_cvec_enodes: usize,
+        learned_rule: String,
     ) {
         self.ruler_profile.push(TimeStats {
             niter,
@@ -51,8 +61,13 @@ impl RulerProfile {
             update_pristine,
             cvec_grouping,
             learn_a_rule,
-            eclasses,
-            enodes,
+            before_eqsat_eclasses,
+            before_eqsat_enodes,
+            before_cvec_eclasses,
+            before_cvec_enodes,
+            after_cvec_eclasses,
+            after_cvec_enodes,
+            learned_rule,
         })
     }
 

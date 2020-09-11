@@ -553,7 +553,7 @@ impl SynthParam {
                 let cloning_pristine = Instant::now().duration_since(before);
 
                 println!(
-                    "iter {} phase 2: before running rules, n={}, e={}",
+                    "iter {} phase 2: before running rules, tainted eg has: enodes = {}, eclasses = {}",
                     iter,
                     tainted_eg.total_size(),
                     tainted_eg.number_of_classes()
@@ -574,6 +574,8 @@ impl SynthParam {
                     Runner::new(tainted_eg.analysis.clone()).with_egraph(tainted_eg);
 
                 let before = Instant::now();
+                let before_eqsat_eclasses = eg.number_of_classes();
+                let before_eqsat_enodes = eg.total_number_of_nodes();
                 tainted_eg = runner
                     .with_time_limit(Duration::from_secs(20))
                     .with_node_limit(usize::MAX)
@@ -593,11 +595,14 @@ impl SynthParam {
                 my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
 
                 println!(
-                    "       phase 2: after running {} rules, n={}, e={}",
+                    "       phase 2: after running {} rules, tainted eg has enodes = {}, eclasses = {}",
                     &equalities.len(),
                     eg.total_size(),
                     eg.number_of_classes()
                 );
+
+                let before_cvec_eclasses = eg.number_of_classes();
+                let before_cvec_enodes = eg.total_number_of_nodes();
 
                 println!("iter {} phase 3: discover rules", iter);
                 let before = Instant::now();
@@ -612,6 +617,12 @@ impl SynthParam {
                     }
                 }
                 let cvec_grouping = Instant::now().duration_since(before);
+
+                println!(
+                    "iter {} phase 3: number of cvec groups: {}",
+                    iter,
+                    by_cvec_some.len()
+                );
 
                 let pattern_cost = |pat: &RecExpr<SimpleMath>| {
                     let mut n_consts = 0;
@@ -631,7 +642,10 @@ impl SynthParam {
                 let mut extract = Extractor::new(&eg, AstSize);
 
                 let before = Instant::now();
-                let mut learn_a_rule = Duration::new(0, 0);
+                let learn_a_rule: Duration;
+                let after_cvec_eclasses: usize;
+                let after_cvec_enodes: usize;
+                let mut learned_rule = String::new();
 
                 let best = by_cvec_some
                     .values_mut()
@@ -660,6 +674,7 @@ impl SynthParam {
                     if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
                         if let Some(eq) = Equality::new(pat1, pat2, None) {
                             if equalities.iter().all(|e| e.name != eq.name) {
+                                learned_rule = eq.name.clone();
                                 equalities.push(eq)
                             }
                         }
@@ -676,6 +691,8 @@ impl SynthParam {
                         }
                     }
                     eg.union(id1, id2);
+                    after_cvec_eclasses = eg.number_of_classes();
+                    after_cvec_enodes = eg.total_number_of_nodes();
                     learn_a_rule = Instant::now().duration_since(before);
                 } else {
                     break;
@@ -690,8 +707,13 @@ impl SynthParam {
                     update_pristine,
                     cvec_grouping,
                     learn_a_rule,
-                    eg.total_size(),
-                    eg.total_number_of_nodes(),
+                    before_eqsat_eclasses,
+                    before_eqsat_enodes,
+                    before_cvec_eclasses,
+                    before_cvec_enodes,
+                    after_cvec_eclasses,
+                    after_cvec_enodes,
+                    learned_rule,
                 );
             }
 
