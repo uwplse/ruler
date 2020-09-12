@@ -313,18 +313,21 @@ impl SynthParam {
         egraph
     }
 
-    fn learn_cond_rules(&mut self, rws: &Vec<Equality<SimpleMath, SynthAnalysis>>) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
+    fn learn_cond_rules(
+        &mut self,
+        rws: &Vec<Equality<SimpleMath, SynthAnalysis>>,
+    ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         let mut ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
 
         let only_diff_at_none_poses =
-            |(pos, (x, y)) : (usize, (Option<Constant>, Option<Constant>)), none_poses: Vec<usize>| none_poses.contains(&pos) || x == y;
+            |(pos, (x, y)): (usize, (Option<Constant>, Option<Constant>)),
+             none_poses: Vec<usize>| none_poses.contains(&pos) || x == y;
 
         let all_false = |cvec: &Vec<Option<Constant>>| {
             cvec.iter().all(|v| v == &Some(Constant::Boolean(false)))
         };
-
 
         let same_cvec = |v1: &Vec<Option<Constant>>, v2: &Vec<Option<Constant>>| {
             v1.iter().zip(v2.iter()).all(|(x, y)| match (x, y) {
@@ -357,7 +360,7 @@ impl SynthParam {
                 c_vars.iter().all(|cv| e_vars.contains(cv))
             };
 
-        for _iter in 0..self.n_iter-1 {
+        for _iter in 0..self.n_iter - 1 {
             ids = ids.into_iter().map(|id| eg.find(id)).collect();
             let mut enodes_to_add = vec![];
             for &i in &ids {
@@ -440,27 +443,27 @@ impl SynthParam {
             }
 
             let rules = rws
-            .iter()
-            .filter(|eq| eq.cond == None)
-            .map(|eq| &eq.rewrite);
+                .iter()
+                .filter(|eq| eq.cond == None)
+                .map(|eq| &eq.rewrite);
 
             let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                    Runner::new(eg.analysis.clone()).with_egraph(eg);
+                Runner::new(eg.analysis.clone()).with_egraph(eg);
 
             eg = runner
-            .with_time_limit(Duration::from_secs(20))
-            .with_node_limit(usize::MAX)
-            .with_iter_limit(5)
-            // .with_scheduler(SimpleScheduler)
-            .run(rules)
-            .egraph;
-        
+                .with_time_limit(Duration::from_secs(20))
+                .with_node_limit(usize::MAX)
+                .with_iter_limit(5)
+                // .with_scheduler(SimpleScheduler)
+                .run(rules)
+                .egraph;
+
             eg.rebuild();
-            
+
             // all eclass cvecs and Ids
             let ec_datas: Vec<(Vec<Option<Constant>>, Id)> =
-            eg.classes().cloned().map(|c| (c.data, c.id)).collect();
-        
+                eg.classes().cloned().map(|c| (c.data, c.id)).collect();
+
             for &i in &ids {
                 for &j in &ids {
                     let mut agreement_vec: Vec<Option<Constant>> = Vec::new();
@@ -480,7 +483,9 @@ impl SynthParam {
 
                         let mut ds = eg[i].data.iter().zip(eg[j].data.iter()).enumerate();
                         // if the cvecs are same everywhere else, then consider for potential conditional rule
-                        if ds.all(|(i, (x, y))| only_diff_at_none_poses((i, (*x, *y)), i_nones.clone())) {
+                        if ds.all(|(i, (x, y))| {
+                            only_diff_at_none_poses((i, (*x, *y)), i_nones.clone())
+                        }) {
                             for idx in 0..eg[j].data.len() {
                                 if i_nones.contains(&idx) {
                                     // cvecs disagree at None positions
@@ -498,11 +503,14 @@ impl SynthParam {
                             let cond = match ec_datas.iter().find(|(ec_data, cond_id)| {
                                 same_cvec(&ec_data, &agreement_vec)
                                     && !all_false(&ec_data)
-                                    && no_free_vars(extract.find_best(*cond_id).1, expr1.clone(), expr2.clone())
+                                    && no_free_vars(
+                                        extract.find_best(*cond_id).1,
+                                        expr1.clone(),
+                                        expr2.clone(),
+                                    )
                             }) {
                                 None => None,
-                                Some((_, id)) =>
-                                    Some(extract.find_best(*id).1)
+                                Some((_, id)) => Some(extract.find_best(*id).1),
                             };
 
                             //TODO: we will  likely need to do this, using inverse subsumption order
