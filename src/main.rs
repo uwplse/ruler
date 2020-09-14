@@ -43,7 +43,7 @@ fn main() {
     };
 
     if args.len() < 2 {
-        param.run(13, true);
+        param.run(13, false);
     } else if args.len() >= 2 && args[1] == "simplify" {
         let res = simplify(param);
         match res {

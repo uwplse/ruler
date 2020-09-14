@@ -360,7 +360,7 @@ impl SynthParam {
                 c_vars.iter().all(|cv| e_vars.contains(cv))
             };
 
-        for _iter in 0..self.n_iter - 1 {
+        for _iter in 0..self.n_iter {
             ids = ids.into_iter().map(|id| eg.find(id)).collect();
             let mut enodes_to_add = vec![];
             for &i in &ids {
@@ -442,23 +442,33 @@ impl SynthParam {
                 ids.insert(eg.add(enode));
             }
 
-            let rules = rws
-                .iter()
-                .filter(|eq| eq.cond == None)
-                .map(|eq| &eq.rewrite);
+            println!(
+                "conditional rules eg size before eqsat: {}",
+                eg.number_of_classes()
+            );
 
-            let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                Runner::new(eg.analysis.clone()).with_egraph(eg);
+            // let rules = rws
+            //     .iter()
+            //     .filter(|eq| eq.cond == None)
+            //     .map(|eq| &eq.rewrite);
 
-            eg = runner
-                .with_time_limit(Duration::from_secs(20))
-                .with_node_limit(usize::MAX)
-                .with_iter_limit(5)
-                // .with_scheduler(SimpleScheduler)
-                .run(rules)
-                .egraph;
+            // let runner: Runner<SimpleMath, SynthAnalysis, ()> =
+            //     Runner::new(eg.analysis.clone()).with_egraph(eg);
 
-            eg.rebuild();
+            // eg = runner
+            //     .with_time_limit(Duration::from_secs(20))
+            //     .with_node_limit(usize::MAX)
+            //     .with_iter_limit(5)
+            //     // .with_scheduler(SimpleScheduler)
+            //     .run(rules)
+            //     .egraph;
+
+            // eg.rebuild();
+
+            println!(
+                "conditional rules eg size after eqsat: {}",
+                eg.number_of_classes()
+            );
 
             // all eclass cvecs and Ids
             let ec_datas: Vec<(Vec<Option<Constant>>, Id)> =
@@ -783,7 +793,6 @@ impl SynthParam {
                     learned_rule,
                 );
             }
-
             println!(
                 "After iter {}, I know {} equalities:",
                 iter,
