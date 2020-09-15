@@ -37,7 +37,7 @@ fn main() {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 2,
         n_samples: 5,
-        variables: vec!["x".into(), "y".into(), "z".into()],
+        variables: vec!["x".into()], //, "y".into(), "z".into()],
         consts: vec![Constant::Number(0), Constant::Number(1)], //, Constant::Boolean(false)] //, Constant::Boolean(true)],
         diff_thresh: 5,
     };

@@ -617,6 +617,9 @@ impl SynthParam {
                     if find_type(&eg, i) == ExprType::Number {
                         enodes_to_add.push(SimpleMath::Neg(i));
                     }
+                    if find_type(&eg, i) ==ExprType::Number {
+                        enodes_to_add.push(SimpleMath::Div([i, j]));
+                    }
                 }
             }
 
