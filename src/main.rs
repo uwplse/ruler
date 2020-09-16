@@ -30,14 +30,15 @@ fn simplify(mut param: SynthParam) -> std::io::Result<()> {
 }
 
 fn main() {
+
     let _ = env_logger::builder().try_init();
     let args: Vec<String> = env::args().collect();
 
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 2,
-        n_samples: 5,
-        variables: vec!["x".into()], //, "y".into(), "z".into()],
+        n_samples: 10,
+        variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![Constant::Number(0), Constant::Number(1)], //, Constant::Boolean(false)] //, Constant::Boolean(true)],
         diff_thresh: 5,
     };

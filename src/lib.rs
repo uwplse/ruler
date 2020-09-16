@@ -211,7 +211,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
                         if n2 != 0 {
-                            Some(Constant::Number(n1 / n2))
+                            Some(Constant::Number(n1.wrapping_div(n2)))
                         } else {
                             None
                         }
@@ -302,6 +302,7 @@ impl SynthParam {
             cvec.push(Some(Constant::Number(0)));
             cvec.push(Some(Constant::Number(1)));
             cvec.shuffle(rng);
+            println!("var: {}, cvec: {:?}", var, cvec);
             egraph[id].data = cvec;
         }
         // implicit sumbumption order here
@@ -583,7 +584,6 @@ impl SynthParam {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
-
         let mut metrics = metrics::RulerProfile::new();
 
         for iter in 0..self.n_iter {
@@ -617,9 +617,11 @@ impl SynthParam {
                     if find_type(&eg, i) == ExprType::Number {
                         enodes_to_add.push(SimpleMath::Neg(i));
                     }
-                    if find_type(&eg, i) ==ExprType::Number {
-                        enodes_to_add.push(SimpleMath::Div([i, j]));
-                    }
+                    // if find_type(&eg, i) ==ExprType::Number 
+                    //     && find_type(&eg, j) == ExprType::Number
+                    // {
+                    //     enodes_to_add.push(SimpleMath::Div([i, j]));
+                    // }
                 }
             }
 
@@ -716,7 +718,6 @@ impl SynthParam {
                     (-(vars.len() as isize), n_consts, pat.as_ref().len())
                 };
 
-                let mut extract = Extractor::new(&eg, AstSize);
 
                 let before = Instant::now();
                 let learn_a_rule: Duration;
@@ -724,6 +725,8 @@ impl SynthParam {
                 let after_cvec_enodes: usize;
                 let mut learned_rule = String::new();
 
+                let mut extract = Extractor::new(&eg, AstSize);
+                
                 let best = by_cvec_some
                     .values_mut()
                     .filter(|ids| ids.len() > 1)
@@ -750,6 +753,8 @@ impl SynthParam {
                     let pat2 = generalize(&expr2, names);
                     if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
                         if let Some(eq) = Equality::new(pat1, pat2, None) {
+                            println!("cvec 1: {:?}", eg[id1].data);
+                            println!("cvec 2: {:?}", eg[id2].data);
                             println!("Learned rule: {} => {}", expr1, expr2);
                             if equalities.iter().all(|e| e.name != eq.name) {
                                 learned_rule = eq.name.clone();
