@@ -387,6 +387,42 @@ impl SynthParam {
         egraph
     }
 
+    fn dfs_cycle_extract(
+        edges: &IndexMap<usize, Vec<usize>>,
+        path: &mut Vec<usize>,
+        visited: &mut HashSet<usize>,
+        results: &mut Vec<HashSet<usize>>,
+        node: usize,
+    ) {
+        if path.contains(&node) {
+            // Cycle!
+            let mut set : HashSet<usize> = path
+                .split(|i| *i == node)
+                .last()
+                .unwrap()
+                .iter()
+                .map(|i| *i)
+                .collect();
+            set.insert(node);
+            // println!("CYCLE DETECTED: {:?}", set);
+            results.push(set);
+        }
+
+        if visited.contains(&node) {
+            return;
+        } else {
+            visited.insert(node);
+        }
+
+        if edges.contains_key(&node) {
+            path.push(node);
+            for child in edges.get(&node).unwrap() {
+                Self::dfs_cycle_extract(edges, path, visited, results, *child);
+            }
+            path.pop();
+        }
+    }
+
     fn expr_subsumption_cost(
         pat: &RecExpr<SimpleMath>
     ) -> (usize, isize) {
@@ -434,7 +470,7 @@ impl SynthParam {
         // This means subsumption is covariant across rules, but also 
         // that the lhs and rhs substitutions must match each other
         let mut removed_eq_nums : HashSet<usize> = HashSet::default();
-        let mut _rule_sub_rels = vec![]; // This vec is for if we need a topo sort of the rules
+        let mut rule_sub_rels = vec![]; // This vec is for if we need a topo sort of the rules
         let mut eq_index = 0;
         let mut var_map = HashMap::default();
 
@@ -451,13 +487,65 @@ impl SynthParam {
                         if rhs_mat.is_some() && *sub_eq_num != eq_index && rhs_mat.unwrap().substs == mat.substs {
                             // Rule subsumption!
                             removed_eq_nums.insert(*sub_eq_num);
-                            _rule_sub_rels.push((eq_index, sub_eq_num));
+                            rule_sub_rels.push((eq_index, sub_eq_num));
                             println!("RULE SUB: {} > {}", eq_index, sub_eq_num);
                         }
                     }
                 }
             }
             eq_index = eq_index + 1;
+        }
+
+        // Handle cycles: If n rules subsume each other, we need to pick exactly one to keep
+        if !rule_sub_rels.is_empty() {
+            let mut rule_sub_map : IndexMap<usize, Vec<usize>> = IndexMap::default();
+            let mut rev_rule_sub_map : IndexMap<usize, Vec<usize>> = IndexMap::default();
+            for (k, v) in rule_sub_rels {
+                rule_sub_map.entry(k).or_default().push(*v);
+                rev_rule_sub_map.entry(*v).or_default().push(k);
+            }
+
+            let mut visited : HashSet<usize> = HashSet::default();
+            let mut results : Vec<HashSet<usize>> = vec![];
+            let mut path : Vec<usize> = vec![];
+            
+            for i in 0..(best_by_cvec.len() - 1) {
+                if !visited.contains(&i) {
+                    // println!("Cycle-checking {}, visited: {:?}", i, visited);
+                    Self::dfs_cycle_extract(&rule_sub_map, &mut path, &mut visited, &mut results, i);
+                }
+            }
+
+            let mut i = 0;
+            while i < results.len() {
+                // Consolidate cycles together to find the maximal group of equivalent rules
+                let mut cycle = results[i].clone();
+                let mut j = i + 1;
+                while j < results.len() {
+                    let cycle2 = results[j].clone();
+                    if !cycle2.is_disjoint(&cycle) {
+                        cycle.extend(cycle2.iter());
+                        results.remove(j);
+                    } else {
+                        j = j + 1;
+                    }
+                }
+
+                // If no rule from outside cycle subsumes any rule from within cycle, then one
+                // rule can be chosen to continue and represent this cycle
+                let mut parents : HashSet<usize> = HashSet::default();
+                for node in cycle.iter() {
+                    parents.extend(rev_rule_sub_map[node].clone());
+                }
+                // println!("CYCLE GROUP: {:?}, parents: {:?}", cycle, parents);
+                if parents.is_subset(&cycle) {
+                    let rep = cycle.iter().next().unwrap();
+                    // println!("CYCLE GROUP: {:?}, REP: {}", cycle, rep);
+                    removed_eq_nums.remove(rep);
+                }
+
+                i = i + 1;
+            }
         }
 
         let mut rem_eq_nums_vec : Vec<&usize> = removed_eq_nums.iter().collect();
@@ -769,7 +857,7 @@ impl SynthParam {
                     .with_time_limit(Duration::from_secs(20))
                     .with_node_limit(usize::MAX)
                     .with_iter_limit(5)
-                    .with_scheduler(SimpleScheduler)
+                    //.with_scheduler(SimpleScheduler)
                     .run(rules)
                     .egraph;
 
@@ -809,25 +897,43 @@ impl SynthParam {
                 //    2. Sort then by ast size/num of variables for all lhs and rhs
                 //       and pick the rule with the lowest max (probably better)
 
-                let best_by_cvec : Vec<_> = by_cvec_some
-                    .values_mut()
-                    .filter(|ids| ids.len() > 1)
-                    .map(|ids| {
-                        let mut extracted: Vec<_> = ids
-                            .iter()
-                            .map(|i| {
-                                let expr = extract.find_best(*i).1;
-                                (Self::expr_subsumption_cost(&expr), *i, expr)
-                            })
-                            .collect();
-                        extracted.sort_by(|a, b| a.0.cmp(&b.0).reverse());
-                        // return the two cheapest things
-                        (extracted.pop().unwrap(), extracted.pop().unwrap())
-                    })
-                    .map(|((_, id1, expr1), (_, id2, expr2))| ((id1, expr1), (id2, expr2)))
+                let by_cvec_recexps : Vec<Vec<(Id, RecExpr<SimpleMath>)>> = by_cvec_some
+                    .iter()
+                    .map(|(_, ids)|
+                        ids.iter().map(|id| (*id, extract.find_best(*id).1)).collect()
+                    )
                     .collect();
 
-                let best = Self::subsumption_find_best(eg.analysis.clone(), best_by_cvec);
+                let mut potential_rules = vec![];
+                for exprs in by_cvec_recexps {
+                    for (id1, expr1) in exprs.clone() {
+                        for (id2, expr2) in exprs.clone() {
+                            if id1 < id2 {
+                                potential_rules.push(((id1, expr1.clone()),(id2, expr2)));
+                            }
+                        }
+                    }
+                }
+
+                // let best_by_cvec : Vec<_> = by_cvec_some
+                //     .values_mut()
+                //     .filter(|ids| ids.len() > 1)
+                //     .map(|ids| {
+                //         let mut extracted: Vec<_> = ids
+                //             .iter()
+                //             .map(|i| {
+                //                 let expr = extract.find_best(*i).1;
+                //                 (Self::expr_subsumption_cost(&expr), *i, expr)
+                //             })
+                //             .collect();
+                //         extracted.sort_by(|a, b| a.0.cmp(&b.0).reverse());
+                //         // return the two cheapest things
+                //         (extracted.pop().unwrap(), extracted.pop().unwrap())
+                //     })
+                //     .map(|((_, id1, expr1), (_, id2, expr2))| ((id1, expr1), (id2, expr2)))
+                //     .collect();
+
+                let best = Self::subsumption_find_best(eg.analysis.clone(), potential_rules);
 
                 // let best = 
                 //     .min_by_key(|((cost1, _, _), (cost2, _, _))| {
