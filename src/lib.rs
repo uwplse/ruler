@@ -617,7 +617,7 @@ impl SynthParam {
                     if find_type(&eg, i) == ExprType::Number {
                         enodes_to_add.push(SimpleMath::Neg(i));
                     }
-                    // if find_type(&eg, i) ==ExprType::Number 
+                    // if find_type(&eg, i) == ExprType::Number
                     //     && find_type(&eg, j) == ExprType::Number
                     // {
                     //     enodes_to_add.push(SimpleMath::Div([i, j]));
@@ -718,7 +718,6 @@ impl SynthParam {
                     (-(vars.len() as isize), n_consts, pat.as_ref().len())
                 };
 
-
                 let before = Instant::now();
                 let learn_a_rule: Duration;
                 let after_cvec_eclasses: usize;
@@ -726,7 +725,7 @@ impl SynthParam {
                 let mut learned_rule = String::new();
 
                 let mut extract = Extractor::new(&eg, AstSize);
-                
+
                 let best = by_cvec_some
                     .values_mut()
                     .filter(|ids| ids.len() > 1)

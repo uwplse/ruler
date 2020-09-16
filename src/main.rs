@@ -30,7 +30,6 @@ fn simplify(mut param: SynthParam) -> std::io::Result<()> {
 }
 
 fn main() {
-
     let _ = env_logger::builder().try_init();
     let args: Vec<String> = env::args().collect();
 
