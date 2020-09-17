@@ -314,6 +314,189 @@ impl SynthParam {
         egraph
     }
 
+    fn dfs_cycle_extract(
+        edges: &IndexMap<usize, Vec<usize>>,
+        path: &mut Vec<usize>,
+        visited: &mut HashSet<usize>,
+        results: &mut Vec<HashSet<usize>>,
+        node: usize,
+    ) {
+        if path.contains(&node) {
+            // Cycle!
+            let mut set : HashSet<usize> = path
+                .split(|i| *i == node)
+                .last()
+                .unwrap()
+                .iter()
+                .map(|i| *i)
+                .collect();
+            set.insert(node);
+            // println!("CYCLE DETECTED: {:?}", set);
+            results.push(set);
+        }
+
+        if visited.contains(&node) {
+            return;
+        } else {
+            visited.insert(node);
+        }
+
+        if edges.contains_key(&node) {
+            path.push(node);
+            for child in edges.get(&node).unwrap() {
+                Self::dfs_cycle_extract(edges, path, visited, results, *child);
+            }
+            path.pop();
+        }
+    }
+
+    fn expr_subsumption_cost(
+        pat: &RecExpr<SimpleMath>
+    ) -> (usize, isize) {
+        let mut vars = HashSet::new();
+        for node in pat.as_ref() {
+            match node {
+                SimpleMath::Var(v) => {
+                    vars.insert(v);
+                }
+                _ => (),
+            }
+        }
+        (pat.as_ref().len(), -(vars.len() as isize))
+    }
+
+    fn subsumption_find_best(
+        analysis: SynthAnalysis,
+        mut potential_rules: Vec<((Id, RecExpr<SimpleMath>), (Id, RecExpr<SimpleMath>))>,
+    ) -> Option<((Id, RecExpr<SimpleMath>), (Id, RecExpr<SimpleMath>))> {
+        let mut eg = EGraph::new(analysis);
+
+        let mut ids = vec![];
+        let mut eq_index = 0;
+        for ((_, expr1), (_, expr2)) in potential_rules.iter() {
+            ids.push(eg.add_expr(expr1));
+            ids.push(eg.add_expr(expr2));
+
+            // println!("EQ {}: {} => {}", eq_index, expr1, expr2);
+            eq_index = eq_index + 1;
+        }
+
+        eg.rebuild();
+        
+        let mut lhs_to_eqs : HashMap<Id, Vec<(Id, usize)>> = HashMap::default();
+        let mut eq_index = 0;
+        for chunk in ids.chunks(2) {
+            if let [lhs_id, rhs_id] = chunk {
+                lhs_to_eqs.entry(*lhs_id).or_default().push((*rhs_id, eq_index));
+                eq_index = eq_index + 1;
+            }
+        }
+
+        // f(x, y, ...) => g(x, y, ...) subsumes
+        // f(x, h(x, y, ...), ...) => g(x, h(x, y, ...), ...)
+        // This means subsumption is covariant across rules, but also 
+        // that the lhs and rhs substitutions must match each other
+        let mut removed_eq_nums : HashSet<usize> = HashSet::default();
+        let mut rule_sub_rels = vec![]; // This vec is for if we need a topo sort of the rules
+        let mut eq_index = 0;
+        let mut var_map = HashMap::default();
+
+        for ((_, expr1), (_, expr2)) in potential_rules.iter() {
+            let lhs_pat = generalize(expr1, &mut var_map);
+            let rhs_pat = generalize(expr2, &mut var_map);
+
+            for mat in lhs_pat.search(&eg) {
+                let sub_lhs_id = mat.eclass;
+                let sub_rhs_vec = lhs_to_eqs.get(&sub_lhs_id);
+                if sub_rhs_vec.is_some() {
+                    for (sub_rhs_id, sub_eq_num) in sub_rhs_vec.unwrap() {
+                        let rhs_mat = rhs_pat.search_eclass(&eg, *sub_rhs_id);
+                        if rhs_mat.is_some() && *sub_eq_num != eq_index && rhs_mat.unwrap().substs == mat.substs {
+                            // Rule subsumption!
+                            removed_eq_nums.insert(*sub_eq_num);
+                            rule_sub_rels.push((eq_index, sub_eq_num));
+                            // println!("RULE SUB: {} > {}", eq_index, sub_eq_num);
+                        }
+                    }
+                }
+            }
+            eq_index = eq_index + 1;
+        }
+
+        // Handle cycles: If n rules subsume each other, we need to pick exactly one to keep
+        if !rule_sub_rels.is_empty() {
+            let mut rule_sub_map : IndexMap<usize, Vec<usize>> = IndexMap::default();
+            let mut rev_rule_sub_map : IndexMap<usize, Vec<usize>> = IndexMap::default();
+            for (k, v) in rule_sub_rels {
+                rule_sub_map.entry(k).or_default().push(*v);
+                rev_rule_sub_map.entry(*v).or_default().push(k);
+            }
+
+            let mut visited : HashSet<usize> = HashSet::default();
+            let mut results : Vec<HashSet<usize>> = vec![];
+            let mut path : Vec<usize> = vec![];
+            
+            for i in 0..(potential_rules.len() - 1) {
+                if !visited.contains(&i) {
+                    // println!("Cycle-checking {}, visited: {:?}", i, visited);
+                    Self::dfs_cycle_extract(&rule_sub_map, &mut path, &mut visited, &mut results, i);
+                }
+            }
+
+            let mut i = 0;
+            while i < results.len() {
+                // Consolidate cycles together to find the maximal group of equivalent rules
+                let mut cycle = results[i].clone();
+                let mut j = i + 1;
+                while j < results.len() {
+                    let cycle2 = results[j].clone();
+                    if !cycle2.is_disjoint(&cycle) {
+                        cycle.extend(cycle2.iter());
+                        results.remove(j);
+                    } else {
+                        j = j + 1;
+                    }
+                }
+
+                // If no rule from outside cycle subsumes any rule from within cycle, then one
+                // rule can be chosen to continue and represent this cycle
+                let mut parents : HashSet<usize> = HashSet::default();
+                for node in cycle.iter() {
+                    parents.extend(rev_rule_sub_map[node].clone());
+                }
+                // println!("CYCLE GROUP: {:?}, parents: {:?}", cycle, parents);
+                if parents.is_subset(&cycle) {
+                    let rep = cycle.iter().next().unwrap();
+                    // println!("CYCLE GROUP: {:?}, REP: {}", cycle, rep);
+                    removed_eq_nums.remove(rep);
+                }
+
+                i = i + 1;
+            }
+        }
+
+        let mut rem_eq_nums_vec : Vec<&usize> = removed_eq_nums.iter().collect();
+        rem_eq_nums_vec.sort();
+        rem_eq_nums_vec.reverse();
+        for i in rem_eq_nums_vec {
+            potential_rules.remove(*i);
+        }
+        potential_rules.sort_by(|((_, lhs1), (_, rhs1)), ((_, lhs2), (_, rhs2))| {
+            let cost1 : (usize, isize) = Self::expr_subsumption_cost(lhs1).max(Self::expr_subsumption_cost(rhs1));
+            let cost2 : (usize, isize) = Self::expr_subsumption_cost(lhs2).max(Self::expr_subsumption_cost(rhs2));
+            cost1.cmp(&cost2)
+        });
+
+        if potential_rules.len() > 0 {
+            let eq = potential_rules.remove(0);
+            // println!("PICKED: {} => {}", (eq.0).1, (eq.1).1);
+            Some(eq)
+        } else {
+            // println!("NO EQUALITY FOUND");
+            None
+        }
+    }
+
     fn learn_cond_rules(
         &mut self,
         rws: &Vec<Equality<SimpleMath, SynthAnalysis>>,
@@ -665,7 +848,7 @@ impl SynthParam {
                     .with_time_limit(Duration::from_secs(20))
                     .with_node_limit(usize::MAX)
                     .with_iter_limit(5)
-                    // .with_scheduler(SimpleScheduler)
+                    //.with_scheduler(SimpleScheduler)
                     .run(rules)
                     .egraph;
 
@@ -703,20 +886,34 @@ impl SynthParam {
                 }
                 let cvec_grouping = Instant::now().duration_since(before);
                 let cvec_groups = by_cvec_some.len();
-                let pattern_cost = |pat: &RecExpr<SimpleMath>| {
-                    let mut n_consts = 0;
-                    let mut vars = HashSet::new();
-                    for node in pat.as_ref() {
-                        match node {
-                            SimpleMath::Num(..) => n_consts += 1,
-                            SimpleMath::Var(v) => {
-                                vars.insert(v);
+                let mut extract = Extractor::new(&eg, AstSize);
+
+                // For subsumption:
+                // Within each cvec class, we need the two "best" expressions
+                // --> That's easy, we determine it first by ast size then by number of variables
+                // Among possible equalities then run rule subsumption to filter out useless rules
+                // From the remainder, either:
+                //    1. Learn all rules at once (probably bad)
+                //    2. Sort then by ast size/num of variables for all lhs and rhs
+                //       and pick the rule with the lowest max (probably better)
+
+                let by_cvec_recexps : Vec<Vec<(Id, RecExpr<SimpleMath>)>> = by_cvec_some
+                    .iter()
+                    .map(|(_, ids)|
+                        ids.iter().map(|id| (*id, extract.find_best(*id).1)).collect()
+                    )
+                    .collect();
+
+                let mut potential_rules = vec![];
+                for exprs in by_cvec_recexps {
+                    for (id1, expr1) in exprs.clone() {
+                        for (id2, expr2) in exprs.clone() {
+                            if id1 < id2 {
+                                potential_rules.push(((id1, expr1.clone()),(id2, expr2)));
                             }
-                            _ => (),
                         }
                     }
-                    (-(vars.len() as isize), n_consts, pat.as_ref().len())
-                };
+                }
 
                 let before = Instant::now();
                 let learn_a_rule: Duration;
@@ -724,29 +921,9 @@ impl SynthParam {
                 let after_cvec_enodes: usize;
                 let mut learned_rule = String::new();
 
-                let mut extract = Extractor::new(&eg, AstSize);
+                let best = Self::subsumption_find_best(eg.analysis.clone(), potential_rules);
 
-                let best = by_cvec_some
-                    .values_mut()
-                    .filter(|ids| ids.len() > 1)
-                    .map(|ids| {
-                        let mut extracted: Vec<_> = ids
-                            .iter()
-                            .map(|i| {
-                                let expr = extract.find_best(*i).1;
-                                (pattern_cost(&expr), *i, expr)
-                            })
-                            .collect();
-                        extracted.sort_by(|a, b| a.0.cmp(&b.0).reverse());
-                        // return the two cheapest things
-                        (extracted.pop().unwrap(), extracted.pop().unwrap())
-                    })
-                    .min_by_key(|((cost1, _, _), (cost2, _, _))| {
-                        // cost1.max(cost2).clone()
-                        (cost1.0 + cost2.0, cost1.1 + cost2.1, cost1.2 + cost2.2)
-                    });
-
-                if let Some(((_, id1, expr1), (_, id2, expr2))) = best {
+                if let Some(((id1, expr1), (id2, expr2))) = best {
                     let names = &mut HashMap::default();
                     let pat1 = generalize(&expr1, names);
                     let pat2 = generalize(&expr2, names);
