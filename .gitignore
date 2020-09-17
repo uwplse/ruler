@@ -6,3 +6,4 @@ out/
 *.bak
 *.dep
 *.zo
+.vscode/

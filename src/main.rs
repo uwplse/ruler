@@ -36,14 +36,14 @@ fn main() {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 2,
-        n_samples: 5,
+        n_samples: 10,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![Constant::Number(0), Constant::Number(1)], //, Constant::Boolean(false)] //, Constant::Boolean(true)],
         diff_thresh: 5,
     };
 
     if args.len() < 2 {
-        param.run(13, true);
+        param.run(13, false);
     } else if args.len() >= 2 && args[1] == "simplify" {
         let res = simplify(param);
         match res {
