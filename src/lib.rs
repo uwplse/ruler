@@ -323,7 +323,7 @@ impl SynthParam {
     ) {
         if path.contains(&node) {
             // Cycle!
-            let mut set : HashSet<usize> = path
+            let mut set: HashSet<usize> = path
                 .split(|i| *i == node)
                 .last()
                 .unwrap()
@@ -350,9 +350,7 @@ impl SynthParam {
         }
     }
 
-    fn expr_subsumption_cost(
-        pat: &RecExpr<SimpleMath>
-    ) -> (usize, isize) {
+    fn expr_subsumption_cost(pat: &RecExpr<SimpleMath>) -> (usize, isize) {
         let mut vars = HashSet::new();
         for node in pat.as_ref() {
             match node {
@@ -382,21 +380,24 @@ impl SynthParam {
         }
 
         eg.rebuild();
-        
-        let mut lhs_to_eqs : HashMap<Id, Vec<(Id, usize)>> = HashMap::default();
+
+        let mut lhs_to_eqs: HashMap<Id, Vec<(Id, usize)>> = HashMap::default();
         let mut eq_index = 0;
         for chunk in ids.chunks(2) {
             if let [lhs_id, rhs_id] = chunk {
-                lhs_to_eqs.entry(*lhs_id).or_default().push((*rhs_id, eq_index));
+                lhs_to_eqs
+                    .entry(*lhs_id)
+                    .or_default()
+                    .push((*rhs_id, eq_index));
                 eq_index = eq_index + 1;
             }
         }
 
         // f(x, y, ...) => g(x, y, ...) subsumes
         // f(x, h(x, y, ...), ...) => g(x, h(x, y, ...), ...)
-        // This means subsumption is covariant across rules, but also 
+        // This means subsumption is covariant across rules, but also
         // that the lhs and rhs substitutions must match each other
-        let mut removed_eq_nums : HashSet<usize> = HashSet::default();
+        let mut removed_eq_nums: HashSet<usize> = HashSet::default();
         let mut rule_sub_rels = vec![]; // This vec is for if we need a topo sort of the rules
         let mut eq_index = 0;
         let mut var_map = HashMap::default();
@@ -411,7 +412,10 @@ impl SynthParam {
                 if sub_rhs_vec.is_some() {
                     for (sub_rhs_id, sub_eq_num) in sub_rhs_vec.unwrap() {
                         let rhs_mat = rhs_pat.search_eclass(&eg, *sub_rhs_id);
-                        if rhs_mat.is_some() && *sub_eq_num != eq_index && rhs_mat.unwrap().substs == mat.substs {
+                        if rhs_mat.is_some()
+                            && *sub_eq_num != eq_index
+                            && rhs_mat.unwrap().substs == mat.substs
+                        {
                             // Rule subsumption!
                             removed_eq_nums.insert(*sub_eq_num);
                             rule_sub_rels.push((eq_index, sub_eq_num));
@@ -425,21 +429,27 @@ impl SynthParam {
 
         // Handle cycles: If n rules subsume each other, we need to pick exactly one to keep
         if !rule_sub_rels.is_empty() {
-            let mut rule_sub_map : IndexMap<usize, Vec<usize>> = IndexMap::default();
-            let mut rev_rule_sub_map : IndexMap<usize, Vec<usize>> = IndexMap::default();
+            let mut rule_sub_map: IndexMap<usize, Vec<usize>> = IndexMap::default();
+            let mut rev_rule_sub_map: IndexMap<usize, Vec<usize>> = IndexMap::default();
             for (k, v) in rule_sub_rels {
                 rule_sub_map.entry(k).or_default().push(*v);
                 rev_rule_sub_map.entry(*v).or_default().push(k);
             }
 
-            let mut visited : HashSet<usize> = HashSet::default();
-            let mut results : Vec<HashSet<usize>> = vec![];
-            let mut path : Vec<usize> = vec![];
-            
+            let mut visited: HashSet<usize> = HashSet::default();
+            let mut results: Vec<HashSet<usize>> = vec![];
+            let mut path: Vec<usize> = vec![];
+
             for i in 0..(potential_rules.len() - 1) {
                 if !visited.contains(&i) {
                     // println!("Cycle-checking {}, visited: {:?}", i, visited);
-                    Self::dfs_cycle_extract(&rule_sub_map, &mut path, &mut visited, &mut results, i);
+                    Self::dfs_cycle_extract(
+                        &rule_sub_map,
+                        &mut path,
+                        &mut visited,
+                        &mut results,
+                        i,
+                    );
                 }
             }
 
@@ -460,7 +470,7 @@ impl SynthParam {
 
                 // If no rule from outside cycle subsumes any rule from within cycle, then one
                 // rule can be chosen to continue and represent this cycle
-                let mut parents : HashSet<usize> = HashSet::default();
+                let mut parents: HashSet<usize> = HashSet::default();
                 for node in cycle.iter() {
                     parents.extend(rev_rule_sub_map[node].clone());
                 }
@@ -475,15 +485,17 @@ impl SynthParam {
             }
         }
 
-        let mut rem_eq_nums_vec : Vec<&usize> = removed_eq_nums.iter().collect();
+        let mut rem_eq_nums_vec: Vec<&usize> = removed_eq_nums.iter().collect();
         rem_eq_nums_vec.sort();
         rem_eq_nums_vec.reverse();
         for i in rem_eq_nums_vec {
             potential_rules.remove(*i);
         }
         potential_rules.sort_by(|((_, lhs1), (_, rhs1)), ((_, lhs2), (_, rhs2))| {
-            let cost1 : (usize, isize) = Self::expr_subsumption_cost(lhs1).max(Self::expr_subsumption_cost(rhs1));
-            let cost2 : (usize, isize) = Self::expr_subsumption_cost(lhs2).max(Self::expr_subsumption_cost(rhs2));
+            let cost1: (usize, isize) =
+                Self::expr_subsumption_cost(lhs1).max(Self::expr_subsumption_cost(rhs1));
+            let cost2: (usize, isize) =
+                Self::expr_subsumption_cost(lhs2).max(Self::expr_subsumption_cost(rhs2));
             cost1.cmp(&cost2)
         });
 
@@ -897,11 +909,13 @@ impl SynthParam {
                 //    2. Sort then by ast size/num of variables for all lhs and rhs
                 //       and pick the rule with the lowest max (probably better)
 
-                let by_cvec_recexps : Vec<Vec<(Id, RecExpr<SimpleMath>)>> = by_cvec_some
+                let by_cvec_recexps: Vec<Vec<(Id, RecExpr<SimpleMath>)>> = by_cvec_some
                     .iter()
-                    .map(|(_, ids)|
-                        ids.iter().map(|id| (*id, extract.find_best(*id).1)).collect()
-                    )
+                    .map(|(_, ids)| {
+                        ids.iter()
+                            .map(|id| (*id, extract.find_best(*id).1))
+                            .collect()
+                    })
                     .collect();
 
                 let mut potential_rules = vec![];
@@ -909,7 +923,7 @@ impl SynthParam {
                     for (id1, expr1) in exprs.clone() {
                         for (id2, expr2) in exprs.clone() {
                             if id1 < id2 {
-                                potential_rules.push(((id1, expr1.clone()),(id2, expr2)));
+                                potential_rules.push(((id1, expr1.clone()), (id2, expr2)));
                             }
                         }
                     }
