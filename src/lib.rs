@@ -768,7 +768,8 @@ impl SynthParam {
                             // the cvecs may be different or None at most at cond_diff_thresh positions
                             if non_none_diff_poses.len() <= self.cond_diff_thresh {
                                 for idx in 0..eg[**j].data.len() {
-                                    if i_nones.contains(&idx) || non_none_diff_poses.contains(&idx) {
+                                    if i_nones.contains(&idx) || non_none_diff_poses.contains(&idx)
+                                    {
                                         // cvecs disagree at None positions
                                         agreement_vec.push(Some(Constant::Boolean(false)));
                                     } else {

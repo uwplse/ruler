@@ -38,14 +38,18 @@ fn main() {
         n_iter: 1,
         n_samples: 10,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![Constant::Number(0), Constant::Number(1), Constant::Number(-1)], //, Constant::Boolean(false)] //, Constant::Boolean(true)],
+        consts: vec![
+            Constant::Number(0),
+            Constant::Number(1),
+            Constant::Number(-1),
+        ], //, Constant::Boolean(false)] //, Constant::Boolean(true)],
         cond_rule_iters: 1,
         cond_rule_rand_idx: 2,
         cond_diff_thresh: 5,
     };
 
     if args.len() < 2 {
-        param.run(13,true);
+        param.run(13, true);
     } else if args.len() >= 2 && args[1] == "simplify" {
         let res = simplify(param);
         match res {
