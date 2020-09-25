@@ -18,7 +18,9 @@ fn cvec_stats_ruler(iter: usize, samples: usize, num_op: usize) -> CVecStats {
         n_samples: samples,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![Constant::Boolean(true), Constant::Boolean(false)],
-        diff_thresh: 5,
+        cond_rule_iters: 1,
+        cond_rule_rand_idx: 1,
+        cond_diff_thresh: 3,
     };
 
     let before = Instant::now();
@@ -65,7 +67,9 @@ fn var_rule_ruler(iter: usize, num_vars: usize, num_op: usize) -> VarRuleStats {
             n_samples: usize::pow(2, 1),
             variables: vec!["x".into()],
             consts: vec![Constant::Boolean(true), Constant::Boolean(false)],
-            diff_thresh: 5,
+            cond_rule_iters: 1,
+            cond_rule_rand_idx: 1,
+            cond_diff_thresh: 3,
         };
         let before = Instant::now();
         let eqs = param.run(num_op, false);
@@ -84,7 +88,9 @@ fn var_rule_ruler(iter: usize, num_vars: usize, num_op: usize) -> VarRuleStats {
             n_samples: usize::pow(2, 2),
             variables: vec!["x".into(), "y".into()],
             consts: vec![Constant::Boolean(true), Constant::Boolean(false)],
-            diff_thresh: 5,
+            cond_rule_iters: 1,
+            cond_rule_rand_idx: 1,
+            cond_diff_thresh: 3,
         };
         let before = Instant::now();
         let eqs = param.run(num_op, false);
@@ -103,7 +109,9 @@ fn var_rule_ruler(iter: usize, num_vars: usize, num_op: usize) -> VarRuleStats {
             n_samples: usize::pow(2, 3),
             variables: vec!["x".into(), "y".into(), "z".into()],
             consts: vec![Constant::Boolean(true), Constant::Boolean(false)],
-            diff_thresh: 5,
+            cond_rule_iters: 1,
+            cond_rule_rand_idx: 1,
+            cond_diff_thresh: 3,
         };
         let before = Instant::now();
         let eqs = param.run(num_op, false);
