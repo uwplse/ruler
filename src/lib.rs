@@ -1249,7 +1249,11 @@ mod tests {
             n_iter: 1,
             n_samples: 25,
             variables: vec!["x".into(), "y".into(), "z".into()],
-            consts: vec![Constant::Number(0), Constant::Number(1)],
+            consts: vec![
+                Constant::Number(0),
+                Constant::Number(1),
+                Constant::Number(-1),
+            ],
             cond_rule_iters: 1,
             cond_rule_rand_idx: 1,
             cond_diff_thresh: 3,
