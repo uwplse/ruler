@@ -1,4 +1,5 @@
 mod metrics;
+use egg::RecExpr;
 use egg::*;
 use indexmap::IndexMap;
 use rand::{prelude::SliceRandom, Rng};
@@ -10,6 +11,12 @@ use std::{
     time::Duration,
     time::Instant,
 };
+
+macro_rules! num {
+    ($x:expr) => {
+        Constant::Number($x)
+    };
+}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Constant {
@@ -69,6 +76,158 @@ define_language! {
         Bool(bool),
         Num(i32),
         Var(egg::Symbol),
+    }
+}
+
+pub fn get_num(c: Constant) -> i32 {
+    match c {
+        Constant::Number(num) => num,
+        _ => panic!("Not a num"),
+    }
+}
+
+pub fn get_bool(c: Constant) -> bool {
+    match c {
+        Constant::Boolean(b) => b,
+        _ => panic!("Not a bool"),
+    }
+}
+
+type Ctx = HashMap<&'static str, Constant>;
+
+pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
+    match expr.last().expect("empty expr!") {
+        SimpleMath::Num(n) => Some(Constant::Number(*n)),
+        SimpleMath::Bool(b) => Some(Constant::Boolean(*b)),
+        SimpleMath::Var(v) => {
+            if v.as_str() == "x" {
+                Some(*ctx.get("x").unwrap())
+            } else if v.as_str() == "y" {
+                Some(*ctx.get("y").unwrap())
+            } else if v.as_str() == "z" {
+                Some(*ctx.get("z").unwrap())
+            } else {
+                panic!("eval: currently only supports rules with 3 variables");
+            }
+        }
+        SimpleMath::Add([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Number(
+                get_num(e1.unwrap()).wrapping_add(get_num(e2.unwrap())),
+            ))
+        }
+        SimpleMath::Sub([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Number(
+                get_num(e1.unwrap()).wrapping_sub(get_num(e2.unwrap())),
+            ))
+        }
+        SimpleMath::Mul([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Number(
+                get_num(e1.unwrap()).wrapping_mul(get_num(e2.unwrap())),
+            ))
+        }
+        SimpleMath::Div([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            if e2 != Some(Constant::Number(0)) {
+                Some(Constant::Number(
+                    get_num(e1.unwrap()).wrapping_div(get_num(e2.unwrap())),
+                ))
+            } else {
+                None
+            }
+        }
+        SimpleMath::Abs(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(Constant::Number(get_num(e1.unwrap()).wrapping_abs()))
+        }
+        SimpleMath::Neg(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(Constant::Number(-get_num(e1.unwrap())))
+        }
+        SimpleMath::Neq([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Boolean(
+                get_num(e1.unwrap()) != get_num(e2.unwrap()),
+            ))
+        }
+        SimpleMath::Leq([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Boolean(
+                get_num(e1.unwrap()) <= get_num(e2.unwrap()),
+            ))
+        }
+        SimpleMath::Geq([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Boolean(
+                get_num(e1.unwrap()) >= get_num(e2.unwrap()),
+            ))
+        }
+        SimpleMath::Lt([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Boolean(
+                get_num(e1.unwrap()) < get_num(e2.unwrap()),
+            ))
+        }
+        SimpleMath::Gt([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Boolean(
+                get_num(e1.unwrap()) > get_num(e2.unwrap()),
+            ))
+        }
+        SimpleMath::And([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Boolean(
+                get_bool(e1.unwrap()) && get_bool(e2.unwrap()),
+            ))
+        }
+        SimpleMath::Or([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(Constant::Boolean(
+                get_bool(e1.unwrap()) || get_bool(e2.unwrap()),
+            ))
+        }
+        SimpleMath::Not(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(Constant::Boolean(!get_bool(e1.unwrap())))
+        }
     }
 }
 
@@ -1029,30 +1188,32 @@ impl SynthParam {
                 let best = Self::subsumption_find_best(eg.analysis.clone(), potential_rules);
 
                 if let Some(((id1, expr1), (id2, expr2))) = best {
-                    let names = &mut HashMap::default();
-                    let pat1 = generalize(&expr1, names);
-                    let pat2 = generalize(&expr2, names);
-                    if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                        if let Some(eq) = Equality::new(pat1, pat2, None) {
-                            if equalities.iter().all(|e| e.name != eq.name) {
-                                learned_rule = eq.name.clone();
-                                equalities.push(eq)
+                    if self.validate_rule(expr1.clone(), expr2.clone()) {
+                        let names = &mut HashMap::default();
+                        let pat1 = generalize(&expr1, names);
+                        let pat2 = generalize(&expr2, names);
+                        if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                            if let Some(eq) = Equality::new(pat1, pat2, None) {
+                                if equalities.iter().all(|e| e.name != eq.name) {
+                                    learned_rule = eq.name.clone();
+                                    equalities.push(eq)
+                                }
                             }
                         }
-                    }
 
-                    let names = &mut HashMap::default();
-                    let pat1 = generalize(&expr2, names);
-                    let pat2 = generalize(&expr1, names);
-                    if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                        if let Some(eq) = Equality::new(pat1, pat2, None) {
-                            println!("Learned rule: {} => {}", expr2, expr1);
-                            if equalities.iter().all(|e| e.name != eq.name) {
-                                equalities.push(eq)
+                        let names = &mut HashMap::default();
+                        let pat1 = generalize(&expr2, names);
+                        let pat2 = generalize(&expr1, names);
+                        if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                            if let Some(eq) = Equality::new(pat1, pat2, None) {
+                                println!("Learned rule: {} => {}", expr2, expr1);
+                                if equalities.iter().all(|e| e.name != eq.name) {
+                                    equalities.push(eq)
+                                }
                             }
                         }
+                        eg.union(id1, id2);
                     }
-                    eg.union(id1, id2);
                     after_cvec_eclasses = eg.number_of_classes();
                     after_cvec_enodes = eg.total_number_of_nodes();
                     learn_a_rule = Instant::now().duration_since(before);
@@ -1100,6 +1261,34 @@ impl SynthParam {
             equalities.extend(cond_rws);
         }
         equalities
+    }
+
+    fn validate_rule(&mut self, lhs: RecExpr<SimpleMath>, rhs: RecExpr<SimpleMath>) -> bool {
+        // just setting some values manually
+        let values: Vec<Constant> = vec![
+            num!(-1),
+            num!(0),
+            num!(1),
+            num!(-625956435),
+            num!(1537958233),
+        ];
+        let mut env: Ctx = HashMap::new();
+        let mut envs = vec![];
+        // TODO: assuming only three variables for now
+        for valx in &values {
+            env.insert("x", *valx);
+            for valy in &values {
+                env.insert("y", *valy);
+                for valz in &values {
+                    env.insert("z", *valz);
+                    envs.push(env.clone());
+                }
+            }
+        }
+        envs.iter().all(|env| {
+            let eval_lhs = eval(&env, lhs.as_ref());
+            eval_lhs != None && (eval_lhs == eval(env, rhs.as_ref()))
+        })
     }
 }
 
