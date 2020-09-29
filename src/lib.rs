@@ -504,6 +504,7 @@ impl SynthParam {
             set.insert(node);
             // println!("CYCLE DETECTED: {:?}", set);
             results.push(set);
+            return;
         }
 
         if visited.contains(&node) {
@@ -636,6 +637,7 @@ impl SynthParam {
                 }
             }
 
+            // println!("Cycle groups before: {:?}", cycle_groups);
             let mut i = 0;
             while i < cycle_groups.len() {
                 // Consolidate cycles together to find the maximal group of equivalent rules
@@ -650,6 +652,7 @@ impl SynthParam {
                         j = j + 1;
                     }
                 }
+                cycle_groups[i] = cycle.clone();
 
                 // If no rule from outside cycle subsumes any rule from within cycle, then one
                 // rule can be chosen to continue and represent this cycle
@@ -666,6 +669,7 @@ impl SynthParam {
 
                 i = i + 1;
             }
+            // println!("Cycle groups after: {:?}", cycle_groups);
         }
 
         let mut rem_eq_nums_vec: Vec<&usize> = removed_eq_nums.iter().collect();
@@ -697,12 +701,15 @@ impl SynthParam {
                     return Some(eq.0);
                 } else {
                     println!(
-                        "Validator: {} for rule: {:?}",
+                        "Validator: {} for rule {}: {} => {}",
                         self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()),
-                        eq.0
+                        eq.1,
+                        ((eq.0).0).1,
+                        ((eq.0).1).1
                     );
                     // Invalidate this rule
                     let cycle_group = cycle_groups.iter().find(|&r| r.contains(&eq.1));
+                    println!("Cycle groups: {:?}", cycle_groups);
                     poison_rules.insert((((eq.0).0).1.clone(), ((eq.0).1).1.clone()));
                     if cycle_group.is_some() {
                         poison_rules.extend(cycle_group.unwrap().iter().map(|&r| {
