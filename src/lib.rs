@@ -535,10 +535,21 @@ impl SynthParam {
     }
 
     fn subsumption_find_best(
+        &mut self,
         analysis: SynthAnalysis,
         mut potential_rules: Vec<((Id, RecExpr<SimpleMath>), (Id, RecExpr<SimpleMath>))>,
+        poison_rules: &mut HashSet<(RecExpr<SimpleMath>, RecExpr<SimpleMath>)>,
     ) -> Option<((Id, RecExpr<SimpleMath>), (Id, RecExpr<SimpleMath>))> {
         let mut eg = EGraph::new(analysis);
+
+        // Forget all known poison rules
+        potential_rules = potential_rules
+            .iter()
+            .filter(|((_, expr1), (_, expr2))| {
+                !poison_rules.contains(&(expr1.clone(), expr2.clone()))
+            })
+            .map(|r| r.clone())
+            .collect();
 
         let mut ids = vec![];
         let mut eq_index = 0;
@@ -599,16 +610,17 @@ impl SynthParam {
         }
 
         // Handle cycles: If n rules subsume each other, we need to pick exactly one to keep
+        let mut cycle_groups: Vec<HashSet<usize>> = vec![];
+
         if !rule_sub_rels.is_empty() {
             let mut rule_sub_map: IndexMap<usize, Vec<usize>> = IndexMap::default();
             let mut rev_rule_sub_map: IndexMap<usize, Vec<usize>> = IndexMap::default();
-            for (k, v) in rule_sub_rels {
+            for (k, v) in rule_sub_rels.clone() {
                 rule_sub_map.entry(k).or_default().push(*v);
                 rev_rule_sub_map.entry(*v).or_default().push(k);
             }
 
             let mut visited: HashSet<usize> = HashSet::default();
-            let mut results: Vec<HashSet<usize>> = vec![];
             let mut path: Vec<usize> = vec![];
 
             for i in 0..(potential_rules.len() - 1) {
@@ -618,22 +630,22 @@ impl SynthParam {
                         &rule_sub_map,
                         &mut path,
                         &mut visited,
-                        &mut results,
+                        &mut cycle_groups,
                         i,
                     );
                 }
             }
 
             let mut i = 0;
-            while i < results.len() {
+            while i < cycle_groups.len() {
                 // Consolidate cycles together to find the maximal group of equivalent rules
-                let mut cycle = results[i].clone();
+                let mut cycle = cycle_groups[i].clone();
                 let mut j = i + 1;
-                while j < results.len() {
-                    let cycle2 = results[j].clone();
+                while j < cycle_groups.len() {
+                    let cycle2 = cycle_groups[j].clone();
                     if !cycle2.is_disjoint(&cycle) {
                         cycle.extend(cycle2.iter());
-                        results.remove(j);
+                        cycle_groups.remove(j);
                     } else {
                         j = j + 1;
                     }
@@ -659,24 +671,74 @@ impl SynthParam {
         let mut rem_eq_nums_vec: Vec<&usize> = removed_eq_nums.iter().collect();
         rem_eq_nums_vec.sort();
         rem_eq_nums_vec.reverse();
-        for i in rem_eq_nums_vec {
-            potential_rules.remove(*i);
+        let mut candidate_rules = vec![];
+        for i in 0..potential_rules.len() {
+            candidate_rules.push((potential_rules[i].clone(), i));
         }
-        potential_rules.sort_by(|((_, lhs1), (_, rhs1)), ((_, lhs2), (_, rhs2))| {
-            let cost1: (usize, isize) =
-                Self::expr_subsumption_cost(lhs1).max(Self::expr_subsumption_cost(rhs1));
-            let cost2: (usize, isize) =
-                Self::expr_subsumption_cost(lhs2).max(Self::expr_subsumption_cost(rhs2));
-            cost1.cmp(&cost2)
-        });
 
-        if potential_rules.len() > 0 {
-            let eq = potential_rules.remove(0);
-            // println!("PICKED: {} => {}", (eq.0).1, (eq.1).1);
-            Some(eq)
-        } else {
-            // println!("NO EQUALITY FOUND");
-            None
+        for i in rem_eq_nums_vec {
+            candidate_rules.remove(*i);
+        }
+
+        loop {
+            candidate_rules.sort_by(|(((_, lhs1), (_, rhs1)), _), (((_, lhs2), (_, rhs2)), _)| {
+                let cost1: (usize, isize) =
+                    Self::expr_subsumption_cost(lhs1).max(Self::expr_subsumption_cost(rhs1));
+                let cost2: (usize, isize) =
+                    Self::expr_subsumption_cost(lhs2).max(Self::expr_subsumption_cost(rhs2));
+                cost1.cmp(&cost2)
+            });
+
+            if candidate_rules.len() > 0 {
+                let eq = candidate_rules.remove(0);
+
+                // Run rule validator
+                if self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()) {
+                    return Some(eq.0);
+                } else {
+                    println!(
+                        "Validator: {} for rule: {:?}",
+                        self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()),
+                        eq.0
+                    );
+                    // Invalidate this rule
+                    let cycle_group = cycle_groups.iter().find(|&r| r.contains(&eq.1));
+                    poison_rules.insert((((eq.0).0).1.clone(), ((eq.0).1).1.clone()));
+                    if cycle_group.is_some() {
+                        poison_rules.extend(cycle_group.unwrap().iter().map(|&r| {
+                            (
+                                (potential_rules[r].0).1.clone(),
+                                (potential_rules[r].1).1.clone(),
+                            )
+                        }));
+                    }
+
+                    let subed_rules: HashSet<_> = rule_sub_rels
+                        .iter()
+                        .filter_map(|(r1, r2)| if *r1 == eq.1 { Some(**r2) } else { None })
+                        .filter(|r| cycle_group.is_none() || !cycle_group.unwrap().contains(r))
+                        .collect();
+
+                    let still_subed: HashSet<_> = rule_sub_rels
+                        .iter()
+                        .filter(|(r1, r2)| {
+                            subed_rules.contains(r2)
+                                && *r1 != eq.1
+                                && (cycle_group.is_none() || !cycle_group.unwrap().contains(r1))
+                        })
+                        .map(|(_, r2)| **r2)
+                        .collect();
+
+                    candidate_rules.extend(
+                        subed_rules
+                            .difference(&still_subed)
+                            .map(|&r| (potential_rules[r].clone(), r)),
+                    );
+                }
+            } else {
+                // println!("NO EQUALITY FOUND");
+                return None;
+            }
         }
     }
 
@@ -1022,6 +1084,8 @@ impl SynthParam {
         let mut eg = self.mk_egraph();
         let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
         let mut metrics = metrics::RulerProfile::new();
+        let mut poison_rules: HashSet<(RecExpr<SimpleMath>, RecExpr<SimpleMath>)> =
+            HashSet::default();
 
         for iter in 0..self.n_iter {
             my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
@@ -1169,6 +1233,7 @@ impl SynthParam {
                     .collect();
 
                 let mut potential_rules = vec![];
+
                 for exprs in by_cvec_recexps {
                     for (id1, expr1) in exprs.clone() {
                         for (id2, expr2) in exprs.clone() {
@@ -1185,35 +1250,38 @@ impl SynthParam {
                 let after_cvec_enodes: usize;
                 let mut learned_rule = String::new();
 
-                let best = Self::subsumption_find_best(eg.analysis.clone(), potential_rules);
+                println!("subsumption potential rules: {}", potential_rules.len());
+                let best = self.subsumption_find_best(
+                    eg.analysis.clone(),
+                    potential_rules,
+                    &mut poison_rules,
+                );
 
                 if let Some(((id1, expr1), (id2, expr2))) = best {
-                    if self.validate_rule(expr1.clone(), expr2.clone()) {
-                        let names = &mut HashMap::default();
-                        let pat1 = generalize(&expr1, names);
-                        let pat2 = generalize(&expr2, names);
-                        if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                            if let Some(eq) = Equality::new(pat1, pat2, None) {
-                                if equalities.iter().all(|e| e.name != eq.name) {
-                                    learned_rule = eq.name.clone();
-                                    equalities.push(eq)
-                                }
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr1, names);
+                    let pat2 = generalize(&expr2, names);
+                    if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                        if let Some(eq) = Equality::new(pat1, pat2, None) {
+                            if equalities.iter().all(|e| e.name != eq.name) {
+                                learned_rule = eq.name.clone();
+                                equalities.push(eq)
                             }
                         }
-
-                        let names = &mut HashMap::default();
-                        let pat1 = generalize(&expr2, names);
-                        let pat2 = generalize(&expr1, names);
-                        if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
-                            if let Some(eq) = Equality::new(pat1, pat2, None) {
-                                println!("Learned rule: {} => {}", expr2, expr1);
-                                if equalities.iter().all(|e| e.name != eq.name) {
-                                    equalities.push(eq)
-                                }
-                            }
-                        }
-                        eg.union(id1, id2);
                     }
+
+                    let names = &mut HashMap::default();
+                    let pat1 = generalize(&expr2, names);
+                    let pat2 = generalize(&expr1, names);
+                    if !pattern_has_pred(&pat1) && !pattern_has_pred(&pat2) {
+                        if let Some(eq) = Equality::new(pat1, pat2, None) {
+                            println!("Learned rule: {} => {}", expr2, expr1);
+                            if equalities.iter().all(|e| e.name != eq.name) {
+                                equalities.push(eq)
+                            }
+                        }
+                    }
+                    eg.union(id1, id2);
                     after_cvec_eclasses = eg.number_of_classes();
                     after_cvec_enodes = eg.total_number_of_nodes();
                     learn_a_rule = Instant::now().duration_since(before);
@@ -1263,6 +1331,9 @@ impl SynthParam {
         equalities
     }
 
+    // if there is an input that is bad, add it to the cvec and recompute them.
+    // TODO: recompute all cvecs for egraph from there.
+    // Altenative: add the rule to poison set. When you pick best, dont pick from poison rule
     fn validate_rule(&mut self, lhs: RecExpr<SimpleMath>, rhs: RecExpr<SimpleMath>) -> bool {
         // just setting some values manually
         let values: Vec<Constant> = vec![

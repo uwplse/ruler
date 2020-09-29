@@ -35,7 +35,7 @@ fn main() {
 
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
-        n_iter: 1,
+        n_iter: 2,
         n_samples: 10,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![
