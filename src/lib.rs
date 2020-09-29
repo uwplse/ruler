@@ -694,12 +694,17 @@ impl SynthParam {
 
                 // Run rule validator
                 if self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()) {
+                    println!(
+                        "VALIDATOR: {} for rule: {:?} => {:?}",
+                        self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()),
+                        ((eq.0).0).1.to_string(), ((eq.0).1).1.to_string() 
+                    );
                     return Some(eq.0);
                 } else {
                     println!(
-                        "Validator: {} for rule: {:?}",
+                        "VALIDATOR: {} for rule: {:?} => {:?}",
                         self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()),
-                        eq.0
+                        ((eq.0).0).1.to_string(), ((eq.0).1).1.to_string()
                     );
                     // Invalidate this rule
                     let cycle_group = cycle_groups.iter().find(|&r| r.contains(&eq.1));
@@ -1356,10 +1361,19 @@ impl SynthParam {
                 }
             }
         }
-        envs.iter().all(|env| {
+
+        let c_eg = envs.iter().find(|env| {
             let eval_lhs = eval(&env, lhs.as_ref());
-            eval_lhs != None && (eval_lhs == eval(env, rhs.as_ref()))
-        })
+            eval_lhs == None || (eval_lhs != eval(env, rhs.as_ref()))
+        });
+        if c_eg == None {
+            true
+        } else {
+            println!("lhs: {:?}", eval(c_eg.unwrap(), lhs.as_ref()));
+            println!("rhs: {:?}", eval(c_eg.unwrap(), rhs.as_ref()));
+            println!("false at input: {:?}", c_eg.unwrap());
+            false
+        }
     }
 }
 
