@@ -248,9 +248,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                     t = f;
                     to_changed = true;
                 }
-                (Some(a), Some(b)) => {
-                    assert_eq!(a, b)
-                }
+                (Some(a), Some(b)) => assert_eq!(a, b),
                 (_, None) => continue,
             }
         }
