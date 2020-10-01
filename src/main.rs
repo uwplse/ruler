@@ -36,20 +36,23 @@ fn main() {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
         n_iter: 2,
-        n_samples: 10,
+        n_samples: 25,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![
             Constant::Number(0),
             Constant::Number(1),
             Constant::Number(-1),
+            // Constant::Number(i32::MIN),
+            // Constant::Number(i32::MAX-1),
+            // Constant::Number(i32::MAX),
         ], //, Constant::Boolean(false)] //, Constant::Boolean(true)],
         cond_rule_iters: 1,
-        cond_rule_rand_idx: 2,
-        cond_diff_thresh: 5,
+        cond_rule_rand_idx: 5,
+        cond_diff_thresh: 12,
     };
 
     if args.len() < 2 {
-        param.run(13, true);
+        param.run(13, false);
     } else if args.len() >= 2 && args[1] == "simplify" {
         let res = simplify(param);
         match res {

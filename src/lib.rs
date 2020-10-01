@@ -240,12 +240,34 @@ impl Analysis<SimpleMath> for SynthAnalysis {
     type Data = Vec<Option<Constant>>;
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
-        // only do assertions on non-empty vecs
-        if !to.is_empty() && !from.is_empty() {
-            assert_eq!(to, &from);
+        let mut to_changed = false;
+        let pairs = to.iter().zip(from.iter());
+        for (mut t, f) in pairs {
+            match (t, f) {
+                (None, Some(_)) => {
+                    t = f;
+                    to_changed = true;
+                }
+                (Some(a), Some(b)) => {
+                    assert_eq!(a, b)
+                }
+                (_, None) => continue,
+            }
         }
-        false
+        to_changed
+        // // only do assertions on non-empty vecs
+        // if !to.is_empty() && !from.is_empty() {
+        //     assert_eq!(to, &from);
+        // }
+        // false
     }
+
+    // fn pre_union(eg: &EGraph<SimpleMath, Self>, id1: Id, id2: Id) {
+    //     let mut extractor = Extractor::new(eg,  AstSize);
+    //     let (_, lhs) = extractor.find_best(id1);
+    //     let (_, rhs) = extractor.find_best(id2);
+    //     println!("preunion: lhs: {}, rhs: {}", lhs, rhs);
+    // }
 
     fn make(egraph: &EGraph<SimpleMath, Self>, enode: &SimpleMath) -> Self::Data {
         // a closure to get the cvec for some eclass
@@ -471,6 +493,9 @@ impl SynthParam {
             cvec.push(Some(Constant::Number(0)));
             cvec.push(Some(Constant::Number(1)));
             cvec.push(Some(Constant::Number(-1)));
+            // cvec.push(Some(Constant::Number(i32::MAX)));
+            // cvec.push(Some(Constant::Number(i32::MIN)));
+            // cvec.push(Some(Constant::Number(i32::MAX-1)));
             cvec.shuffle(rng);
             egraph[id].data = cvec.clone();
             var_cvec_map.insert(var, cvec.clone());
@@ -504,6 +529,7 @@ impl SynthParam {
             set.insert(node);
             // println!("CYCLE DETECTED: {:?}", set);
             results.push(set);
+            return;
         }
 
         if visited.contains(&node) {
@@ -636,6 +662,7 @@ impl SynthParam {
                 }
             }
 
+            // println!("Cycle groups before: {:?}", cycle_groups);
             let mut i = 0;
             while i < cycle_groups.len() {
                 // Consolidate cycles together to find the maximal group of equivalent rules
@@ -650,6 +677,7 @@ impl SynthParam {
                         j = j + 1;
                     }
                 }
+                cycle_groups[i] = cycle.clone();
 
                 // If no rule from outside cycle subsumes any rule from within cycle, then one
                 // rule can be chosen to continue and represent this cycle
@@ -666,6 +694,7 @@ impl SynthParam {
 
                 i = i + 1;
             }
+            // println!("Cycle groups after: {:?}", cycle_groups);
         }
 
         let mut rem_eq_nums_vec: Vec<&usize> = removed_eq_nums.iter().collect();
@@ -693,21 +722,28 @@ impl SynthParam {
                 let eq = candidate_rules.remove(0);
 
                 // Run rule validator
-                if self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()) {
+                let valid_start = Instant::now();
+                let is_valid = self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone());
+                let validation_time = Instant::now().duration_since(valid_start);
+                println!("validation time: {:?}", validation_time);
+                if is_valid {
                     println!(
                         "VALIDATOR: {} for rule: {:?} => {:?}",
-                        self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()),
-                        ((eq.0).0).1.to_string(), ((eq.0).1).1.to_string() 
+                        is_valid,
+                        ((eq.0).0).1.to_string(),
+                        ((eq.0).1).1.to_string()
                     );
                     return Some(eq.0);
                 } else {
                     println!(
                         "VALIDATOR: {} for rule: {:?} => {:?}",
-                        self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone()),
-                        ((eq.0).0).1.to_string(), ((eq.0).1).1.to_string()
+                        is_valid,
+                        ((eq.0).0).1.to_string(),
+                        ((eq.0).1).1.to_string()
                     );
                     // Invalidate this rule
                     let cycle_group = cycle_groups.iter().find(|&r| r.contains(&eq.1));
+                    println!("Cycle groups: {:?}", cycle_groups);
                     poison_rules.insert((((eq.0).0).1.clone(), ((eq.0).1).1.clone()));
                     if cycle_group.is_some() {
                         poison_rules.extend(cycle_group.unwrap().iter().map(|&r| {
@@ -1167,6 +1203,9 @@ impl SynthParam {
                     .filter(|eq| eq.cond == None)
                     .map(|eq| &eq.rewrite);
 
+                for r in rules.clone() {
+                    println!("{:?}", r.name());
+                }
                 let clean_rules = Instant::now().duration_since(before);
 
                 let runner: Runner<SimpleMath, SynthAnalysis, ()> =
@@ -1347,32 +1386,59 @@ impl SynthParam {
             num!(1),
             num!(-625956435),
             num!(1537958233),
+            num!(2147483646),
+            num!(i32::MAX),
+            num!(i32::MIN),
         ];
         let mut env: Ctx = HashMap::new();
         let mut envs = vec![];
         // TODO: assuming only three variables for now
-        for valx in &values {
-            env.insert("x", *valx);
-            for valy in &values {
-                env.insert("y", *valy);
-                for valz in &values {
-                    env.insert("z", *valz);
+        // for valx in &values {
+        //     env.insert("x", *valx);
+        //     for valy in &values {
+        //         env.insert("y", *valy);
+        //         for valz in &values {
+        //             env.insert("z", *valz);
+        //             envs.push(env.clone());
+        //         }
+        //     }
+        // }
+        // let rng = &mut self.rng;
+        for i in -20..21 {
+            for j in -20..21 {
+                for k in -20..21 {
+                    env.insert("x", num!(i));
+                    env.insert("y", num!(j));
+                    env.insert("z", num!(k));
                     envs.push(env.clone());
                 }
             }
         }
-
+        // add more random inputs for testing
+        // take the max values out of cvec and fuzz test [-10, 10]
+        // for i in 0..100000 {
+        //     let (x, y, z) = (rng.gen::<i32>(), rng.gen::<i32>(), rng.gen::<i32>());
+        //     env.insert("x", num!(x));
+        //     env.insert("y", num!(y));
+        //     env.insert("z", num!(z));
+        //     envs.push(env.clone());
+        // }
         let c_eg = envs.iter().find(|env| {
-            let eval_lhs = eval(&env, lhs.as_ref());
-            eval_lhs == None || (eval_lhs != eval(env, rhs.as_ref()))
+            let l = eval(&env, lhs.as_ref());
+            let r = eval(&env, rhs.as_ref());
+            match (l, r) {
+                (None, _) | (_, None) => true,
+                (Some(l), Some(r)) => l != r,
+            }
         });
-        if c_eg == None {
-            true
-        } else {
-            println!("lhs: {:?}", eval(c_eg.unwrap(), lhs.as_ref()));
-            println!("rhs: {:?}", eval(c_eg.unwrap(), rhs.as_ref()));
-            println!("false at input: {:?}", c_eg.unwrap());
+
+        if let Some(c_eg) = c_eg {
+            println!("lhs: {:?}", eval(c_eg, lhs.as_ref()));
+            println!("rhs: {:?}", eval(c_eg, rhs.as_ref()));
+            println!("false at input: {:?}", c_eg);
             false
+        } else {
+            true
         }
     }
 }
