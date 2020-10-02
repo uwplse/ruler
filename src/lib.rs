@@ -272,271 +272,275 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         let x = |i: &Id| egraph[*i].data.1.iter().copied();
         let params = &egraph.analysis;
         match enode {
-            SimpleMath::Num(n) => ((0..params.cvec_len)
-                .map(|_| Some(Constant::Number(*n)))
-                .collect(),
+            SimpleMath::Num(n) => (
                 (0..params.cvec_len)
-                .map(|_| Some(Constant::Number(*n)))
-                .collect()),
-            SimpleMath::Bool(b) => ((0..params.cvec_len)
-                .map(|_| Some(Constant::Boolean(*b)))
-                .collect(),
+                    .map(|_| Some(Constant::Number(*n)))
+                    .collect(),
                 (0..params.cvec_len)
-                .map(|_| Some(Constant::Boolean(*b)))
-                .collect()),
+                    .map(|_| Some(Constant::Number(*n)))
+                    .collect(),
+            ),
+            SimpleMath::Bool(b) => (
+                (0..params.cvec_len)
+                    .map(|_| Some(Constant::Boolean(*b)))
+                    .collect(),
+                (0..params.cvec_len)
+                    .map(|_| Some(Constant::Boolean(*b)))
+                    .collect(),
+            ),
             SimpleMath::Var(_) => (vec![], vec![]),
-            SimpleMath::Not(a) => (x(a)
-                .map(|x| match x {
+            SimpleMath::Not(a) => (
+                x(a).map(|x| match x {
                     Some(Constant::Boolean(b)) => Some(Constant::Boolean(!b)),
                     _ => None,
                 })
                 .collect(),
-                x(a)
-                .map(|x| match x {
+                x(a).map(|x| match x {
                     Some(Constant::Boolean(b)) => Some(Constant::Boolean(!b)),
                     _ => None,
                 })
-                .collect()),
-            SimpleMath::Neg(a) => (x(a)
-                .map(|x| match x {
+                .collect(),
+            ),
+            SimpleMath::Neg(a) => (
+                x(a).map(|x| match x {
                     Some(Constant::Number(n)) => Some(Constant::Number(-n)),
                     _ => None,
                 })
                 .collect(),
-                x(a)
-                .map(|x| match x {
+                x(a).map(|x| match x {
                     Some(Constant::Number(n)) => Some(Constant::Number(-n)),
                     _ => None,
                 })
-                .collect()),
-            SimpleMath::And([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                        Some(Constant::Boolean(b1 && b2))
-                    }
-                    (_, _) => None,
-                })
                 .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                        Some(Constant::Boolean(b1 && b2))
-                    }
-                    (_, _) => None,
-                })
-                .collect()),
-            SimpleMath::Or([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                        Some(Constant::Boolean(b1 || b2))
-                    }
-                    (_, _) => None,
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                        Some(Constant::Boolean(b1 || b2))
-                    }
-                    (_, _) => None,
-                })
-                .collect()),
-            SimpleMath::Neq([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x != y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x != y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect()),
-            SimpleMath::Leq([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x <= y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x <= y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect()),
-            SimpleMath::Geq([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x >= y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x >= y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect()),
-            SimpleMath::Lt([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x < y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x < y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect()),
-            SimpleMath::Gt([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x > y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| {
-                    if x > y {
-                        Some(Constant::Boolean(true))
-                    } else {
-                        Some(Constant::Boolean(false))
-                    }
-                })
-                .collect()),
-            SimpleMath::Add([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_add(n2)))
-                    }
-                    (_, _) => None,
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_add(n2)))
-                    }
-                    (_, _) => None,
-                })
-                .collect()),
-            SimpleMath::Sub([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_sub(n2)))
-                    }
-                    (_, _) => None,
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_sub(n2)))
-                    }
-                    (_, _) => None,
-                })
-                .collect()),
-            SimpleMath::Mul([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_mul(n2)))
-                    }
-                    (_, _) => None,
-                })
-                .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_mul(n2)))
-                    }
-                    (_, _) => None,
-                })
-                .collect()),
-            SimpleMath::Abs(a) => (x(a)
-                .map(|x| match x {
+            ),
+            SimpleMath::And([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
+                            Some(Constant::Boolean(b1 && b2))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
+                            Some(Constant::Boolean(b1 && b2))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Or([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
+                            Some(Constant::Boolean(b1 || b2))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
+                            Some(Constant::Boolean(b1 || b2))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Neq([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x != y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x != y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Leq([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x <= y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x <= y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Geq([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x >= y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x >= y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Lt([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x < y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x < y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Gt([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x > y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| {
+                        if x > y {
+                            Some(Constant::Boolean(true))
+                        } else {
+                            Some(Constant::Boolean(false))
+                        }
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Add([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            Some(Constant::Number(n1.wrapping_add(n2)))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            Some(Constant::Number(n1.wrapping_add(n2)))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Sub([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            Some(Constant::Number(n1.wrapping_sub(n2)))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            Some(Constant::Number(n1.wrapping_sub(n2)))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Mul([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            Some(Constant::Number(n1.wrapping_mul(n2)))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            Some(Constant::Number(n1.wrapping_mul(n2)))
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+            ),
+            SimpleMath::Abs(a) => (
+                x(a).map(|x| match x {
                     Some(Constant::Number(n1)) => Some(Constant::Number(n1.wrapping_abs())),
                     _ => None,
                 })
                 .collect(),
-                x(a)
-                .map(|x| match x {
+                x(a).map(|x| match x {
                     Some(Constant::Number(n1)) => Some(Constant::Number(n1.wrapping_abs())),
                     _ => None,
                 })
-                .collect()),
-            SimpleMath::Div([a, b]) => (x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        if n2 != 0 {
-                            Some(Constant::Number(n1.wrapping_div(n2)))
-                        } else {
-                            None
-                        }
-                    }
-                    (_, _) => None,
-                })
                 .collect(),
-                x(a)
-                .zip(x(b))
-                .map(|(x, y)| match (x, y) {
-                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        if n2 != 0 {
-                            Some(Constant::Number(n1.wrapping_div(n2)))
-                        } else {
-                            None
+            ),
+            SimpleMath::Div([a, b]) => (
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            if n2 != 0 {
+                                Some(Constant::Number(n1.wrapping_div(n2)))
+                            } else {
+                                None
+                            }
                         }
-                    }
-                    (_, _) => None,
-                })
-                .collect()),
+                        (_, _) => None,
+                    })
+                    .collect(),
+                x(a).zip(x(b))
+                    .map(|(x, y)| match (x, y) {
+                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                            if n2 != 0 {
+                                Some(Constant::Number(n1.wrapping_div(n2)))
+                            } else {
+                                None
+                            }
+                        }
+                        (_, _) => None,
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -1107,14 +1111,18 @@ impl SynthParam {
         let cvec_len = self.n_samples + self.consts.len();
         let mut rand_indices = vec![];
         // all predicate eclass cvecs and Ids
-        let pred_datas: Vec<(Vec<Option<Constant>>, Id)> =
-            pred_eg.classes().cloned().map(|c| (c.data.1, c.id)).collect();
+        let pred_datas: Vec<(Vec<Option<Constant>>, Id)> = pred_eg
+            .classes()
+            .cloned()
+            .map(|c| (c.data.1, c.id))
+            .collect();
 
         for _iter in 0..num_cond_iters {
             for _i in 0..num_rand_idx {
                 rand_indices.push(self.rng.gen_range(0, cvec_len));
             }
-            let mut by_rand_idx: IndexMap<Vec<(&usize, Option<Constant>)>, Vec<Id>> = IndexMap::new();
+            let mut by_rand_idx: IndexMap<Vec<(&usize, Option<Constant>)>, Vec<Id>> =
+                IndexMap::new();
 
             for id in &ids {
                 let mut values_at_rand_idxs = vec![];
@@ -1142,7 +1150,7 @@ impl SynthParam {
                     .filter(|id| !&eg[**id].data.1.iter().all(|v| v == &None))
                     .collect();
                 println!("ecs len: {}", ecs.len());
-               let mut ctr = 0;
+                let mut ctr = 0;
                 for i in &ecs {
                     for j in &ecs {
                         // println!("i: {}", ctr);
@@ -1151,7 +1159,7 @@ impl SynthParam {
                         if i != j && eg[**i].data.1 != eg[**j].data.1
                         // they must have _some_ None values
                         // && (eg[**i].data.contains(&None) || eg[**j].data.contains(&None))
-                        {   
+                        {
                             // println!("some none value present");
                             let ds = eg[**i].data.1.iter().zip(eg[**j].data.1.iter()).enumerate();
                             // all indices where either cvecs have None
@@ -1393,7 +1401,10 @@ impl SynthParam {
                     if my_ids.contains(&class.id) {
                         if !class.data.0.contains(&None) {
                             // the ids corresponding to a specific cvec key in this hash map are for normal rewrites and can be unioned.
-                            by_cvec_some.entry(&class.data.0).or_default().push(class.id);
+                            by_cvec_some
+                                .entry(&class.data.0)
+                                .or_default()
+                                .push(class.id);
                         }
                     }
                 }
@@ -1516,10 +1527,9 @@ impl SynthParam {
             equalities.extend(cond_rws);
         }
         let posion_map = &mut HashMap::default();
-        let mut gen_poison_rules: Vec<Equality<SimpleMath, SynthAnalysis>> =
-            Vec::new();
+        let mut gen_poison_rules: Vec<Equality<SimpleMath, SynthAnalysis>> = Vec::new();
         let mut poison_set = HashSet::new();
-        for (pl, pr) in poison_rules{
+        for (pl, pr) in poison_rules {
             let pl_gen = generalize(&pl, posion_map);
             let pr_gen = generalize(&pr, posion_map);
             // println!("{} => {}", pl_gen, pr_gen);
