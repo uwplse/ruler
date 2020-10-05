@@ -237,11 +237,11 @@ pub struct SynthAnalysis {
 }
 
 impl Analysis<SimpleMath> for SynthAnalysis {
-    type Data = (Vec<Option<Constant>>, Vec<Option<Constant>>);
+    type Data = Vec<Option<Constant>>;
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
         let mut to_changed = false;
-        let pairs = to.0.iter().zip(from.0.iter());
+        let pairs = to.iter().zip(from.iter());
         for (mut t, f) in pairs {
             match (t, f) {
                 (None, Some(_)) => {
@@ -269,283 +269,147 @@ impl Analysis<SimpleMath> for SynthAnalysis {
 
     fn make(egraph: &EGraph<SimpleMath, Self>, enode: &SimpleMath) -> Self::Data {
         // a closure to get the cvec for some eclass
-        let x = |i: &Id| egraph[*i].data.1.iter().copied();
+        let x = |i: &Id| egraph[*i].data.iter().copied();
         let params = &egraph.analysis;
         match enode {
-            SimpleMath::Num(n) => (
-                (0..params.cvec_len)
-                    .map(|_| Some(Constant::Number(*n)))
-                    .collect(),
-                (0..params.cvec_len)
-                    .map(|_| Some(Constant::Number(*n)))
-                    .collect(),
-            ),
-            SimpleMath::Bool(b) => (
-                (0..params.cvec_len)
-                    .map(|_| Some(Constant::Boolean(*b)))
-                    .collect(),
-                (0..params.cvec_len)
-                    .map(|_| Some(Constant::Boolean(*b)))
-                    .collect(),
-            ),
-            SimpleMath::Var(_) => (vec![], vec![]),
-            SimpleMath::Not(a) => (
-                x(a).map(|x| match x {
+            SimpleMath::Num(n) => (0..params.cvec_len)
+                .map(|_| Some(Constant::Number(*n)))
+                .collect(),
+            SimpleMath::Bool(b) => (0..params.cvec_len)
+                .map(|_| Some(Constant::Boolean(*b)))
+                .collect(),
+            SimpleMath::Var(_) => vec![],
+            SimpleMath::Not(a) => x(a)
+                .map(|x| match x {
                     Some(Constant::Boolean(b)) => Some(Constant::Boolean(!b)),
                     _ => None,
                 })
                 .collect(),
-                x(a).map(|x| match x {
-                    Some(Constant::Boolean(b)) => Some(Constant::Boolean(!b)),
-                    _ => None,
-                })
-                .collect(),
-            ),
-            SimpleMath::Neg(a) => (
-                x(a).map(|x| match x {
+            SimpleMath::Neg(a) => x(a)
+                .map(|x| match x {
                     Some(Constant::Number(n)) => Some(Constant::Number(-n)),
                     _ => None,
                 })
                 .collect(),
-                x(a).map(|x| match x {
-                    Some(Constant::Number(n)) => Some(Constant::Number(-n)),
-                    _ => None,
+            SimpleMath::And([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| match (x, y) {
+                    (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
+                        Some(Constant::Boolean(b1 && b2))
+                    }
+                    (_, _) => None,
                 })
                 .collect(),
-            ),
-            SimpleMath::And([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                            Some(Constant::Boolean(b1 && b2))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                            Some(Constant::Boolean(b1 && b2))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Or([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                            Some(Constant::Boolean(b1 || b2))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                            Some(Constant::Boolean(b1 || b2))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Neq([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x != y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x != y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Leq([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x <= y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x <= y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Geq([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x >= y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x >= y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Lt([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x < y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x < y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Gt([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x > y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| {
-                        if x > y {
-                            Some(Constant::Boolean(true))
-                        } else {
-                            Some(Constant::Boolean(false))
-                        }
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Add([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            Some(Constant::Number(n1.wrapping_add(n2)))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            Some(Constant::Number(n1.wrapping_add(n2)))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Sub([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            Some(Constant::Number(n1.wrapping_sub(n2)))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            Some(Constant::Number(n1.wrapping_sub(n2)))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Mul([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            Some(Constant::Number(n1.wrapping_mul(n2)))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            Some(Constant::Number(n1.wrapping_mul(n2)))
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-            ),
-            SimpleMath::Abs(a) => (
-                x(a).map(|x| match x {
+            SimpleMath::Or([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| match (x, y) {
+                    (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
+                        Some(Constant::Boolean(b1 || b2))
+                    }
+                    (_, _) => None,
+                })
+                .collect(),
+            SimpleMath::Neq([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| {
+                    if x != y {
+                        Some(Constant::Boolean(true))
+                    } else {
+                        Some(Constant::Boolean(false))
+                    }
+                })
+                .collect(),
+            SimpleMath::Leq([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| {
+                    if x <= y {
+                        Some(Constant::Boolean(true))
+                    } else {
+                        Some(Constant::Boolean(false))
+                    }
+                })
+                .collect(),
+            SimpleMath::Geq([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| {
+                    if x >= y {
+                        Some(Constant::Boolean(true))
+                    } else {
+                        Some(Constant::Boolean(false))
+                    }
+                })
+                .collect(),
+            SimpleMath::Lt([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| {
+                    if x < y {
+                        Some(Constant::Boolean(true))
+                    } else {
+                        Some(Constant::Boolean(false))
+                    }
+                })
+                .collect(),
+            SimpleMath::Gt([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| {
+                    if x > y {
+                        Some(Constant::Boolean(true))
+                    } else {
+                        Some(Constant::Boolean(false))
+                    }
+                })
+                .collect(),
+            SimpleMath::Add([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| match (x, y) {
+                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                        Some(Constant::Number(n1.wrapping_add(n2)))
+                    }
+                    (_, _) => None,
+                })
+                .collect(),
+            SimpleMath::Sub([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| match (x, y) {
+                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                        Some(Constant::Number(n1.wrapping_sub(n2)))
+                    }
+                    (_, _) => None,
+                })
+                .collect(),
+            SimpleMath::Mul([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| match (x, y) {
+                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                        Some(Constant::Number(n1.wrapping_mul(n2)))
+                    }
+                    (_, _) => None,
+                })
+                .collect(),
+            SimpleMath::Abs(a) => x(a)
+                .map(|x| match x {
                     Some(Constant::Number(n1)) => Some(Constant::Number(n1.wrapping_abs())),
                     _ => None,
                 })
                 .collect(),
-                x(a).map(|x| match x {
-                    Some(Constant::Number(n1)) => Some(Constant::Number(n1.wrapping_abs())),
-                    _ => None,
+            SimpleMath::Div([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| match (x, y) {
+                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                        if n2 != 0 {
+                            Some(Constant::Number(n1.wrapping_div(n2)))
+                        } else {
+                            None
+                        }
+                    }
+                    (_, _) => None,
                 })
                 .collect(),
-            ),
-            SimpleMath::Div([a, b]) => (
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            if n2 != 0 {
-                                Some(Constant::Number(n1.wrapping_div(n2)))
-                            } else {
-                                None
-                            }
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-                x(a).zip(x(b))
-                    .map(|(x, y)| match (x, y) {
-                        (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                            if n2 != 0 {
-                                Some(Constant::Number(n1.wrapping_div(n2)))
-                            } else {
-                                None
-                            }
-                        }
-                        (_, _) => None,
-                    })
-                    .collect(),
-            ),
         }
     }
 
     fn modify(egraph: &mut EGraph<SimpleMath, Self>, id: Id) {
-        let cv = &egraph[id].data.0;
+        let cv = &egraph[id].data;
         if cv.is_empty() || cv.contains(&None) {
             return;
         }
@@ -631,8 +495,7 @@ impl SynthParam {
             // cvec.push(Some(Constant::Number(i32::MIN)));
             // cvec.push(Some(Constant::Number(i32::MAX-1)));
             cvec.shuffle(rng);
-            egraph[id].data.0 = cvec.clone();
-            egraph[id].data.1 = cvec.clone();
+            egraph[id].data = cvec.clone();
             var_cvec_map.insert(var, cvec.clone());
             println!("var: {}, cvec: {:?}", var, cvec.clone());
         }
@@ -860,22 +723,22 @@ impl SynthParam {
                 let valid_start = Instant::now();
                 let is_valid = self.validate_rule(((eq.0).0).1.clone(), ((eq.0).1).1.clone());
                 let validation_time = Instant::now().duration_since(valid_start);
-                println!("validation time: {:?}", validation_time);
+                // println!("validation time: {:?}", validation_time);
                 if is_valid {
-                    println!(
-                        "VALIDATOR: {} for rule: {:?} => {:?}",
-                        is_valid,
-                        ((eq.0).0).1.to_string(),
-                        ((eq.0).1).1.to_string()
-                    );
+                    // println!(
+                    //     "VALIDATOR: {} for rule: {:?} => {:?}",
+                    //     is_valid,
+                    //     ((eq.0).0).1.to_string(),
+                    //     ((eq.0).1).1.to_string()
+                    // );
                     return Some(eq.0);
                 } else {
-                    println!(
-                        "VALIDATOR: {} for rule: {:?} => {:?}",
-                        is_valid,
-                        ((eq.0).0).1.to_string(),
-                        ((eq.0).1).1.to_string()
-                    );
+                    // println!(
+                    //     "VALIDATOR: {} for rule: {:?} => {:?}",
+                    //     is_valid,
+                    //     ((eq.0).0).1.to_string(),
+                    //     ((eq.0).1).1.to_string()
+                    // );
                     // Invalidate this rule
                     let cycle_group = cycle_groups.iter().find(|&r| r.contains(&eq.1));
                     // println!("Cycle groups: {:?}", cycle_groups);
@@ -959,29 +822,27 @@ impl SynthParam {
                 }
             }
         }
-        println!("adding {} exprs Phase A:", preds_to_add.len());
         for pred in preds_to_add {
             let id = eg.add(pred);
             ids.insert(id);
         }
-        println!("added phase A exprs");
 
-        // let rules = rws
-        //     .iter()
-        //     .filter(|eq| eq.cond == None)
-        //     .map(|eq| &eq.rewrite);
+        let rules = rws
+            .iter()
+            .filter(|eq| eq.cond == None)
+            .map(|eq| &eq.rewrite);
 
-        // let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-        //     Runner::new(eg.analysis.clone()).with_egraph(eg.clone());
+        let runner: Runner<SimpleMath, SynthAnalysis, ()> =
+            Runner::new(eg.analysis.clone()).with_egraph(eg.clone());
 
-        // *eg = runner
-        //     .with_time_limit(Duration::from_secs(20))
-        //     .with_node_limit(usize::MAX)
-        //     .with_iter_limit(5)
-        //     .run(rules)
-        //     .egraph;
+        *eg = runner
+            .with_time_limit(Duration::from_secs(20))
+            .with_node_limit(usize::MAX)
+            .with_iter_limit(5)
+            .run(rules)
+            .egraph;
 
-        // eg.rebuild();
+        eg.rebuild();
         ids = eg.classes().map(|c| eg.find(c.id)).collect();
 
         if phase_b {
@@ -1012,7 +873,6 @@ impl SynthParam {
             for pred in preds_to_add {
                 eg.add(pred);
             }
-            println!("added phase B exprs");
         }
     }
 
@@ -1026,42 +886,40 @@ impl SynthParam {
         for var in &self.variables {
             let id = eg.add(SimpleMath::Var(*var));
             let old_id = old_eg.lookup(SimpleMath::Var(*var)).unwrap();
-            eg[id].data.0 = old_eg[old_id].data.0.clone();
-            eg[id].data.1 = old_eg[old_id].data.1.clone();
+            eg[id].data = old_eg[old_id].data.clone();
         }
         for n in &self.consts {
             if let Constant::Number(num) = n {
                 eg.add(SimpleMath::Num(*num));
             }
         }
-        println!("number of eclasses: {}", eg.number_of_classes());
-        // let mut ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
-        // let mut enodes_to_add = vec![];
-        // for &i in &ids {
-        //     for &j in &ids {
-        //         if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
-        //             enodes_to_add.push(SimpleMath::Add([i, j]));
-        //         }
-        //         if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
-        //             enodes_to_add.push(SimpleMath::Sub([i, j]));
-        //         }
-        //         if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
-        //             enodes_to_add.push(SimpleMath::Mul([i, j]));
-        //         }
-        //         if find_type(&eg, i) == ExprType::Number {
-        //             enodes_to_add.push(SimpleMath::Neg(i));
-        //         }
-        //         if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
-        //             enodes_to_add.push(SimpleMath::Div([i, j]));
-        //         }
-        //         if find_type(&eg, i) == ExprType::Number {
-        //             enodes_to_add.push(SimpleMath::Abs(i));
-        //         }
-        //     }
-        // }
-        // for enode in enodes_to_add {
-        //     ids.insert(eg.add(enode));
-        // }
+        let mut ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
+        let mut enodes_to_add = vec![];
+        for &i in &ids {
+            for &j in &ids {
+                if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
+                    enodes_to_add.push(SimpleMath::Add([i, j]));
+                }
+                if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
+                    enodes_to_add.push(SimpleMath::Sub([i, j]));
+                }
+                if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
+                    enodes_to_add.push(SimpleMath::Mul([i, j]));
+                }
+                if find_type(&eg, i) == ExprType::Number {
+                    enodes_to_add.push(SimpleMath::Neg(i));
+                }
+                if find_type(&eg, i) == ExprType::Number && find_type(&eg, j) == ExprType::Number {
+                    enodes_to_add.push(SimpleMath::Div([i, j]));
+                }
+                if find_type(&eg, i) == ExprType::Number {
+                    enodes_to_add.push(SimpleMath::Abs(i));
+                }
+            }
+        }
+        for enode in enodes_to_add {
+            ids.insert(eg.add(enode));
+        }
         self.enumerate_preds(&mut eg, false, rws);
         eg
     }
@@ -1069,7 +927,7 @@ impl SynthParam {
     fn learn_cond_rules(
         &mut self,
         eg: &mut EGraph<SimpleMath, SynthAnalysis>,
-        num_cond_iters: usize,
+        num_iters: usize,
         num_rand_idx: usize,
         rws: &Vec<Equality<SimpleMath, SynthAnalysis>>,
     ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
@@ -1111,23 +969,21 @@ impl SynthParam {
         let cvec_len = self.n_samples + self.consts.len();
         let mut rand_indices = vec![];
         // all predicate eclass cvecs and Ids
-        let pred_datas: Vec<(Vec<Option<Constant>>, Id)> = pred_eg
-            .classes()
-            .cloned()
-            .map(|c| (c.data.1, c.id))
-            .collect();
+        let pred_datas: Vec<(Vec<Option<Constant>>, Id)> =
+            pred_eg.classes().cloned().map(|c| (c.data, c.id)).collect();
 
-        for _iter in 0..num_cond_iters {
+        for _iter in 0..num_iters {
             for _i in 0..num_rand_idx {
                 rand_indices.push(self.rng.gen_range(0, cvec_len));
             }
+
             let mut by_rand_idx: IndexMap<Vec<(&usize, Option<Constant>)>, Vec<Id>> =
                 IndexMap::new();
 
             for id in &ids {
                 let mut values_at_rand_idxs = vec![];
                 for idx in &rand_indices {
-                    let data = eg[*id].data.1[*idx];
+                    let data = eg[*id].data[*idx];
                     if data != None {
                         values_at_rand_idxs.push((idx, data)); // get a few non-None cvec values at random points
                     }
@@ -1139,7 +995,6 @@ impl SynthParam {
             }
 
             by_rand_idx.retain(|_, vs| vs.len() > 1);
-            println!("by_rand_idx len {}", by_rand_idx.len());
 
             for same_at_rands in by_rand_idx.keys() {
                 let ecs: Vec<&Id> = by_rand_idx
@@ -1147,21 +1002,16 @@ impl SynthParam {
                     .unwrap()
                     .iter()
                     // remove ids that have all None values
-                    .filter(|id| !&eg[**id].data.1.iter().all(|v| v == &None))
+                    .filter(|id| !&eg[**id].data.iter().all(|v| v == &None))
                     .collect();
-                println!("ecs len: {}", ecs.len());
-                let mut ctr = 0;
                 for i in &ecs {
                     for j in &ecs {
-                        // println!("i: {}", ctr);
-                        ctr = ctr + 1;
                         let mut agreement_vec: Vec<Option<Constant>> = Vec::new();
-                        if i != j && eg[**i].data.1 != eg[**j].data.1
+                        if i != j && eg[**i].data != eg[**j].data
                         // they must have _some_ None values
                         // && (eg[**i].data.contains(&None) || eg[**j].data.contains(&None))
                         {
-                            // println!("some none value present");
-                            let ds = eg[**i].data.1.iter().zip(eg[**j].data.1.iter()).enumerate();
+                            let ds = eg[**i].data.iter().zip(eg[**j].data.iter()).enumerate();
                             // all indices where either cvecs have None
                             let i_nones: Vec<usize> = ds
                                 .clone()
@@ -1169,7 +1019,6 @@ impl SynthParam {
                                 .map(|(i, _)| i)
                                 .collect();
 
-                            // println!("inones found");
                             // all indices where neither cvec are None but they are different
                             let non_none_diff_poses: Vec<usize> = ds
                                 .filter(|(_, (x, y))| *x != &None && *y != &None && x != y)
@@ -1178,8 +1027,7 @@ impl SynthParam {
 
                             // the cvecs may be different or None at most at cond_diff_thresh positions
                             if non_none_diff_poses.len() <= self.cond_diff_thresh {
-                                // println!("start making agreement vec");
-                                for idx in 0..eg[**j].data.1.len() {
+                                for idx in 0..eg[**j].data.len() {
                                     if i_nones.contains(&idx) || non_none_diff_poses.contains(&idx)
                                     {
                                         // cvecs disagree at None positions
@@ -1224,7 +1072,6 @@ impl SynthParam {
                                         && !pattern_has_pred(&pat1)
                                         && !pattern_has_pred(&pat2)
                                     {
-                                        println!("cond: {} => {}, if {}", pat1, pat2, c);
                                         equalities.extend(Equality::new(pat1, pat2, Some(c)))
                                     }
                                     let names = &mut HashMap::default();
@@ -1354,9 +1201,9 @@ impl SynthParam {
                     .filter(|eq| eq.cond == None)
                     .map(|eq| &eq.rewrite);
 
-                // for r in rules.clone() {
-                //     println!("{:?}", r.name());
-                // }
+                for r in rules.clone() {
+                    println!("{:?}", r.name());
+                }
                 let clean_rules = Instant::now().duration_since(before);
 
                 let runner: Runner<SimpleMath, SynthAnalysis, ()> =
@@ -1399,12 +1246,9 @@ impl SynthParam {
 
                 for class in eg.classes() {
                     if my_ids.contains(&class.id) {
-                        if !class.data.0.contains(&None) {
+                        if !class.data.contains(&None) {
                             // the ids corresponding to a specific cvec key in this hash map are for normal rewrites and can be unioned.
-                            by_cvec_some
-                                .entry(&class.data.0)
-                                .or_default()
-                                .push(class.id);
+                            by_cvec_some.entry(&class.data).or_default().push(class.id);
                         }
                     }
                 }
@@ -1448,7 +1292,7 @@ impl SynthParam {
                 let after_cvec_enodes: usize;
                 let mut learned_rule = String::new();
 
-                println!("subsumption potential rules: {}", potential_rules.len());
+                // println!("subsumption potential rules: {}", potential_rules.len());
                 let best = self.subsumption_find_best(
                     eg.analysis.clone(),
                     potential_rules,
@@ -1526,21 +1370,6 @@ impl SynthParam {
             );
             equalities.extend(cond_rws);
         }
-        let posion_map = &mut HashMap::default();
-        let mut gen_poison_rules: Vec<Equality<SimpleMath, SynthAnalysis>> = Vec::new();
-        let mut poison_set = HashSet::new();
-        for (pl, pr) in poison_rules {
-            let pl_gen = generalize(&pl, posion_map);
-            let pr_gen = generalize(&pr, posion_map);
-            // println!("{} => {}", pl_gen, pr_gen);
-            if let Some(eq) = Equality::new(pl_gen, pr_gen, None) {
-                if gen_poison_rules.iter().all(|e| e.name != eq.name) {
-                    gen_poison_rules.push(eq);
-                }
-            }
-        }
-        gen_poison_rules.retain(|eq| poison_set.insert(eq.name.clone()));
-        // println!("posion rule set size: {}", gen_poison_rules.len());
         equalities
     }
 
@@ -1652,7 +1481,7 @@ where
 }
 
 fn find_type(eg: &EGraph<SimpleMath, SynthAnalysis>, id: Id) -> ExprType {
-    match &eg[id].data.0[0] {
+    match &eg[id].data[0] {
         Some(Constant::Number(_)) => ExprType::Number,
         Some(Constant::Boolean(_)) => ExprType::Boolean,
         // TODO: this is a bug. What if the first element is None due to div or other ops?
