@@ -1122,20 +1122,23 @@ impl SynthParam {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
         let mut my_ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
-        let mut metrics = metrics::RulerProfile::new();
+
+        let mut eqsat_iter = 0;
+        let mut metrics = metrics::EgraphStats::new();
+        let mut profiling = metrics::RulerProfile::new();
         let mut poison_rules: HashSet<(RecExpr<SimpleMath>, RecExpr<SimpleMath>)> =
             HashSet::default();
 
         for iter in 0..self.n_iter {
             my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
-            let mut enodes_to_add = vec![];
-
             println!(
                 "iter {} phase 1: adding ops over {} eclasses",
                 iter,
                 my_ids.len(),
             );
-
+            let mut enodes_to_add = vec![];
+            // TODO probably a better way, like with a mapping
+            let mut expr_added = vec![];
             let before = Instant::now();
             for &i in &my_ids {
                 for &j in &my_ids {
@@ -1143,27 +1146,33 @@ impl SynthParam {
                         && find_type(&eg, j) == ExprType::Number
                     {
                         enodes_to_add.push(SimpleMath::Add([i, j]));
+                        expr_added.push(format!("(+ {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
                         enodes_to_add.push(SimpleMath::Sub([i, j]));
+                        expr_added.push(format!("(- {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
                         enodes_to_add.push(SimpleMath::Mul([i, j]));
+                        expr_added.push(format!("(* {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number {
                         enodes_to_add.push(SimpleMath::Neg(i));
+                        expr_added.push(format!("(- {})", i))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
                         enodes_to_add.push(SimpleMath::Div([i, j]));
+                        expr_added.push(format!("(/ {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number {
                         enodes_to_add.push(SimpleMath::Abs(i));
+                        expr_added.push(format!("(abs {})", i))
                     }
                 }
             }
@@ -1172,6 +1181,14 @@ impl SynthParam {
                 my_ids.insert(eg.add(enode));
             }
             let adding_exprs = Instant::now().duration_since(before);
+
+            metrics.log_event_metrics(
+                eqsat_iter,
+                eg.number_of_classes(),
+                eg.total_size(),
+                metrics::EventType::AddedNodes,
+                metrics::Content::Nodes(expr_added),
+            );
 
             println!(
                 "number of eclasses after enumeration in normal rules: {}",
@@ -1190,6 +1207,12 @@ impl SynthParam {
                     iter,
                     tainted_eg.total_size(),
                     tainted_eg.number_of_classes()
+                );
+
+                metrics.record(
+                    eqsat_iter,
+                    tainted_eg.number_of_classes(),
+                    tainted_eg.total_size(),
                 );
 
                 let before = Instant::now();
@@ -1237,6 +1260,17 @@ impl SynthParam {
                     eg.number_of_classes()
                 );
 
+                // TODO parameterize metrics Vec<Equality>SimpleMath, SynthAnaylsis (equalities)
+                metrics.record(eqsat_iter, eg.number_of_classes(), eg.total_size());
+                metrics.log_event_metrics(
+                    eqsat_iter,
+                    eg.number_of_classes(),
+                    eg.total_size(),
+                    metrics::EventType::FoundRules,
+                    metrics::Content::Rules(
+                        equalities.clone().into_iter().map(|d| d.name).collect(),
+                    ),
+                );
                 let before_cvec_eclasses = eg.number_of_classes();
                 let before_cvec_enodes = eg.total_number_of_nodes();
 
@@ -1330,7 +1364,7 @@ impl SynthParam {
                 } else {
                     break;
                 }
-                metrics.record(
+                profiling.record(
                     iter,
                     adding_exprs,
                     nloop,
@@ -1359,6 +1393,7 @@ impl SynthParam {
                 println!("  {}", eq);
             }
         }
+
         metrics.print_to_file();
         if _conditional {
             let cond_rws = self.learn_cond_rules(
@@ -1441,6 +1476,7 @@ impl SynthParam {
     }
 }
 
+#[derive(Clone)]
 pub struct Equality<L, A> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
