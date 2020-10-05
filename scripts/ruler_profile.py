@@ -16,7 +16,7 @@ def ruler_profiler(p):
             'before_eqsat_ec', 'before_eqsat_en', 'tainted_eqsat',
             'update_pristine', 'before_cvec_ec', 'before_cvec_en',
             'cvec_grouping', 'learn_a_rule', 'after_cvec_ec', 'after_cvec_en',
-            'learned_rule'
+            'cvec_groups', 'learned_rule'
         ])
         for d in data:
             csv_writer.writerow([
@@ -30,7 +30,7 @@ def ruler_profiler(p):
                 d['before_cvec_enodes'],
                 time(d, 'cvec_grouping'),
                 time(d, 'learn_a_rule'), d['after_cvec_eclasses'],
-                d['after_cvec_enodes'], d['learned_rule']
+                d['after_cvec_enodes'], d['cvec_groups'], d['learned_rule']
             ])
         csv_file.close()
 

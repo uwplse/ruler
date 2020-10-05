@@ -92,6 +92,7 @@ struct TimeStats {
     pub before_cvec_enodes: usize,
     pub after_cvec_eclasses: usize,
     pub after_cvec_enodes: usize,
+    pub cvec_groups: usize,
     pub learned_rule: String,
 }
 
@@ -123,6 +124,7 @@ impl RulerProfile {
         before_cvec_enodes: usize,
         after_cvec_eclasses: usize,
         after_cvec_enodes: usize,
+        cvec_groups: usize,
         learned_rule: String,
     ) {
         self.ruler_profile.push(TimeStats {
@@ -142,6 +144,7 @@ impl RulerProfile {
             after_cvec_eclasses,
             after_cvec_enodes,
             learned_rule,
+            cvec_groups,
         })
     }
 
