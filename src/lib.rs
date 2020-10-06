@@ -1118,6 +1118,7 @@ impl SynthParam {
         &mut self,
         _num_ops: usize,
         _conditional: bool,
+        eqsat: bool,
     ) -> Vec<Equality<SimpleMath, SynthAnalysis>> {
         let mut equalities: Vec<Equality<SimpleMath, SynthAnalysis>> = vec![];
         let mut eg = self.mk_egraph();
@@ -1224,32 +1225,32 @@ impl SynthParam {
                     .filter(|eq| eq.cond == None)
                     .map(|eq| &eq.rewrite);
 
-                for r in rules.clone() {
-                    println!("{:?}", r.name());
-                }
                 let clean_rules = Instant::now().duration_since(before);
-
-                let runner: Runner<SimpleMath, SynthAnalysis, ()> =
-                    Runner::new(tainted_eg.analysis.clone()).with_egraph(tainted_eg);
-
-                let before = Instant::now();
+                let mut tainted_eqsat: Duration = Duration::new(0, 0);
+                let mut update_pristine: Duration = Duration::new(0, 0);
                 let before_eqsat_eclasses = eg.number_of_classes();
                 let before_eqsat_enodes = eg.total_number_of_nodes();
-                tainted_eg = runner
-                    .with_time_limit(Duration::from_secs(20))
-                    .with_node_limit(usize::MAX)
-                    .with_iter_limit(5)
-                    //.with_scheduler(SimpleScheduler)
-                    .run(rules)
-                    .egraph;
+                if eqsat {
+                    let runner: Runner<SimpleMath, SynthAnalysis, ()> =
+                        Runner::new(tainted_eg.analysis.clone()).with_egraph(tainted_eg);
 
-                let tainted_eqsat = Instant::now().duration_since(before);
+                    let before = Instant::now();
+                    tainted_eg = runner
+                        .with_time_limit(Duration::from_secs(20))
+                        .with_node_limit(usize::MAX)
+                        .with_iter_limit(5)
+                        //.with_scheduler(SimpleScheduler)
+                        .run(rules)
+                        .egraph;
 
-                let before = Instant::now();
-                eg = self.update_clean_egraph(tainted_eg, eg);
-                let update_pristine = Instant::now().duration_since(before);
+                    tainted_eqsat = Instant::now().duration_since(before);
 
-                eg.rebuild();
+                    let before = Instant::now();
+                    eg = self.update_clean_egraph(tainted_eg, eg);
+                    update_pristine = Instant::now().duration_since(before);
+
+                    eg.rebuild();
+                }
 
                 my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
 
@@ -1633,8 +1634,7 @@ mod tests {
             cond_diff_thresh: 3,
         };
 
-        let eqs = param.run(13, false);
-
+        let eqs = param.run(13, false, true);
         check_proves(&eqs, "(+ a b)", "(+ b a)");
         check_proves(&eqs, "(+ a 0)", "a");
         check_proves(&eqs, "(+ 0 a)", "a");

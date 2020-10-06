@@ -6,7 +6,7 @@ use std::env;
 use std::io::{self, Write};
 
 fn simplify(mut param: SynthParam) -> std::io::Result<()> {
-    let eqs = param.run(13, true);
+    let eqs = param.run(13, false, true);
     let rules = eqs.iter().map(|eq| &eq.rewrite);
     println!("Entering simplification loop...");
     loop {
@@ -52,7 +52,7 @@ fn main() {
     };
 
     if args.len() < 2 {
-        param.run(13, false);
+        param.run(13, false, true);
     } else if args.len() >= 2 && args[1] == "simplify" {
         let res = simplify(param);
         match res {

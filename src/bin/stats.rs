@@ -11,6 +11,12 @@ struct CVecStats {
     time: Duration,
 }
 
+#[derive(Serialize, Deserialize)]
+struct EqsatStats {
+    eqsat_on: bool,
+    time: Duration,
+}
+
 fn cvec_stats_ruler(iter: usize, samples: usize, num_op: usize) -> CVecStats {
     let mut param = SynthParam {
         rng: SeedableRng::seed_from_u64(5),
@@ -24,7 +30,7 @@ fn cvec_stats_ruler(iter: usize, samples: usize, num_op: usize) -> CVecStats {
     };
 
     let before = Instant::now();
-    param.run(num_op, false);
+    param.run(num_op, false, true);
     let after = Instant::now();
     return CVecStats {
         niter: iter,
@@ -72,7 +78,7 @@ fn var_rule_ruler(iter: usize, num_vars: usize, num_op: usize) -> VarRuleStats {
             cond_diff_thresh: 3,
         };
         let before = Instant::now();
-        let eqs = param.run(num_op, false);
+        let eqs = param.run(num_op, false, true);
         let after = Instant::now();
         return VarRuleStats {
             iter: iter,
@@ -93,7 +99,7 @@ fn var_rule_ruler(iter: usize, num_vars: usize, num_op: usize) -> VarRuleStats {
             cond_diff_thresh: 3,
         };
         let before = Instant::now();
-        let eqs = param.run(num_op, false);
+        let eqs = param.run(num_op, false, true);
         let after = Instant::now();
         return VarRuleStats {
             iter: iter,
@@ -114,7 +120,7 @@ fn var_rule_ruler(iter: usize, num_vars: usize, num_op: usize) -> VarRuleStats {
             cond_diff_thresh: 3,
         };
         let before = Instant::now();
-        let eqs = param.run(num_op, false);
+        let eqs = param.run(num_op, false, true);
         let after = Instant::now();
         return VarRuleStats {
             iter: iter,
@@ -145,7 +151,46 @@ fn var_const_rule_time() {
     serde_json::to_writer_pretty(outfile, &data).unwrap();
 }
 
+fn ruler_eqsat(iter: usize, samples: usize, eqsat: bool) -> EqsatStats {
+    let mut param = SynthParam {
+        rng: SeedableRng::seed_from_u64(5),
+        n_iter: iter,
+        n_samples: samples,
+        variables: vec!["x".into(), "y".into(), "z".into()],
+        consts: vec![Constant::Number(0), Constant::Number(1)],
+        cond_rule_iters: 1,
+        cond_rule_rand_idx: 1,
+        cond_diff_thresh: 3,
+    };
+
+    let before = Instant::now();
+    param.run(13, false, eqsat);
+    let after = Instant::now();
+    return EqsatStats {
+        eqsat_on: eqsat,
+        time: after.duration_since(before),
+    };
+}
+
+fn eqsat_time() {
+    //let cvec_lens = vec![10, 20, 40, 60, 80, 100, 200, 400]; //, 750, 1000];
+
+    let eqsat_on = vec![true, false];
+    let iters = vec![1];
+    let mut data = vec![];
+    let outfile = std::fs::File::create("../../out/eqsat_time.json").expect("failed to open file");
+    for on in &eqsat_on {
+        for i in &iters {
+            for _ in 0..10 {
+                data.push(ruler_eqsat(*i, 5, *on));
+            }
+        }
+    }
+    serde_json::to_writer_pretty(outfile, &data).unwrap();
+}
+
 fn main() {
+    eqsat_time();
     // nsamples_vs_exec_time();
-    var_const_rule_time();
+    // var_const_rule_time();
 }
