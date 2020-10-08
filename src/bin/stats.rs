@@ -1,3 +1,4 @@
+use num::rational::Ratio;
 use rand::SeedableRng;
 use ruler::*;
 use serde::Deserialize;
@@ -157,7 +158,7 @@ fn ruler_eqsat(iter: usize, samples: usize, eqsat: bool) -> EqsatStats {
         n_iter: iter,
         n_samples: samples,
         variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![Constant::Number(0), Constant::Number(1)],
+        consts: vec![num!(0, 1), num!(1, 1)],
         cond_rule_iters: 1,
         cond_rule_rand_idx: 1,
         cond_diff_thresh: 3,

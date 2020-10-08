@@ -2,6 +2,7 @@ mod metrics;
 use egg::RecExpr;
 use egg::*;
 use indexmap::IndexMap;
+use num::rational::Ratio;
 use rand::{prelude::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use std::{
@@ -12,15 +13,16 @@ use std::{
     time::Instant,
 };
 
+#[macro_export]
 macro_rules! num {
-    ($x:expr) => {
-        Constant::Number($x)
+    ($x:expr, $y:expr) => {
+        Constant::Number(num::rational::Ratio::new($x, $y))
     };
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Constant {
-    Number(i32),
+    Number(Ratio<i64>),
     Boolean(bool),
 }
 
@@ -34,7 +36,7 @@ pub enum ExprType {
 impl Display for Constant {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Constant::Number(n) => write!(f, "{}", n),
+            Constant::Number(n) => write!(f, "{} / {}", n.numer(), n.denom()),
             Constant::Boolean(b) => write!(f, "{}", b),
         }
     }
@@ -47,8 +49,11 @@ impl std::str::FromStr for Constant {
             "True" | "true" => Ok(Constant::Boolean(true)),
             "False" | "false" => Ok(Constant::Boolean(false)),
             _ => {
-                if let Ok(n) = s.parse::<i32>() {
-                    Ok(Constant::Number(n))
+                let nd: Vec<&str> = s.split(" ").collect();
+                if nd.len() == 2 {
+                    let numer = nd[0].parse::<i64>().unwrap();
+                    let denom = nd[1].parse::<i64>().unwrap();
+                    Ok(Constant::Number(Ratio::new(numer, denom)))
                 } else {
                     Err(format!("'{}' is not a valid value for Constant", s))
                 }
@@ -70,16 +75,20 @@ define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
+        "pow" = Pow([Id; 2]),
         "abs" = Abs(Id),
+        "floor" = Floor(Id),
+        "ceil" = Ceil(Id),
+        "recip" = Reciprocal(Id),
         "~" = Neg(Id),
         "!" = Not(Id),
         Bool(bool),
-        Num(i32),
+        Num(Ratio<i64>),
         Var(egg::Symbol),
     }
 }
 
-pub fn get_num(c: Constant) -> i32 {
+pub fn get_num(c: Constant) -> Ratio<i64> {
     match c {
         Constant::Number(num) => num,
         _ => panic!("Not a num"),
@@ -116,7 +125,7 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             let e1 = eval(ctx, &expr[..=a]);
             let e2 = eval(ctx, &expr[..=b]);
             Some(Constant::Number(
-                get_num(e1.unwrap()).wrapping_add(get_num(e2.unwrap())),
+                get_num(e1.unwrap()) + get_num(e2.unwrap()),
             ))
         }
         SimpleMath::Sub([a, b]) => {
@@ -125,7 +134,7 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             let e1 = eval(ctx, &expr[..=a]);
             let e2 = eval(ctx, &expr[..=b]);
             Some(Constant::Number(
-                get_num(e1.unwrap()).wrapping_sub(get_num(e2.unwrap())),
+                get_num(e1.unwrap()) - get_num(e2.unwrap()),
             ))
         }
         SimpleMath::Mul([a, b]) => {
@@ -134,7 +143,7 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             let e1 = eval(ctx, &expr[..=a]);
             let e2 = eval(ctx, &expr[..=b]);
             Some(Constant::Number(
-                get_num(e1.unwrap()).wrapping_mul(get_num(e2.unwrap())),
+                get_num(e1.unwrap()) * get_num(e2.unwrap()),
             ))
         }
         SimpleMath::Div([a, b]) => {
@@ -142,9 +151,9 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             let b = usize::from(*b);
             let e1 = eval(ctx, &expr[..=a]);
             let e2 = eval(ctx, &expr[..=b]);
-            if e2 != Some(Constant::Number(0)) {
+            if *get_num(e2.unwrap()).numer() != 0 as i64 {
                 Some(Constant::Number(
-                    get_num(e1.unwrap()).wrapping_div(get_num(e2.unwrap())),
+                    get_num(e1.unwrap()) / get_num(e2.unwrap()),
                 ))
             } else {
                 None
@@ -153,7 +162,37 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
         SimpleMath::Abs(a) => {
             let a = usize::from(*a);
             let e1 = eval(ctx, &expr[..=a]);
-            Some(Constant::Number(get_num(e1.unwrap()).wrapping_abs()))
+            let nd = get_num(e1.unwrap());
+            Some(Constant::Number(Ratio::new(
+                (*nd.numer() as i64).abs(),
+                (*nd.denom() as i64).abs(),
+            )))
+        }
+        SimpleMath::Pow([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            let power = get_num(e2.unwrap());
+            assert!(power.is_integer());
+            Some(Constant::Number(
+                get_num(e1.unwrap()).pow(*power.numer() as i32),
+            ))
+        }
+        SimpleMath::Floor(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(Constant::Number(get_num(e1.unwrap()).floor()))
+        }
+        SimpleMath::Ceil(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(Constant::Number(get_num(e1.unwrap()).ceil()))
+        }
+        SimpleMath::Reciprocal(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(Constant::Number(get_num(e1.unwrap()).recip()))
         }
         SimpleMath::Neg(a) => {
             let a = usize::from(*a);
@@ -268,7 +307,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
     // }
 
     fn make(egraph: &EGraph<SimpleMath, Self>, enode: &SimpleMath) -> Self::Data {
-        // a closure to get the cvec for some eclass
+        // a closure to get the cvec for an eclass
         let x = |i: &Id| egraph[*i].data.iter().copied();
         let params = &egraph.analysis;
         match enode {
@@ -363,7 +402,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_add(n2)))
+                        Some(Constant::Number(n1 + n2))
                     }
                     (_, _) => None,
                 })
@@ -372,7 +411,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_sub(n2)))
+                        Some(Constant::Number(n1 - n2))
                     }
                     (_, _) => None,
                 })
@@ -381,14 +420,17 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        Some(Constant::Number(n1.wrapping_mul(n2)))
+                        Some(Constant::Number(n1 * n2))
                     }
                     (_, _) => None,
                 })
                 .collect(),
             SimpleMath::Abs(a) => x(a)
                 .map(|x| match x {
-                    Some(Constant::Number(n1)) => Some(Constant::Number(n1.wrapping_abs())),
+                    Some(Constant::Number(n1)) => Some(Constant::Number(Ratio::new(
+                        n1.numer().abs(),
+                        n1.denom().abs(),
+                    ))),
                     _ => None,
                 })
                 .collect(),
@@ -396,13 +438,44 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        if n2 != 0 {
-                            Some(Constant::Number(n1.wrapping_div(n2)))
+                        if *n2.numer() != 0 as i64 {
+                            Some(Constant::Number(n1 / n2))
                         } else {
                             None
                         }
                     }
                     (_, _) => None,
+                })
+                .collect(),
+            SimpleMath::Pow([a, b]) => x(a)
+                .zip(x(b))
+                .map(|(x, y)| match (x, y) {
+                    (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
+                        if n2.is_integer() {
+                            Some(Constant::Number(n1.pow(*n2.numer() as i32)))
+                        } else {
+                            None
+                        }
+                    }
+                    (_, _) => None,
+                })
+                .collect(),
+            SimpleMath::Floor(a) => x(a)
+                .map(|x| match x {
+                    Some(Constant::Number(n1)) => Some(Constant::Number(n1.floor())),
+                    _ => None,
+                })
+                .collect(),
+            SimpleMath::Ceil(a) => x(a)
+                .map(|x| match x {
+                    Some(Constant::Number(n1)) => Some(Constant::Number(n1.ceil())),
+                    _ => None,
+                })
+                .collect(),
+            SimpleMath::Reciprocal(a) => x(a)
+                .map(|x| match x {
+                    Some(Constant::Number(n1)) => Some(Constant::Number(n1.recip())),
+                    _ => None,
                 })
                 .collect(),
         }
@@ -486,11 +559,16 @@ impl SynthParam {
         for var in &self.variables {
             let id = egraph.add(SimpleMath::Var(*var));
             let mut cvec: Vec<Option<Constant>> = (0..self.n_samples)
-                .map(|_| Some(Constant::Number(rng.gen::<i32>())))
+                .map(|_| {
+                    Some(Constant::Number(Ratio::new(
+                        rng.gen::<i64>(),
+                        rng.gen::<i64>(),
+                    )))
+                })
                 .collect();
-            cvec.push(Some(Constant::Number(0)));
-            cvec.push(Some(Constant::Number(1)));
-            cvec.push(Some(Constant::Number(-1)));
+            cvec.push(Some(Constant::Number(Ratio::new(0, 1))));
+            cvec.push(Some(Constant::Number(Ratio::new(1, 1))));
+            cvec.push(Some(Constant::Number(Ratio::new(-1, 1))));
             // cvec.push(Some(Constant::Number(i32::MAX)));
             // cvec.push(Some(Constant::Number(i32::MIN)));
             // cvec.push(Some(Constant::Number(i32::MAX-1)));
@@ -1175,6 +1253,22 @@ impl SynthParam {
                         enodes_to_add.push(SimpleMath::Abs(i));
                         expr_added.push(format!("(abs {})", i))
                     }
+                    // if find_type(&eg, i) == ExprType::Number {
+                    //     enodes_to_add.push(SimpleMath::Floor(i));
+                    //     expr_added.push(format!("(floor {})", i))
+                    // }
+                    // if find_type(&eg, i) == ExprType::Number {
+                    //     enodes_to_add.push(SimpleMath::Ceil(i));
+                    //     expr_added.push(format!("(ceil {})", i))
+                    // }
+                    // if find_type(&eg, i) == ExprType::Number {
+                    //     enodes_to_add.push(SimpleMath::Reciprocal(i));
+                    //     expr_added.push(format!("(recip {})", i))
+                    // }
+                    // if find_type(&eg, i) == ExprType::Number {
+                    //     enodes_to_add.push(SimpleMath::Pow([i, j]));
+                    //     expr_added.push(format!("(pow {})", i))
+                    // }
                 }
             }
 
@@ -1250,6 +1344,7 @@ impl SynthParam {
                     update_pristine = Instant::now().duration_since(before);
 
                     eg.rebuild();
+                    eqsat_iter = eqsat_iter + 1;
                 }
 
                 my_ids = my_ids.into_iter().map(|id| eg.find(id)).collect();
@@ -1414,49 +1509,31 @@ impl SynthParam {
     // Altenative: add the rule to poison set. When you pick best, dont pick from poison rule
     fn validate_rule(&mut self, lhs: RecExpr<SimpleMath>, rhs: RecExpr<SimpleMath>) -> bool {
         // just setting some values manually
-        let values: Vec<Constant> = vec![
-            num!(-1),
-            num!(0),
-            num!(1),
-            num!(-625956435),
-            num!(1537958233),
-            num!(2147483646),
-            num!(i32::MAX),
-            num!(i32::MIN),
-        ];
+        let values: Vec<Constant> = vec![num!(-1, 1), num!(0, 1), num!(1, 1)];
         let mut env: Ctx = HashMap::new();
         let mut envs = vec![];
-        // TODO: assuming only three variables for now
-        // for valx in &values {
-        //     env.insert("x", *valx);
-        //     for valy in &values {
-        //         env.insert("y", *valy);
-        //         for valz in &values {
-        //             env.insert("z", *valz);
-        //             envs.push(env.clone());
-        //         }
-        //     }
-        // }
-        // let rng = &mut self.rng;
-        for i in -20..21 {
-            for j in -20..21 {
-                for k in -20..21 {
-                    env.insert("x", num!(i));
-                    env.insert("y", num!(j));
-                    env.insert("z", num!(k));
+
+        for valx in &values {
+            env.insert("x", *valx);
+            for valy in &values {
+                env.insert("y", *valy);
+                for valz in &values {
+                    env.insert("z", *valz);
                     envs.push(env.clone());
                 }
             }
         }
+
+        let rng = &mut self.rng;
         // add more random inputs for testing
-        // take the max values out of cvec and fuzz test [-10, 10]
-        // for i in 0..100000 {
-        //     let (x, y, z) = (rng.gen::<i32>(), rng.gen::<i32>(), rng.gen::<i32>());
-        //     env.insert("x", num!(x));
-        //     env.insert("y", num!(y));
-        //     env.insert("z", num!(z));
-        //     envs.push(env.clone());
-        // }
+        for _ in 0..100000 {
+            let (xn, yn, zn) = (rng.gen::<i64>(), rng.gen::<i64>(), rng.gen::<i64>());
+            let (xd, yd, zd) = (rng.gen::<i64>(), rng.gen::<i64>(), rng.gen::<i64>());
+            env.insert("x", num!(xn, xd));
+            env.insert("y", num!(yn, yd));
+            env.insert("z", num!(zn, zd));
+            envs.push(env.clone());
+        }
         let c_eg = envs.iter().find(|env| {
             let l = eval(&env, lhs.as_ref());
             let r = eval(&env, rhs.as_ref());
@@ -1624,11 +1701,7 @@ mod tests {
             n_iter: 1,
             n_samples: 25,
             variables: vec!["x".into(), "y".into(), "z".into()],
-            consts: vec![
-                Constant::Number(0),
-                Constant::Number(1),
-                Constant::Number(-1),
-            ],
+            consts: vec![num!(0, 1), num!(1, 1), num!(-1, 1)],
             cond_rule_iters: 1,
             cond_rule_rand_idx: 1,
             cond_diff_thresh: 3,
