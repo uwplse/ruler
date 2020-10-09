@@ -1,4 +1,5 @@
 use egg::*;
+use num::bigint::ToBigInt;
 use rand::SeedableRng;
 use ruler::Constant;
 use ruler::*;
@@ -39,9 +40,9 @@ fn main() {
         n_samples: 25,
         variables: vec!["x".into(), "y".into(), "z".into()],
         consts: vec![
-            num!(0, 1),
-            num!(1, 1),
-            num!(-1, 1),
+            num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+            num!(0.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+            num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
         ],
         cond_rule_iters: 1,
         cond_rule_rand_idx: 5,

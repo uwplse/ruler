@@ -3,8 +3,13 @@ use egg::RecExpr;
 use egg::*;
 use indexmap::IndexMap;
 use num::rational::Ratio;
+use num::{
+    bigint::{BigInt, RandBigInt, Sign, ToBigInt},
+    Signed, ToPrimitive,
+};
 use rand::{prelude::SliceRandom, Rng};
 use rand_pcg::Pcg64;
+use std::convert::TryInto;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
@@ -20,9 +25,9 @@ macro_rules! num {
     };
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub enum Constant {
-    Number(Ratio<i64>),
+    Number(Ratio<BigInt>),
     Boolean(bool),
 }
 
@@ -49,10 +54,11 @@ impl std::str::FromStr for Constant {
             "True" | "true" => Ok(Constant::Boolean(true)),
             "False" | "false" => Ok(Constant::Boolean(false)),
             _ => {
+                // TODO: I am not sure about this.
                 let nd: Vec<&str> = s.split(" ").collect();
                 if nd.len() == 2 {
-                    let numer = nd[0].parse::<i64>().unwrap();
-                    let denom = nd[1].parse::<i64>().unwrap();
+                    let numer = nd[0].parse::<BigInt>().unwrap();
+                    let denom = nd[1].parse::<BigInt>().unwrap();
                     Ok(Constant::Number(Ratio::new(numer, denom)))
                 } else {
                     Err(format!("'{}' is not a valid value for Constant", s))
@@ -83,12 +89,12 @@ define_language! {
         "~" = Neg(Id),
         "!" = Not(Id),
         Bool(bool),
-        Num(Ratio<i64>),
+        Num(Ratio<BigInt>),
         Var(egg::Symbol),
     }
 }
 
-pub fn get_num(c: Constant) -> Ratio<i64> {
+pub fn get_num(c: Constant) -> Ratio<BigInt> {
     match c {
         Constant::Number(num) => num,
         _ => panic!("Not a num"),
@@ -106,17 +112,20 @@ type Ctx = HashMap<&'static str, Constant>;
 
 pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
     match expr.last().expect("empty expr!") {
-        SimpleMath::Num(n) => Some(Constant::Number(*n)),
+        SimpleMath::Num(n) => Some(Constant::Number(n.clone())),
         SimpleMath::Bool(b) => Some(Constant::Boolean(*b)),
         SimpleMath::Var(v) => {
+            let x = ctx.get("x").cloned();
+            let y = ctx.get("y").cloned();
+            let z = ctx.get("z").cloned();
             if v.as_str() == "x" {
-                Some(*ctx.get("x").unwrap())
+                Some(x.unwrap())
             } else if v.as_str() == "y" {
-                Some(*ctx.get("y").unwrap())
+                Some(y.unwrap())
             } else if v.as_str() == "z" {
-                Some(*ctx.get("z").unwrap())
+                Some(z.unwrap())
             } else {
-                panic!("eval: currently only supports rules with 3 variables");
+                 panic!("eval: currently only supports rules with 3 variables");
             }
         }
         SimpleMath::Add([a, b]) => {
@@ -151,7 +160,7 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             let b = usize::from(*b);
             let e1 = eval(ctx, &expr[..=a]);
             let e2 = eval(ctx, &expr[..=b]);
-            if *get_num(e2.unwrap()).numer() != 0 as i64 {
+            if *get_num(e2.clone().unwrap()).numer() != 0.to_bigint().unwrap() {
                 Some(Constant::Number(
                     get_num(e1.unwrap()) / get_num(e2.unwrap()),
                 ))
@@ -164,8 +173,8 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             let e1 = eval(ctx, &expr[..=a]);
             let nd = get_num(e1.unwrap());
             Some(Constant::Number(Ratio::new(
-                (*nd.numer() as i64).abs(),
-                (*nd.denom() as i64).abs(),
+                (nd.numer().clone() as BigInt).abs(),
+                (nd.denom().clone() as BigInt).abs(),
             )))
         }
         SimpleMath::Pow([a, b]) => {
@@ -175,9 +184,16 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             let e2 = eval(ctx, &expr[..=b]);
             let power = get_num(e2.unwrap());
             assert!(power.is_integer());
-            Some(Constant::Number(
-                get_num(e1.unwrap()).pow(*power.numer() as i32),
-            ))
+            let numer = power.numer().clone();
+            if (numer <= BigInt::new(Sign::Plus, vec![i32::MAX.try_into().unwrap()]))
+                && (numer >= BigInt::new(Sign::Plus, vec![i32::MIN.try_into().unwrap()]))
+            {
+                Some(Constant::Number(
+                    get_num(e1.unwrap()).pow(numer.to_i32().unwrap()),
+                ))
+            } else {
+                None
+            }
         }
         SimpleMath::Floor(a) => {
             let a = usize::from(*a);
@@ -308,11 +324,11 @@ impl Analysis<SimpleMath> for SynthAnalysis {
 
     fn make(egraph: &EGraph<SimpleMath, Self>, enode: &SimpleMath) -> Self::Data {
         // a closure to get the cvec for an eclass
-        let x = |i: &Id| egraph[*i].data.iter().copied();
+        let x = |i: &Id| egraph[*i].data.iter();
         let params = &egraph.analysis;
         match enode {
             SimpleMath::Num(n) => (0..params.cvec_len)
-                .map(|_| Some(Constant::Number(*n)))
+                .map(|_| Some(Constant::Number(n.clone())))
                 .collect(),
             SimpleMath::Bool(b) => (0..params.cvec_len)
                 .map(|_| Some(Constant::Boolean(*b)))
@@ -334,7 +350,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                        Some(Constant::Boolean(b1 && b2))
+                        Some(Constant::Boolean(*b1 && *b2))
                     }
                     (_, _) => None,
                 })
@@ -343,7 +359,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Boolean(b1)), Some(Constant::Boolean(b2))) => {
-                        Some(Constant::Boolean(b1 || b2))
+                        Some(Constant::Boolean(*b1 || *b2))
                     }
                     (_, _) => None,
                 })
@@ -438,7 +454,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .zip(x(b))
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
-                        if *n2.numer() != 0 as i64 {
+                        if *n2.numer() != 0.to_bigint().unwrap() {
                             Some(Constant::Number(n1 / n2))
                         } else {
                             None
@@ -452,7 +468,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .map(|(x, y)| match (x, y) {
                     (Some(Constant::Number(n1)), Some(Constant::Number(n2))) => {
                         if n2.is_integer() {
-                            Some(Constant::Number(n1.pow(*n2.numer() as i32)))
+                            Some(Constant::Number(n1.pow(n2.numer().to_i32().unwrap())))
                         } else {
                             None
                         }
@@ -474,7 +490,12 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .collect(),
             SimpleMath::Reciprocal(a) => x(a)
                 .map(|x| match x {
-                    Some(Constant::Number(n1)) => Some(Constant::Number(n1.recip())),
+                    Some(Constant::Number(n1)) => 
+                        if *n1.numer() != 0.to_bigint().unwrap() {
+                            Some(Constant::Number(n1.recip()))
+                        } else {
+                            None
+                        }
                     _ => None,
                 })
                 .collect(),
@@ -486,7 +507,7 @@ impl Analysis<SimpleMath> for SynthAnalysis {
         if cv.is_empty() || cv.contains(&None) {
             return;
         }
-        let first = cv[0];
+        let first = cv[0].clone();
         if cv.iter().all(|x| *x == first) {
             match first {
                 Some(Constant::Number(n)) => {
@@ -559,19 +580,11 @@ impl SynthParam {
         for var in &self.variables {
             let id = egraph.add(SimpleMath::Var(*var));
             let mut cvec: Vec<Option<Constant>> = (0..self.n_samples)
-                .map(|_| {
-                    Some(Constant::Number(Ratio::new(
-                        rng.gen::<i64>(),
-                        rng.gen::<i64>(),
-                    )))
-                })
+                .map(|_| Some(num!(rng.gen_bigint(32), rng.gen_bigint(32))))
                 .collect();
-            cvec.push(Some(Constant::Number(Ratio::new(0, 1))));
-            cvec.push(Some(Constant::Number(Ratio::new(1, 1))));
-            cvec.push(Some(Constant::Number(Ratio::new(-1, 1))));
-            // cvec.push(Some(Constant::Number(i32::MAX)));
-            // cvec.push(Some(Constant::Number(i32::MIN)));
-            // cvec.push(Some(Constant::Number(i32::MAX-1)));
+            cvec.push(Some(num!(0.to_bigint().unwrap(), 1.to_bigint().unwrap())));
+            cvec.push(Some(num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap())));
+            cvec.push(Some(num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap())));
             cvec.shuffle(rng);
             egraph[id].data = cvec.clone();
             var_cvec_map.insert(var, cvec.clone());
@@ -580,7 +593,7 @@ impl SynthParam {
         // implicit sumbumption order here
         for n in &self.consts {
             if let Constant::Number(num) = n {
-                egraph.add(SimpleMath::Num(*num));
+                egraph.add(SimpleMath::Num(num.clone()));
             }
         }
         egraph
@@ -968,7 +981,7 @@ impl SynthParam {
         }
         for n in &self.consts {
             if let Constant::Number(num) = n {
-                eg.add(SimpleMath::Num(*num));
+                eg.add(SimpleMath::Num(num.clone()));
             }
         }
         let mut ids: BTreeSet<Id> = eg.classes().map(|c| c.id).collect();
@@ -1061,7 +1074,7 @@ impl SynthParam {
             for id in &ids {
                 let mut values_at_rand_idxs = vec![];
                 for idx in &rand_indices {
-                    let data = eg[*id].data[*idx];
+                    let data = eg[*id].data[*idx].clone();
                     if data != None {
                         values_at_rand_idxs.push((idx, data)); // get a few non-None cvec values at random points
                     }
@@ -1224,43 +1237,49 @@ impl SynthParam {
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
+                        println!("add");
                         enodes_to_add.push(SimpleMath::Add([i, j]));
                         expr_added.push(format!("(+ {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
+                        println!("sub");
                         enodes_to_add.push(SimpleMath::Sub([i, j]));
                         expr_added.push(format!("(- {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
+                        println!("mul");
                         enodes_to_add.push(SimpleMath::Mul([i, j]));
                         expr_added.push(format!("(* {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number {
+                        println!("neg");
                         enodes_to_add.push(SimpleMath::Neg(i));
                         expr_added.push(format!("(- {})", i))
                     }
                     if find_type(&eg, i) == ExprType::Number
                         && find_type(&eg, j) == ExprType::Number
                     {
+                        println!("div");
                         enodes_to_add.push(SimpleMath::Div([i, j]));
                         expr_added.push(format!("(/ {} {})", i, j))
                     }
                     if find_type(&eg, i) == ExprType::Number {
+                        println!("abs");
                         enodes_to_add.push(SimpleMath::Abs(i));
                         expr_added.push(format!("(abs {})", i))
                     }
-                    // if find_type(&eg, i) == ExprType::Number {
-                    //     enodes_to_add.push(SimpleMath::Floor(i));
-                    //     expr_added.push(format!("(floor {})", i))
-                    // }
-                    // if find_type(&eg, i) == ExprType::Number {
-                    //     enodes_to_add.push(SimpleMath::Ceil(i));
-                    //     expr_added.push(format!("(ceil {})", i))
-                    // }
+                    if find_type(&eg, i) == ExprType::Number {
+                        enodes_to_add.push(SimpleMath::Floor(i));
+                        expr_added.push(format!("(floor {})", i))
+                    }
+                    if find_type(&eg, i) == ExprType::Number {
+                        enodes_to_add.push(SimpleMath::Ceil(i));
+                        expr_added.push(format!("(ceil {})", i))
+                    }
                     // if find_type(&eg, i) == ExprType::Number {
                     //     enodes_to_add.push(SimpleMath::Reciprocal(i));
                     //     expr_added.push(format!("(recip {})", i))
@@ -1509,16 +1528,20 @@ impl SynthParam {
     // Altenative: add the rule to poison set. When you pick best, dont pick from poison rule
     fn validate_rule(&mut self, lhs: RecExpr<SimpleMath>, rhs: RecExpr<SimpleMath>) -> bool {
         // just setting some values manually
-        let values: Vec<Constant> = vec![num!(-1, 1), num!(0, 1), num!(1, 1)];
+        let values: Vec<Constant> = vec![
+            num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+            num!(0.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+            num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+        ];
         let mut env: Ctx = HashMap::new();
         let mut envs = vec![];
 
-        for valx in &values {
-            env.insert("x", *valx);
-            for valy in &values {
-                env.insert("y", *valy);
-                for valz in &values {
-                    env.insert("z", *valz);
+        for valx in values.clone() {
+            env.insert("x", valx);
+            for valy in values.clone() {
+                env.insert("y", valy);
+                for valz in values.clone() {
+                    env.insert("z", valz);
                     envs.push(env.clone());
                 }
             }
@@ -1527,16 +1550,18 @@ impl SynthParam {
         let rng = &mut self.rng;
         // add more random inputs for testing
         for _ in 0..100000 {
-            let (xn, yn, zn) = (rng.gen::<i64>(), rng.gen::<i64>(), rng.gen::<i64>());
-            let (xd, yd, zd) = (rng.gen::<i64>(), rng.gen::<i64>(), rng.gen::<i64>());
+            let (xn, yn, zn) = (rng.gen_bigint(32), rng.gen_bigint(32), rng.gen_bigint(32));
+            let (xd, yd, zd) = (rng.gen_bigint(32), rng.gen_bigint(32), rng.gen_bigint(32));
             env.insert("x", num!(xn, xd));
             env.insert("y", num!(yn, yd));
             env.insert("z", num!(zn, zd));
             envs.push(env.clone());
         }
         let c_eg = envs.iter().find(|env| {
-            let l = eval(&env, lhs.as_ref());
-            let r = eval(&env, rhs.as_ref());
+            let lenv = env.clone();
+            let renv = env.clone();
+            let l = eval(lenv, lhs.as_ref());
+            let r = eval(renv, rhs.as_ref());
             match (l, r) {
                 (None, _) | (_, None) => true,
                 (Some(l), Some(r)) => l != r,
@@ -1544,8 +1569,8 @@ impl SynthParam {
         });
 
         if let Some(c_eg) = c_eg {
-            println!("lhs: {:?}", eval(c_eg, lhs.as_ref()));
-            println!("rhs: {:?}", eval(c_eg, rhs.as_ref()));
+            // println!("lhs: {:?}", eval(c_eg, lhs.as_ref()));
+            // println!("rhs: {:?}", eval(c_eg, rhs.as_ref()));
             println!("false at input: {:?}", c_eg);
             false
         } else {
@@ -1697,11 +1722,14 @@ mod tests {
     #[test]
     fn super_simple() {
         let mut param = SynthParam {
-            rng: SeedableRng::seed_from_u64(5),
+            rng: SeedableRng::seed_from_u64(3),
             n_iter: 1,
-            n_samples: 25,
+            n_samples: 10,
             variables: vec!["x".into(), "y".into(), "z".into()],
-            consts: vec![num!(0, 1), num!(1, 1), num!(-1, 1)],
+            consts: vec![
+                num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+                num!(0.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+                num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap())],
             cond_rule_iters: 1,
             cond_rule_rand_idx: 1,
             cond_diff_thresh: 3,

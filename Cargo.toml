@@ -19,3 +19,4 @@ serde_json = "1"
 egg = "0.6"
 indexmap = "1"
 num = "0.3"
+num-bigint = { version = "0.3", features = ["rand"] }
