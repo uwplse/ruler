@@ -125,7 +125,7 @@ pub fn eval(ctx: &Ctx, expr: &[SimpleMath]) -> Option<Constant> {
             } else if v.as_str() == "z" {
                 Some(z.unwrap())
             } else {
-                 panic!("eval: currently only supports rules with 3 variables");
+                panic!("eval: currently only supports rules with 3 variables");
             }
         }
         SimpleMath::Add([a, b]) => {
@@ -490,12 +490,13 @@ impl Analysis<SimpleMath> for SynthAnalysis {
                 .collect(),
             SimpleMath::Reciprocal(a) => x(a)
                 .map(|x| match x {
-                    Some(Constant::Number(n1)) => 
+                    Some(Constant::Number(n1)) => {
                         if *n1.numer() != 0.to_bigint().unwrap() {
                             Some(Constant::Number(n1.recip()))
                         } else {
                             None
                         }
+                    }
                     _ => None,
                 })
                 .collect(),
@@ -1729,7 +1730,8 @@ mod tests {
             consts: vec![
                 num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
                 num!(0.to_bigint().unwrap(), 1.to_bigint().unwrap()),
-                num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap())],
+                num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+            ],
             cond_rule_iters: 1,
             cond_rule_rand_idx: 1,
             cond_diff_thresh: 3,
