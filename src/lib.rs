@@ -16,6 +16,36 @@ type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 pub type Constant = i32;
 pub type CVec = Vec<Option<Constant>>;
 
+struct AstSize;
+impl CostFunction<Math> for AstSize {
+    type Cost = usize;
+
+    fn cost<C>(&mut self, enode: &Math, mut cost: C) -> Self::Cost
+    where
+        C: FnMut(Id) -> Self::Cost,
+    {
+        let base = match enode {
+            Math::Sub(_) => 2,
+            _ => 1,
+        };
+        enode.fold(base, |acc, id| acc + cost(id))
+    }
+}
+
+impl CostFunction<ENodeOrVar<Math>> for AstSize {
+    type Cost = usize;
+
+    fn cost<C>(&mut self, enode: &ENodeOrVar<Math>, mut cost: C) -> Self::Cost
+    where
+        C: FnMut(Id) -> Self::Cost,
+    {
+        match enode {
+            ENodeOrVar::ENode(enode) => Self.cost(enode, cost),
+            ENodeOrVar::Var(_) => 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Signature {
     cvec: CVec,
@@ -102,7 +132,10 @@ impl Analysis<Math> for SynthAnalysis {
                 cvec: (0..param.cvec_len).map(|_| Some(n.clone())).collect(),
                 exact: true,
             },
-            Math::Var(_) => Signature { cvec: vec![], exact: false },
+            Math::Var(_) => Signature {
+                cvec: vec![],
+                exact: false,
+            },
         }
     }
 
@@ -111,8 +144,8 @@ impl Analysis<Math> for SynthAnalysis {
             assert_eq!(&to.cvec, &from.cvec);
             if !to.exact && from.exact {
                 to.exact = true;
-                return true
-            } 
+                return true;
+            }
         }
         false
     }
@@ -191,7 +224,7 @@ impl Synthesizer {
         self.egraph.classes().map(|c| c.id)
     }
 
-    fn add_layer(&mut self) {
+    fn make_layer(&self) -> Vec<Math> {
         let mut to_add = vec![];
         for i in self.ids() {
             for j in self.ids() {
@@ -201,9 +234,9 @@ impl Synthesizer {
             }
             to_add.push(Math::Neg(i));
         }
-        for node in to_add {
-            self.egraph.add(node);
-        }
+
+        log::info!("Made a layer of {} enodes", to_add.len());
+        to_add
     }
 
     fn run_rewrites(&mut self) -> EGraph {
@@ -212,7 +245,7 @@ impl Synthesizer {
         let runner = Runner::new(self.egraph.analysis.clone())
             .with_egraph(self.egraph.clone())
             .with_node_limit(usize::MAX)
-            .with_iter_limit(2)
+            .with_iter_limit(1)
             .with_scheduler(SimpleScheduler)
             // .with_iter_limit(20)
             // .with_scheduler(BackoffScheduler::default())
@@ -271,42 +304,56 @@ impl Synthesizer {
         new_eqs
     }
 
-    pub fn run_mrat(mut self, iters: usize) -> EqualityMap {
-        for _ in 0..iters {
-            self.add_layer();
-            self.run_rewrites();
-            let new_eqs = self.cvec_match();
-            self.equalities.extend(new_eqs);
-            // TODO minimize
-        }
-        self.equalities
-    }
+    // pub fn run_mrat(mut self, iters: usize) -> EqualityMap {
+    //     for _ in 0..iters {
+    //         self.add_layer();
+    //         self.run_rewrites();
+    //         log::info!("egraph n={}, e={}", self.egraph.total_size(), self.egraph.number_of_classes());
+    //         let new_eqs = self.cvec_match();
+    //         self.equalities.extend(new_eqs);
+    //         // TODO minimize
+    //     }
+    //     self.equalities
+    // }
 
     pub fn run_orat(mut self, iters: usize) -> EqualityMap {
         for _ in 0..iters {
-            self.add_layer();
-            loop {
-                self.run_rewrites();
-                let new_eqs = self.cvec_match();
-                if new_eqs.is_empty() {
-                    break;
+            let layer = self.make_layer();
+            for chunk in layer.chunks(10000) {
+                for node in chunk {
+                    self.egraph.add(node.clone());
                 }
-                let eq = choose_best_eq(&new_eqs);
-                log::info!("Chose best {}", eq);
-                assert!(!self.equalities.contains_key(&eq.name));
-                self.equalities.insert(eq.name.clone(), eq);
+                loop {
+                    self.run_rewrites();
+                    log::info!(
+                        "egraph n={}, e={}",
+                        self.egraph.total_size(),
+                        self.egraph.number_of_classes()
+                    );
+                    let new_eqs = self.cvec_match();
+                    if new_eqs.is_empty() {
+                        break;
+                    }
+                    let eq = choose_best_eq(&new_eqs);
+                    log::info!("Chose best {}", eq);
+                    assert!(!self.equalities.contains_key(&eq.name));
+                    self.equalities.insert(eq.name.clone(), eq);
+                }
             }
         }
         self.equalities
     }
 }
 
-fn score(eq: &Equality) -> (usize, isize) {
+fn score(eq: &Equality) -> (isize, isize) {
     let mut vars: HashSet<Var> = Default::default();
     vars.extend(eq.lhs.vars());
     vars.extend(eq.rhs.vars());
-    let size = usize::max(eq.lhs.ast.as_ref().len(), eq.rhs.ast.as_ref().len());
-    (vars.len(), -(size as isize))
+    let size = usize::max(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
+    (vars.len() as isize, -(size as isize))
+    // let x = (-(size as isize), vars.len() as isize);
+    // // println!("{} {:?}", eq, x);
+    // x
 }
 
 fn choose_best_eq(new_eqs: &EqualityMap) -> Equality {
