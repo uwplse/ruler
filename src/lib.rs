@@ -189,6 +189,7 @@ impl Synthesizer {
             .with_egraph(self.egraph.clone())
             .with_iter_limit(3)
             .with_node_limit(usize::MAX)
+            // .with_scheduler(SimpleScheduler)
             .with_scheduler(BackoffScheduler::default())
             .run(rewrites);
 
@@ -207,7 +208,8 @@ impl Synthesizer {
         runner.egraph
     }
 
-    fn cvec_match(&mut self, dirty_eg: &EGraph) -> EqualityMap {
+    fn cvec_match(&self, dirty_eg: &EGraph) -> EqualityMap {
+        let dirty_eg = &self.egraph;
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
         for id in self.ids() {
@@ -252,13 +254,14 @@ impl Synthesizer {
             self.add_layer();
             loop {
                 let dirty = self.run_rewrites();
-                let new_eqs = self.cvec_match(&dirty);
+                let mut new_eqs = self.cvec_match(&dirty);
+                new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
                 if new_eqs.is_empty() {
                     break;
                 }
                 let eq = choose_best_eq(&new_eqs);
-                assert!(!self.equalities.contains_key(&eq.name));
                 log::info!("Chose best {}", eq);
+                // assert!(!self.equalities.contains_key(&eq.name));
                 self.equalities.insert(eq.name.clone(), eq);
             }
         }
@@ -295,45 +298,49 @@ impl<L: Language, A> Display for Equality<L, A> {
 }
 
 impl Equality<Math, SynthAnalysis> {
-    fn new<'a>(mut e1: &'a RecExpr, mut e2: &'a RecExpr) -> Option<Self> {
-        // canonicalize
-        if e2 < e1 {
-            std::mem::swap(&mut e1, &mut e2);
-        }
-
-        let forward: (Pattern, Pattern, Option<Rewrite>) = {
+    fn new(e1: &RecExpr, e2: &RecExpr) -> Option<Self> {
+        let mut forward: (String, Pattern, Pattern, Option<Rewrite>) = {
             let map = &mut HashMap::default();
             let lhs = generalize(&e1, map);
             let rhs = generalize(&e2, map);
+            let name = format!("{} => {}", lhs, rhs);
             (
+                name.clone(),
                 lhs.clone(),
                 rhs.clone(),
-                Rewrite::new(format!("{} => {}", lhs, rhs), lhs.clone(), rhs.clone()).ok(),
+                Rewrite::new(name, lhs.clone(), rhs.clone()).ok(),
             )
         };
 
-        let back: (Pattern, Pattern, Option<Rewrite>) = {
+        let mut back: (String, Pattern, Pattern, Option<Rewrite>) = {
             let map = &mut HashMap::default();
             let lhs = generalize(&e2, map);
             let rhs = generalize(&e1, map);
+            let name = format!("{} => {}", lhs, rhs);
             (
+                name.clone(),
                 lhs.clone(),
                 rhs.clone(),
-                Rewrite::new(format!("{} => {}", lhs, rhs), lhs.clone(), rhs.clone()).ok(),
+                Rewrite::new(name, lhs.clone(), rhs.clone()).ok(),
             )
         };
 
+        // make sure we always do things in the same order
+        if back.0 > forward.0 {
+            std::mem::swap(&mut forward, &mut back);
+        }
+
         match (forward, back) {
-            ((_, _, None), (_, _, None)) => None,
-            ((lhs, rhs, Some(rw)), (_, _, None)) | ((_, _, None), (lhs, rhs, Some(rw))) => {
+            ((_, _, _, None), (_, _, _, None)) => None,
+            ((name, lhs, rhs, Some(rw)), (_, _, _, None)) | ((_, _, _, None), (name, lhs, rhs, Some(rw))) => {
                 Some(Self {
-                    name: format!("{} => {}", lhs, rhs).into(),
+                    name: name.into(),
                     lhs,
                     rhs,
                     rewrites: vec![rw],
                 })
             }
-            ((lhs, rhs, Some(rw1)), (_, _, Some(rw2))) => Some(Self {
+            ((_, lhs, rhs, Some(rw1)), (_, _, _, Some(rw2))) => Some(Self {
                 name: format!("{} <=> {}", lhs, rhs).into(),
                 lhs,
                 rhs,
@@ -386,7 +393,7 @@ mod tests {
             constants: vec![0, 1],
             variables: vec!["x".into(), "y".into(), "z".into()],
         });
-        let eqs = syn.run_orat(1);
+        let eqs = syn.run_orat(2);
 
         for eq in eqs.values() {
             println!("{}", eq);
