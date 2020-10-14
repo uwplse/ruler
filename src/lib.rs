@@ -1,8 +1,8 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 
 use egg::*;
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use rand::{prelude::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
@@ -103,8 +103,11 @@ impl Analysis<Math> for SynthAnalysis {
         if cv.iter().all(|x| *x == first) {
             match first {
                 Some(n) => {
-                    let added = egraph.add(Math::Num(n.clone()));
-                    egraph.union(id, added);
+                    let _added = egraph.add(Math::Num(n.clone()));
+                    // NOTE: if you union here, then you'll miss rules like a * 0 => 0
+                    // because they will be unified during eqsat and therefore never 
+                    // considered during cvec matching
+                    // egraph.union(id, added);
                 }
                 None => {}
             }
@@ -120,11 +123,13 @@ pub struct SynthParams {
     pub variables: Vec<egg::Symbol>,
 }
 
+type EqualityMap<L = Math, A = SynthAnalysis> = IndexMap<Rc<str>, Equality<L, A>>;
+
 pub struct Synthesizer {
     params: SynthParams,
     rng: Pcg64,
     egraph: EGraph,
-    equalities: Vec<Equality<Math, SynthAnalysis>>,
+    equalities: EqualityMap,
 }
 
 impl Synthesizer {
@@ -154,7 +159,7 @@ impl Synthesizer {
             rng,
             egraph,
             params,
-            equalities: vec![],
+            equalities: Default::default(),
         }
     }
 
@@ -179,7 +184,7 @@ impl Synthesizer {
 
     fn run_rewrites(&mut self) -> EGraph {
         // run the rewrites
-        let rewrites = self.equalities.iter().map(|eq| &eq.rewrite);
+        let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
         let runner = Runner::new(self.egraph.analysis.clone())
             .with_egraph(self.egraph.clone())
             .with_iter_limit(3)
@@ -202,7 +207,7 @@ impl Synthesizer {
         runner.egraph
     }
 
-    fn cvec_match(&mut self, dirty_eg: &EGraph) -> Vec<Equality> {
+    fn cvec_match(&mut self, dirty_eg: &EGraph) -> EqualityMap {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
         for id in self.ids() {
@@ -210,7 +215,7 @@ impl Synthesizer {
             by_cvec.entry(&class.data).or_default().push(class.id);
         }
 
-        let mut new_eqs = vec![];
+        let mut new_eqs = EqualityMap::default();
         let mut extract = Extractor::new(dirty_eg, AstSize);
         let mut to_merge: Vec<(Id, Id)> = vec![];
         for ids in by_cvec.values() {
@@ -220,22 +225,9 @@ impl Synthesizer {
                     to_merge.push((id1, id2));
                     let (_, e1) = extract.find_best(id1);
                     let (_, e2) = extract.find_best(id2);
-                    let map = &mut HashMap::default();
-                    let p1 = generalize(&e1, map);
-                    let p2 = generalize(&e2, map);
-
-                    if let Some(eq) = Equality::new(p1.clone(), p2.clone()) {
-                        if !self.equalities.contains(&eq) && !new_eqs.contains(&eq) {
-                            log::debug!("  Candidate {}", eq);
-                            new_eqs.push(eq);
-                        }
-                    }
-
-                    if let Some(eq) = Equality::new(p2, p1) {
-                        if !self.equalities.contains(&eq) && !new_eqs.contains(&eq) {
-                            log::debug!("  Candidate {}", eq);
-                            new_eqs.push(eq);
-                        }
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        log::debug!("  Candidate {}", eq);
+                        new_eqs.insert(eq.name.clone(), eq);
                     }
                 }
             }
@@ -244,34 +236,30 @@ impl Synthesizer {
         new_eqs
     }
 
-    pub fn run_mrat(mut self, iters: usize) -> Vec<Equality> {
+    pub fn run_mrat(mut self, iters: usize) -> EqualityMap {
         for _ in 0..iters {
             self.add_layer();
             let dirty = self.run_rewrites();
             let new_eqs = self.cvec_match(&dirty);
-            for eq in new_eqs {
-                if !self.equalities.contains(&eq) {
-                    self.equalities.push(eq);
-                }
-            }
+            self.equalities.extend(new_eqs);
             // TODO minimize
         }
         self.equalities
     }
 
-    pub fn run_orat(mut self, iters: usize) -> Vec<Equality> {
+    pub fn run_orat(mut self, iters: usize) -> EqualityMap {
         for _ in 0..iters {
             self.add_layer();
             loop {
                 let dirty = self.run_rewrites();
                 let new_eqs = self.cvec_match(&dirty);
                 if new_eqs.is_empty() {
-                    break
+                    break;
                 }
-                let eq = choose_best_eq(new_eqs);
-                assert!(!self.equalities.contains(&eq));
+                let eq = choose_best_eq(&new_eqs);
+                assert!(!self.equalities.contains_key(&eq.name));
                 log::info!("Chose best {}", eq);
-                self.equalities.push(eq);
+                self.equalities.insert(eq.name.clone(), eq);
             }
         }
         self.equalities
@@ -286,42 +274,76 @@ fn rank(eq: &Equality) -> (usize, isize) {
     (vars.len(), -(size as isize))
 }
 
-fn choose_best_eq(new_eqs: Vec<Equality>) -> Equality {
-    new_eqs.iter().max_by_key(|eq| rank(eq)).unwrap().clone()
+fn choose_best_eq(new_eqs: &EqualityMap) -> Equality {
+    new_eqs.values().max_by_key(|eq| rank(eq)).unwrap().clone()
 }
 
 // TODO should probably keep things together
 #[derive(Clone)]
 pub struct Equality<L = Math, A = SynthAnalysis> {
+    pub name: Rc<str>,
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
     // pub cond: Option<Pattern<L>>,
-    pub name: String,
-    pub rewrite: egg::Rewrite<L, A>,
-}
-
-impl PartialEq for Equality {
-    fn eq(&self, other: &Self) -> bool {
-        self.lhs == other.lhs && self.rhs == other.rhs
-    }
+    pub rewrites: Vec<Rewrite<L, A>>,
 }
 
 impl<L: Language, A> Display for Equality<L, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.rewrite.name())
+        write!(f, "{}", self.name)
     }
 }
 
 impl Equality<Math, SynthAnalysis> {
-    fn new(lhs: Pattern, rhs: Pattern) -> Option<Self> {
-        let name = format!("{} => {}", lhs, rhs);
-        let rw = egg::Rewrite::new(name.clone(), lhs.clone(), rhs.clone()).ok()?;
-        Some(Self {
-            lhs,
-            rhs,
-            name,
-            rewrite: rw,
-        })
+    fn new<'a>(mut e1: &'a RecExpr, mut e2: &'a RecExpr) -> Option<Self> {
+        // canonicalize
+        if e2 < e1 {
+            std::mem::swap(&mut e1, &mut e2);
+        }
+
+        let forward: (Pattern, Pattern, Option<Rewrite>) = {
+            let map = &mut HashMap::default();
+            let lhs = generalize(&e1, map);
+            let rhs = generalize(&e2, map);
+            (
+                lhs.clone(),
+                rhs.clone(),
+                Rewrite::new(format!("{} => {}", lhs, rhs), lhs.clone(), rhs.clone()).ok(),
+            )
+        };
+
+        let back: (Pattern, Pattern, Option<Rewrite>) = {
+            let map = &mut HashMap::default();
+            let lhs = generalize(&e2, map);
+            let rhs = generalize(&e1, map);
+            (
+                lhs.clone(),
+                rhs.clone(),
+                Rewrite::new(format!("{} => {}", lhs, rhs), lhs.clone(), rhs.clone()).ok(),
+            )
+        };
+
+        match (forward, back) {
+            ((_, _, None), (_, _, None)) => None,
+            ((lhs, rhs, Some(rw)), (_, _, None)) | ((_, _, None), (lhs, rhs, Some(rw))) => {
+                Some(Self {
+                    name: format!("{} => {}", lhs, rhs).into(),
+                    lhs,
+                    rhs,
+                    rewrites: vec![rw],
+                })
+            }
+            ((lhs, rhs, Some(rw1)), (_, _, Some(rw2))) => Some(Self {
+                name: format!("{} <=> {}", lhs, rhs).into(),
+                lhs,
+                rhs,
+                rewrites: if rw1.name == rw2.name {
+                    vec![rw1]
+                } else {
+                    vec![rw1, rw2]
+                },
+            }),
+        }
     }
 }
 
@@ -366,7 +388,7 @@ mod tests {
         });
         let eqs = syn.run_orat(1);
 
-        for eq in &eqs {
+        for eq in eqs.values() {
             println!("{}", eq);
         }
         println!("found {} rules", eqs.len());
