@@ -16,6 +16,12 @@ type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 pub type Constant = i32;
 pub type CVec = Vec<Option<Constant>>;
 
+#[derive(Debug, Clone)]
+pub struct Signature {
+    cvec: CVec,
+    exact: bool,
+}
+
 define_language! {
     pub enum Math {
         "+" = Add([Id; 2]),
@@ -50,19 +56,30 @@ fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<M
     Pattern::from(PatternAst::from(nodes))
 }
 
-fn fold1(a: &CVec, mut f: impl FnMut(Constant) -> Option<Constant>) -> CVec {
-    a.iter().map(|x| x.and_then(&mut f)).collect()
-}
-
-fn fold2(a: &CVec, b: &CVec, mut f: impl FnMut(Constant, Constant) -> Option<Constant>) -> CVec {
-    assert_eq!(a.len(), b.len());
-    a.iter()
-        .zip(b)
-        .map(|(x, y)| match (x, y) {
-            (Some(n1), Some(n2)) => f(*n1, *n2),
+impl Signature {
+    fn fold1(&self, mut f: impl FnMut(Constant) -> Option<Constant>) -> Self {
+        let cvec = self.cvec.iter().map(|x| x.and_then(&mut f)).collect();
+        Self {
+            cvec,
+            exact: self.exact,
+        }
+    }
+    fn fold2(
+        &self,
+        other: &Self,
+        mut f: impl FnMut(Constant, Constant) -> Option<Constant>,
+    ) -> Self {
+        assert_eq!(self.cvec.len(), other.cvec.len());
+        let compute = |(x, y): (&Option<Constant>, &Option<Constant>)| match (x, y) {
+            (Some(n1), Some(n2)) => f(n1.clone(), n2.clone()),
             (_, _) => None,
-        })
-        .collect()
+        };
+        let cvec = self.cvec.iter().zip(&other.cvec).map(compute).collect();
+        Self {
+            cvec,
+            exact: self.exact && other.exact,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -71,31 +88,39 @@ pub struct SynthAnalysis {
 }
 
 impl Analysis<Math> for SynthAnalysis {
-    type Data = CVec;
+    type Data = Signature;
 
     fn make(egraph: &EGraph, enode: &Math) -> Self::Data {
         let v = |i: &Id| &egraph[*i].data;
         let param = &egraph.analysis;
-        let cvec: CVec = match enode {
-            Math::Neg(a) => fold1(v(a), |a| Some(a.wrapping_neg())),
-            Math::Add([a, b]) => fold2(v(a), v(b), |a, b| Some(a.wrapping_add(b))),
-            Math::Sub([a, b]) => fold2(v(a), v(b), |a, b| Some(a.wrapping_sub(b))),
-            Math::Mul([a, b]) => fold2(v(a), v(b), |a, b| Some(a.wrapping_mul(b))),
-            Math::Num(n) => (0..param.cvec_len).map(|_| Some(n.clone())).collect(),
-            Math::Var(_) => vec![],
-        };
-        cvec
+        match enode {
+            Math::Neg(a) => v(a).fold1(|a| Some(a.wrapping_neg())),
+            Math::Add([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_add(b))),
+            Math::Sub([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_sub(b))),
+            Math::Mul([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_mul(b))),
+            Math::Num(n) => Signature {
+                cvec: (0..param.cvec_len).map(|_| Some(n.clone())).collect(),
+                exact: true,
+            },
+            Math::Var(_) => Signature { cvec: vec![], exact: false },
+        }
     }
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
-        if !to.is_empty() && !from.is_empty() {
-            assert_eq!(to, &from)
+        if !to.cvec.is_empty() && !from.cvec.is_empty() {
+            assert_eq!(&to.cvec, &from.cvec);
+            if !to.exact && from.exact {
+                to.exact = true;
+                return true
+            } 
         }
         false
     }
 
     fn modify(egraph: &mut EGraph, id: Id) {
-        let cv = &egraph[id].data;
+        let sig = &egraph[id].data;
+        let cv = &sig.cvec;
+        let exact = sig.exact;
         if cv.is_empty() || cv.contains(&None) {
             return;
         }
@@ -103,11 +128,10 @@ impl Analysis<Math> for SynthAnalysis {
         if cv.iter().all(|x| *x == first) {
             match first {
                 Some(n) => {
-                    let _added = egraph.add(Math::Num(n.clone()));
-                    // NOTE: if you union here, then you'll miss rules like a * 0 => 0
-                    // because they will be unified during eqsat and therefore never 
-                    // considered during cvec matching
-                    // egraph.union(id, added);
+                    let added = egraph.add(Math::Num(n.clone()));
+                    if exact {
+                        egraph.union(id, added);
+                    }
                 }
                 None => {}
             }
@@ -143,12 +167,12 @@ impl Synthesizer {
         // initialize the variables
         for &var in &params.variables {
             let id = egraph.add(Math::Var(var));
-            egraph[id].data = (0..params.n_samples)
+            egraph[id].data.cvec = (0..params.n_samples)
                 .map(|_| rng.gen::<Constant>())
                 .chain(params.constants.iter().cloned())
                 .map(Some)
                 .collect();
-            egraph[id].data.shuffle(&mut rng);
+            egraph[id].data.cvec.shuffle(&mut rng);
         }
 
         for n in &params.constants {
@@ -187,10 +211,11 @@ impl Synthesizer {
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
         let runner = Runner::new(self.egraph.analysis.clone())
             .with_egraph(self.egraph.clone())
-            .with_iter_limit(3)
             .with_node_limit(usize::MAX)
-            // .with_scheduler(SimpleScheduler)
-            .with_scheduler(BackoffScheduler::default())
+            .with_iter_limit(2)
+            .with_scheduler(SimpleScheduler)
+            // .with_iter_limit(20)
+            // .with_scheduler(BackoffScheduler::default())
             .run(rewrites);
 
         // update the clean egraph based on any unions that happened
@@ -208,17 +233,16 @@ impl Synthesizer {
         runner.egraph
     }
 
-    fn cvec_match(&self, dirty_eg: &EGraph) -> EqualityMap {
-        let dirty_eg = &self.egraph;
+    fn cvec_match(&self) -> EqualityMap {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
         for id in self.ids() {
             let class = &self.egraph[id];
-            by_cvec.entry(&class.data).or_default().push(class.id);
+            by_cvec.entry(&class.data.cvec).or_default().push(class.id);
         }
 
         let mut new_eqs = EqualityMap::default();
-        let mut extract = Extractor::new(dirty_eg, AstSize);
+        let mut extract = Extractor::new(&self.egraph, AstSize);
         let mut to_merge: Vec<(Id, Id)> = vec![];
         for ids in by_cvec.values() {
             let mut id_iter = ids.iter();
@@ -235,14 +259,23 @@ impl Synthesizer {
             }
         }
 
+        // let id_sets: Vec<_> = by_cvec.into_iter().map(|(_k, v)| v).collect();
+        // for ids in id_sets {
+        //     for &id in &ids {
+        //         self.egraph.union(ids[0], id);
+        //     }
+        // }
+
+        // TODO why is this needed
+        new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
         new_eqs
     }
 
     pub fn run_mrat(mut self, iters: usize) -> EqualityMap {
         for _ in 0..iters {
             self.add_layer();
-            let dirty = self.run_rewrites();
-            let new_eqs = self.cvec_match(&dirty);
+            self.run_rewrites();
+            let new_eqs = self.cvec_match();
             self.equalities.extend(new_eqs);
             // TODO minimize
         }
@@ -253,15 +286,14 @@ impl Synthesizer {
         for _ in 0..iters {
             self.add_layer();
             loop {
-                let dirty = self.run_rewrites();
-                let mut new_eqs = self.cvec_match(&dirty);
-                new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
+                self.run_rewrites();
+                let new_eqs = self.cvec_match();
                 if new_eqs.is_empty() {
                     break;
                 }
                 let eq = choose_best_eq(&new_eqs);
                 log::info!("Chose best {}", eq);
-                // assert!(!self.equalities.contains_key(&eq.name));
+                assert!(!self.equalities.contains_key(&eq.name));
                 self.equalities.insert(eq.name.clone(), eq);
             }
         }
@@ -269,16 +301,16 @@ impl Synthesizer {
     }
 }
 
-fn rank(eq: &Equality) -> (usize, isize) {
+fn score(eq: &Equality) -> (usize, isize) {
     let mut vars: HashSet<Var> = Default::default();
     vars.extend(eq.lhs.vars());
     vars.extend(eq.rhs.vars());
-    let size = eq.lhs.ast.as_ref().len() + eq.rhs.ast.as_ref().len();
+    let size = usize::max(eq.lhs.ast.as_ref().len(), eq.rhs.ast.as_ref().len());
     (vars.len(), -(size as isize))
 }
 
 fn choose_best_eq(new_eqs: &EqualityMap) -> Equality {
-    new_eqs.values().max_by_key(|eq| rank(eq)).unwrap().clone()
+    new_eqs.values().max_by_key(|eq| score(eq)).unwrap().clone()
 }
 
 // TODO should probably keep things together
@@ -332,14 +364,13 @@ impl Equality<Math, SynthAnalysis> {
 
         match (forward, back) {
             ((_, _, _, None), (_, _, _, None)) => None,
-            ((name, lhs, rhs, Some(rw)), (_, _, _, None)) | ((_, _, _, None), (name, lhs, rhs, Some(rw))) => {
-                Some(Self {
-                    name: name.into(),
-                    lhs,
-                    rhs,
-                    rewrites: vec![rw],
-                })
-            }
+            ((name, lhs, rhs, Some(rw)), (_, _, _, None))
+            | ((_, _, _, None), (name, lhs, rhs, Some(rw))) => Some(Self {
+                name: name.into(),
+                lhs,
+                rhs,
+                rewrites: vec![rw],
+            }),
             ((_, lhs, rhs, Some(rw1)), (_, _, _, Some(rw2))) => Some(Self {
                 name: format!("{} <=> {}", lhs, rhs).into(),
                 lhs,
@@ -390,8 +421,9 @@ mod tests {
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
             n_samples: 10,
-            constants: vec![0, 1],
+            constants: vec![0, 1, -1],
             variables: vec!["x".into(), "y".into(), "z".into()],
+            // variables: vec!["x".into(), "y".into(), "z".into(), "w".into()],
         });
         let eqs = syn.run_orat(2);
 
