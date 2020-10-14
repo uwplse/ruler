@@ -495,9 +495,7 @@ mod tests {
             .with_iter_limit(100)
             .with_scheduler(SimpleScheduler)
             .with_hook(|runner| {
-                if runner
-                    .egraph
-                    .find(runner.roots[0]) == runner.egraph.find(runner.roots[1]) {
+                if runner.egraph.find(runner.roots[0]) == runner.egraph.find(runner.roots[1]) {
                     Err(format!("Done"))
                 } else {
                     Ok(())
