@@ -86,6 +86,24 @@ fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<M
     Pattern::from(PatternAst::from(nodes))
 }
 
+fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
+    let nodes: Vec<_> = pattern
+        .ast
+        .as_ref()
+        .iter()
+        .map(|n| match n {
+            ENodeOrVar::ENode(n) => n.clone(),
+            ENodeOrVar::Var(v) => {
+                let s = v.to_string();
+                assert!(s.starts_with('?'));
+                Math::Var(s[1..].into())
+            }
+        })
+        .collect();
+
+    RecExpr::from(nodes)
+}
+
 impl Signature {
     fn fold1(&self, mut f: impl FnMut(Constant) -> Option<Constant>) -> Self {
         let cvec = self.cvec.iter().map(|x| x.and_then(&mut f)).collect();
@@ -242,7 +260,7 @@ impl Synthesizer {
     fn run_rewrites(&mut self) -> EGraph {
         // run the rewrites
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
-        let runner = Runner::new(self.egraph.analysis.clone())
+        let mut runner = Runner::new(self.egraph.analysis.clone())
             .with_egraph(self.egraph.clone())
             .with_node_limit(usize::MAX)
             .with_iter_limit(1)
@@ -263,7 +281,34 @@ impl Synthesizer {
             self.egraph.union(id, id2);
         }
 
+        runner.egraph.rebuild();
         runner.egraph
+    }
+
+    fn minimize(&self, eq: Equality) -> Option<Equality> {
+        // instantiate both lhs and rhs of eq
+        let l_expr = instantiate(&eq.lhs);
+        let r_expr = instantiate(&eq.rhs);
+
+        // run eqsat with all current ruleset
+        let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
+        let mut runner = Runner::default()
+            .with_expr(&l_expr)
+            .with_node_limit(usize::MAX)
+            .with_iter_limit(1)
+            // .with_scheduler(SimpleScheduler)
+            .run(rewrites);
+
+        // add rhs to the egraph
+        let rhs_id = runner.egraph.add_expr(&r_expr);
+
+        // lhs and rhs are in same eclass
+        if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
+            println!("threw away: {}", eq.name);
+            None
+        } else {
+            Some(eq)
+        }
     }
 
     fn cvec_match(&self) -> EqualityMap {
@@ -319,7 +364,7 @@ impl Synthesizer {
     pub fn run_orat(mut self, iters: usize) -> EqualityMap {
         for _ in 0..iters {
             let layer = self.make_layer();
-            for chunk in layer.chunks(10000) {
+            for chunk in layer.chunks(100) {
                 for node in chunk {
                     self.egraph.add(node.clone());
                 }
@@ -336,8 +381,12 @@ impl Synthesizer {
                     }
                     let eq = choose_best_eq(&new_eqs);
                     log::info!("Chose best {}", eq);
-                    assert!(!self.equalities.contains_key(&eq.name));
-                    self.equalities.insert(eq.name.clone(), eq);
+                    // assert!(!self.equalities.contains_key(&eq.name));
+                    // self.equalities.insert(eq.name.clone(), eq);
+                    if let Some(r) = self.minimize(eq) {
+                        assert!(!self.equalities.contains_key(&r.name));
+                        self.equalities.insert(r.name.clone(), r);
+                    }
                 }
             }
         }
@@ -436,31 +485,35 @@ impl Equality<Math, SynthAnalysis> {
 mod tests {
     use super::*;
 
-    // fn check_proves<L, A>(eqs: &[Equality<L, A>], a: &str, b: &str)
-    // where
-    //     L: Language,
-    //     A: Analysis<L> + Default,
-    // {
-    //     let rules = eqs.iter().map(|eq| &eq.rewrite);
-    //     let runner: Runner = Runner::default()
-    //         .with_expr(&a.parse().unwrap())
-    //         .with_expr(&b.parse().unwrap())
-    //         .with_hook(|runner| {
-    //             if runner.egraph.find(runner.roots[0]) == runner.egraph.find(runner.roots[1]) {
-    //                 Err(format!("Done early"))
-    //             } else {
-    //                 Ok(())
-    //             }
-    //         })
-    //         .run(rules);
+    fn check_proves(eqs: &EqualityMap, a: &str, b: &str) {
+        let rules = eqs.values().flat_map(|eq| &eq.rewrites);
 
-    //     let id_a = runner.egraph.find(runner.roots[0]);
-    //     let id_b = runner.egraph.find(runner.roots[1]);
+        let mut runner = Runner::default()
+            .with_expr(&a.parse().unwrap())
+            .with_expr(&b.parse().unwrap())
+            .with_node_limit(10000)
+            .with_iter_limit(100)
+            .with_scheduler(SimpleScheduler)
+            .with_hook(|runner| {
+                if runner
+                    .egraph
+                    .find(runner.roots[0]) == runner.egraph.find(runner.roots[1]) {
+                    Err(format!("Done"))
+                } else {
+                    Ok(())
+                }
+            })
+            .run(rules);
 
-    //     if id_a != id_b {
-    //         panic!("Failed to simplify {} => {}", a, b)
-    //     }
-    // }
+        runner.egraph.rebuild();
+        let id_a = runner.egraph.find(runner.roots[0]);
+        let id_b = runner.egraph.find(runner.roots[1]);
+
+        // println!("id_a: {}, id_b: {}", id_a, id_b);
+        if id_a != id_b {
+            panic!("Failed to simplify {} => {}", a, b)
+        }
+    }
 
     #[test]
     fn test1() {
@@ -470,13 +523,13 @@ mod tests {
             n_samples: 10,
             constants: vec![0, 1, -1],
             variables: vec!["x".into(), "y".into(), "z".into()],
-            // variables: vec!["x".into(), "y".into(), "z".into(), "w".into()],
         });
         let eqs = syn.run_orat(2);
 
-        for eq in eqs.values() {
-            println!("{}", eq);
-        }
-        println!("found {} rules", eqs.len());
+        // check_proves(&eqs, "(+ a b)", "(+ b a)");
+        // check_proves(&eqs, "(* a b)", "(* b a)");
+        check_proves(&eqs, "(+ 1 1)", "2");
+        // check_proves(&eqs, "a", "(* 1 a)");
+        // check_proves(&eqs, "a", "(+ a 0)");
     }
 }
