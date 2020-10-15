@@ -58,8 +58,8 @@ define_language! {
         "-" = Sub([Id; 2]),
         "~" = Neg(Id),
         "*" = Mul([Id; 2]),
-        Var(egg::Symbol),
         Num(Constant),
+        Var(egg::Symbol),
     }
 }
 
@@ -117,7 +117,10 @@ impl Signature {
         other: &Self,
         mut f: impl FnMut(Constant, Constant) -> Option<Constant>,
     ) -> Self {
-        assert_eq!(self.cvec.len(), other.cvec.len());
+        if !self.cvec.is_empty() && !other.cvec.is_empty() {
+            assert_eq!(self.cvec.len(), other.cvec.len());
+        }
+
         let compute = |(x, y): (&Option<Constant>, &Option<Constant>)| match (x, y) {
             (Some(n1), Some(n2)) => f(n1.clone(), n2.clone()),
             (_, _) => None,
@@ -130,9 +133,17 @@ impl Signature {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SynthAnalysis {
     cvec_len: usize,
+}
+
+impl Default for SynthAnalysis {
+    fn default() -> Self {
+        Self {
+            cvec_len: 10,
+        }
+    }
 }
 
 impl Analysis<Math> for SynthAnalysis {
@@ -141,7 +152,7 @@ impl Analysis<Math> for SynthAnalysis {
     fn make(egraph: &EGraph, enode: &Math) -> Self::Data {
         let v = |i: &Id| &egraph[*i].data;
         let param = &egraph.analysis;
-        match enode {
+        let sig = match enode {
             Math::Neg(a) => v(a).fold1(|a| Some(a.wrapping_neg())),
             Math::Add([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_add(b))),
             Math::Sub([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_sub(b))),
@@ -154,7 +165,8 @@ impl Analysis<Math> for SynthAnalysis {
                 cvec: vec![],
                 exact: false,
             },
-        }
+        };
+        sig
     }
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
@@ -488,12 +500,9 @@ mod tests {
     fn check_proves(eqs: &EqualityMap, a: &str, b: &str) {
         let rules = eqs.values().flat_map(|eq| &eq.rewrites);
 
-        let mut runner = Runner::default()
+        let runner = Runner::default()
             .with_expr(&a.parse().unwrap())
             .with_expr(&b.parse().unwrap())
-            .with_node_limit(10000)
-            .with_iter_limit(100)
-            .with_scheduler(SimpleScheduler)
             .with_hook(|runner| {
                 if runner.egraph.find(runner.roots[0]) == runner.egraph.find(runner.roots[1]) {
                     Err(format!("Done"))
@@ -503,31 +512,30 @@ mod tests {
             })
             .run(rules);
 
-        runner.egraph.rebuild();
         let id_a = runner.egraph.find(runner.roots[0]);
         let id_b = runner.egraph.find(runner.roots[1]);
 
-        // println!("id_a: {}, id_b: {}", id_a, id_b);
         if id_a != id_b {
             panic!("Failed to simplify {} => {}", a, b)
         }
     }
 
     #[test]
-    fn test1() {
+    fn orat1() {
         let _ = env_logger::try_init();
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
             n_samples: 10,
-            constants: vec![0, 1, -1],
-            variables: vec!["x".into(), "y".into(), "z".into()],
+            constants: vec![0, 1],
+            variables: vec!["x".into(), "y".into()],
         });
-        let eqs = syn.run_orat(2);
+        let eqs = syn.run_orat(1);
 
-        // check_proves(&eqs, "(+ a b)", "(+ b a)");
-        // check_proves(&eqs, "(* a b)", "(* b a)");
+        println!("CHECKING!");
+        check_proves(&eqs, "(+ a b)", "(+ b a)");
+        check_proves(&eqs, "(* a b)", "(* b a)");
         check_proves(&eqs, "(+ 1 1)", "2");
-        // check_proves(&eqs, "a", "(* 1 a)");
-        // check_proves(&eqs, "a", "(+ a 0)");
+        check_proves(&eqs, "a", "(* 1 a)");
+        check_proves(&eqs, "a", "(+ a 0)");
     }
 }
