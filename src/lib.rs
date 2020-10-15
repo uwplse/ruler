@@ -2,7 +2,7 @@ use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 
 use egg::*;
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use rand::{prelude::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ impl CostFunction<Math> for AstSize {
 impl CostFunction<ENodeOrVar<Math>> for AstSize {
     type Cost = usize;
 
-    fn cost<C>(&mut self, enode: &ENodeOrVar<Math>, mut cost: C) -> Self::Cost
+    fn cost<C>(&mut self, enode: &ENodeOrVar<Math>, cost: C) -> Self::Cost
     where
         C: FnMut(Id) -> Self::Cost,
     {
@@ -140,9 +140,7 @@ pub struct SynthAnalysis {
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self {
-            cvec_len: 10,
-        }
+        Self { cvec_len: 10 }
     }
 }
 
@@ -212,6 +210,7 @@ pub struct SynthParams {
 
 type EqualityMap<L = Math, A = SynthAnalysis> = IndexMap<Rc<str>, Equality<L, A>>;
 
+#[allow(dead_code)]
 pub struct Synthesizer {
     params: SynthParams,
     rng: Pcg64,
