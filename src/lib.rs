@@ -274,10 +274,10 @@ impl Synthesizer {
         let mut runner = Runner::new(self.egraph.analysis.clone())
             .with_egraph(self.egraph.clone())
             .with_node_limit(usize::MAX)
-            .with_iter_limit(1)
+            .with_iter_limit(2)
             .with_scheduler(SimpleScheduler)
             // .with_iter_limit(20)
-            // .with_scheduler(BackoffScheduler::default())
+            // .with_scheduler(BackoffScheduler::default().with_initial_match_limit(5_000))
             .run(rewrites);
 
         // update the clean egraph based on any unions that happened
@@ -360,22 +360,31 @@ impl Synthesizer {
         new_eqs
     }
 
-    // pub fn run_mrat(mut self, iters: usize) -> EqualityMap {
-    //     for _ in 0..iters {
-    //         self.add_layer();
-    //         self.run_rewrites();
-    //         log::info!("egraph n={}, e={}", self.egraph.total_size(), self.egraph.number_of_classes());
-    //         let new_eqs = self.cvec_match();
-    //         self.equalities.extend(new_eqs);
-    //         // TODO minimize
-    //     }
-    //     self.equalities
-    // }
+    pub fn run_mrat(mut self, iters: usize) -> EqualityMap {
+        for _ in 0..iters {
+            let layer = self.make_layer();
+            for node in layer {
+                self.egraph.add(node);
+            }
+
+            self.run_rewrites();
+            log::info!(
+                "egraph n={}, e={}",
+                self.egraph.total_size(),
+                self.egraph.number_of_classes()
+            );
+
+            let new_eqs = self.cvec_match();
+            let new_eqs = minimize(&self.equalities, new_eqs);
+            self.equalities.extend(new_eqs);
+        }
+        self.equalities
+    }
 
     pub fn run_orat(mut self, iters: usize) -> EqualityMap {
         for _ in 0..iters {
             let layer = self.make_layer();
-            for chunk in layer.chunks(100) {
+            for chunk in layer.chunks(10000) {
                 for node in chunk {
                     self.egraph.add(node.clone());
                 }
@@ -392,12 +401,8 @@ impl Synthesizer {
                     }
                     let eq = choose_best_eq(&new_eqs);
                     log::info!("Chose best {}", eq);
-                    // assert!(!self.equalities.contains_key(&eq.name));
-                    // self.equalities.insert(eq.name.clone(), eq);
-                    if let Some(r) = self.minimize(eq) {
-                        assert!(!self.equalities.contains_key(&r.name));
-                        self.equalities.insert(r.name.clone(), r);
-                    }
+                    assert!(!self.equalities.contains_key(&eq.name));
+                    self.equalities.insert(eq.name.clone(), eq);
                 }
             }
         }
@@ -405,12 +410,45 @@ impl Synthesizer {
     }
 }
 
+fn minimize(old_eqs: &EqualityMap, mut new_eqs: EqualityMap) -> EqualityMap {
+    // make the best first
+    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
+
+    let mut keepers = EqualityMap::default();
+    for eq in new_eqs.values() {
+        let l_expr = instantiate(&eq.lhs);
+        let r_expr = instantiate(&eq.rhs);
+
+        let rewrites = old_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .chain(keepers.values().flat_map(|eq| &eq.rewrites));
+        let mut runner = Runner::default()
+            .with_expr(&l_expr)
+            .with_iter_limit(2)
+            .with_scheduler(SimpleScheduler)
+            .run(rewrites);
+
+        let rhs_id = runner.egraph.add_expr(&r_expr);
+
+        if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
+            println!("threw away: {}", eq.name);
+        } else {
+            keepers.insert(eq.name.clone(), eq.clone());
+        }
+    }
+
+    keepers
+}
+
 fn score(eq: &Equality) -> (isize, isize) {
     let mut vars: HashSet<Var> = Default::default();
     vars.extend(eq.lhs.vars());
     vars.extend(eq.rhs.vars());
-    let size = usize::max(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
+    // let size = usize::add(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
+    let size = AstSize.cost_rec(&eq.lhs.ast) + AstSize.cost_rec(&eq.rhs.ast);
     (vars.len() as isize, -(size as isize))
+    // (-(size as isize), vars.len() as isize)
     // let x = (-(size as isize), vars.len() as isize);
     // // println!("{} {:?}", eq, x);
     // x
@@ -525,12 +563,40 @@ mod tests {
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
             n_samples: 10,
-            constants: vec![0, 1],
-            variables: vec!["x".into(), "y".into()],
+            constants: vec![-1, 0, 1],
+            variables: vec!["x".into(), "y".into(), "z".into()],
         });
+
         let eqs = syn.run_orat(1);
 
-        println!("CHECKING!");
+        println!("CHECKING! Found {} rules", eqs.len());
+        for eq in eqs.values() {
+            println!("  {}", eq);
+        }
+
+        check_proves(&eqs, "(+ a b)", "(+ b a)");
+        check_proves(&eqs, "(* a b)", "(* b a)");
+        check_proves(&eqs, "(+ 1 1)", "2");
+        check_proves(&eqs, "a", "(* 1 a)");
+        check_proves(&eqs, "a", "(+ a 0)");
+    }
+
+    #[test]
+    fn mrat1() {
+        let _ = env_logger::try_init();
+        let syn = Synthesizer::new(SynthParams {
+            seed: 5,
+            n_samples: 10,
+            constants: vec![-1, 0, 1],
+            variables: vec!["x".into(), "y".into(), "z".into()],
+        });
+        let eqs = syn.run_mrat(1);
+
+        println!("CHECKING! Found {} rules", eqs.len());
+        for eq in eqs.values() {
+            println!("  {}", eq);
+        }
+
         check_proves(&eqs, "(+ a b)", "(+ b a)");
         check_proves(&eqs, "(* a b)", "(* b a)");
         check_proves(&eqs, "(+ 1 1)", "2");
