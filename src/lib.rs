@@ -171,7 +171,7 @@ fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
 // Idea: given ulps range U
 //   - sample a float, call it x
 //   - sample an u64 ulp offset in [-U, U] call it u
-//   - return (x as u64 + u) ass f64
+//   - return (x as u64 + u) as f64
 fn sample_float(mut rng: Pcg64, x: f64, ulps_range: u64) -> f64 {
     let u = rng.gen_range(0, ulps_range);
     f64::from_bits(x.to_bits() + u)
@@ -259,7 +259,7 @@ fn is_valid(rng: Pcg64, lhs: Pattern, rhs: Pattern) -> bool {
                     continue;
                 } else {
                     println!(
-                        "vadildation of {} => {} failed at: {} {} {}",
+                        "validation of {} => {} failed at: {} {} {}",
                         lhs, rhs, a, b, c
                     );
                     valid = false;
