@@ -377,10 +377,10 @@ impl Analysis<Math> for SynthAnalysis {
                     to_cvec_changed = true;
                 }
                 (Some(a), Some(b)) => {
-                    if a!= b {
-                            println!("cvecs do not match");
-                            print!("{: >+20e} \t {: >+20e}", a.into_inner(), b.into_inner());
-                            panic!("cvecs do not match");
+                    if a != b {
+                        println!("cvecs do not match");
+                        print!("{: >+20e} \t {: >+20e}", a.into_inner(), b.into_inner());
+                        panic!("cvecs do not match");
                     } else {
                         continue;
                     }
