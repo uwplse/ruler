@@ -1,8 +1,9 @@
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 
+use byteorder::{ByteOrder, LittleEndian};
 use egg::*;
-
 use indexmap::IndexMap;
+use ordered_float::OrderedFloat;
 use rand::{prelude::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
@@ -13,8 +14,9 @@ type RecExpr<L = Math> = egg::RecExpr<L>;
 type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
 type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 
-pub type Constant = i32;
+pub type Constant = OrderedFloat<f64>;
 pub type CVec = Vec<Option<Constant>>;
+pub type Ctx = HashMap<&'static str, Constant>;
 
 struct AstSize;
 impl CostFunction<Math> for AstSize {
@@ -63,6 +65,52 @@ define_language! {
     }
 }
 
+pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
+    match expr.last().expect("empty expr!") {
+        Math::Num(n) => Some(n.clone()),
+        Math::Var(v) => {
+            let a = ctx.get("a").cloned();
+            let b = ctx.get("b").cloned();
+            let c = ctx.get("c").cloned();
+            if v.as_str() == "a" {
+                Some(a.unwrap())
+            } else if v.as_str() == "b" {
+                Some(b.unwrap())
+            } else if v.as_str() == "c" {
+                Some(c.unwrap())
+            } else {
+                panic!("eval: currently only supports rules with 3 variables");
+            }
+        }
+        Math::Add([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(e1.unwrap() + e2.unwrap())
+        }
+        Math::Sub([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(e1.unwrap() - e2.unwrap())
+        }
+        Math::Mul([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(e1.unwrap() * e2.unwrap())
+        }
+        Math::Neg(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(-e1.unwrap())
+        }
+    }
+}
+
 fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<Math> {
     let alpha = b"abcdefghijklmnopqrstuvwxyz";
     let nodes: Vec<_> = expr
@@ -86,6 +134,20 @@ fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<M
     Pattern::from(PatternAst::from(nodes))
 }
 
+// TODO: maybe this should take just an OrderedFloat and not the entire cvec
+fn first_n_bits(vs: &Vec<Option<OrderedFloat<f64>>>) -> Vec<Option<OrderedFloat<f64>>> {
+    let mut ret = vec![];
+    for n in vs {
+        if *n != None {
+            let u = n.unwrap().into_inner().to_bits();
+            ret.push(Some(OrderedFloat::from(<f64>::from_bits(u & ((!0) << 10)))))
+        } else {
+            ret.push(None);
+        }
+    }
+    ret
+}
+
 fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
     let nodes: Vec<_> = pattern
         .ast
@@ -102,6 +164,111 @@ fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
         .collect();
 
     RecExpr::from(nodes)
+}
+
+// sample one float uniformly (from u64, cast to float), then sample near and far from it
+// maybe sample around the center
+// Idea: given ulps range U
+//   - sample a float, call it x
+//   - sample an u64 ulp offset in [-U, U] call it u
+//   - return (x as u64 + u) ass f64
+fn sample_float(mut rng: Pcg64, x: f64, ulps_range: u64) -> f64 {
+    let u = rng.gen_range(0, ulps_range);
+    f64::from_bits(x.to_bits() + u)
+}
+
+fn rand_float_repr(mut rng: Pcg64) -> f64 {
+    //f64::from_bits(Pcg64::())
+    let mut rng = rand::thread_rng();
+    let mut x = f64::NAN;
+    while x.is_nan() {
+        x = f64::from_bits(rng.gen::<u64>())
+    }
+    x
+}
+
+fn is_valid(rng: Pcg64, lhs: Pattern, rhs: Pattern) -> bool {
+    let lhs = instantiate(&lhs);
+    let rhs = instantiate(&rhs);
+    let mut env: Ctx = HashMap::new();
+    let mut valid = false;
+    let ulp_rad_sm: u64 = 1000;
+    let ulp_rad_lg: u64 = 50000000000000;
+    for i in 0..1000000 {
+        let mut a = rand_float_repr(rng.clone());
+        let b;
+        let c;
+        match i % 10 {
+            0 => {
+                b = sample_float(rng.clone(), a, ulp_rad_sm);
+                c = sample_float(rng.clone(), a, ulp_rad_sm);
+            }
+            1 => {
+                b = sample_float(rng.clone(), a, ulp_rad_lg);
+                c = sample_float(rng.clone(), a, ulp_rad_sm);
+            }
+            2 => {
+                b = sample_float(rng.clone(), a, ulp_rad_sm);
+                c = sample_float(rng.clone(), a, ulp_rad_lg);
+            }
+            3 => {
+                b = sample_float(rng.clone(), a, ulp_rad_lg);
+                c = sample_float(rng.clone(), a, ulp_rad_lg);
+            }
+            4 => {
+                match i % 3 {
+                    0 => {
+                        a = -1.0;
+                    }
+                    1 => {
+                        a = 0.0;
+                    }
+                    _ => {
+                        a = 1.0;
+                    }
+                }
+                b = sample_float(rng.clone(), a, ulp_rad_lg);
+                c = sample_float(rng.clone(), a, ulp_rad_lg);
+            }
+            _ => {
+                b = rand_float_repr(rng.clone());
+                c = rand_float_repr(rng.clone());
+            }
+        }
+        if a.is_nan() || b.is_nan() || c.is_nan() {
+            continue;
+        }
+        env.insert("a", OrderedFloat::from(a));
+        env.insert("b", OrderedFloat::from(b));
+        env.insert("c", OrderedFloat::from(c));
+
+        let l = eval(&env.clone(), lhs.as_ref());
+        let r = eval(&env, rhs.as_ref());
+        match (l, r) {
+            (None, _) | (_, None) => {
+                valid = false;
+                println!(
+                    "validation of {} => {} failed at: {} {} {}",
+                    lhs, rhs, a, b, c
+                );
+                break;
+            }
+            (Some(l), Some(r)) => {
+                if l == r {
+                    valid = true;
+                    continue;
+                } else {
+                    println!(
+                        "vadildation of {} => {} failed at: {} {} {}",
+                        lhs, rhs, a, b, c
+                    );
+                    valid = false;
+                    break;
+                }
+            }
+        }
+    }
+    valid
 }
 
 impl Signature {
@@ -136,11 +303,19 @@ impl Signature {
 #[derive(Debug, Clone)]
 pub struct SynthAnalysis {
     cvec_len: usize,
+    pub cvx: CVec,
+    pub cvy: CVec,
+    pub cvz: CVec,
 }
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { cvec_len: 10 }
+        Self {
+            cvec_len: 10,
+            cvx: vec![],
+            cvy: vec![],
+            cvz: vec![],
+        }
     }
 }
 
@@ -151,10 +326,34 @@ impl Analysis<Math> for SynthAnalysis {
         let v = |i: &Id| &egraph[*i].data;
         let param = &egraph.analysis;
         let sig = match enode {
-            Math::Neg(a) => v(a).fold1(|a| Some(a.wrapping_neg())),
-            Math::Add([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_add(b))),
-            Math::Sub([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_sub(b))),
-            Math::Mul([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_mul(b))),
+            Math::Neg(a) => v(a).fold1(|a| {
+                if a != OrderedFloat::from(f64::NAN) {
+                    Some(-a)
+                } else {
+                    None
+                }
+            }),
+            Math::Add([a, b]) => v(a).fold2(v(b), |a, b| {
+                if (a + b) != OrderedFloat::from(f64::NAN) {
+                    Some(a + b)
+                } else {
+                    None
+                }
+            }),
+            Math::Sub([a, b]) => v(a).fold2(v(b), |a, b| {
+                if (a - b) != OrderedFloat::from(f64::NAN) {
+                    Some(a - b)
+                } else {
+                    None
+                }
+            }),
+            Math::Mul([a, b]) => v(a).fold2(v(b), |a, b| {
+                if (a * b) != OrderedFloat::from(f64::NAN) {
+                    Some(a * b)
+                } else {
+                    None
+                }
+            }),
             Math::Num(n) => Signature {
                 cvec: (0..param.cvec_len).map(|_| Some(n.clone())).collect(),
                 exact: true,
@@ -168,14 +367,64 @@ impl Analysis<Math> for SynthAnalysis {
     }
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
-        if !to.cvec.is_empty() && !from.cvec.is_empty() {
-            assert_eq!(&to.cvec, &from.cvec);
-            if !to.exact && from.exact {
-                to.exact = true;
-                return true;
+        let mut to_cvec_changed = false;
+        let mut to_exact_changed = false;
+        let pairs = to.cvec.iter().zip(from.cvec.iter());
+        for (mut t, f) in pairs {
+            match (t, f) {
+                (None, Some(_)) => {
+                    t = f;
+                    to_cvec_changed = true;
+                }
+                (Some(a), Some(b)) => {
+                    if a!= b {
+                            println!("cvecs do not match");
+                            print!("{: >+20e} \t {: >+20e}", a.into_inner(), b.into_inner());
+                            panic!("cvecs do not match");
+                    } else {
+                        continue;
+                    }
+                }
+                (_, None) => continue,
             }
         }
-        false
+        // if !to.cvec.is_empty() && !from.cvec.is_empty() {
+        //     if to.cvec != from.cvec {
+        //         println!("cvecs do not match");
+        //         for i in 0..to.cvec.len() {
+        //             match to.cvec[i] {
+        //                 Some(of) => {
+        //                     print!("{: >+20e}", of.into_inner());
+        //                 }
+        //                 None => {
+        //                     print!("None");
+        //                 }
+        //             }
+        //             print!("\t");
+        //             match from.cvec[i] {
+        //                 Some(of) => {
+        //                     print!("{: >+20e}", of.into_inner());
+        //                 }
+        //                 None => {
+        //                     print!("None");
+        //                 }
+        //             }
+        //         }
+        //         panic!("cvecs don't match");
+        //     }
+        // }
+        if !to.exact && from.exact {
+            to.exact = true;
+            to_exact_changed = true;
+        }
+
+        to_cvec_changed || to_exact_changed
+    }
+
+    fn pre_union(eg: &EGraph<Math, Self>, id1: Id, id2: Id) {
+        let mut extract = Extractor::new(eg, AstSize);
+        println!("id1: {}", extract.find_best(id1).1);
+        println!("id2: {} \n", extract.find_best(id2).1);
     }
 
     fn modify(egraph: &mut EGraph, id: Id) {
@@ -219,22 +468,37 @@ pub struct Synthesizer {
 }
 
 impl Synthesizer {
-    pub fn new(params: SynthParams) -> Self {
+    pub fn new(mut params: SynthParams) -> Self {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: params.n_samples + params.constants.len(),
+            cvx: vec![],
+            cvy: vec![],
+            cvz: vec![],
         });
 
         let mut rng = Pcg64::seed_from_u64(params.seed);
+
+        // .map(|_| OrderedFloat::from(rng.gen::<f64>()))
 
         // initialize the variables
         for &var in &params.variables {
             let id = egraph.add(Math::Var(var));
             egraph[id].data.cvec = (0..params.n_samples)
-                .map(|_| rng.gen::<Constant>())
+                .map(|_| OrderedFloat::from(rand_float_repr(rng.clone())))
                 .chain(params.constants.iter().cloned())
                 .map(Some)
                 .collect();
             egraph[id].data.cvec.shuffle(&mut rng);
+
+            if var.to_string() == "x" {
+                egraph.analysis.cvx = egraph[id].data.cvec.clone();
+            }
+            if var.to_string() == "y" {
+                egraph.analysis.cvy = egraph[id].data.cvec.clone();
+            }
+            if var.to_string() == "z" {
+                egraph.analysis.cvz = egraph[id].data.cvec.clone();
+            }
         }
 
         for n in &params.constants {
@@ -259,7 +523,7 @@ impl Synthesizer {
             for j in self.ids() {
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Mul([i, j]));
-                to_add.push(Math::Sub([i, j]));
+                // to_add.push(Math::Sub([i, j]));
             }
             to_add.push(Math::Neg(i));
         }
@@ -325,8 +589,11 @@ impl Synthesizer {
     fn cvec_match(&self) -> EqualityMap {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
+
         for id in self.ids() {
             let class = &self.egraph[id];
+            // let key = first_n_bits(&class.clone().data.cvec);
+            // by_cvec.entry(key).or_default().push(class.id);
             by_cvec.entry(&class.data.cvec).or_default().push(class.id);
         }
 
@@ -399,7 +666,14 @@ impl Synthesizer {
                     if new_eqs.is_empty() {
                         break;
                     }
-                    let eq = choose_best_eq(&new_eqs);
+                    let valid_eqs: EqualityMap = new_eqs
+                        .into_iter()
+                        .filter(|eq| is_valid(self.rng.clone(), eq.1.lhs.clone(), eq.1.rhs.clone()))
+                        .collect();
+                    if valid_eqs.is_empty() {
+                        break;
+                    }
+                    let eq = choose_best_eq(&valid_eqs);
                     log::info!("Chose best {}", eq);
                     assert!(!self.equalities.contains_key(&eq.name));
                     self.equalities.insert(eq.name.clone(), eq);
@@ -562,12 +836,16 @@ mod tests {
         let _ = env_logger::try_init();
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
-            n_samples: 10,
-            constants: vec![-1, 0, 1],
+            n_samples: 100,
+            constants: vec![
+                OrderedFloat::from(-1.0),
+                OrderedFloat::from(0.0),
+                OrderedFloat::from(1.0),
+            ],
             variables: vec!["x".into(), "y".into(), "z".into()],
         });
 
-        let eqs = syn.run_orat(1);
+        let eqs = syn.run_orat(2);
 
         println!("CHECKING! Found {} rules", eqs.len());
         for eq in eqs.values() {
@@ -587,7 +865,11 @@ mod tests {
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
             n_samples: 10,
-            constants: vec![-1, 0, 1],
+            constants: vec![
+                OrderedFloat::from(-1.0),
+                OrderedFloat::from(0.0),
+                OrderedFloat::from(1.0),
+            ],
             variables: vec!["x".into(), "y".into(), "z".into()],
         });
         let eqs = syn.run_mrat(1);
