@@ -5,7 +5,7 @@ fn main() {
     let _ = env_logger::builder().try_init();
     let syn = Synthesizer::new(SynthParams {
         seed: 5,
-        n_samples: 100,
+        n_samples: 10000,
         constants: vec![
             OrderedFloat::from(-1.0),
             OrderedFloat::from(0.0),

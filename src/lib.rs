@@ -1,5 +1,6 @@
-use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
+use std::{collections::HashSet, fmt::Display, hash::Hash, path::Path, rc::Rc, io::Write};
 
+use std::fs::OpenOptions;
 use byteorder::{ByteOrder, LittleEndian};
 use egg::*;
 use indexmap::IndexMap;
@@ -7,7 +8,6 @@ use ordered_float::OrderedFloat;
 use rand::{prelude::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
-
 type Runner = egg::Runner<Math, SynthAnalysis, ()>;
 type Pattern<L = Math> = egg::Pattern<L>;
 type RecExpr<L = Math> = egg::RecExpr<L>;
@@ -27,7 +27,7 @@ impl CostFunction<Math> for AstSize {
         C: FnMut(Id) -> Self::Cost,
     {
         let base = match enode {
-            Math::Sub(_) => 2,
+            Math::Sub(_) => 1,
             _ => 1,
         };
         enode.fold(base, |acc, id| acc + cost(id))
@@ -134,20 +134,6 @@ fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<M
     Pattern::from(PatternAst::from(nodes))
 }
 
-// TODO: maybe this should take just an OrderedFloat and not the entire cvec
-fn first_n_bits(vs: &Vec<Option<OrderedFloat<f64>>>) -> Vec<Option<OrderedFloat<f64>>> {
-    let mut ret = vec![];
-    for n in vs {
-        if *n != None {
-            let u = n.unwrap().into_inner().to_bits();
-            ret.push(Some(OrderedFloat::from(<f64>::from_bits(u & ((!0) << 10)))))
-        } else {
-            ret.push(None);
-        }
-    }
-    ret
-}
-
 fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
     let nodes: Vec<_> = pattern
         .ast
@@ -166,18 +152,27 @@ fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
     RecExpr::from(nodes)
 }
 
-// sample one float uniformly (from u64, cast to float), then sample near and far from it
-// maybe sample around the center
-// Idea: given ulps range U
-//   - sample a float, call it x
-//   - sample an u64 ulp offset in [-U, U] call it u
-//   - return (x as u64 + u) as f64
-fn sample_float(mut rng: Pcg64, x: f64, ulps_range: u64) -> f64 {
+// TODO: maybe this should take just an OrderedFloat and not the entire cvec
+fn first_n_bits(vs: &Vec<Option<OrderedFloat<f64>>>) -> Vec<Option<OrderedFloat<f64>>> {
+    let mut ret = vec![];
+    for n in vs {
+        if *n != None {
+            let u = n.unwrap().into_inner().to_bits();
+            ret.push(Some(OrderedFloat::from(<f64>::from_bits(u & ((!0) << 10)))))
+        } else {
+            ret.push(None);
+        }
+    }
+    ret
+}
+
+fn sample_float_range(x: f64, ulps_range: u64) -> f64 {
+    let mut rng = rand::thread_rng();
     let u = rng.gen_range(0, ulps_range);
     f64::from_bits(x.to_bits() + u)
 }
 
-fn rand_float_repr(mut rng: Pcg64) -> f64 {
+fn rand_float_repr() -> f64 {
     //f64::from_bits(Pcg64::())
     let mut rng = rand::thread_rng();
     let mut x = f64::NAN;
@@ -187,33 +182,35 @@ fn rand_float_repr(mut rng: Pcg64) -> f64 {
     x
 }
 
-fn is_valid(rng: Pcg64, lhs: Pattern, rhs: Pattern) -> bool {
-    let lhs = instantiate(&lhs);
-    let rhs = instantiate(&rhs);
-    let mut env: Ctx = HashMap::new();
-    let mut valid = false;
+// TODO: only works for 3 variables for now
+fn gen_rand_xyz(n_samples: usize) -> Vec<(f64, f64, f64)> {
     let ulp_rad_sm: u64 = 1000;
     let ulp_rad_lg: u64 = 50000000000000;
-    for i in 0..1000000 {
-        let mut a = rand_float_repr(rng.clone());
+    let mut samples = vec![];
+    for i in 0..n_samples {
+        let mut a = rand_float_repr();
         let b;
         let c;
         match i % 10 {
             0 => {
-                b = sample_float(rng.clone(), a, ulp_rad_sm);
-                c = sample_float(rng.clone(), a, ulp_rad_sm);
+                b = sample_float_range(a, ulp_rad_sm);
+                c = sample_float_range(a, ulp_rad_sm);
+                samples.push((a, b, c));
             }
             1 => {
-                b = sample_float(rng.clone(), a, ulp_rad_lg);
-                c = sample_float(rng.clone(), a, ulp_rad_sm);
+                b = sample_float_range(a, ulp_rad_lg);
+                c = sample_float_range(a, ulp_rad_sm);
+                samples.push((a, b, c));
             }
             2 => {
-                b = sample_float(rng.clone(), a, ulp_rad_sm);
-                c = sample_float(rng.clone(), a, ulp_rad_lg);
+                b = sample_float_range(a, ulp_rad_sm);
+                c = sample_float_range(a, ulp_rad_lg);
+                samples.push((a, b, c));
             }
             3 => {
-                b = sample_float(rng.clone(), a, ulp_rad_lg);
-                c = sample_float(rng.clone(), a, ulp_rad_lg);
+                b = sample_float_range(a, ulp_rad_lg);
+                c = sample_float_range(a, ulp_rad_lg);
+                samples.push((a, b, c));
             }
             4 => {
                 match i % 3 {
@@ -227,12 +224,86 @@ fn is_valid(rng: Pcg64, lhs: Pattern, rhs: Pattern) -> bool {
                         a = 1.0;
                     }
                 }
-                b = sample_float(rng.clone(), a, ulp_rad_lg);
-                c = sample_float(rng.clone(), a, ulp_rad_lg);
+                b = sample_float_range(a, ulp_rad_lg);
+                c = sample_float_range(a, ulp_rad_lg);
+                samples.push((a, b, c));
             }
             _ => {
-                b = rand_float_repr(rng.clone());
-                c = rand_float_repr(rng.clone());
+                b = rand_float_repr();
+                c = rand_float_repr();
+                samples.push((a, b, c));
+            }
+            // _ => {
+            //     panic!("bad");
+            // }
+        }
+        if a.is_nan() || b.is_nan() || c.is_nan() {
+            continue;
+        }
+    }
+    samples
+}
+
+#[derive(Debug)]
+enum SampleStrat {
+    RSmSm,
+    RSmLg,
+    RLgLg,
+    RLgSm,
+    RRR,
+}
+
+// TODO: I know it's tempting to want to reuse some of the cvec sampling here but I think we want to be able to separately
+// experiment with validation and cvec sampling.
+fn is_valid(
+    lhs: Pattern,
+    rhs: Pattern,
+) -> bool {
+
+    // let mut file = match OpenOptions::new().create(true).append(true).open("fuzz_pts.txt") {
+    //     Err(why) => panic!("failed to open file {}", why),
+    //     Ok(file) => file,
+    // };
+    log::info!("entered validator");
+    let lhs = instantiate(&lhs);
+    let rhs = instantiate(&rhs);
+    let mut env: Ctx = HashMap::new();
+    let mut valid = false;
+
+    let mut failed_with: SampleStrat;
+    let ulp_rad_sm: u64 = 1000;
+    let ulp_rad_lg: u64 = 50000000000000;
+    let mut before_failure = 0;
+    for i in 0..100000 {
+        let a = rand_float_repr();
+        let b;
+        let c;
+        match i % 4 {
+            0 => {
+                b = sample_float_range(a, ulp_rad_sm);
+                c = sample_float_range(a, ulp_rad_sm);
+                failed_with = SampleStrat::RSmSm;
+            }
+            1 => {
+                b = sample_float_range(a, ulp_rad_lg);
+                c = sample_float_range(a, ulp_rad_sm);
+                failed_with = SampleStrat::RLgSm;
+            }
+            2 => {
+                b = sample_float_range(a, ulp_rad_sm);
+                c = sample_float_range(a, ulp_rad_lg);
+                failed_with = SampleStrat::RSmLg;
+            }
+            3 => {
+                b = sample_float_range(a, ulp_rad_lg);
+                c = sample_float_range(a, ulp_rad_lg);
+                failed_with = SampleStrat::RLgLg;
+            }
+            _ => {
+                // b = rand_float_repr();
+                // c = rand_float_repr();
+                // failed_with = SampleStrat::RRR;
+                panic!("bad remainder");
             }
         }
         if a.is_nan() || b.is_nan() || c.is_nan() {
@@ -241,16 +312,30 @@ fn is_valid(rng: Pcg64, lhs: Pattern, rhs: Pattern) -> bool {
         env.insert("a", OrderedFloat::from(a));
         env.insert("b", OrderedFloat::from(b));
         env.insert("c", OrderedFloat::from(c));
+        
+        before_failure = before_failure + 1;
 
         let l = eval(&env.clone(), lhs.as_ref());
         let r = eval(&env, rhs.as_ref());
         match (l, r) {
             (None, _) | (_, None) => {
-                valid = false;
+                // let astr = a.to_string().to_owned();
+                // let bstr = b.to_string().to_owned();
+                // let cstr = c.to_string().to_owned();
+                // let input = astr + " " + &bstr + " " + &cstr;
+                // file.write(input.as_bytes()).expect("could not write fuzzer input to file");
+                // file.write("could not write fuzzer input to file".as_bytes());
                 println!(
-                    "validation of {} => {} failed at: {} {} {}",
-                    lhs, rhs, a, b, c
+                    "validation of {} => {} failed at: {} {} {} needed {} samples, failed with: {:?}",
+                    lhs,
+                    rhs,
+                    a,
+                    b,
+                    c,
+                    before_failure,
+                    failed_with
                 );
+                valid = false;
                 break;
             }
             (Some(l), Some(r)) => {
@@ -259,8 +344,14 @@ fn is_valid(rng: Pcg64, lhs: Pattern, rhs: Pattern) -> bool {
                     continue;
                 } else {
                     println!(
-                        "validation of {} => {} failed at: {} {} {}",
-                        lhs, rhs, a, b, c
+                        "validation of {} => {} failed at: {} {} {} needed {} samples, failed with: {:?}",
+                        lhs,
+                        rhs,
+                        a,
+                        b,
+                        c,
+                        before_failure,
+                        failed_with
                     );
                     valid = false;
                     break;
@@ -303,18 +394,18 @@ impl Signature {
 #[derive(Debug, Clone)]
 pub struct SynthAnalysis {
     cvec_len: usize,
-    pub cvx: CVec,
-    pub cvy: CVec,
-    pub cvz: CVec,
+    // pub cvx: CVec,
+    // pub cvy: CVec,
+    // pub cvz: CVec,
 }
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
         Self {
             cvec_len: 10,
-            cvx: vec![],
-            cvy: vec![],
-            cvz: vec![],
+            // cvx: vec![],
+            // cvy: vec![],
+            // cvz: vec![],
         }
     }
 }
@@ -378,8 +469,8 @@ impl Analysis<Math> for SynthAnalysis {
                 }
                 (Some(a), Some(b)) => {
                     if a != b {
-                        println!("cvecs do not match");
-                        print!("{: >+20e} \t {: >+20e}", a.into_inner(), b.into_inner());
+                        log::info!("cvecs do not match");
+                        log::info!("{: >+20e} \t {: >+20e}", a.into_inner(), b.into_inner());
                         panic!("cvecs do not match");
                     } else {
                         continue;
@@ -413,6 +504,7 @@ impl Analysis<Math> for SynthAnalysis {
         //         panic!("cvecs don't match");
         //     }
         // }
+
         if !to.exact && from.exact {
             to.exact = true;
             to_exact_changed = true;
@@ -421,11 +513,11 @@ impl Analysis<Math> for SynthAnalysis {
         to_cvec_changed || to_exact_changed
     }
 
-    fn pre_union(eg: &EGraph<Math, Self>, id1: Id, id2: Id) {
-        let mut extract = Extractor::new(eg, AstSize);
-        println!("id1: {}", extract.find_best(id1).1);
-        println!("id2: {} \n", extract.find_best(id2).1);
-    }
+    // fn pre_union(eg: &EGraph<Math, Self>, id1: Id, id2: Id) {
+    //     let mut extract = Extractor::new(eg, AstSize);
+    //     log::info!("id1: {}", extract.find_best(id1).1);
+    //     log::info!("id2: {} \n", extract.find_best(id2).1);
+    // }
 
     fn modify(egraph: &mut EGraph, id: Id) {
         let sig = &egraph[id].data;
@@ -471,34 +563,44 @@ impl Synthesizer {
     pub fn new(mut params: SynthParams) -> Self {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: params.n_samples + params.constants.len(),
-            cvx: vec![],
-            cvy: vec![],
-            cvz: vec![],
         });
 
         let mut rng = Pcg64::seed_from_u64(params.seed);
 
         // .map(|_| OrderedFloat::from(rng.gen::<f64>()))
 
+        let xyz_samples = gen_rand_xyz(params.n_samples);
         // initialize the variables
         for &var in &params.variables {
             let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = (0..params.n_samples)
-                .map(|_| OrderedFloat::from(rand_float_repr(rng.clone())))
-                .chain(params.constants.iter().cloned())
-                .map(Some)
-                .collect();
-            egraph[id].data.cvec.shuffle(&mut rng);
+            // egraph[id].data.cvec = (0..params.n_samples)
+            //     .map(|_| OrderedFloat::from(rand_float_repr()))
+            //     .chain(params.constants.iter().cloned())
+            //     .map(Some)
+            //     .collect();
 
             if var.to_string() == "x" {
-                egraph.analysis.cvx = egraph[id].data.cvec.clone();
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|i| OrderedFloat::from(xyz_samples[i].0))
+                    .chain(params.constants.iter().cloned())
+                    .map(Some)
+                    .collect();
             }
             if var.to_string() == "y" {
-                egraph.analysis.cvy = egraph[id].data.cvec.clone();
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|i| OrderedFloat::from(xyz_samples[i].1))
+                    .chain(params.constants.iter().cloned())
+                    .map(Some)
+                    .collect();
             }
             if var.to_string() == "z" {
-                egraph.analysis.cvz = egraph[id].data.cvec.clone();
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|i| OrderedFloat::from(xyz_samples[i].2))
+                    .chain(params.constants.iter().cloned())
+                    .map(Some)
+                    .collect();
             }
+            egraph[id].data.cvec.shuffle(&mut rng);
         }
 
         for n in &params.constants {
@@ -523,7 +625,7 @@ impl Synthesizer {
             for j in self.ids() {
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Mul([i, j]));
-                // to_add.push(Math::Sub([i, j]));
+                to_add.push(Math::Sub([i, j]));
             }
             to_add.push(Math::Neg(i));
         }
@@ -534,6 +636,7 @@ impl Synthesizer {
 
     fn run_rewrites(&mut self) -> EGraph {
         // run the rewrites
+        log::info!("running eqsat with {} rules", self.equalities.len());
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
         let mut runner = Runner::new(self.egraph.analysis.clone())
             .with_egraph(self.egraph.clone())
@@ -560,31 +663,31 @@ impl Synthesizer {
         runner.egraph
     }
 
-    fn minimize(&self, eq: Equality) -> Option<Equality> {
-        // instantiate both lhs and rhs of eq
-        let l_expr = instantiate(&eq.lhs);
-        let r_expr = instantiate(&eq.rhs);
+    // fn minimize(&self, eq: Equality) -> Option<Equality> {
+    //     // instantiate both lhs and rhs of eq
+    //     let l_expr = instantiate(&eq.lhs);
+    //     let r_expr = instantiate(&eq.rhs);
 
-        // run eqsat with all current ruleset
-        let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
-        let mut runner = Runner::default()
-            .with_expr(&l_expr)
-            .with_node_limit(usize::MAX)
-            .with_iter_limit(1)
-            // .with_scheduler(SimpleScheduler)
-            .run(rewrites);
+    //     // run eqsat with all current ruleset
+    //     let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
+    //     let mut runner = Runner::default()
+    //         .with_expr(&l_expr)
+    //         .with_node_limit(usize::MAX)
+    //         .with_iter_limit(1)
+    //         // .with_scheduler(SimpleScheduler)
+    //         .run(rewrites);
 
-        // add rhs to the egraph
-        let rhs_id = runner.egraph.add_expr(&r_expr);
+    //     // add rhs to the egraph
+    //     let rhs_id = runner.egraph.add_expr(&r_expr);
 
-        // lhs and rhs are in same eclass
-        if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
-            println!("threw away: {}", eq.name);
-            None
-        } else {
-            Some(eq)
-        }
-    }
+    //     // lhs and rhs are in same eclass
+    //     if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
+    //         println!("threw away: {}", eq.name);
+    //         None
+    //     } else {
+    //         Some(eq)
+    //     }
+    // }
 
     fn cvec_match(&self) -> EqualityMap {
         // build the cvec matching data structure
@@ -608,7 +711,7 @@ impl Synthesizer {
                     let (_, e1) = extract.find_best(id1);
                     let (_, e2) = extract.find_best(id2);
                     if let Some(eq) = Equality::new(&e1, &e2) {
-                        log::debug!("  Candidate {}", eq);
+                        // log::info!("  Candidate {}", eq);
                         new_eqs.insert(eq.name.clone(), eq);
                     }
                 }
@@ -649,7 +752,8 @@ impl Synthesizer {
     }
 
     pub fn run_orat(mut self, iters: usize) -> EqualityMap {
-        for _ in 0..iters {
+        for i in 0..iters {
+            log::info!("iter: {}", i);
             let layer = self.make_layer();
             for chunk in layer.chunks(10000) {
                 for node in chunk {
@@ -662,21 +766,38 @@ impl Synthesizer {
                         self.egraph.total_size(),
                         self.egraph.number_of_classes()
                     );
-                    let new_eqs = self.cvec_match();
+                    let mut new_eqs = self.cvec_match();
+                    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
                     if new_eqs.is_empty() {
                         break;
                     }
-                    let valid_eqs: EqualityMap = new_eqs
-                        .into_iter()
-                        .filter(|eq| is_valid(self.rng.clone(), eq.1.lhs.clone(), eq.1.rhs.clone()))
-                        .collect();
-                    if valid_eqs.is_empty() {
-                        break;
+                    log::info!("Number of new_eqs: {}", new_eqs.len());
+                    for (_, eq) in new_eqs.iter() {
+                        if is_valid(eq.lhs.clone(), eq.rhs.clone()) {
+                            log::info!("Chose best {}", eq);
+                            assert!(!self.equalities.contains_key(&eq.name));
+                            self.equalities.insert(eq.name.clone(), eq.clone());
+                            break; 
+                        } 
                     }
-                    let eq = choose_best_eq(&valid_eqs);
-                    log::info!("Chose best {}", eq);
-                    assert!(!self.equalities.contains_key(&eq.name));
-                    self.equalities.insert(eq.name.clone(), eq);
+                    // let valid_eqs: EqualityMap = new_eqs
+                    //     .into_iter()
+                    //     .filter(|eq| {
+                    //         is_valid(
+                    //             eq.1.lhs.clone(),
+                    //             eq.1.rhs.clone(),
+                    //         )
+                    //     })
+                    //     .collect();
+                    // if valid_eqs.is_empty() {
+                    //     break;
+                    // }
+                    // log::info!("Number of valid eqs: {}", valid_eqs.len());
+
+                    // let eq = choose_best_eq(&valid_eqs);
+                    // log::info!("Chose best {}", eq);
+                    // assert!(!self.equalities.contains_key(&eq.name));
+                    // self.equalities.insert(eq.name.clone(), eq);
                 }
             }
         }
@@ -706,7 +827,7 @@ fn minimize(old_eqs: &EqualityMap, mut new_eqs: EqualityMap) -> EqualityMap {
         let rhs_id = runner.egraph.add_expr(&r_expr);
 
         if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
-            println!("threw away: {}", eq.name);
+            log::info!("Threw away: {}", eq.name);
         } else {
             keepers.insert(eq.name.clone(), eq.clone());
         }
@@ -727,6 +848,12 @@ fn score(eq: &Equality) -> (isize, isize) {
     // // println!("{} {:?}", eq, x);
     // x
 }
+
+// fn take_best_eq(mut new_eqs: EqualityMap) -> Equality {
+//     let (nm, eq) = new_eqs.iter().max_by_key(|(nm, eq)| score(eq)).unwrap();
+//     new_eqs.remove(nm);
+//     eq.clone()
+// }
 
 fn choose_best_eq(new_eqs: &EqualityMap) -> Equality {
     new_eqs.values().max_by_key(|eq| score(eq)).unwrap().clone()
