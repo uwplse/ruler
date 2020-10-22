@@ -1,13 +1,12 @@
-use std::{collections::HashSet, fmt::Display, hash::Hash, path::Path, rc::Rc, io::Write};
-
-use std::fs::OpenOptions;
-use byteorder::{ByteOrder, LittleEndian};
 use egg::*;
 use indexmap::IndexMap;
+use libm::{erf, erfc, erfcf, erff, fma, fmaf, remainder, remainderf};
 use ordered_float::OrderedFloat;
 use rand::{prelude::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::{collections::HashSet, fmt::Display, hash::Hash, io::Write, path::Path, rc::Rc};
 type Runner = egg::Runner<Math, SynthAnalysis, ()>;
 type Pattern<L = Math> = egg::Pattern<L>;
 type RecExpr<L = Math> = egg::RecExpr<L>;
@@ -60,6 +59,33 @@ define_language! {
         "-" = Sub([Id; 2]),
         "~" = Neg(Id),
         "*" = Mul([Id; 2]),
+        "/" = Div([Id; 2]),
+        "fabs" = Fabs(Id),
+        "exp" = Exp(Id),
+        "cbrt" = Cbrt(Id),
+        "sqrt" = Sqrt(Id),
+        "pow" = Pow([Id; 2]),
+        "remainder" = Remainder([Id; 2]),
+        "log1p" = Log1p(Id),
+        "expm1" = Expm1(Id),
+        "erf" = Erf(Id),
+        "erfc" = Erfc(Id),
+        "fma" = Fma([Id; 3]),
+        "log" = Log(Id),
+        "sin" = Sin(Id),
+        "cos" = Cos(Id),
+        "tan" = Tan(Id),
+        "atan" = Atan(Id),
+        "acos" = Acos(Id),
+        "asin" = Asin(Id),
+        "tanh" = Tanh(Id),
+        "cosh" = Cosh(Id),
+        "sinh" = Sinh(Id),
+        "atanh" = Atanh(Id),
+        "acosh" = Acosh(Id),
+        "asinh" = Asinh(Id),
+        "atan2" = Atan2([Id; 2]),
+        "hypot" = Hypot([Id; 2]),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -107,6 +133,169 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             let a = usize::from(*a);
             let e1 = eval(ctx, &expr[..=a]);
             Some(-e1.unwrap())
+        }
+        Math::Div([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(e1.unwrap() / e2.unwrap())
+        }
+        Math::Fabs(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().abs()))
+        }
+        Math::Exp(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().exp()))
+        }
+        Math::Sqrt(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().sqrt()))
+        }
+        Math::Cbrt(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().cbrt()))
+        }
+        Math::Pow([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(OrderedFloat::from(
+                e1.unwrap().into_inner().powf(e2.unwrap().into_inner()),
+            ))
+        }
+        Math::Remainder([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(OrderedFloat::from(remainder(
+                e1.unwrap().into_inner(),
+                e2.unwrap().into_inner(),
+            )))
+        }
+        // TODO Log and Ln? What's expected?
+        Math::Log1p(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().ln_1p()))
+        }
+        Math::Expm1(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().exp_m1()))
+        }
+        Math::Erf(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(erf(e1.unwrap().into_inner())))
+        }
+        Math::Erfc(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(erfc(e1.unwrap().into_inner())))
+        }
+        Math::Fma([a, b, c]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let c = usize::from(*c);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            let e3 = eval(ctx, &expr[..=c]);
+            Some(OrderedFloat::from(fma(
+                e1.unwrap().into_inner(),
+                e2.unwrap().into_inner(),
+                e3.unwrap().into_inner(),
+            )))
+        }
+        Math::Log(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(libm::log(e1.unwrap().into_inner())))
+        }
+        Math::Sin(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().sin()))
+        }
+        Math::Cos(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().cos()))
+        }
+        Math::Tan(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().tan()))
+        }
+        Math::Asin(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().asin()))
+        }
+        Math::Acos(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().acos()))
+        }
+        Math::Atan(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().atan()))
+        }
+        Math::Sinh(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().sinh()))
+        }
+        Math::Cosh(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().cosh()))
+        }
+        Math::Tanh(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().tanh()))
+        }
+        Math::Asinh(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().asinh()))
+        }
+        Math::Acosh(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().acosh()))
+        }
+        Math::Atanh(a) => {
+            let a = usize::from(*a);
+            let e1 = eval(ctx, &expr[..=a]);
+            Some(OrderedFloat::from(e1.unwrap().into_inner().atanh()))
+        }
+        Math::Atan2([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(OrderedFloat::from(
+                e1.unwrap().into_inner().atan2(e2.unwrap().into_inner()),
+            ))
+        }
+        Math::Hypot([a, b]) => {
+            let a = usize::from(*a);
+            let b = usize::from(*b);
+            let e1 = eval(ctx, &expr[..=a]);
+            let e2 = eval(ctx, &expr[..=b]);
+            Some(OrderedFloat::from(
+                e1.unwrap().into_inner().hypot(e2.unwrap().into_inner()),
+            ))
         }
     }
 }
@@ -232,10 +421,9 @@ fn gen_rand_xyz(n_samples: usize) -> Vec<(f64, f64, f64)> {
                 b = rand_float_repr();
                 c = rand_float_repr();
                 samples.push((a, b, c));
-            }
-            // _ => {
-            //     panic!("bad");
-            // }
+            } // _ => {
+              //     panic!("bad");
+              // }
         }
         if a.is_nan() || b.is_nan() || c.is_nan() {
             continue;
@@ -255,16 +443,11 @@ enum SampleStrat {
 
 // TODO: I know it's tempting to want to reuse some of the cvec sampling here but I think we want to be able to separately
 // experiment with validation and cvec sampling.
-fn is_valid(
-    lhs: Pattern,
-    rhs: Pattern,
-) -> bool {
-
+fn is_valid(lhs: Pattern, rhs: Pattern) -> bool {
     // let mut file = match OpenOptions::new().create(true).append(true).open("fuzz_pts.txt") {
     //     Err(why) => panic!("failed to open file {}", why),
     //     Ok(file) => file,
     // };
-    log::info!("entered validator");
     let lhs = instantiate(&lhs);
     let rhs = instantiate(&rhs);
     let mut env: Ctx = HashMap::new();
@@ -274,7 +457,7 @@ fn is_valid(
     let ulp_rad_sm: u64 = 1000;
     let ulp_rad_lg: u64 = 50000000000000;
     let mut before_failure = 0;
-    for i in 0..100000 {
+    for i in 0..1000000 {
         let a = rand_float_repr();
         let b;
         let c;
@@ -312,7 +495,7 @@ fn is_valid(
         env.insert("a", OrderedFloat::from(a));
         env.insert("b", OrderedFloat::from(b));
         env.insert("c", OrderedFloat::from(c));
-        
+
         before_failure = before_failure + 1;
 
         let l = eval(&env.clone(), lhs.as_ref());
@@ -453,6 +636,230 @@ impl Analysis<Math> for SynthAnalysis {
                 cvec: vec![],
                 exact: false,
             },
+            Math::Div([a, b]) => v(a).fold2(v(b), |a, b| {
+                if b != OrderedFloat::from(0.0) && (a / b) != OrderedFloat::from(f64::NAN) {
+                    Some(a / b)
+                } else {
+                    None
+                }
+            }),
+            Math::Fabs(a) => v(a).fold1(|a| {
+                let fabs = OrderedFloat::from(a.into_inner().abs());
+                if fabs != OrderedFloat::from(f64::NAN) {
+                    Some(fabs)
+                } else {
+                    None
+                }
+            }),
+            Math::Exp(a) => v(a).fold1(|a| {
+                let exp = OrderedFloat::from(a.into_inner().exp());
+                if exp != OrderedFloat::from(f64::NAN) {
+                    Some(exp)
+                } else {
+                    None
+                }
+            }),
+            Math::Cbrt(a) => v(a).fold1(|a| {
+                let cbrt = OrderedFloat::from(a.into_inner().cbrt());
+                if cbrt != OrderedFloat::from(f64::NAN) {
+                    Some(cbrt)
+                } else {
+                    None
+                }
+            }),
+            Math::Sqrt(a) => v(a).fold1(|a| {
+                let sqrt = OrderedFloat::from(a.into_inner().sqrt());
+                if sqrt != OrderedFloat::from(f64::NAN) {
+                    Some(sqrt)
+                } else {
+                    None
+                }
+            }),
+            Math::Pow([a, b]) => v(a).fold2(v(b), |a, b| {
+                let pow = OrderedFloat::from(a.into_inner().powf(b.into_inner()));
+                if pow != OrderedFloat::from(f64::NAN) {
+                    Some(pow)
+                } else {
+                    None
+                }
+            }),
+            Math::Remainder([a, b]) => v(a).fold2(v(b), |a, b| {
+                let remainder = OrderedFloat::from(remainder(a.into_inner(), b.into_inner()));
+                if remainder != OrderedFloat::from(f64::NAN) {
+                    Some(remainder)
+                } else {
+                    None
+                }
+            }),
+            Math::Log1p(a) => v(a).fold1(|a| {
+                let log1p = OrderedFloat::from(a.into_inner().ln_1p());
+                if log1p != OrderedFloat::from(f64::NAN) {
+                    Some(log1p)
+                } else {
+                    None
+                }
+            }),
+            Math::Expm1(a) => v(a).fold1(|a| {
+                let exp1m = OrderedFloat::from(a.into_inner().exp_m1());
+                if exp1m != OrderedFloat::from(f64::NAN) {
+                    Some(exp1m)
+                } else {
+                    None
+                }
+            }),
+            Math::Erf(a) => v(a).fold1(|a| {
+                let erf = OrderedFloat::from(erf(a.into_inner()));
+                if erf != OrderedFloat::from(f64::NAN) {
+                    Some(erf)
+                } else {
+                    None
+                }
+            }),
+            Math::Erfc(a) => v(a).fold1(|a| {
+                let erf = OrderedFloat::from(erfc(a.into_inner()));
+                if erf != OrderedFloat::from(f64::NAN) {
+                    Some(erf)
+                } else {
+                    None
+                }
+            }),
+            Math::Fma([a, b, c]) => Signature {
+                cvec: v(a)
+                    .cvec
+                    .iter()
+                    .zip(v(b).clone().cvec)
+                    .zip(v(c).clone().cvec)
+                    .map(|((x, y), z)| match (x, y, z) {
+                        (Some(n1), Some(n2), Some(n3)) => Some(OrderedFloat::from(fma(
+                            n1.into_inner(),
+                            n2.into_inner(),
+                            n3.into_inner(),
+                        ))),
+                        (_, _, _) => None,
+                    })
+                    .collect(),
+                exact: v(a).exact && v(b).exact && v(c).exact,
+            },
+            Math::Log(a) => v(a).fold1(|a| {
+                let log = OrderedFloat::from(libm::log(a.into_inner()));
+                if log != OrderedFloat::from(f64::NAN) {
+                    Some(log)
+                } else {
+                    None
+                }
+            }),
+            Math::Sin(a) => v(a).fold1(|a| {
+                let sin = OrderedFloat::from(a.into_inner().sin());
+                if sin != OrderedFloat::from(f64::NAN) {
+                    Some(sin)
+                } else {
+                    None
+                }
+            }),
+            Math::Cos(a) => v(a).fold1(|a| {
+                let cos = OrderedFloat::from(a.into_inner().cos());
+                if cos != OrderedFloat::from(f64::NAN) {
+                    Some(cos)
+                } else {
+                    None
+                }
+            }),
+            Math::Tan(a) => v(a).fold1(|a| {
+                let tan = OrderedFloat::from(a.into_inner().tan());
+                if tan != OrderedFloat::from(f64::NAN) {
+                    Some(tan)
+                } else {
+                    None
+                }
+            }),
+            Math::Atan(a) => v(a).fold1(|a| {
+                let atan = OrderedFloat::from(a.into_inner().atan());
+                if atan != OrderedFloat::from(f64::NAN) {
+                    Some(atan)
+                } else {
+                    None
+                }
+            }),
+            Math::Acos(a) => v(a).fold1(|a| {
+                let acos = OrderedFloat::from(a.into_inner().acos());
+                if acos != OrderedFloat::from(f64::NAN) {
+                    Some(acos)
+                } else {
+                    None
+                }
+            }),
+            Math::Asin(a) => v(a).fold1(|a| {
+                let asin = OrderedFloat::from(a.into_inner().asin());
+                if asin != OrderedFloat::from(f64::NAN) {
+                    Some(asin)
+                } else {
+                    None
+                }
+            }),
+            Math::Tanh(a) => v(a).fold1(|a| {
+                let tanh = OrderedFloat::from(a.into_inner().tanh());
+                if tanh != OrderedFloat::from(f64::NAN) {
+                    Some(tanh)
+                } else {
+                    None
+                }
+            }),
+            Math::Cosh(a) => v(a).fold1(|a| {
+                let cosh = OrderedFloat::from(a.into_inner().cosh());
+                if cosh != OrderedFloat::from(f64::NAN) {
+                    Some(cosh)
+                } else {
+                    None
+                }
+            }),
+            Math::Sinh(a) => v(a).fold1(|a| {
+                let sinh = OrderedFloat::from(a.into_inner().sinh());
+                if sinh != OrderedFloat::from(f64::NAN) {
+                    Some(sinh)
+                } else {
+                    None
+                }
+            }),
+            Math::Atanh(a) => v(a).fold1(|a| {
+                let atanh = OrderedFloat::from(a.into_inner().atanh());
+                if atanh != OrderedFloat::from(f64::NAN) {
+                    Some(atanh)
+                } else {
+                    None
+                }
+            }),
+            Math::Acosh(a) => v(a).fold1(|a| {
+                let acosh = OrderedFloat::from(a.into_inner().acosh());
+                if acosh != OrderedFloat::from(f64::NAN) {
+                    Some(acosh)
+                } else {
+                    None
+                }
+            }),
+            Math::Asinh(a) => v(a).fold1(|a| {
+                let asinh = OrderedFloat::from(a.into_inner().asinh());
+                if asinh != OrderedFloat::from(f64::NAN) {
+                    Some(asinh)
+                } else {
+                    None
+                }
+            }),
+            Math::Atan2([a, b]) => v(a).fold2(v(b), |a, b| {
+                let atan2 = OrderedFloat::from(a.into_inner().atan2(b.into_inner()));
+                if atan2 != OrderedFloat::from(f64::NAN) {
+                    Some(atan2)
+                } else {
+                    None
+                }
+            }),
+            Math::Hypot([a, b]) => v(a).fold2(v(b), |a, b| {
+                let hypot = OrderedFloat::from(a.into_inner().hypot(b.into_inner()));
+                if hypot != OrderedFloat::from(f64::NAN) {
+                    Some(hypot)
+                } else {
+                    None
+                }
+            }),
         };
         sig
     }
@@ -469,8 +876,8 @@ impl Analysis<Math> for SynthAnalysis {
                 }
                 (Some(a), Some(b)) => {
                     if a != b {
-                        log::info!("cvecs do not match");
-                        log::info!("{: >+20e} \t {: >+20e}", a.into_inner(), b.into_inner());
+                        println!("cvecs do not match");
+                        println!("{: >+20e} \t {: >+20e}", a.into_inner(), b.into_inner());
                         panic!("cvecs do not match");
                     } else {
                         continue;
@@ -626,8 +1033,34 @@ impl Synthesizer {
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Mul([i, j]));
                 to_add.push(Math::Sub([i, j]));
+                to_add.push(Math::Div([i, j]));
+                to_add.push(Math::Pow([i, j]));
+                to_add.push(Math::Remainder([i, j]));
+                to_add.push(Math::Atan2([i, j]));
+                to_add.push(Math::Hypot([i, j]));
             }
             to_add.push(Math::Neg(i));
+            to_add.push(Math::Fabs(i));
+            to_add.push(Math::Exp(i));
+            to_add.push(Math::Sqrt(i));
+            to_add.push(Math::Cbrt(i));
+            to_add.push(Math::Log1p(i));
+            to_add.push(Math::Expm1(i));
+            to_add.push(Math::Erf(i));
+            to_add.push(Math::Erfc(i));
+            to_add.push(Math::Log(i));
+            to_add.push(Math::Sin(i));
+            to_add.push(Math::Cos(i));
+            to_add.push(Math::Tan(i));
+            to_add.push(Math::Asin(i));
+            to_add.push(Math::Acos(i));
+            to_add.push(Math::Atan(i));
+            to_add.push(Math::Sinh(i));
+            to_add.push(Math::Cosh(i));
+            to_add.push(Math::Tanh(i));
+            to_add.push(Math::Asinh(i));
+            to_add.push(Math::Acosh(i));
+            to_add.push(Math::Atanh(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -767,18 +1200,20 @@ impl Synthesizer {
                         self.egraph.number_of_classes()
                     );
                     let mut new_eqs = self.cvec_match();
-                    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
                     if new_eqs.is_empty() {
                         break;
                     }
                     log::info!("Number of new_eqs: {}", new_eqs.len());
+                    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
+                    let mut idx = 0;
                     for (_, eq) in new_eqs.iter() {
+                        idx = idx + 1;
                         if is_valid(eq.lhs.clone(), eq.rhs.clone()) {
-                            log::info!("Chose best {}", eq);
+                            log::info!("Chose best {}, idx {}", eq, idx);
                             assert!(!self.equalities.contains_key(&eq.name));
                             self.equalities.insert(eq.name.clone(), eq.clone());
-                            break; 
-                        } 
+                            break;
+                        }
                     }
                     // let valid_eqs: EqualityMap = new_eqs
                     //     .into_iter()
