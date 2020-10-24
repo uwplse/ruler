@@ -1,12 +1,11 @@
 use egg::*;
 use indexmap::IndexMap;
-use libm::{erf, erfc, erfcf, erff, fma, fmaf, remainder, remainderf};
+use libm::{erf, erfc, fma, remainder};
 use ordered_float::OrderedFloat;
 use rand::{prelude::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::{collections::HashSet, fmt::Display, hash::Hash, io::Write, path::Path, rc::Rc};
+use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 type Runner = egg::Runner<Math, SynthAnalysis, ()>;
 type Pattern<L = Math> = egg::Pattern<L>;
 type RecExpr<L = Math> = egg::RecExpr<L>;
@@ -1033,11 +1032,11 @@ impl Synthesizer {
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Mul([i, j]));
                 to_add.push(Math::Sub([i, j]));
-                to_add.push(Math::Div([i, j]));
-                to_add.push(Math::Pow([i, j]));
-                to_add.push(Math::Remainder([i, j]));
-                to_add.push(Math::Atan2([i, j]));
-                to_add.push(Math::Hypot([i, j]));
+                // to_add.push(Math::Div([i, j]));
+                // to_add.push(Math::Pow([i, j]));
+                // to_add.push(Math::Remainder([i, j]));
+                // to_add.push(Math::Atan2([i, j]));
+                // to_add.push(Math::Hypot([i, j]));
             }
             to_add.push(Math::Neg(i));
             to_add.push(Math::Fabs(i));
@@ -1125,12 +1124,13 @@ impl Synthesizer {
     fn cvec_match(&self) -> EqualityMap {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
-
-        for id in self.ids() {
+        let all_nones = self.ids().filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
+        for id in all_nones {
             let class = &self.egraph[id];
-            // let key = first_n_bits(&class.clone().data.cvec);
-            // by_cvec.entry(key).or_default().push(class.id);
+            // key = first_n_bits(&class.clone().data.cvec);
+            // by_cvec.entry(&key).or_default().push(class.id);
             by_cvec.entry(&class.data.cvec).or_default().push(class.id);
+            
         }
 
         let mut new_eqs = EqualityMap::default();
@@ -1185,55 +1185,76 @@ impl Synthesizer {
     }
 
     pub fn run_orat(mut self, iters: usize) -> EqualityMap {
+        let mut poison_rules: HashSet<Equality> = HashSet::new();
         for i in 0..iters {
             log::info!("iter: {}", i);
             let layer = self.make_layer();
-            for chunk in layer.chunks(10000) {
-                for node in chunk {
-                    self.egraph.add(node.clone());
+            // for chunk in layer.chunks(10000) {
+            log::info!("added {} exprs to the egraph", layer.len());
+            for node in layer {
+                self.egraph.add(node.clone());
+            }
+            loop {
+                self.run_rewrites();
+                log::info!(
+                    "egraph n={}, e={}",
+                    self.egraph.total_size(),
+                    self.egraph.number_of_classes()
+                );
+                let mut new_eqs = self.cvec_match();
+                log::info!("Poison len: {}", poison_rules.len());
+                log::info!(
+                    "Number of new_eqs before filtering old poison: {}",
+                    new_eqs.len()
+                );
+                // TODO: a hack: filter out rules that are in poison set
+                new_eqs = new_eqs
+                    .into_iter()
+                    .filter(|eq| !poison_rules.contains(&eq.1))
+                    .collect();
+                // Good approach: add counter examples to cvec in next iteration.
+                // Make is_valid return Option<counter example>.
+                if new_eqs.is_empty() {
+                    break;
                 }
-                loop {
-                    self.run_rewrites();
-                    log::info!(
-                        "egraph n={}, e={}",
-                        self.egraph.total_size(),
-                        self.egraph.number_of_classes()
-                    );
-                    let mut new_eqs = self.cvec_match();
-                    if new_eqs.is_empty() {
+                log::info!(
+                    "Number of new_eqs after filtering old poison: {}",
+                    new_eqs.len()
+                );
+                new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
+                let mut idx = 0;
+                for (_, eq) in new_eqs.iter() {
+                    if is_valid(eq.lhs.clone(), eq.rhs.clone()) {
+                        log::info!("Chose best {}, idx {}", eq, idx);
+                        assert!(!self.equalities.contains_key(&eq.name));
+                        self.equalities.insert(eq.name.clone(), eq.clone());
                         break;
+                    } else {
+                        poison_rules.insert(eq.clone());
                     }
-                    log::info!("Number of new_eqs: {}", new_eqs.len());
-                    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
-                    let mut idx = 0;
-                    for (_, eq) in new_eqs.iter() {
-                        idx = idx + 1;
-                        if is_valid(eq.lhs.clone(), eq.rhs.clone()) {
-                            log::info!("Chose best {}, idx {}", eq, idx);
-                            assert!(!self.equalities.contains_key(&eq.name));
-                            self.equalities.insert(eq.name.clone(), eq.clone());
-                            break;
-                        }
-                    }
-                    // let valid_eqs: EqualityMap = new_eqs
-                    //     .into_iter()
-                    //     .filter(|eq| {
-                    //         is_valid(
-                    //             eq.1.lhs.clone(),
-                    //             eq.1.rhs.clone(),
-                    //         )
-                    //     })
-                    //     .collect();
-                    // if valid_eqs.is_empty() {
-                    //     break;
-                    // }
-                    // log::info!("Number of valid eqs: {}", valid_eqs.len());
-
-                    // let eq = choose_best_eq(&valid_eqs);
-                    // log::info!("Chose best {}", eq);
-                    // assert!(!self.equalities.contains_key(&eq.name));
-                    // self.equalities.insert(eq.name.clone(), eq);
+                    idx = idx + 1;
                 }
+                if idx == new_eqs.len() {
+                    break;
+                }
+                // let valid_eqs: EqualityMap = new_eqs
+                //     .into_iter()
+                //     .filter(|eq| {
+                //         is_valid(
+                //             eq.1.lhs.clone(),
+                //             eq.1.rhs.clone(),
+                //         )
+                //     })
+                //     .collect();
+                // if valid_eqs.is_empty() {
+                //     break;
+                // }
+                // log::info!("Number of valid eqs: {}", valid_eqs.len());
+
+                // let eq = choose_best_eq(&valid_eqs);
+                // log::info!("Chose best {}", eq);
+                // assert!(!self.equalities.contains_key(&eq.name));
+                // self.equalities.insert(eq.name.clone(), eq);
             }
         }
         self.equalities
@@ -1304,10 +1325,25 @@ pub struct Equality<L = Math, A = SynthAnalysis> {
     pub rewrites: Vec<Rewrite<L, A>>,
 }
 
+impl<L: Language, A> Hash for Equality<L, A> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
 impl<L: Language, A> Display for Equality<L, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
+}
+
+impl<L: Language, A> PartialEq for Equality<L, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl<L: Language, A> Eq for Equality<L, A> {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 
 impl Equality<Math, SynthAnalysis> {

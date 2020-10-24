@@ -10,6 +10,8 @@ fn main() {
             OrderedFloat::from(-1.0),
             OrderedFloat::from(0.0),
             OrderedFloat::from(1.0),
+            // OrderedFloat::from(f64::INFINITY),
+            // OrderedFloat::from(-f64::INFINITY),
         ],
         variables: vec!["x".into(), "y".into(), "z".into()],
         // variables: vec!["x".into(), "y".into(), "z".into(), "w".into()],
