@@ -460,7 +460,7 @@ fn is_valid(lhs: Pattern, rhs: Pattern) -> bool {
         let a = rand_float_repr();
         let b;
         let c;
-        match i % 4 {
+        match i % 5 {
             0 => {
                 b = sample_float_range(a, ulp_rad_sm);
                 c = sample_float_range(a, ulp_rad_sm);
@@ -482,10 +482,10 @@ fn is_valid(lhs: Pattern, rhs: Pattern) -> bool {
                 failed_with = SampleStrat::RLgLg;
             }
             _ => {
-                // b = rand_float_repr();
-                // c = rand_float_repr();
-                // failed_with = SampleStrat::RRR;
-                panic!("bad remainder");
+                b = rand_float_repr();
+                c = rand_float_repr();
+                failed_with = SampleStrat::RRR;
+                // panic!("bad remainder");
             }
         }
         if a.is_nan() || b.is_nan() || c.is_nan() {
@@ -1029,37 +1029,37 @@ impl Synthesizer {
         let mut to_add = vec![];
         for i in self.ids() {
             for j in self.ids() {
-                to_add.push(Math::Add([i, j]));
+                // to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Mul([i, j]));
-                to_add.push(Math::Sub([i, j]));
+                // to_add.push(Math::Sub([i, j]));
                 // to_add.push(Math::Div([i, j]));
                 // to_add.push(Math::Pow([i, j]));
                 // to_add.push(Math::Remainder([i, j]));
                 // to_add.push(Math::Atan2([i, j]));
                 // to_add.push(Math::Hypot([i, j]));
             }
-            to_add.push(Math::Neg(i));
-            to_add.push(Math::Fabs(i));
-            to_add.push(Math::Exp(i));
+            // to_add.push(Math::Neg(i));
+            // to_add.push(Math::Fabs(i));
+            // to_add.push(Math::Exp(i));
             to_add.push(Math::Sqrt(i));
-            to_add.push(Math::Cbrt(i));
-            to_add.push(Math::Log1p(i));
-            to_add.push(Math::Expm1(i));
-            to_add.push(Math::Erf(i));
-            to_add.push(Math::Erfc(i));
-            to_add.push(Math::Log(i));
-            to_add.push(Math::Sin(i));
-            to_add.push(Math::Cos(i));
-            to_add.push(Math::Tan(i));
-            to_add.push(Math::Asin(i));
-            to_add.push(Math::Acos(i));
-            to_add.push(Math::Atan(i));
-            to_add.push(Math::Sinh(i));
-            to_add.push(Math::Cosh(i));
-            to_add.push(Math::Tanh(i));
-            to_add.push(Math::Asinh(i));
-            to_add.push(Math::Acosh(i));
-            to_add.push(Math::Atanh(i));
+            // to_add.push(Math::Cbrt(i));
+            // to_add.push(Math::Log1p(i));
+            // to_add.push(Math::Expm1(i));
+            // to_add.push(Math::Erf(i));
+            // to_add.push(Math::Erfc(i));
+            // to_add.push(Math::Log(i));
+            // to_add.push(Math::Sin(i));
+            // to_add.push(Math::Cos(i));
+            // to_add.push(Math::Tan(i));
+            // to_add.push(Math::Asin(i));
+            // to_add.push(Math::Acos(i));
+            // to_add.push(Math::Atan(i));
+            // to_add.push(Math::Sinh(i));
+            // to_add.push(Math::Cosh(i));
+            // to_add.push(Math::Tanh(i));
+            // to_add.push(Math::Asinh(i));
+            // to_add.push(Math::Acosh(i));
+            // to_add.push(Math::Atanh(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
