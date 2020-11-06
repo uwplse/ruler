@@ -119,24 +119,6 @@ impl Default for SynthAnalysis {
     }
 }
 
-// fn shl(a: u32, b: u32) -> u32 {
-//     a << (b % 32)
-//     // if b > 31 {
-//     //     0
-//     // } else {
-//     //     a << b
-//     // }
-// }
-
-// fn shr(a: u32, b: u32) -> u32 {
-//     a >> (b % 32)
-//     // if b > 31 {
-//     //     0
-//     // } else {
-//     //     a >> b
-//     // }
-// }
-
 impl Analysis<Math> for SynthAnalysis {
     type Data = Signature;
 
@@ -331,6 +313,8 @@ impl Synthesizer {
             by_cvec.entry(&class.data.cvec).or_default().push(class.id);
         }
 
+        log::info!("# unique cvecs: {}", by_cvec.len());
+
         let mut new_eqs = EqualityMap::default();
         let mut extract = Extractor::new(&self.egraph, AstSize);
         let mut to_merge: Vec<(Id, Id)> = vec![];
@@ -385,7 +369,7 @@ impl Synthesizer {
     pub fn run_orat(mut self, iters: usize) -> EqualityMap {
         for _ in 0..iters {
             let layer = self.make_layer();
-            for chunk in layer.chunks(10000) {
+            for chunk in layer.chunks(usize::MAX) {
                 for node in chunk {
                     self.egraph.add(node.clone());
                 }
@@ -591,7 +575,7 @@ mod tests {
             variables: vec!["x".into(), "y".into(), "z".into()],
         });
 
-        let eqs = syn.run_orat(2);
+        let eqs = syn.run_orat(1);
 
         println!("CHECKING! Found {} rules", eqs.len());
         for eq in eqs.values() {
