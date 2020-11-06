@@ -5,7 +5,7 @@ fn main() {
     let syn = Synthesizer::new(SynthParams {
         seed: 5,
         n_samples: 10,
-        constants: vec![0, 1, -1],
+        constants: vec![0, 1],
         variables: vec!["x".into(), "y".into(), "z".into()],
         // variables: vec!["x".into(), "y".into(), "z".into(), "w".into()],
     });

@@ -1,3 +1,4 @@
+use std::ops::Not;
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 
 use egg::*;
@@ -13,38 +14,8 @@ type RecExpr<L = Math> = egg::RecExpr<L>;
 type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
 type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 
-pub type Constant = i32;
+pub type Constant = u8;
 pub type CVec = Vec<Option<Constant>>;
-
-struct AstSize;
-impl CostFunction<Math> for AstSize {
-    type Cost = usize;
-
-    fn cost<C>(&mut self, enode: &Math, mut cost: C) -> Self::Cost
-    where
-        C: FnMut(Id) -> Self::Cost,
-    {
-        let base = match enode {
-            Math::Sub(_) => 2,
-            _ => 1,
-        };
-        enode.fold(base, |acc, id| acc + cost(id))
-    }
-}
-
-impl CostFunction<ENodeOrVar<Math>> for AstSize {
-    type Cost = usize;
-
-    fn cost<C>(&mut self, enode: &ENodeOrVar<Math>, cost: C) -> Self::Cost
-    where
-        C: FnMut(Id) -> Self::Cost,
-    {
-        match enode {
-            ENodeOrVar::ENode(enode) => Self.cost(enode, cost),
-            ENodeOrVar::Var(_) => 1,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Signature {
@@ -55,9 +26,13 @@ pub struct Signature {
 define_language! {
     pub enum Math {
         "+" = Add([Id; 2]),
-        "-" = Sub([Id; 2]),
-        "~" = Neg(Id),
         "*" = Mul([Id; 2]),
+        "-" = Neg(Id),
+        "~" = Not(Id),
+        "<<" = Shl([Id; 2]),
+        ">>" = Shr([Id; 2]),
+        "&" = And([Id; 2]),
+        "|" = Or([Id; 2]),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -140,9 +115,27 @@ pub struct SynthAnalysis {
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { cvec_len: 10 }
+        Self { cvec_len: 10_000 }
     }
 }
+
+// fn shl(a: u32, b: u32) -> u32 {
+//     a << (b % 32)
+//     // if b > 31 {
+//     //     0
+//     // } else {
+//     //     a << b
+//     // }
+// }
+
+// fn shr(a: u32, b: u32) -> u32 {
+//     a >> (b % 32)
+//     // if b > 31 {
+//     //     0
+//     // } else {
+//     //     a >> b
+//     // }
+// }
 
 impl Analysis<Math> for SynthAnalysis {
     type Data = Signature;
@@ -152,8 +145,8 @@ impl Analysis<Math> for SynthAnalysis {
         let param = &egraph.analysis;
         let sig = match enode {
             Math::Neg(a) => v(a).fold1(|a| Some(a.wrapping_neg())),
+            Math::Not(a) => v(a).fold1(|a| Some(a.not())),
             Math::Add([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_add(b))),
-            Math::Sub([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_sub(b))),
             Math::Mul([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_mul(b))),
             Math::Num(n) => Signature {
                 cvec: (0..param.cvec_len).map(|_| Some(n.clone())).collect(),
@@ -163,6 +156,10 @@ impl Analysis<Math> for SynthAnalysis {
                 cvec: vec![],
                 exact: false,
             },
+            Math::Shl([a, b]) => v(a).fold2(v(b), |a, b| Some(a.overflowing_shl(b.into()).0)),
+            Math::Shr([a, b]) => v(a).fold2(v(b), |a, b| Some(a.overflowing_shr(b.into()).0)),
+            Math::And([a, b]) => v(a).fold2(v(b), |a, b| Some(a & b)),
+            Math::Or([a, b]) => v(a).fold2(v(b), |a, b| Some(a | b)),
         };
         sig
     }
@@ -259,9 +256,13 @@ impl Synthesizer {
             for j in self.ids() {
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Mul([i, j]));
-                to_add.push(Math::Sub([i, j]));
+                to_add.push(Math::And([i, j]));
+                to_add.push(Math::Or([i, j]));
+                to_add.push(Math::Shl([i, j]));
+                to_add.push(Math::Shr([i, j]));
             }
             to_add.push(Math::Neg(i));
+            to_add.push(Math::Not(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -530,6 +531,29 @@ impl Equality<Math, SynthAnalysis> {
     }
 }
 
+fn validate(n: usize, rng: &mut impl Rng, lhs: &RecExpr, rhs: &RecExpr) -> bool {
+    let mut egraph = EGraph::new(SynthAnalysis { cvec_len: n });
+    let mut vars = HashSet::new();
+    for node in lhs.as_ref().iter().chain(rhs.as_ref()) {
+        if let Math::Var(v) = node {
+            vars.insert(v);
+        }
+    }
+
+    for v in vars {
+        let id = egraph.add(Math::Var(*v));
+        egraph[id].data.cvec = (0..n).map(|_| rng.gen::<Constant>()).map(Some).collect();
+    }
+
+    let lhs_id = egraph.add_expr(lhs);
+    let rhs_id = egraph.add_expr(rhs);
+
+    let lhs_cvec = &egraph[lhs_id].data.cvec;
+    let rhs_cvec = &egraph[rhs_id].data.cvec;
+
+    lhs_cvec == rhs_cvec
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562,12 +586,12 @@ mod tests {
         let _ = env_logger::try_init();
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
-            n_samples: 10,
-            constants: vec![-1, 0, 1],
+            n_samples: 1000,
+            constants: vec![0, 1],
             variables: vec!["x".into(), "y".into(), "z".into()],
         });
 
-        let eqs = syn.run_orat(1);
+        let eqs = syn.run_orat(2);
 
         println!("CHECKING! Found {} rules", eqs.len());
         for eq in eqs.values() {
@@ -586,21 +610,60 @@ mod tests {
         let _ = env_logger::try_init();
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
-            n_samples: 10,
-            constants: vec![-1, 0, 1],
+            n_samples: 1000,
+            constants: vec![0, 1],
             variables: vec!["x".into(), "y".into(), "z".into()],
         });
-        let eqs = syn.run_mrat(1);
+        let eqs = syn.run_mrat(2);
 
         println!("CHECKING! Found {} rules", eqs.len());
         for eq in eqs.values() {
             println!("  {}", eq);
         }
+        println!("CHECKED! Found {} rules", eqs.len());
 
         check_proves(&eqs, "(+ a b)", "(+ b a)");
         check_proves(&eqs, "(* a b)", "(* b a)");
         check_proves(&eqs, "(+ 1 1)", "2");
         check_proves(&eqs, "a", "(* 1 a)");
         check_proves(&eqs, "a", "(+ a 0)");
+    }
+
+    #[test]
+    fn validate_iowa() {
+        use std::fs::File;
+        use std::io::{self, BufRead};
+        use std::path::Path;
+
+        let mut pairs: Vec<(RecExpr, RecExpr)> = vec![];
+        let file = File::open("bv.txt").unwrap();
+        let reader = io::BufReader::new(file);
+        for line in reader.lines() {
+            let line = line.unwrap();
+            let split: Vec<&str> = line.split(" => ").collect();
+            assert_eq!(split.len(), 2);
+            let lhs = split[0].parse().unwrap();
+            let rhs = split[1].parse().unwrap();
+            pairs.push((lhs, rhs));
+        }
+
+        println!("Parsed {} rules", pairs.len());
+
+        let n_tests = 10_000;
+        let rng = &mut Pcg64::seed_from_u64(1);
+        let mut n_correct = 0;
+        for (lhs, rhs) in &pairs {
+            if validate(n_tests, rng, lhs, rhs) {
+                println!("correct: {} = {}", lhs, rhs);
+                n_correct += 1;
+            }
+        }
+
+        println!(
+            "{} of {} ({}) were correct",
+            n_correct,
+            pairs.len(),
+            n_correct as f64 / pairs.len() as f64
+        );
     }
 }
