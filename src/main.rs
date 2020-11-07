@@ -18,5 +18,4 @@ fn main() {
         println!("{}", eq);
     }
     println!("found {} rules", eqs.len());
-
 }

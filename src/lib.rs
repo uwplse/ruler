@@ -1,5 +1,5 @@
-use std::{time::Instant, ops::Not};
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
+use std::{ops::Not, time::Instant};
 
 use egg::*;
 
@@ -284,7 +284,11 @@ impl Synthesizer {
 
         runner.egraph.rebuild();
 
-        log::info!("Ran {} rules in {:?}, cvec matching...", self.equalities.len(), t.elapsed());
+        log::info!(
+            "Ran {} rules in {:?}, cvec matching...",
+            self.equalities.len(),
+            t.elapsed()
+        );
         runner.egraph
     }
 
@@ -351,7 +355,11 @@ impl Synthesizer {
                 }
             }
         }
-        println!("Learned {} rules in {:?}", self.equalities.len(), t.elapsed());
+        println!(
+            "Learned {} rules in {:?}",
+            self.equalities.len(),
+            t.elapsed()
+        );
         self.equalities
     }
 }
@@ -401,7 +409,12 @@ fn minimize(old_eqs: &EqualityMap, mut new_eqs: EqualityMap) -> EqualityMap {
         }
     }
 
-    log::info!("Minimized {}->{} rules in {:?}", len, new_eqs.len(), t.elapsed());
+    log::info!(
+        "Minimized {}->{} rules in {:?}",
+        len,
+        new_eqs.len(),
+        t.elapsed()
+    );
     keepers
 }
 
