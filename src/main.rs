@@ -7,10 +7,12 @@ fn main() {
         n_samples: 10,
         constants: vec![0, 1],
         variables: vec!["x".into(), "y".into(), "z".into()],
+        iters: 1,
+        rules_to_take: 1,
+        chunk_size: usize::MAX,
         // variables: vec!["x".into(), "y".into(), "z".into(), "w".into()],
     });
-
-    let eqs = syn.run_orat(2);
+    let eqs = syn.run();
 
     for eq in eqs.values() {
         println!("{}", eq);

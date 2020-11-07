@@ -1,4 +1,4 @@
-use std::ops::Not;
+use std::{time::Instant, ops::Not};
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 
 use egg::*;
@@ -185,6 +185,10 @@ pub struct SynthParams {
     pub n_samples: usize,
     pub constants: Vec<Constant>,
     pub variables: Vec<egg::Symbol>,
+    // search params
+    pub iters: usize,
+    pub rules_to_take: usize,
+    pub chunk_size: usize,
 }
 
 type EqualityMap<L = Math, A = SynthAnalysis> = IndexMap<Rc<str>, Equality<L, A>>;
@@ -252,6 +256,9 @@ impl Synthesizer {
     }
 
     fn run_rewrites(&mut self) -> EGraph {
+        let t = Instant::now();
+        log::info!("Running {} rules...", self.equalities.len());
+
         // run the rewrites
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
         let mut runner = Runner::new(self.egraph.analysis.clone())
@@ -276,36 +283,12 @@ impl Synthesizer {
         }
 
         runner.egraph.rebuild();
+
+        log::info!("Ran {} rules in {:?}, cvec matching...", self.equalities.len(), t.elapsed());
         runner.egraph
     }
 
-    fn minimize(&self, eq: Equality) -> Option<Equality> {
-        // instantiate both lhs and rhs of eq
-        let l_expr = instantiate(&eq.lhs);
-        let r_expr = instantiate(&eq.rhs);
-
-        // run eqsat with all current ruleset
-        let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
-        let mut runner = Runner::default()
-            .with_expr(&l_expr)
-            .with_node_limit(usize::MAX)
-            .with_iter_limit(1)
-            // .with_scheduler(SimpleScheduler)
-            .run(rewrites);
-
-        // add rhs to the egraph
-        let rhs_id = runner.egraph.add_expr(&r_expr);
-
-        // lhs and rhs are in same eclass
-        if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
-            println!("threw away: {}", eq.name);
-            None
-        } else {
-            Some(eq)
-        }
-    }
-
-    fn cvec_match(&self) -> EqualityMap {
+    fn cvec_match(&self) -> (EqualityMap, IndexMap<&CVec, Vec<Id>>) {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
         for id in self.ids() {
@@ -333,69 +316,63 @@ impl Synthesizer {
             }
         }
 
-        // let id_sets: Vec<_> = by_cvec.into_iter().map(|(_k, v)| v).collect();
-        // for ids in id_sets {
-        //     for &id in &ids {
-        //         self.egraph.union(ids[0], id);
-        //     }
-        // }
-
         // TODO why is this needed
         new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
-        new_eqs
+        (new_eqs, by_cvec)
     }
 
-    pub fn run_mrat(mut self, iters: usize) -> EqualityMap {
-        for _ in 0..iters {
+    pub fn run(mut self) -> EqualityMap {
+        let t = Instant::now();
+        for _ in 0..self.params.iters {
             let layer = self.make_layer();
-            for node in layer {
-                self.egraph.add(node);
-            }
-
-            self.run_rewrites();
-            log::info!(
-                "egraph n={}, e={}",
-                self.egraph.total_size(),
-                self.egraph.number_of_classes()
-            );
-
-            let new_eqs = self.cvec_match();
-            let new_eqs = minimize(&self.equalities, new_eqs);
-            self.equalities.extend(new_eqs);
-        }
-        self.equalities
-    }
-
-    pub fn run_orat(mut self, iters: usize) -> EqualityMap {
-        for _ in 0..iters {
-            let layer = self.make_layer();
-            for chunk in layer.chunks(usize::MAX) {
+            for chunk in layer.chunks(self.params.chunk_size) {
                 for node in chunk {
                     self.egraph.add(node.clone());
                 }
                 loop {
                     self.run_rewrites();
+                    let (new_eqs, by_cvec) = self.cvec_match();
                     log::info!(
-                        "egraph n={}, e={}",
+                        "egraph n={}, e={}, cv={}",
                         self.egraph.total_size(),
-                        self.egraph.number_of_classes()
+                        self.egraph.number_of_classes(),
+                        by_cvec.len()
                     );
-                    let new_eqs = self.cvec_match();
-                    if new_eqs.is_empty() {
+                    let eqs = choose_eqs(&self.equalities, new_eqs, self.params.rules_to_take);
+                    if eqs.is_empty() {
                         break;
                     }
-                    let eq = choose_best_eq(&new_eqs);
-                    log::info!("Chose best {}", eq);
-                    assert!(!self.equalities.contains_key(&eq.name));
-                    self.equalities.insert(eq.name.clone(), eq);
+                    log::info!("Chose {} rules", eqs.len());
+                    for eq in eqs.values() {
+                        log::info!("  {}", eq);
+                        assert!(!self.equalities.contains_key(&eq.name));
+                    }
+                    self.equalities.extend(eqs);
                 }
             }
         }
+        println!("Learned {} rules in {:?}", self.equalities.len(), t.elapsed());
         self.equalities
     }
 }
 
+fn choose_eqs(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> EqualityMap {
+    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
+    let n = n.min(new_eqs.len());
+    new_eqs.drain(n..);
+    assert_eq!(new_eqs.len(), n);
+    minimize(old_eqs, new_eqs)
+    // assert_eq!(n, 1);
+    // let eq = choose_best_eq(&new_eqs);
+    // let mut map = EqualityMap::new();
+    // map.insert(eq.name.clone().into(), eq);
+    // map
+}
+
 fn minimize(old_eqs: &EqualityMap, mut new_eqs: EqualityMap) -> EqualityMap {
+    let t = Instant::now();
+    let len = new_eqs.len();
+    log::info!("Minimizing {} rules...", len);
     // make the best first
     new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
 
@@ -410,19 +387,21 @@ fn minimize(old_eqs: &EqualityMap, mut new_eqs: EqualityMap) -> EqualityMap {
             .chain(keepers.values().flat_map(|eq| &eq.rewrites));
         let mut runner = Runner::default()
             .with_expr(&l_expr)
-            .with_iter_limit(2)
+            .with_expr(&r_expr)
+            .with_iter_limit(3)
             .with_scheduler(SimpleScheduler)
             .run(rewrites);
 
         let rhs_id = runner.egraph.add_expr(&r_expr);
 
         if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
-            println!("threw away: {}", eq.name);
+            log::debug!("threw away: {}", eq.name);
         } else {
             keepers.insert(eq.name.clone(), eq.clone());
         }
     }
 
+    log::info!("Minimized {}->{} rules in {:?}", len, new_eqs.len(), t.elapsed());
     keepers
 }
 
@@ -437,10 +416,6 @@ fn score(eq: &Equality) -> (isize, isize) {
     // let x = (-(size as isize), vars.len() as isize);
     // // println!("{} {:?}", eq, x);
     // x
-}
-
-fn choose_best_eq(new_eqs: &EqualityMap) -> Equality {
-    new_eqs.values().max_by_key(|eq| score(eq)).unwrap().clone()
 }
 
 // TODO should probably keep things together
@@ -573,14 +548,18 @@ mod tests {
             n_samples: 1000,
             constants: vec![0, 1],
             variables: vec!["x".into(), "y".into(), "z".into()],
+            // search params
+            iters: 1,
+            rules_to_take: 1,
+            chunk_size: usize::MAX,
         });
-
-        let eqs = syn.run_orat(1);
+        let eqs = syn.run();
 
         println!("CHECKING! Found {} rules", eqs.len());
         for eq in eqs.values() {
             println!("  {}", eq);
         }
+        println!("CHECKING! Found {} rules", eqs.len());
 
         check_proves(&eqs, "(+ a b)", "(+ b a)");
         check_proves(&eqs, "(* a b)", "(* b a)");
@@ -597,8 +576,13 @@ mod tests {
             n_samples: 1000,
             constants: vec![0, 1],
             variables: vec!["x".into(), "y".into(), "z".into()],
+            // search params
+            iters: 1,
+            rules_to_take: 100,
+            chunk_size: usize::MAX,
         });
-        let eqs = syn.run_mrat(2);
+
+        let eqs = syn.run();
 
         println!("CHECKING! Found {} rules", eqs.len());
         for eq in eqs.values() {
