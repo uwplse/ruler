@@ -11,8 +11,9 @@ pub fn parse_rules(line: String) -> (RecExpr<Math>, RecExpr<Math>) {
     (lhs, rhs) 
 }
 
-pub fn derive(ruler: String, other: String) -> Vec<(RecExpr<Math>, RecExpr<Math>)> {
+pub fn derive(ruler: String, other: String) -> (Vec<(RecExpr<Math>, RecExpr<Math>)>, Vec<(RecExpr<Math>, RecExpr<Math>)>) {
     let mut derivable = vec![];
+    let mut not_derivable = vec![];
     let ruler = File::open(ruler).unwrap();
     let reader = io::BufReader::new(ruler);
     let mut rules : Vec<Equality> = vec![];
@@ -35,12 +36,15 @@ pub fn derive(ruler: String, other: String) -> Vec<(RecExpr<Math>, RecExpr<Math>
         let runner = Runner::default().with_egraph(egraph).with_iter_limit(3).run(rs.clone());
         if runner.egraph.equivs(&l, &r).len() != 0 {
             derivable.push((l, r));
-        } 
+        } else {
+            not_derivable.push((l, r));
+        }
     }
-    derivable 
+    (derivable, not_derivable)
 }
 
 fn main() {
-    let derivable = derive("out/ruler.txt".to_string(), "out/bv.txt".to_string());
+    let (derivable, not_derivable) = derive("out/ruler.txt".to_string(), "out/arrowed.txt".to_string());
     println!("{} rules are derivable from Ruler rules", derivable.len());
+    println!("{} rules are not derivable from Ruler rules", not_derivable.len());
 }
