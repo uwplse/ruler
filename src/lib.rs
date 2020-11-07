@@ -38,7 +38,7 @@ define_language! {
     }
 }
 
-fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<Math> {
+pub fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<Math> {
     let alpha = b"abcdefghijklmnopqrstuvwxyz";
     let nodes: Vec<_> = expr
         .as_ref()
@@ -61,7 +61,7 @@ fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Pattern<M
     Pattern::from(PatternAst::from(nodes))
 }
 
-fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
+pub fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
     let nodes: Vec<_> = pattern
         .ast
         .as_ref()
@@ -476,7 +476,7 @@ impl<L: Language, A> Display for Equality<L, A> {
 }
 
 impl Equality<Math, SynthAnalysis> {
-    fn new(e1: &RecExpr, e2: &RecExpr) -> Option<Self> {
+    pub fn new(e1: &RecExpr, e2: &RecExpr) -> Option<Self> {
         let mut forward: (String, Pattern, Pattern, Option<Rewrite>) = {
             let map = &mut HashMap::default();
             let lhs = generalize(&e1, map);
