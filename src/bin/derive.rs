@@ -1,25 +1,34 @@
-use ruler::*;
 use egg::*;
-use std::fs;
+use ruler::*;
 use std::fs::File;
 use std::io::{Write, BufReader, BufRead, Error};
 use std::io::{self};
 use std::env;
 
 pub fn parse_rules(line: String) -> (RecExpr<Math>, RecExpr<Math>) {
-    let split: Vec<&str> = line.split("=>").flat_map(|s| s.split(" <")).filter(|e| *e !="").collect();
+    let split: Vec<&str> = line
+        .split("=>")
+        .flat_map(|s| s.split(" <"))
+        .filter(|e| *e != "")
+        .collect();
     assert_eq!(split.len(), 2);
     let lhs: RecExpr<Math> = split[0].parse().unwrap();
     let rhs: RecExpr<Math> = split[1].parse().unwrap();
-    (lhs, rhs) 
+    (lhs, rhs)
 }
 
-pub fn derive(ruler: String, other: String) -> (Vec<(RecExpr<Math>, RecExpr<Math>)>, Vec<(RecExpr<Math>, RecExpr<Math>)>) {
+pub fn derive(
+    ruler: String,
+    other: String,
+) -> (
+    Vec<(RecExpr<Math>, RecExpr<Math>)>,
+    Vec<(RecExpr<Math>, RecExpr<Math>)>,
+) {
     let mut derivable = vec![];
     let mut not_derivable = vec![];
     let ruler = File::open(ruler).unwrap();
     let reader = io::BufReader::new(ruler);
-    let mut rules : Vec<Equality> = vec![];
+    let mut rules: Vec<Equality> = vec![];
     for line in reader.lines() {
         let parsed = parse_rules(line.unwrap());
         let lhs = parsed.0;
@@ -36,7 +45,10 @@ pub fn derive(ruler: String, other: String) -> (Vec<(RecExpr<Math>, RecExpr<Math
         let mut egraph = EGraph::<Math, SynthAnalysis>::default();
         egraph.add_expr(&l);
         egraph.add_expr(&r);
-        let runner = Runner::default().with_egraph(egraph).with_iter_limit(7).run(rs.clone());
+        let runner = Runner::default()
+            .with_egraph(egraph)
+            .with_iter_limit(7)
+            .run(rs.clone());
         if runner.egraph.equivs(&l, &r).len() != 0 {
             derivable.push((l, r));
         } else {
