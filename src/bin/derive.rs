@@ -1,7 +1,10 @@
 use ruler::*;
 use egg::*;
+use std::fs;
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{Write, BufReader, BufRead, Error};
+use std::io::{self};
+use std::env;
 
 pub fn parse_rules(line: String) -> (RecExpr<Math>, RecExpr<Math>) {
     let split: Vec<&str> = line.split("=>").flat_map(|s| s.split(" <")).filter(|e| *e !="").collect();
@@ -33,7 +36,7 @@ pub fn derive(ruler: String, other: String) -> (Vec<(RecExpr<Math>, RecExpr<Math
         let mut egraph = EGraph::<Math, SynthAnalysis>::default();
         egraph.add_expr(&l);
         egraph.add_expr(&r);
-        let runner = Runner::default().with_egraph(egraph).with_iter_limit(3).run(rs.clone());
+        let runner = Runner::default().with_egraph(egraph).with_iter_limit(7).run(rs.clone());
         if runner.egraph.equivs(&l, &r).len() != 0 {
             derivable.push((l, r));
         } else {
@@ -43,8 +46,25 @@ pub fn derive(ruler: String, other: String) -> (Vec<(RecExpr<Math>, RecExpr<Math
     (derivable, not_derivable)
 }
 
-fn main() {
-    let (derivable, not_derivable) = derive("out/ruler.txt".to_string(), "out/arrowed.txt".to_string());
+fn main() -> std::io::Result<()> {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 3 {
+        panic!("Provide two rule files");
+    }
+    let ruler = &args[1];
+    let other = &args[2];
+    let (derivable, not_derivable) = derive(ruler.to_string(), other.to_string());
     println!("{} rules are derivable from Ruler rules", derivable.len());
     println!("{} rules are not derivable from Ruler rules", not_derivable.len());
+    let mut df = File::create("derivable.txt")?;
+    let mut ndf = File::create("notderivable.txt")?;
+    for d in derivable {
+        let wd = format!("{} => {}", d.0.pretty(100), d.1.pretty(100));
+        write!(df, "{}\n", wd)?;
+    }
+    for d in not_derivable {
+        let wd = format!("{} => {}", d.0.pretty(100), d.1.pretty(100));
+        write!(ndf, "{}\n", wd)?;
+    }
+    Ok(())
 }
