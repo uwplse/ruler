@@ -8,11 +8,11 @@ use rand::{prelude::SliceRandom, Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
 
-type Runner = egg::Runner<Math, SynthAnalysis, ()>;
-type Pattern<L = Math> = egg::Pattern<L>;
-type RecExpr<L = Math> = egg::RecExpr<L>;
-type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
-type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
+pub type Runner = egg::Runner<Math, SynthAnalysis, ()>;
+pub type Pattern<L = Math> = egg::Pattern<L>;
+pub type RecExpr<L = Math> = egg::RecExpr<L>;
+pub type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
+pub type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 
 pub type Constant = u8;
 pub type CVec = Vec<Option<Constant>>;
@@ -637,6 +637,8 @@ mod tests {
             if validate(n_tests, rng, lhs, rhs) {
                 println!("correct: {} = {}", lhs, rhs);
                 n_correct += 1;
+            } else {
+                println!("bad:     {} = {}", lhs, rhs);
             }
         }
 
