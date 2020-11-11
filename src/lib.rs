@@ -1,3 +1,4 @@
+use std::io::BufRead;
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 use std::{ops::Not, time::Instant};
 
@@ -503,7 +504,7 @@ impl Equality<Math, SynthAnalysis> {
     }
 }
 
-fn validate(n: usize, rng: &mut impl Rng, lhs: &RecExpr, rhs: &RecExpr) -> bool {
+pub fn validate_one(n: usize, rng: &mut impl Rng, lhs: &RecExpr, rhs: &RecExpr) -> bool {
     let mut egraph = EGraph::new(SynthAnalysis { cvec_len: n });
     let mut vars = HashSet::new();
     for node in lhs.as_ref().iter().chain(rhs.as_ref()) {
@@ -524,6 +525,42 @@ fn validate(n: usize, rng: &mut impl Rng, lhs: &RecExpr, rhs: &RecExpr) -> bool 
     let rhs_cvec = &egraph[rhs_id].data.cvec;
 
     lhs_cvec == rhs_cvec
+}
+
+pub fn validate(
+    eqs: Vec<(RecExpr, RecExpr)>,
+    n_samples: usize,
+) -> (Vec<(RecExpr, RecExpr)>, Vec<(RecExpr, RecExpr)>) {
+    let rng = &mut Pcg64::seed_from_u64(1);
+    eqs.into_iter()
+        .partition(|(l, r)| validate_one(n_samples, rng, l, r))
+}
+
+pub fn parse_rule(line: &str) -> (RecExpr, RecExpr) {
+    let mut split: Vec<&str> = line.split(" <=> ").collect();
+    if split.len() < 2 {
+        split = line.split(" => ").collect();
+    }
+    assert_eq!(split.len(), 2);
+    let lhs = split[0].parse().unwrap();
+    let rhs = split[1].parse().unwrap();
+    (lhs, rhs)
+}
+
+pub fn parse_rules_from_reader(reader: impl BufRead) -> Vec<(RecExpr, RecExpr)> {
+    let mut pairs = vec![];
+    for line in reader.lines() {
+        let line = line.expect("failed to read line");
+        pairs.push(parse_rule(&line));
+    }
+    pairs
+}
+
+pub fn parse_rules_from_file(filename: &str) -> Vec<(RecExpr, RecExpr)> {
+    let file = std::fs::File::open(filename)
+        .unwrap_or_else(|_| panic!("Failed to open {}", filename));
+    let reader = std::io::BufReader::new(file);
+    parse_rules_from_reader(reader)
 }
 
 #[cfg(test)]
@@ -612,41 +649,22 @@ mod tests {
 
     #[test]
     fn validate_iowa() {
-        use std::fs::File;
-        use std::io::{self, BufRead};
-        use std::path::Path;
-
-        let mut pairs: Vec<(RecExpr, RecExpr)> = vec![];
-        let file = File::open("bv.txt").unwrap();
-        let reader = io::BufReader::new(file);
-        for line in reader.lines() {
-            let line = line.unwrap();
-            let split: Vec<&str> = line.split(" => ").collect();
-            assert_eq!(split.len(), 2);
-            let lhs = split[0].parse().unwrap();
-            let rhs = split[1].parse().unwrap();
-            pairs.push((lhs, rhs));
-        }
+        // let file = File::open("notderivable.txt").unwrap();
+        let pairs = parse_rules_from_file("bv3.txt");
 
         println!("Parsed {} rules", pairs.len());
 
-        let n_tests = 10_000;
-        let rng = &mut Pcg64::seed_from_u64(1);
-        let mut n_correct = 0;
-        for (lhs, rhs) in &pairs {
-            if validate(n_tests, rng, lhs, rhs) {
-                println!("correct: {} = {}", lhs, rhs);
-                n_correct += 1;
-            } else {
-                println!("bad:     {} = {}", lhs, rhs);
-            }
+        let (good, bad) = validate(pairs, 10_000);
+        for (lhs, rhs) in &bad {
+            println!("bad: {} = {}", lhs, rhs);
         }
 
+        let n = good.len() + bad.len();
         println!(
             "{} of {} ({}) were correct",
-            n_correct,
-            pairs.len(),
-            n_correct as f64 / pairs.len() as f64
+            good.len(),
+            n,
+            good.len() as f64 / n as f64
         );
     }
 }
