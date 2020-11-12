@@ -12,24 +12,31 @@ fn replace(s: &str) -> RecExpr {
         .replace("bvnot", "~")
         .replace("bvlshr", ">>")
         .replace("bvshl", "<<")
-        .replace("#b0000", "0");
+        .replace("#b0000", "0")
+        .replace("and", "&")
+        .replace("xor", "^")
+        .replace("or", "|")
+        .replace("not", "~");
     s.parse().unwrap()
 }
 
-fn convert(s: &str) -> Equality {
+fn convert(s: &str) -> Option<Equality> {
     let sexp = parse_str(s).unwrap();
     let list = sexp.list().unwrap();
     assert_eq!(list[0], Sexp::String("candidate-rewrite".into()));
     let l = list[1].to_string();
     let r = list[2].to_string();
-    Equality::new(&replace(&l), &replace(&r)).unwrap()
+    Equality::new(&replace(&l), &replace(&r))
 }
 
 fn main() {
     let stdin = io::stdin();
     for line in stdin.lock().lines() {
         let line = line.unwrap();
-        let eq = convert(&line);
-        println!("{}", eq);
+        if let Some(eq) = convert(&line) {
+            println!("{}", eq);
+        } else {
+            eprintln!("Failed to make eq for {}", line);
+        }
     }
 }

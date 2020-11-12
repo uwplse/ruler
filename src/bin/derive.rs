@@ -49,7 +49,12 @@ fn parse_and_validate(filename: &str) -> Vec<Pair> {
     let pairs = parse_rules_from_file(filename);
 
     let (good, bad) = validate(pairs, 10_000);
-    println!("Ignoring {} bad rules from {}", bad.len(), filename);
+    println!(
+        "{}: {} ok rules, {} bad rules",
+        filename,
+        good.len(),
+        bad.len()
+    );
     for (l, r) in bad {
         println!("  {} =/= {}", l, r);
     }
@@ -70,6 +75,11 @@ fn main() -> std::io::Result<()> {
     println!("Using {} to derive {}", args[1], args[2]);
     let (derivable, not_derivable) = derive(&pairs1, &pairs2);
     println!("\nDone!");
+
+    // check the other way just for fun, but don't record it
+    println!("Using {} to derive {}", args[2], args[1]);
+    let _ = derive(&pairs2, &pairs1);
+    println!("\nDone with other way (not recorded)!");
 
     let mut df = File::create("derivable.txt")?;
     let mut ndf = File::create("notderivable.txt")?;
