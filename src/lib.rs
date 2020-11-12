@@ -1,4 +1,5 @@
 use std::io::BufRead;
+use std::time::Duration;
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 use std::{ops::Not, time::Instant};
 
@@ -373,65 +374,87 @@ fn choose_eqs(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> Equa
     new_eqs.drain(n..);
     assert_eq!(new_eqs.len(), n);
     minimize(old_eqs, new_eqs)
-    // assert_eq!(n, 1);
-    // let eq = choose_best_eq(&new_eqs);
-    // let mut map = EqualityMap::new();
-    // map.insert(eq.name.clone().into(), eq);
-    // map
 }
 
 fn minimize(old_eqs: &EqualityMap, mut new_eqs: EqualityMap) -> EqualityMap {
     let t = Instant::now();
-    let len = new_eqs.len();
-    log::info!("Minimizing {} rules...", len);
-    // make the best first
-    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)).reverse());
+    let n_new_eqs = new_eqs.len();
+    log::info!("Minimizing {} rules...", n_new_eqs);
 
     let mut keepers = EqualityMap::default();
-    for eq in new_eqs.values() {
-        let l_expr = instantiate(&eq.lhs);
-        let r_expr = instantiate(&eq.rhs);
+
+    // make the best last
+    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
+
+    while let Some((name, eq)) = new_eqs.pop() {
+        keepers.insert(name, eq);
+
+        if new_eqs.is_empty() {
+            continue;
+        }
 
         let rewrites = old_eqs
             .values()
             .flat_map(|eq| &eq.rewrites)
             .chain(keepers.values().flat_map(|eq| &eq.rewrites));
+
         let mut runner = Runner::default()
-            .with_expr(&l_expr)
-            .with_expr(&r_expr)
-            .with_iter_limit(3)
+            .with_iter_limit(2)
             .with_scheduler(SimpleScheduler)
-            .run(rewrites);
+            .with_node_limit(1_000_000);
 
-        let rhs_id = runner.egraph.add_expr(&r_expr);
-
-        if runner.egraph.find(runner.roots[0]) == runner.egraph.find(rhs_id) {
-            log::debug!("threw away: {}", eq.name);
-        } else {
-            keepers.insert(eq.name.clone(), eq.clone());
+        for candidate_eq in new_eqs.values() {
+            runner = runner.with_expr(&instantiate(&candidate_eq.lhs));
+            runner = runner.with_expr(&instantiate(&candidate_eq.rhs));
         }
+
+        runner = runner.run(rewrites);
+
+        let mut redundant = HashSet::new();
+        for (eq, ids) in new_eqs.values().zip(runner.roots.chunks(2)) {
+            if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+                redundant.insert(eq.name.clone());
+            }
+        }
+
+        // Indexmap::retain preserves the score ordering
+        new_eqs.retain(|name, _eq| !redundant.contains(name));
+        log::info!(
+            "Minimizing... threw away {} rules, {} / {} remain",
+            redundant.len(),
+            new_eqs.len(),
+            n_new_eqs
+        );
     }
 
     log::info!(
         "Minimized {}->{} rules in {:?}",
-        len,
-        new_eqs.len(),
+        n_new_eqs,
+        keepers.len(),
         t.elapsed()
     );
     keepers
 }
 
+// fn score(eq: &Equality) -> (isize, isize) {
+//     let mut vars: HashSet<Var> = Default::default();
+//     vars.extend(eq.lhs.vars());
+//     vars.extend(eq.rhs.vars());
+//     // let size = usize::add(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
+//     let size = AstSize.cost_rec(&eq.lhs.ast) + AstSize.cost_rec(&eq.rhs.ast);
+//     (vars.len() as isize, -(size as isize))
+//     // (-(size as isize), vars.len() as isize)
+//     // let x = (-(size as isize), vars.len() as isize);
+//     // // println!("{} {:?}", eq, x);
+//     // x
+// }
+
 fn score(eq: &Equality) -> (isize, isize) {
     let mut vars: HashSet<Var> = Default::default();
     vars.extend(eq.lhs.vars());
     vars.extend(eq.rhs.vars());
-    // let size = usize::add(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
-    let size = AstSize.cost_rec(&eq.lhs.ast) + AstSize.cost_rec(&eq.rhs.ast);
-    (vars.len() as isize, -(size as isize))
-    // (-(size as isize), vars.len() as isize)
-    // let x = (-(size as isize), vars.len() as isize);
-    // // println!("{} {:?}", eq, x);
-    // x
+    let size = usize::max(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
+    (-(size as isize), vars.len() as isize)
 }
 
 // TODO should probably keep things together
@@ -543,7 +566,7 @@ pub fn parse_rule(line: &str) -> (RecExpr, RecExpr) {
     if split.len() < 2 {
         split = line.split(" => ").collect();
     }
-    assert_eq!(split.len(), 2);
+    assert_eq!(split.len(), 2, "line is bad: {}", line);
     let lhs = split[0].parse().unwrap();
     let rhs = split[1].parse().unwrap();
     (lhs, rhs)
@@ -553,7 +576,10 @@ pub fn parse_rules_from_reader(reader: impl BufRead) -> Vec<(RecExpr, RecExpr)> 
     let mut pairs = vec![];
     for line in reader.lines() {
         let line = line.expect("failed to read line");
-        pairs.push(parse_rule(&line));
+        let line = line.trim();
+        if !line.is_empty() {
+            pairs.push(parse_rule(&line));
+        }
     }
     pairs
 }
@@ -647,26 +673,5 @@ mod tests {
         check_proves(&eqs, "(+ 1 1)", "2");
         check_proves(&eqs, "a", "(* 1 a)");
         check_proves(&eqs, "a", "(+ a 0)");
-    }
-
-    #[test]
-    fn validate_iowa() {
-        // let file = File::open("notderivable.txt").unwrap();
-        let pairs = parse_rules_from_file("bv3.txt");
-
-        println!("Parsed {} rules", pairs.len());
-
-        let (good, bad) = validate(pairs, 10_000);
-        for (lhs, rhs) in &bad {
-            println!("bad: {} = {}", lhs, rhs);
-        }
-
-        let n = good.len() + bad.len();
-        println!(
-            "{} of {} ({}) were correct",
-            good.len(),
-            n,
-            good.len() as f64 / n as f64
-        );
     }
 }
