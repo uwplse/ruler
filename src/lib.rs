@@ -34,6 +34,7 @@ define_language! {
         ">>" = Shr([Id; 2]),
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
+        "^" = Xor([Id; 2]),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -143,6 +144,7 @@ impl Analysis<Math> for SynthAnalysis {
             Math::Shr([a, b]) => v(a).fold2(v(b), |a, b| Some(a.overflowing_shr(b.into()).0)),
             Math::And([a, b]) => v(a).fold2(v(b), |a, b| Some(a & b)),
             Math::Or([a, b]) => v(a).fold2(v(b), |a, b| Some(a | b)),
+            Math::Xor([a, b]) => v(a).fold2(v(b), |a, b| Some(a ^ b)),
         };
         sig
     }
