@@ -1,3 +1,5 @@
+mod bv;
+
 use std::io::BufRead;
 use std::time::Duration;
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
@@ -16,8 +18,25 @@ pub type RecExpr<L = Math> = egg::RecExpr<L>;
 pub type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
 pub type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 
-pub type Constant = u8;
+pub type Constant = bv::u4;
 pub type CVec = Vec<Option<Constant>>;
+
+struct NumberOfOps;
+
+impl egg::CostFunction<Math> for NumberOfOps {
+    type Cost = usize;
+
+    fn cost<C>(&mut self, enode: &Math, mut costs: C) -> Self::Cost
+    where
+        C: FnMut(Id) -> Self::Cost,
+    {
+        if enode.is_leaf() {
+            0
+        } else {
+            enode.fold(1, |sum, id| sum + costs(id))
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Signature {
@@ -28,6 +47,7 @@ pub struct Signature {
 define_language! {
     pub enum Math {
         "+" = Add([Id; 2]),
+        "--" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "-" = Neg(Id),
         "~" = Not(Id),
@@ -118,7 +138,9 @@ pub struct SynthAnalysis {
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { cvec_len: 10_000 }
+        Self {
+            cvec_len: 10_000
+        }
     }
 }
 
@@ -132,6 +154,7 @@ impl Analysis<Math> for SynthAnalysis {
             Math::Neg(a) => v(a).fold1(|a| Some(a.wrapping_neg())),
             Math::Not(a) => v(a).fold1(|a| Some(a.not())),
             Math::Add([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_add(b))),
+            Math::Sub([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_sub(b))),
             Math::Mul([a, b]) => v(a).fold2(v(b), |a, b| Some(a.wrapping_mul(b))),
             Math::Num(n) => Signature {
                 cvec: (0..param.cvec_len).map(|_| Some(n.clone())).collect(),
@@ -141,8 +164,8 @@ impl Analysis<Math> for SynthAnalysis {
                 cvec: vec![],
                 exact: false,
             },
-            Math::Shl([a, b]) => v(a).fold2(v(b), |a, b| Some(a.overflowing_shl(b.into()).0)),
-            Math::Shr([a, b]) => v(a).fold2(v(b), |a, b| Some(a.overflowing_shr(b.into()).0)),
+            Math::Shl([a, b]) => v(a).fold2(v(b), |a, b| Some(a.my_shl(b))),
+            Math::Shr([a, b]) => v(a).fold2(v(b), |a, b| Some(a.my_shr(b))),
             Math::And([a, b]) => v(a).fold2(v(b), |a, b| Some(a & b)),
             Math::Or([a, b]) => v(a).fold2(v(b), |a, b| Some(a | b)),
             Math::Xor([a, b]) => v(a).fold2(v(b), |a, b| Some(a ^ b)),
@@ -240,19 +263,36 @@ impl Synthesizer {
         self.egraph.classes().map(|c| c.id)
     }
 
-    fn make_layer(&self) -> Vec<Math> {
+    fn make_layer(&self, n_ops: usize) -> Vec<Math> {
+        assert!(n_ops > 0);
+        let mut extract = Extractor::new(&self.egraph, NumberOfOps);
+
+        // maps ids to n_ops
+        let ids: IndexMap<Id, usize> = self
+            .ids()
+            .map(|id| (id, extract.find_best_cost(id)))
+            .collect();
+
         let mut to_add = vec![];
         for i in self.ids() {
             for j in self.ids() {
-                to_add.push(Math::Add([i, j]));
-                to_add.push(Math::Mul([i, j]));
-                to_add.push(Math::And([i, j]));
-                to_add.push(Math::Or([i, j]));
-                to_add.push(Math::Shl([i, j]));
-                to_add.push(Math::Shr([i, j]));
+                if ids[&i] + ids[&j] == n_ops - 1 {
+                    to_add.push(Math::And([i, j]));
+                    to_add.push(Math::Or([i, j]));
+
+                    to_add.push(Math::Xor([i, j]));
+
+                    // to_add.push(Math::Add([i, j]));
+                    // to_add.push(Math::Mul([i, j]));
+
+                    // to_add.push(Math::Shl([i, j]));
+                    // to_add.push(Math::Shr([i, j]));
+                }
             }
-            to_add.push(Math::Neg(i));
-            to_add.push(Math::Not(i));
+            if ids[&i] == n_ops - 1 {
+                // to_add.push(Math::Neg(i));
+                to_add.push(Math::Not(i));
+            }
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -270,6 +310,15 @@ impl Synthesizer {
             .with_node_limit(usize::MAX)
             .with_iter_limit(2)
             .with_scheduler(SimpleScheduler)
+            .with_time_limit(Duration::from_secs(60))
+            .with_hook(|r| {
+                for c in r.egraph.classes_mut() {
+                    if c.nodes.iter().find(|n| matches!(n, Math::Num(_))).is_some() {
+                        c.nodes.retain(|n| matches!(n, Math::Num(_)))
+                    }
+                }
+                Ok(())
+            })
             // .with_iter_limit(20)
             // .with_scheduler(BackoffScheduler::default().with_initial_match_limit(5_000))
             .run(rewrites);
@@ -331,8 +380,8 @@ impl Synthesizer {
 
     pub fn run(mut self) -> EqualityMap {
         let t = Instant::now();
-        for _ in 0..self.params.iters {
-            let layer = self.make_layer();
+        for n_ops in 1..=self.params.iters {
+            let layer = self.make_layer(n_ops);
             for chunk in layer.chunks(self.params.chunk_size) {
                 for node in chunk {
                     self.egraph.add(node.clone());
@@ -436,26 +485,26 @@ fn minimize(old_eqs: &EqualityMap, mut new_eqs: EqualityMap) -> EqualityMap {
     keepers
 }
 
-// fn score(eq: &Equality) -> (isize, isize) {
-//     let mut vars: HashSet<Var> = Default::default();
-//     vars.extend(eq.lhs.vars());
-//     vars.extend(eq.rhs.vars());
-//     // let size = usize::add(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
-//     let size = AstSize.cost_rec(&eq.lhs.ast) + AstSize.cost_rec(&eq.rhs.ast);
-//     (vars.len() as isize, -(size as isize))
-//     // (-(size as isize), vars.len() as isize)
-//     // let x = (-(size as isize), vars.len() as isize);
-//     // // println!("{} {:?}", eq, x);
-//     // x
-// }
-
 fn score(eq: &Equality) -> (isize, isize) {
     let mut vars: HashSet<Var> = Default::default();
     vars.extend(eq.lhs.vars());
     vars.extend(eq.rhs.vars());
-    let size = usize::max(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
-    (-(size as isize), vars.len() as isize)
+    // let size = usize::add(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
+    let size = AstSize.cost_rec(&eq.lhs.ast) + AstSize.cost_rec(&eq.rhs.ast);
+    (vars.len() as isize, -(size as isize))
+    // (-(size as isize), vars.len() as isize)
+    // let x = (-(size as isize), vars.len() as isize);
+    // // println!("{} {:?}", eq, x);
+    // x
 }
+
+// fn score(eq: &Equality) -> (isize, isize) {
+//     let mut vars: HashSet<Var> = Default::default();
+//     vars.extend(eq.lhs.vars());
+//     vars.extend(eq.rhs.vars());
+//     let size = usize::max(AstSize.cost_rec(&eq.lhs.ast), AstSize.cost_rec(&eq.rhs.ast));
+//     (-(size as isize), vars.len() as isize)
+// }
 
 // TODO should probably keep things together
 #[derive(Clone)]
@@ -585,8 +634,8 @@ pub fn parse_rules_from_reader(reader: impl BufRead) -> Vec<(RecExpr, RecExpr)> 
 }
 
 pub fn parse_rules_from_file(filename: &str) -> Vec<(RecExpr, RecExpr)> {
-    let file = std::fs::File::open(filename)
-        .unwrap_or_else(|_| panic!("Failed to open {}", filename));
+    let file =
+        std::fs::File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let reader = std::io::BufReader::new(file);
     parse_rules_from_reader(reader)
 }
@@ -624,12 +673,12 @@ mod tests {
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
             n_samples: 1000,
-            constants: vec![0, 1],
+            constants: vec![0, 1].into_iter().map(Constant::from).collect(),
             variables: vec!["x".into(), "y".into(), "z".into()],
             // search params
-            iters: 1,
+            iters: 2,
             rules_to_take: 1,
-            chunk_size: usize::MAX,
+            chunk_size: 100_000,
         });
         let eqs = syn.run();
 
@@ -652,12 +701,13 @@ mod tests {
         let syn = Synthesizer::new(SynthParams {
             seed: 5,
             n_samples: 1000,
-            constants: vec![0, 1],
+            constants: vec![0].into_iter().map(Constant::from).collect(),
             variables: vec!["x".into(), "y".into(), "z".into()],
+            // variables: vec!["x".into(), "y".into()],
             // search params
-            iters: 1,
-            rules_to_take: 100,
-            chunk_size: usize::MAX,
+            iters: 3,
+            rules_to_take: usize::MAX,
+            chunk_size: 100_000,
         });
 
         let eqs = syn.run();
