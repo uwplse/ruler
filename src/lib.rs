@@ -537,16 +537,17 @@ fn choose_eqs(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> Equa
 
     let mut keepers = EqualityMap::default();
 
-    // make the best last
-    new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
+    // // make the best last
+    // new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
 
-    while let Some((name, eq)) = new_eqs.pop() {
-        keepers.insert(name, eq);
+    while !new_eqs.is_empty() && keepers.len() < n {
+        // keepers.insert(name, eq);
 
-        if new_eqs.is_empty() || keepers.len() >= n {
-            break;
-        }
+        // if new_eqs.is_empty() || keepers.len() >= n {
+        //     break;
+        // }
 
+        let n_new_eqs_this_loop = new_eqs.len();
         let rewrites = old_eqs
             .values()
             .flat_map(|eq| &eq.rewrites)
@@ -564,18 +565,43 @@ fn choose_eqs(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> Equa
 
         runner = runner.run(rewrites);
 
-        let mut redundant = HashSet::new();
-        for (eq, ids) in new_eqs.values().zip(runner.roots.chunks(2)) {
+        let mut extract = Extractor::new(&runner.egraph, AstSize);
+        new_eqs = runner.roots.chunks(2).filter_map(|ids| {
             if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
-                redundant.insert(eq.name.clone());
+                None
+            } else {
+                let lhs = extract.find_best(ids[0]).1;
+                let rhs = extract.find_best(ids[1]).1;
+                // TODO get ids so they can be unioned by `run`
+                Equality::new(&lhs, &rhs).map(|eq| (eq.name.clone(), eq))
+            }
+        }).collect();
+
+        // if !new_eqs.is_empty() {
+        // }
+
+        new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
+        while !new_eqs.is_empty() {
+            let (name, eq) = new_eqs.pop().unwrap();
+            if !keepers.contains_key(&name) && !old_eqs.contains_key(&name) {
+                keepers.insert(name, eq);
+                break
             }
         }
 
-        // Indexmap::retain preserves the score ordering
-        new_eqs.retain(|name, _eq| !redundant.contains(name));
+        // let mut redundant = HashSet::new();
+        // for (eq, ids) in new_eqs.values().zip(runner.roots.chunks(2)) {
+        //     if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+        //         redundant.insert(eq.name.clone());
+        //     }
+        // }
+
+        // // Indexmap::retain preserves the score ordering
+        // new_eqs.retain(|name, _eq| !redundant.contains(name));
+
         log::info!(
             "Minimizing... threw away {} rules, {} / {} remain",
-            redundant.len(),
+            n_new_eqs_this_loop - new_eqs.len(),
             new_eqs.len(),
             n_new_eqs
         );
