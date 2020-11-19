@@ -548,12 +548,16 @@ fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> Equality
     let mut flat: VecDeque<Equality> = new_eqs.into_iter().map(|(_, eq)| eq).collect();
     let mut test = vec![];
 
-    for n_chunks in (1..).map(|i| 1 << i) {
+    for mut n_chunks in (2..).map(|i| 1 << i) {
+
+        if n_chunks > flat.len() {
+            if n_chunks >= flat.len() * 2 {
+                break
+            }
+            n_chunks = flat.len();
+        }
 
         println!("n chunks {}", n_chunks);
-        if n_chunks > flat.len() {
-            break
-        }
 
         let mut chunk_sizes = vec![flat.len() / n_chunks; n_chunks];
         for i in 0..(flat.len() % n_chunks) {
@@ -562,11 +566,14 @@ fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> Equality
         assert_eq!(flat.len(), chunk_sizes.iter().sum());
 
         for size in chunk_sizes {
+            let n_new_eqs_this_loop = flat.len();
             test.clear();
             for _ in 0..size {
                 test.push(flat.pop_front().unwrap());
             }
             assert_eq!(test.len(), size);
+
+            println!("chunk size {}, flat {}", size, flat.len());
 
             let mut rewrites: Vec<_> = old_eqs
                 .values()
@@ -579,7 +586,8 @@ fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> Equality
             let mut runner = Runner::default()
                 .with_iter_limit(2)
                 .with_scheduler(SimpleScheduler)
-                .with_node_limit(1_000_000);
+                .with_time_limit(Duration::from_secs(60))
+                .with_node_limit(10_000_000);
 
             for candidate_eq in &test {
                 runner = runner.with_expr(&instantiate(&candidate_eq.lhs));
@@ -589,16 +597,28 @@ fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> Equality
             runner = runner.run(rewrites);
 
             let mut extract = Extractor::new(&runner.egraph, AstSize);
-            flat.extend(runner.roots.chunks(2).filter_map(|ids| {
+            flat.extend(runner.roots.chunks(2).zip(&test).filter_map(|(ids, eq)| {
                 if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
                     None
                 } else {
                     let lhs = extract.find_best(ids[0]).1;
                     let rhs = extract.find_best(ids[1]).1;
                     // TODO get ids so they can be unioned by `run`
-                    Equality::new(&lhs, &rhs)
+                    if let Some(mut eq2) = Equality::new(&lhs, &rhs) {
+                        eq2.ids = eq.ids;
+                        Some(eq2)
+                    } else {
+                        None
+                    }
                 }
             }));
+
+            log::info!(
+                "Minimizing... threw away {} rules, {} / {} remain",
+                n_new_eqs_this_loop - flat.len(),
+                flat.len(),
+                n_new_eqs
+            );
         }
     }
 
