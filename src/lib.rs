@@ -151,7 +151,7 @@ pub struct SynthAnalysis {
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { cvec_len: 10_000 }
+        Self { cvec_len: 1 }
     }
 }
 
@@ -480,14 +480,34 @@ impl Synthesizer {
                         self.egraph.number_of_classes(),
                         n_cv,
                     );
-                    let eqs = choose_eqs(&self.equalities, new_eqs, rules_to_take);
+
+
+                    let minimize = true;
+                    let one_shot = true;
+
+                    let eqs = if minimize {
+                        choose_eqs(&self.equalities, new_eqs, rules_to_take)
+                    } else {
+                        choose_eqs_old(&self.equalities, new_eqs, rules_to_take)
+                    };
+
+                    if one_shot {
+                        // this is ok because we are unioning all of the rules
+                        let id_groups: Vec<Vec<Id>> = by_cvec.into_iter().map(|x| x.1).collect();
+                        for ids in id_groups {
+                            for win in ids.windows(2) {
+                                self.egraph.union(win[0], win[1]);
+                            }
+                        }
+                    }
+
                     if eqs.is_empty() {
                         break;
                     }
                     log::info!("Chose {} rules", eqs.len());
                     for eq in eqs.values() {
                         log::info!("  {}", eq);
-                        assert!(!self.equalities.contains_key(&eq.name));
+                        // assert!(!self.equalities.contains_key(&eq.name));
                         // it's ok to union the commited rules, because they are
                         // guaranteed to get matched in the next go around.
                         // this can help us early exit
@@ -501,6 +521,10 @@ impl Synthesizer {
                     if n_cv == self.egraph.number_of_classes() {
                         log::info!("Leaving inner loop early...");
                         break;
+                    }
+
+                    if one_shot {
+                        break
                     }
                 }
             }
@@ -537,6 +561,94 @@ pub struct Report {
 //     minimize(old_eqs, new_eqs)
 // }
 //
+
+fn choose_eqs_old(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> EqualityMap {
+    let t = Instant::now();
+    let n_new_eqs = new_eqs.len();
+    log::info!("Minimizing {} rules...", n_new_eqs);
+
+    let mut keepers = EqualityMap::default();
+
+    // make the best last
+    // new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
+
+    while !new_eqs.is_empty() {
+
+        let name = new_eqs.values().max_by_key(|eq| eq.score).unwrap().name.clone();
+        let eq = new_eqs.remove(&name).unwrap();
+
+        keepers.insert(name, eq);
+
+        if new_eqs.is_empty() || keepers.len() >= n {
+            break;
+        }
+
+        let rewrites = old_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .chain(keepers.values().flat_map(|eq| &eq.rewrites));
+
+        let mut runner = Runner::default()
+            .with_iter_limit(2)
+            .with_scheduler(SimpleScheduler)
+            .with_node_limit(1_000_000);
+
+        for candidate_eq in new_eqs.values() {
+            runner = runner.with_expr(&instantiate(&candidate_eq.lhs));
+            runner = runner.with_expr(&instantiate(&candidate_eq.rhs));
+        }
+
+        runner = runner.run(rewrites);
+
+        // let mut redundant = HashSet::new();
+        // for (eq, ids) in new_eqs.values().zip(runner.roots.chunks(2)) {
+        //     if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+        //         redundant.insert(eq.name.clone());
+        //     }
+        // }
+
+        // // Indexmap::retain preserves the score ordering
+        // new_eqs.retain(|name, _eq| !redundant.contains(name));
+        //
+        let mut extract = Extractor::new(&runner.egraph, AstSize);
+        new_eqs = runner.roots.chunks(2).zip(new_eqs.values()).filter_map(|(ids, eq)| {
+            if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+                None
+            } else {
+                let lhs = extract.find_best(ids[0]).1;
+                let rhs = extract.find_best(ids[1]).1;
+                // TODO get ids so they can be unioned by `run`
+                if let Some(mut eq2) = Equality::new(&lhs, &rhs) {
+                    if old_eqs.contains_key(&eq2.name) {
+                        None
+                    } else {
+                        eq2.ids = eq.ids;
+                        Some((eq2.name.clone(), eq2))
+                    }
+                } else {
+                    None
+                }
+            }
+        }).collect();
+        // // make the best last
+        // new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
+
+        log::info!(
+            "Minimizing... threw away {} rules, {} / {} remain",
+            0,
+            new_eqs.len(),
+            n_new_eqs
+        );
+    }
+
+    log::info!(
+        "Minimized {}->{} rules in {:?}",
+        n_new_eqs,
+        keepers.len(),
+        t.elapsed()
+    );
+    keepers
+}
 
 fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> EqualityMap {
     let t = Instant::now();
@@ -744,6 +856,7 @@ pub struct Equality<L = Math, A = SynthAnalysis> {
     pub rhs: Pattern<L>,
     // pub cond: Option<Pattern<L>>,
     pub rewrites: Vec<Rewrite<L, A>>,
+    pub score: (isize, isize, isize),
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -773,6 +886,7 @@ impl<L: Language + 'static, A: Analysis<L>> From<SerializedEq> for Equality<L, A
             rhs,
             rewrites,
             ids: None,
+            score: Default::default(),
         }
     }
 }
@@ -826,28 +940,32 @@ impl Equality<Math, SynthAnalysis> {
             std::mem::swap(&mut forward, &mut back);
         }
 
-        match (forward, back) {
-            ((_, _, _, None), (_, _, _, None)) => None,
+        let mut eq = match (forward, back) {
+            ((_, _, _, None), (_, _, _, None)) => return None,
             ((name, lhs, rhs, Some(rw)), (_, _, _, None))
-            | ((_, _, _, None), (name, lhs, rhs, Some(rw))) => Some(Self {
+            | ((_, _, _, None), (name, lhs, rhs, Some(rw))) => Self {
                 name: name.into(),
                 lhs,
                 rhs,
                 ids: None,
+                score: Default::default(),
                 rewrites: vec![rw],
-            }),
-            ((_, lhs, rhs, Some(rw1)), (_, _, _, Some(rw2))) => Some(Self {
+            },
+            ((_, lhs, rhs, Some(rw1)), (_, _, _, Some(rw2))) => Self {
                 name: format!("{} <=> {}", lhs, rhs).into(),
                 lhs,
                 rhs,
                 ids: None,
+                score: Default::default(),
                 rewrites: if rw1.name == rw2.name {
                     vec![rw1]
                 } else {
                     vec![rw1, rw2]
                 },
-            }),
-        }
+            },
+        };
+        eq.score = score(&eq);
+        Some(eq)
     }
 }
 
