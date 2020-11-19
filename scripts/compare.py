@@ -29,9 +29,7 @@ def make_same_row(diff):
         'vars': ruler['params']['variables'],
         'iterations': ruler['params']['iters'],
         'ruler time': ruler['time'],
-        'ruler time pct': pct(ruler['time'], cvc['time']),
         'ruler rules': len(ruler['eqs']),
-        'ruler rules pct': pct(len(ruler['eqs']), len(cvc['eqs'])),
         # 'ruler bad': len(diff['forward']['bad']),
         'ruler prove power': len(diff['forward']['derivable']) / len(cvc['eqs']),
         'cvc time': cvc['time'],
@@ -40,13 +38,16 @@ def make_same_row(diff):
         'cvc prove power': len(diff['reverse']['derivable']) / len(ruler['eqs']),
         # 'ruler cannot prove': len(diff['forward']['not_derivable']),
         # 'cvc cannot prove': len(diff['reverse']['not_derivable']),
+        'ruler time pct': pct(ruler['time'], cvc['time']),
+        'ruler rules pct': pct(len(ruler['eqs']), len(cvc['eqs'])),
     }
 
     return data
 
 def pct(a, b):
-    pct = int(a * 100 / b)
-    return "({}%)".format(pct)
+    return a / b
+    # pct = int(a * 100 / b)
+    # return "({}%)".format(pct)
 
 def fmt(x):
     if x == 0.0:

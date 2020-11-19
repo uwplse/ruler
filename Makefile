@@ -1,6 +1,6 @@
 #
 # make sure you have the `moreutils` package
-
+# and pandoc if you want to generate latex report
 
 SHELL=/usr/bin/env bash
 
@@ -63,7 +63,6 @@ $(eval $(call synthesize,bv4,3,3,99999))
 .PHONY: report
 report: $(diffs)
 	./scripts/compare.py $^ | pandoc -f csv -t latex --columns 200 | sed 's/tabularnewline/\\/'
-
 
 .PHONY: ruler-reports
 ruler-reports: $(ruler-reports)
