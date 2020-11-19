@@ -423,14 +423,12 @@ impl Synthesizer {
 
         let mut new_eqs = EqualityMap::default();
         let mut extract = Extractor::new(&self.egraph, AstSize);
-        let mut to_merge: Vec<(Id, Id)> = vec![];
         for ids in by_cvec.values() {
             if false {
                 // limit id_iter so the cartesian product doesn't get too big
                 let mut id_iter = ids.iter().take(50);
                 while let Some(&id1) = id_iter.next() {
                     for &id2 in id_iter.clone() {
-                        to_merge.push((id1, id2));
                         let (_, e1) = extract.find_best(id1);
                         let (_, e2) = extract.find_best(id2);
                         if let Some(mut eq) = Equality::new(&e1, &e2) {
