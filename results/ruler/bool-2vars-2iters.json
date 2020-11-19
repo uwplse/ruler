@@ -1,0 +1,129 @@
+{
+  "params": {
+    "seed": 0,
+    "n-samples": 0,
+    "domain": "bool",
+    "constants": [
+      0,
+      15
+    ],
+    "variables": 2,
+    "outfile": "results/ruler/bool-2vars-2iters.json",
+    "iters": 2,
+    "rules-to-take": 99999,
+    "chunk-size": null
+  },
+  "time": 0.010674397,
+  "eqs": [
+    {
+      "lhs": "?a",
+      "rhs": "(& ?a ?a)",
+      "bidirectional": true
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(| ?a ?a)",
+      "bidirectional": true
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(| ?a 0)",
+      "bidirectional": true
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(& ?a 15)",
+      "bidirectional": true
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(^ ?a 0)",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(& ?a 0)",
+      "rhs": "0",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(^ ?a ?a)",
+      "rhs": "0",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a 15)",
+      "rhs": "15",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(& ?a ?b)",
+      "rhs": "(& ?b ?a)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a ?b)",
+      "rhs": "(| ?b ?a)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(^ ?a ?b)",
+      "rhs": "(^ ?b ?a)",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(~ ?a)",
+      "rhs": "(^ ?a 15)",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(& ?a (| ?a ?b))",
+      "rhs": "?a",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(^ ?a (^ ?a ?b))",
+      "rhs": "?b",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(| ?a (& ?a ?b))",
+      "rhs": "?a",
+      "bidirectional": false
+    },
+    {
+      "lhs": "(& ?a ?b)",
+      "rhs": "(& ?a (& ?a ?b))",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(| ?a ?b)",
+      "rhs": "(| ?a (| ?a ?b))",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(| ?a ?b)",
+      "rhs": "(| ?a (^ ?a ?b))",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(^ ?a (| ?a ?b))",
+      "rhs": "(& ?b (~ ?a))",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(^ ?a (& ?a ?b))",
+      "rhs": "(& ?a (~ ?b))",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(& ?a (~ ?b))",
+      "rhs": "(& ?a (^ ?a ?b))",
+      "bidirectional": true
+    },
+    {
+      "lhs": "(~ (^ ?a ?b))",
+      "rhs": "(^ ?b (~ ?a))",
+      "bidirectional": true
+    }
+  ]
+}
