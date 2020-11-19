@@ -1,5 +1,6 @@
 mod bv;
 
+use std::collections::VecDeque;
 use std::time::Duration;
 use std::{collections::HashSet, fmt::Display, hash::Hash, rc::Rc};
 use std::{ops::Not, time::Instant};
@@ -530,90 +531,155 @@ pub struct Report {
 // }
 //
 
-fn choose_eqs(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> EqualityMap {
+fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> EqualityMap {
     let t = Instant::now();
     let n_new_eqs = new_eqs.len();
     log::info!("Minimizing {} rules...", n_new_eqs);
 
-    let mut keepers = EqualityMap::default();
+    let mut flat: VecDeque<Equality> = new_eqs.into_iter().map(|(_, eq)| eq).collect();
+    let mut test = vec![];
+
+    for n_chunks in (1..).map(|i| 1 << i) {
+
+        println!("n chunks {}", n_chunks);
+        if n_chunks > flat.len() {
+            break
+        }
+
+        let mut chunk_sizes = vec![flat.len() / n_chunks; n_chunks];
+        for i in 0..(flat.len() % n_chunks) {
+            chunk_sizes[i] += 1;
+        }
+        assert_eq!(flat.len(), chunk_sizes.iter().sum());
+
+        for size in chunk_sizes {
+            test.clear();
+            for _ in 0..size {
+                test.push(flat.pop_front().unwrap());
+            }
+            assert_eq!(test.len(), size);
+
+            let mut rewrites: Vec<_> = old_eqs
+                .values()
+                .flat_map(|eq| &eq.rewrites)
+                .chain(flat.iter().flat_map(|eq| &eq.rewrites)).collect();
+
+            rewrites.sort_by_key(|rw| rw.name());
+            rewrites.dedup_by_key(|rw| rw.name());
+
+            let mut runner = Runner::default()
+                .with_iter_limit(2)
+                .with_scheduler(SimpleScheduler)
+                .with_node_limit(1_000_000);
+
+            for candidate_eq in &test {
+                runner = runner.with_expr(&instantiate(&candidate_eq.lhs));
+                runner = runner.with_expr(&instantiate(&candidate_eq.rhs));
+            }
+
+            runner = runner.run(rewrites);
+
+            let mut extract = Extractor::new(&runner.egraph, AstSize);
+            flat.extend(runner.roots.chunks(2).filter_map(|ids| {
+                if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+                    None
+                } else {
+                    let lhs = extract.find_best(ids[0]).1;
+                    let rhs = extract.find_best(ids[1]).1;
+                    // TODO get ids so they can be unioned by `run`
+                    Equality::new(&lhs, &rhs)
+                }
+            }));
+        }
+    }
 
     // // make the best last
     // new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
+    //
+    // for n_chunks in 2.. {
+    //     if n_chunks > flat.len() {
+    //         break
+    //     }
+    //     let chunk_size = flat.len() / n_chunks;
 
-    while !new_eqs.is_empty() && keepers.len() < n {
-        // keepers.insert(name, eq);
+    //     let mut chunks = Vec::with_capacity(n_chunks);
+    // }
 
-        // if new_eqs.is_empty() || keepers.len() >= n {
-        //     break;
-        // }
+    // while !new_eqs.is_empty() && keepers.len() < n {
+    //     // keepers.insert(name, eq);
 
-        let n_new_eqs_this_loop = new_eqs.len();
-        let rewrites = old_eqs
-            .values()
-            .flat_map(|eq| &eq.rewrites)
-            .chain(keepers.values().flat_map(|eq| &eq.rewrites));
+    //     // if new_eqs.is_empty() || keepers.len() >= n {
+    //     //     break;
+    //     // }
 
-        let mut runner = Runner::default()
-            .with_iter_limit(2)
-            .with_scheduler(SimpleScheduler)
-            .with_node_limit(1_000_000);
+    //     let n_new_eqs_this_loop = new_eqs.len();
+    //     let rewrites = old_eqs
+    //         .values()
+    //         .flat_map(|eq| &eq.rewrites)
+    //         .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
-        for candidate_eq in new_eqs.values() {
-            runner = runner.with_expr(&instantiate(&candidate_eq.lhs));
-            runner = runner.with_expr(&instantiate(&candidate_eq.rhs));
-        }
+    //     let mut runner = Runner::default()
+    //         .with_iter_limit(2)
+    //         .with_scheduler(SimpleScheduler)
+    //         .with_node_limit(1_000_000);
 
-        runner = runner.run(rewrites);
+    //     for candidate_eq in new_eqs.values() {
+    //         runner = runner.with_expr(&instantiate(&candidate_eq.lhs));
+    //         runner = runner.with_expr(&instantiate(&candidate_eq.rhs));
+    //     }
 
-        let mut extract = Extractor::new(&runner.egraph, AstSize);
-        new_eqs = runner.roots.chunks(2).filter_map(|ids| {
-            if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
-                None
-            } else {
-                let lhs = extract.find_best(ids[0]).1;
-                let rhs = extract.find_best(ids[1]).1;
-                // TODO get ids so they can be unioned by `run`
-                Equality::new(&lhs, &rhs).map(|eq| (eq.name.clone(), eq))
-            }
-        }).collect();
+    //     runner = runner.run(rewrites);
 
-        // if !new_eqs.is_empty() {
-        // }
+    //     let mut extract = Extractor::new(&runner.egraph, AstSize);
+    //     new_eqs = runner.roots.chunks(2).filter_map(|ids| {
+    //         if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+    //             None
+    //         } else {
+    //             let lhs = extract.find_best(ids[0]).1;
+    //             let rhs = extract.find_best(ids[1]).1;
+    //             // TODO get ids so they can be unioned by `run`
+    //             Equality::new(&lhs, &rhs).map(|eq| (eq.name.clone(), eq))
+    //         }
+    //     }).collect();
 
-        new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
-        while !new_eqs.is_empty() {
-            let (name, eq) = new_eqs.pop().unwrap();
-            if !keepers.contains_key(&name) && !old_eqs.contains_key(&name) {
-                keepers.insert(name, eq);
-                break
-            }
-        }
+    //     // if !new_eqs.is_empty() {
+    //     // }
 
-        // let mut redundant = HashSet::new();
-        // for (eq, ids) in new_eqs.values().zip(runner.roots.chunks(2)) {
-        //     if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
-        //         redundant.insert(eq.name.clone());
-        //     }
-        // }
+    //     new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
+    //     while !new_eqs.is_empty() {
+    //         let (name, eq) = new_eqs.pop().unwrap();
+    //         if !keepers.contains_key(&name) && !old_eqs.contains_key(&name) {
+    //             keepers.insert(name, eq);
+    //             break
+    //         }
+    //     }
 
-        // // Indexmap::retain preserves the score ordering
-        // new_eqs.retain(|name, _eq| !redundant.contains(name));
+    //     // let mut redundant = HashSet::new();
+    //     // for (eq, ids) in new_eqs.values().zip(runner.roots.chunks(2)) {
+    //     //     if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+    //     //         redundant.insert(eq.name.clone());
+    //     //     }
+    //     // }
 
-        log::info!(
-            "Minimizing... threw away {} rules, {} / {} remain",
-            n_new_eqs_this_loop - new_eqs.len(),
-            new_eqs.len(),
-            n_new_eqs
-        );
-    }
+    //     // // Indexmap::retain preserves the score ordering
+    //     // new_eqs.retain(|name, _eq| !redundant.contains(name));
+
+    //     log::info!(
+    //         "Minimizing... threw away {} rules, {} / {} remain",
+    //         n_new_eqs_this_loop - new_eqs.len(),
+    //         new_eqs.len(),
+    //         n_new_eqs
+    //     );
+    // }
 
     log::info!(
         "Minimized {}->{} rules in {:?}",
         n_new_eqs,
-        keepers.len(),
+        flat.len(),
         t.elapsed()
     );
-    keepers
+
+    flat.into_iter().map(|eq| (eq.name.clone(), eq)).collect()
 }
 
 fn score(eq: &Equality) -> (isize, isize, isize) {
