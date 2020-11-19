@@ -60,12 +60,19 @@ $(eval $(call synthesize,bv4,2,3,99999))
 $(eval $(call synthesize,bv4,3,2,99999))
 $(eval $(call synthesize,bv4,3,3,99999))
 
+.PHONY: report
+report: $(diffs)
+	./scripts/compare.py $^ | pandoc -f csv -t latex --columns 200 | sed 's/tabularnewline/\\/'
+
+
 .PHONY: ruler-reports
 ruler-reports: $(ruler-reports)
 .PHONY: cvc4-reports
 cvc4-reports: $(cvc4-reports)
+.PHONY: diffs
+diffs: $(diffs)
 
-all: ruler-reports cvc4-reports
+all: ruler-reports cvc4-reports diffs
 
 # Local Variables:
 # indent-tabs-mode: t
