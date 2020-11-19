@@ -363,8 +363,15 @@ impl Synthesizer {
 
         // run the rewrites
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
-        let mut runner = Runner::new(self.egraph.analysis.clone())
-            .with_egraph(self.egraph.clone())
+
+        let mut egraph = self.egraph.clone();
+        egraph.analysis.cvec_len = 1;
+        for c in egraph.classes_mut() {
+            c.data.cvec.truncate(1);
+        }
+
+        let mut runner = Runner::new(egraph.analysis.clone())
+            .with_egraph(egraph.clone())
             .with_node_limit(usize::MAX)
             .with_iter_limit(2)
             .with_scheduler(SimpleScheduler)
