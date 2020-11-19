@@ -352,6 +352,8 @@ impl Synthesizer {
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
+
+        to_add.retain(|n| !n.children().iter().all(|&id| self.egraph[id].data.exact));
         to_add
     }
 
