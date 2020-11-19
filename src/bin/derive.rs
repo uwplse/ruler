@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::Write;
 use std::ops::DerefMut;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use rayon::prelude::*;
 
@@ -13,12 +14,15 @@ pub fn derive(src: &[Pair], test: &[Pair]) -> (Vec<Pair>, Vec<Pair>) {
     let eqs: Vec<Equality> = src.iter().flat_map(|(l, r)| Equality::new(l, r)).collect();
 
     let lists = Mutex::new((vec![], vec![]));
+    let mut n = 0.0;
     test.iter().for_each(|(l, r)| {
+        n += 1.0;
         let runner = Runner::default()
             .with_expr(&l)
             .with_expr(&r)
             .with_iter_limit(5)
-            .with_node_limit(1_000_000)
+            .with_time_limit(Duration::from_secs(1))
+            .with_node_limit(100_000)
             .with_scheduler(egg::SimpleScheduler)
             .with_hook(|r| {
                 if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
@@ -41,9 +45,11 @@ pub fn derive(src: &[Pair], test: &[Pair]) -> (Vec<Pair>, Vec<Pair>) {
             not_derivable.push((l.clone(), r.clone()));
         }
         print!(
-            "\r{} derivable, {} not derivable",
+            "\r{} ({:.2}) derivable, {} ({:.2}) not derivable",
             derivable.len(),
-            not_derivable.len()
+            derivable.len() as f64 / n,
+            not_derivable.len(),
+            not_derivable.len() as f64 / n,
         );
         std::io::stdout().flush().unwrap();
     });
