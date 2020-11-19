@@ -465,7 +465,7 @@ impl Synthesizer {
                 for node in chunk {
                     self.egraph.add(node.clone());
                 }
-                loop {
+                for _inner in 0..3 {
                     self.run_rewrites();
                     let (new_eqs, by_cvec) = self.cvec_match();
                     let n_cv = by_cvec.len();
