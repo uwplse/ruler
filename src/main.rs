@@ -1,63 +1,30 @@
-use egg::*;
 use num::bigint::ToBigInt;
 use rand::SeedableRng;
 use ruler::Constant;
 use ruler::*;
-use std::env;
-use std::io::{self, Write};
 
-fn simplify(mut param: SynthParam) -> std::io::Result<()> {
-    let eqs = param.run(13, false, true);
-    let rules = eqs.iter().map(|eq| &eq.rewrite);
-    println!("Entering simplification loop...");
-    loop {
-        print!("Input expression: ");
-        io::stdout().flush()?;
-        let mut expr_str = String::new();
-        match io::stdin().read_line(&mut expr_str) {
-            Ok(_) => {
-                let runner: Runner<SimpleMath, SynthAnalysis, ()> = Runner::default()
-                    .with_expr(&expr_str.parse().unwrap())
-                    .run(rules.clone());
-
-                let mut ext = Extractor::new(&runner.egraph, AstSize);
-                let (_, simp_expr) = ext.find_best(runner.roots[0]);
-                println!("Simplified result: {}", simp_expr);
-                println!();
-            }
-            Err(_) => println!("failed to read expression"),
-        }
-    }
-}
 
 fn main() {
     let _ = env_logger::builder().try_init();
-    let args: Vec<String> = env::args().collect();
-
-    let mut param = SynthParam {
-        rng: SeedableRng::seed_from_u64(5),
-        n_iter: 2,
-        n_samples: 25,
-        variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![
-            num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
+    let syn = Synthesizer::new(SynthParams {
+        seed: 5,
+        n_samples: 2,
+        constants: vec![
+            // num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
             num!(0.to_bigint().unwrap(), 1.to_bigint().unwrap()),
             num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
         ],
-        cond_rule_iters: 1,
-        cond_rule_rand_idx: 5,
-        cond_diff_thresh: 12,
-    };
+        // TODO: DON'T ENABLE THIS! We don't support eval with more than 3 vars right now, so this will give you index out of bounds.
+        // variables: vec!["x".into(), "y".into(), "z".into(), "w".into()],
+        variables: vec!["x".into(), "y".into(), "z".into()],
+        iters: 1,
+        rules_to_take: 1,
+        chunk_size: usize::MAX,
+    });
+    let eqs = syn.run();
 
-    if args.len() < 2 {
-        param.run(13, false, true);
-    } else if args.len() >= 2 && args[1] == "simplify" {
-        let res = simplify(param);
-        match res {
-            Ok(_) => println!(),
-            Err(_) => println!("Error while simplifying"),
-        }
-    } else {
-        println!("USAGE: \n `cargo run` will run Ruler \n `cargo run simplify` will allow simplifying an expression.");
+    for eq in eqs.values() {
+        println!("{}", eq);
     }
+    println!("found {} rules", eqs.len());
 }
