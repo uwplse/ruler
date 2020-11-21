@@ -49,6 +49,7 @@ impl egg::CostFunction<Math> for NumberOfOps {
 pub enum Domain {
     Bool,
     BV4,
+    BV4NS,
 }
 
 #[derive(Debug, Clone)]
@@ -260,7 +261,7 @@ impl Synthesizer {
         if params.constants.is_empty() {
             params.constants = match params.domain {
                 Domain::Bool => vec![Constant::ZERO, Constant::MAX],
-                Domain::BV4 => vec![Constant::ZERO, 0x8.into(), 0x7.into()],
+                Domain::BV4 | Domain::BV4NS => vec![Constant::ZERO, 0x8.into(), 0x7.into()],
             }
         }
 
@@ -331,13 +332,14 @@ impl Synthesizer {
                         Domain::Bool => {
                             to_add.push(Math::Xor([i, j]));
                         }
-                        Domain::BV4 => {
+                        Domain::BV4 | Domain::BV4NS => {
                             to_add.push(Math::Add([i, j]));
                             to_add.push(Math::Sub([i, j]));
                             to_add.push(Math::Mul([i, j]));
-
-                            to_add.push(Math::Shl([i, j]));
-                            to_add.push(Math::Shr([i, j]));
+                            if self.params.domain == Domain::BV4 {
+                                to_add.push(Math::Shl([i, j]));
+                                to_add.push(Math::Shr([i, j]));
+                            }
                         }
                     }
                 }
@@ -345,7 +347,7 @@ impl Synthesizer {
             if ids[&i] + 1 == n_ops {
                 to_add.push(Math::Not(i));
 
-                if self.params.domain == Domain::BV4 {
+                if matches!(self.params.domain, Domain::BV4 | Domain::BV4NS) {
                     to_add.push(Math::Neg(i));
                 }
             }

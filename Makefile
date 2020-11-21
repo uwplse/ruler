@@ -34,7 +34,7 @@ results/cvc4/$(1)-$(2)vars-$(3)iters.txt: cvc4/$(1)-$(2)vars.sy
 	\time -p $(cvc4) --sygus-abort-size $(3) $$< 2>&1 | sponge $$@
 
 cvc4-reports += results/cvc4/$(1)-$(2)vars-$(3)iters.json
-results/cvc4/$(1)-$(2)vars-$(3)iters.json: results/cvc4/$(1)-$(2)vars-$(3)iters.txt $(rust-src)
+results/cvc4/$(1)-$(2)vars-$(3)iters.json: results/cvc4/$(1)-$(2)vars-$(3)iters.txt # $(rust-src)
 	cargo run --release --bin convert_sexp -- $$< | sponge $$@
 
 diffs += results/diffs/$(1)-$(2)vars-$(3)iters.json
@@ -54,11 +54,17 @@ $(eval $(call synthesize,bool,3,3,99999))
 $(eval $(call synthesize,bool,4,2,99999))
 $(eval $(call synthesize,bool,4,3,99999))
 # $(eval $(call synthesize,bool,4,4,99999))
-
+#
 $(eval $(call synthesize,bv4,2,2,99999))
 $(eval $(call synthesize,bv4,2,3,99999))
 $(eval $(call synthesize,bv4,3,2,99999))
 $(eval $(call synthesize,bv4,3,3,99999))
+
+$(eval $(call synthesize,bv4ns,2,2,99999))
+$(eval $(call synthesize,bv4ns,2,3,99999))
+$(eval $(call synthesize,bv4ns,3,2,99999))
+$(eval $(call synthesize,bv4ns,3,3,99999))
+
 
 .PHONY: report
 report: $(diffs)

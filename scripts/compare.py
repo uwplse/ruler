@@ -3,6 +3,7 @@
 import csv
 import sys
 import json
+import statistics
 
 
 def load_report(filename):
@@ -64,8 +65,15 @@ if __name__ == '__main__':
 
     rows = [make_same_row(d) for d in diffs]
 
+    avg_time_diff = statistics.harmonic_mean([r['ruler time pct'] for r in rows])
+    avg_rule_diff = statistics.harmonic_mean([r['ruler rules pct'] for r in rows])
+
     writer = csv.DictWriter(sys.stdout, rows[0].keys())
     writer.writeheader()
     for row in rows:
         row = {k: fmt(v) for k,v in row.items()}
         writer.writerow(row)
+
+    print('avg time diff', 'avg rule diff',
+          avg_time_diff, '{:.1f}x'.format(1/avg_time_diff),
+          avg_rule_diff, '{:.1f}x'.format(1/avg_rule_diff))
