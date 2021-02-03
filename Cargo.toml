@@ -25,8 +25,9 @@ itertools = "0.9"
 
 [dependencies.egg]
 features = ["serde"]
-# git = "https://github.com/egraphs-good/egg"
+git = "https://github.com/egraphs-good/egg"
+rev = "39415f19acdacd6dde62f40cb2bb08f8669acc85"
 # rev = "e5213a5e5e77b31f3eab85f1515c1c3be9c3f560" # eclasses
 # rev = "8f4bf69ed139aa3d8683f54cc8c0884a984fc4a8" # rules
 # rev = "dc99befe30f25c6bce05d10febd10d9228619a8f" # master
-path = "../egg"
+# path = "../egg"
