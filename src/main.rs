@@ -1,35 +1,16 @@
-use egg::*;
-use rand::SeedableRng;
 use ruler::*;
-use std::io::{self, Write};
+use structopt::StructOpt;
 
-fn main() -> io::Result<()> {
-    let mut param = SynthParam {
-        rng: SeedableRng::seed_from_u64(5),
-        n_iter: 2,
-        n_samples: 25,
-        variables: vec!["x".into(), "y".into(), "z".into()],
-        consts: vec![-1, 0, 1],
-    };
+fn main() {
+    let _ = env_logger::builder().try_init();
+    let params = SynthParams::from_args();
 
-    let eqs = param.run();
-    let rules = eqs.iter().map(|eq| &eq.rewrite);
+    let syn = Synthesizer::new(params.clone());
+    let report = syn.run();
 
-    println!("Entering simplification loop...");
-    let stdin = io::stdin();
-    loop {
-        print!("Input expression: ");
-        io::stdout().flush()?;
-        let mut expr_str = String::new();
-        stdin.read_line(&mut expr_str)?;
-
-        let runner: Runner<SimpleMath, SynthAnalysis, ()> = Runner::default()
-            .with_expr(&expr_str.parse().unwrap())
-            .run(rules.clone());
-
-        let mut ext = Extractor::new(&runner.egraph, AstSize);
-        let (_, simp_expr) = ext.find_best(runner.roots[0]);
-        println!("Simplified result: {}", simp_expr);
-        println!();
+    if let Some(outfile) = &params.outfile {
+        let file = std::fs::File::create(outfile)
+            .unwrap_or_else(|_| panic!("Failed to open outfile '{}'", outfile));
+        serde_json::to_writer_pretty(file, &report).expect("failed to write json");
     }
 }
