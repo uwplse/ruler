@@ -58,8 +58,7 @@ pub fn derive(src: &[Pair], test: &[Pair]) -> (Vec<Pair>, Vec<Pair>) {
 }
 
 fn parse_and_validate(filename: &str) -> (Vec<Pair>, Vec<Pair>) {
-    let file = File::open(filename)
-        .unwrap_or_else(|_| panic!("Failed to open {}", filename));
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let report: Report = serde_json::from_reader(file).unwrap();
 
     let pairs: Vec<Pair> = report
