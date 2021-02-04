@@ -1,4 +1,4 @@
-# ruler
+# Ruler
 
 Ruler is a framework that uses equality saturation
  to automatically infer rewrite rules for a domain, given an interpreter.
