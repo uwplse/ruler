@@ -460,6 +460,62 @@ impl Synthesizer {
         (new_eqs, by_cvec)
     }
 
+    pub fn orat(mut self) -> Report {
+        let chunk_size = self.params.chunk_size.unwrap_or(usize::MAX);
+
+        let t = Instant::now();
+        for n_ops in 1..=self.params.iters {
+            log::info!("[[[[  Iteration {}   ]]]]", n_ops);
+            let layer = self.make_layer(n_ops);
+            for chunk in layer.chunks(chunk_size) {
+                for node in chunk {
+                    self.egraph.add(node.clone());
+                }
+                loop {
+                    self.run_rewrites();
+                    let (new_eqs, by_cvec) = self.cvec_match();
+                    let n_cv = by_cvec.len();
+                    log::info!(
+                        "egraph n={}, e={}, cv={}",
+                        self.egraph.total_size(),
+                        self.egraph.number_of_classes(),
+                        n_cv,
+                    );
+
+                    let eqs = choose_eqs_old(&self.equalities, new_eqs, 1);
+
+                    if eqs.is_empty() {
+                        break;
+                    }
+                    log::info!("Chose {} rules", eqs.len());
+                    for eq in eqs.values() {
+                        log::info!("  {}", eq);
+                        if let Some((i, j)) = eq.ids {
+                            self.egraph.union(i, j);
+                        }
+                    }
+
+                    self.equalities.extend(eqs);
+                    self.egraph.rebuild();
+                }
+            }
+        }
+
+        let time = t.elapsed().as_secs_f64();
+        let eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
+
+        for eq in &eqs {
+            println!("{}", eq);
+        }
+        println!("Learned {} rules in {}", eqs.len(), time,);
+
+        Report {
+            params: self.params,
+            time,
+            eqs,
+        }
+    }
+ 
     pub fn run(mut self) -> Report {
         let chunk_size = self.params.chunk_size.unwrap_or(usize::MAX);
         let rules_to_take = self.params.rules_to_take;
@@ -473,6 +529,7 @@ impl Synthesizer {
                     self.egraph.add(node.clone());
                 }
                 for _inner in 0..3 {
+                // loop {
                     self.run_rewrites();
                     let (new_eqs, by_cvec) = self.cvec_match();
                     let n_cv = by_cvec.len();
@@ -490,7 +547,7 @@ impl Synthesizer {
                     let eqs = if minimize {
                         choose_eqs(&self.equalities, new_eqs, rules_to_take)
                     } else {
-                        choose_eqs_old(&self.equalities, new_eqs, rules_to_take)
+                        choose_eqs_old(&self.equalities, new_eqs, 1)
                     };
 
                     if one_shot {
@@ -602,16 +659,6 @@ fn choose_eqs_old(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> 
 
         runner = runner.run(rewrites);
 
-        // let mut redundant = HashSet::new();
-        // for (eq, ids) in new_eqs.values().zip(runner.roots.chunks(2)) {
-        //     if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
-        //         redundant.insert(eq.name.clone());
-        //     }
-        // }
-
-        // // Indexmap::retain preserves the score ordering
-        // new_eqs.retain(|name, _eq| !redundant.contains(name));
-        //
         let mut extract = Extractor::new(&runner.egraph, AstSize);
         new_eqs = runner.roots.chunks(2).zip(new_eqs.values()).filter_map(|(ids, eq)| {
             if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
