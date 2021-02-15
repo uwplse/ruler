@@ -460,8 +460,9 @@ impl Synthesizer {
         (new_eqs, by_cvec)
     }
 
-    pub fn orat(mut self) -> Report {
+    pub fn mrat(mut self) -> Report {
         let chunk_size = self.params.chunk_size.unwrap_or(usize::MAX);
+        let rules_to_take = self.params.rules_to_take;
 
         let t = Instant::now();
         for n_ops in 1..=self.params.iters {
@@ -482,7 +483,7 @@ impl Synthesizer {
                         n_cv,
                     );
 
-                    let eqs = choose_eqs_old(&self.equalities, new_eqs, 1);
+                    let eqs = choose_eqs_old(&self.equalities, new_eqs, rules_to_take);
 
                     if eqs.is_empty() {
                         break;

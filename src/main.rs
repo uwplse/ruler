@@ -7,6 +7,7 @@ fn main() {
 
     let syn = Synthesizer::new(params.clone());
     let report = syn.run();
+    // let report = syn.mrat();
 
     if let Some(outfile) = &params.outfile {
         let file = std::fs::File::create(outfile)
