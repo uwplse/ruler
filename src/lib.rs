@@ -6,75 +6,37 @@ use num::{rational::Ratio, Signed, ToPrimitive};
 use rand::SeedableRng;
 use rand::{prelude::SliceRandom, Rng};
 use rand_pcg::Pcg64;
+use std::collections::VecDeque;
+use std::rc::Rc;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
-    fmt::Formatter,
     time::Duration,
     time::Instant,
 };
-use std::{convert::TryInto, rc::Rc};
 use std::{hash::Hash, sync::Mutex};
+
 type Runner = egg::Runner<Math, SynthAnalysis, ()>;
 type Pattern<L = Math> = egg::Pattern<L>;
 type RecExpr<L = Math> = egg::RecExpr<L>;
 type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
 type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 
-#[macro_export]
-macro_rules! num {
-    ($x:expr, $y:expr) => {
-        Constant {
-            val: num::rational::Ratio::new($x, $y),
-        }
-    };
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct Constant {
-    pub val: Ratio<BigInt>,
-}
-
-pub static PREC: u32 = 2048;
-pub static MASK: i32 = 10;
-pub static SEED: u64 = 5;
-pub static VALID_SEED: u64 = 7;
-pub static EPS: f32 = 1e-5;
-
-lazy_static! {
-    static ref RNG: Mutex<Pcg64> = Mutex::new(Pcg64::seed_from_u64(SEED));
-}
-
+pub type Constant = Ratio<BigInt>;
 pub type CVec = Vec<Option<Constant>>;
 pub type Ctx = HashMap<&'static str, Constant>;
 
-impl Display for Constant {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} / {}", self.val.numer(), self.val.denom())
-    }
-}
-
-impl std::str::FromStr for Constant {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Constant, Self::Err> {
-        // TODO: I am not sure about this.
-        let nd: Vec<&str> = s.split(" ").collect();
-        if nd.len() == 2 {
-            let numer = nd[0].parse::<BigInt>().unwrap();
-            let denom = nd[1].parse::<BigInt>().unwrap();
-            Ok(Constant {
-                val: Ratio::new(numer, denom),
-            })
-        } else {
-            Err(format!("'{}' is not a valid value for Constant", s))
-        }
-    }
+pub static SEED: u64 = 5;
+pub static VALID_SEED: u64 = 7;
+lazy_static! {
+    static ref RNG: Mutex<Pcg64> = Mutex::new(Pcg64::seed_from_u64(SEED));
 }
 
 #[derive(Debug, Clone)]
 pub struct Signature {
     cvec: CVec,
     exact: bool,
+    constant: Option<Constant>,
 }
 
 define_language! {
@@ -84,12 +46,33 @@ define_language! {
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
         "pow" = Pow([Id; 2]),
-        "abs" = Abs(Id),
+        "fabs" = Abs(Id),
         "recip" = Reciprocal(Id),
         "~" = Neg(Id),
         Num(Constant),
         Var(egg::Symbol),
     }
+}
+
+pub fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
+    if d == &0.to_bigint().unwrap() {
+        None
+    } else {
+        Some(Ratio::new(n.clone(), d.clone()))
+    }
+}
+
+// randomly sample denoms so that they are not 0
+// Ratio::new will panic if the denom is 0
+pub fn gen_bigint(rng: &Pcg64, bits: u64) -> BigInt {
+    let mut res = 0.to_bigint().unwrap();
+    loop {
+        res = rng.clone().gen_bigint(bits);
+        if res != 0.to_bigint().unwrap() {
+            break;
+        }
+    }
+    res
 }
 
 // if there is an input that is bad, add it to the cvec and recompute them.
@@ -102,26 +85,31 @@ fn is_valid(lhs: Pattern, rhs: Pattern) -> bool {
     let lhs = instantiate(&lhs);
     let rhs = instantiate(&rhs);
     // add more random inputs for testing
-    for _ in 0..100000 {
+    for _ in 0..1000 {
         let (xn, yn, zn) = (rng.gen_bigint(32), rng.gen_bigint(32), rng.gen_bigint(32));
-        let (xd, yd, zd) = (rng.gen_bigint(32), rng.gen_bigint(32), rng.gen_bigint(32));
-        env.insert("x", num!(xn, xd));
-        env.insert("y", num!(yn, yd));
-        env.insert("z", num!(zn, zd));
+        let (xd, yd, zd) = (
+            gen_bigint(&rng, 32),
+            gen_bigint(&rng, 32),
+            gen_bigint(&rng, 32),
+        );
+        let a = Ratio::new(xn, xd);
+        let b = Ratio::new(yn, yd);
+        let c = Ratio::new(zn, zd);
+        env.insert("a", a.clone());
+        env.insert("b", b.clone());
+        env.insert("c", c.clone());
         let l = eval(&env.clone(), lhs.as_ref());
         let r = eval(&env, rhs.as_ref());
         match (l, r) {
-            (None, None) => {
-                valid = true;
-            },
-            (None, Some(_)) | (Some(_), None) => {
+            (None, _) | (_, None) => {
+                println!("{} => {} failed validation at {} {} {}", lhs, rhs, a, b, c);
                 return false
             },
             (Some(l), Some(r)) => {
                 if l == r {
                     valid = true;
                 } else {
-                    return false
+                    return false;
                 }
             }
         }
@@ -131,17 +119,20 @@ fn is_valid(lhs: Pattern, rhs: Pattern) -> bool {
 
 pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
     match expr.last().expect("empty expr!") {
-        Math::Num(n) => Some(n.clone()),
+        Math::Num(n) => mk_constant(n.numer(), n.denom()),
         Math::Var(v) => {
-            let x = ctx.get("x").cloned();
-            let y = ctx.get("y").cloned();
-            let z = ctx.get("z").cloned();
-            if v.as_str() == "x" {
-                Some(x.unwrap())
-            } else if v.as_str() == "y" {
-                Some(y.unwrap())
-            } else if v.as_str() == "z" {
-                Some(z.unwrap())
+            let a = ctx.get("a").cloned();
+            let b = ctx.get("b").cloned();
+            let c = ctx.get("c").cloned();
+            if v.as_str() == "a" {
+                let au = a.unwrap();
+                mk_constant(au.numer(), au.denom())
+            } else if v.as_str() == "b" {
+                let bu = b.unwrap();
+                mk_constant(bu.numer(), bu.denom())
+            } else if v.as_str() == "c" {
+                let cu = c.unwrap();
+                mk_constant(cu.numer(), cu.denom())
             } else {
                 panic!("eval: currently only supports rules with 3 variables");
             }
@@ -154,9 +145,8 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             if e1 == None || e2 == None {
                 None
             } else {
-                Some(Constant {
-                    val: (e1.unwrap().val + e2.unwrap().val),
-                })
+                let res = e1.unwrap() + e2.unwrap();
+                mk_constant(res.numer(), res.denom())
             }
         }
         Math::Sub([a, b]) => {
@@ -167,9 +157,8 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             if e1 == None || e2 == None {
                 None
             } else {
-                Some(Constant {
-                    val: (e1.unwrap().val - e2.unwrap().val),
-                })
+                let res = e1.unwrap() - e2.unwrap();
+                mk_constant(res.numer(), res.denom())
             }
         }
         Math::Mul([a, b]) => {
@@ -180,9 +169,8 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             if e1 == None || e2 == None {
                 None
             } else {
-                Some(Constant {
-                    val: (e1.unwrap().val - e2.unwrap().val),
-                })
+                let res = e1.unwrap() * e2.unwrap();
+                mk_constant(res.numer(), res.denom())
             }
         }
         Math::Div([a, b]) => {
@@ -193,9 +181,8 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             if e1 == None || e2 == None {
                 None
             } else {
-                Some(Constant {
-                    val: (e1.unwrap().val / e2.unwrap().val),
-                })
+                let res = e1.unwrap() / e2.unwrap();
+                mk_constant(res.numer(), res.denom())
             }
         }
         Math::Abs(a) => {
@@ -204,9 +191,8 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             if e1 == None {
                 None
             } else {
-                Some(Constant {
-                    val: e1.unwrap().val.abs(),
-                })
+                let res = e1.unwrap().abs();
+                mk_constant(res.numer(), res.denom())
             }
         }
         Math::Pow([a, b]) => {
@@ -214,13 +200,16 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             let b = usize::from(*b);
             let e1 = eval(ctx, &expr[..=a]);
             let e2 = eval(ctx, &expr[..=b]);
-            let power = e2.unwrap().val.numer().to_i32();
-            if e1 == None || power == None {
+            if e1 == None || e2 == None {
                 None
             } else {
-                Some(Constant {
-                    val: e1.unwrap().val.pow(power.unwrap()),
-                })
+                match e2.unwrap().to_i32() {
+                    None => None,
+                    Some(v) => {
+                        let res = e1.unwrap().pow(v);
+                        mk_constant(res.numer(), res.denom())
+                    }
+                }
             }
         }
         Math::Reciprocal(a) => {
@@ -229,9 +218,8 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             if e1 == None {
                 None
             } else {
-                Some(Constant {
-                    val: e1.unwrap().val.recip(),
-                })
+                let res = e1.unwrap().recip();
+                mk_constant(res.numer(), res.denom())
             }
         }
         Math::Neg(a) => {
@@ -240,9 +228,8 @@ pub fn eval(ctx: &Ctx, expr: &[Math]) -> Option<Constant> {
             if e1 == None {
                 None
             } else {
-                Some(Constant {
-                    val: -e1.unwrap().val,
-                })
+                let res = -e1.unwrap();
+                mk_constant(res.numer(), res.denom())
             }
         }
     }
@@ -290,22 +277,20 @@ fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
 }
 
 impl Signature {
-    fn fold1(&self, mut f: impl FnMut(&Constant) -> Option<Constant>) -> Self {
-        let cvec = self
-            .cvec
-            .iter()
-            .map(|x| x.as_ref().and_then(&mut f))
-            .collect();
+    fn fold1(&self, mut f: impl Fn(Constant) -> Option<Constant>) -> Self {
+        let compute = |x : &Option<Constant>| match x {
+            None => None,
+            Some(v) => f(v.clone())
+        };
+        let cvec = self.cvec.iter().map(&compute).collect();
         Self {
             cvec,
             exact: self.exact,
+            constant: compute(&self.constant),
         }
     }
-    fn fold2(
-        &self,
-        other: &Self,
-        mut f: impl FnMut(Constant, Constant) -> Option<Constant>,
-    ) -> Self {
+
+    fn fold2(&self, other: &Self, f: impl Fn(Constant, Constant) -> Option<Constant>) -> Self {
         if !self.cvec.is_empty() && !other.cvec.is_empty() {
             assert_eq!(self.cvec.len(), other.cvec.len());
         }
@@ -314,10 +299,12 @@ impl Signature {
             (Some(n1), Some(n2)) => f(n1.clone(), n2.clone()),
             (_, _) => None,
         };
-        let cvec = self.cvec.iter().zip(&other.cvec).map(compute).collect();
+        // let cvec: CVec = self.cvec.iter().zip(&other.cvec).map(|(x, y)| compute((x, y))).collect();
+        let cvec: CVec = self.cvec.iter().zip(&other.cvec).map(&compute).collect();
         Self {
             cvec,
             exact: self.exact && other.exact,
+            constant: compute((&self.constant, &other.constant)),
         }
     }
 }
@@ -364,68 +351,75 @@ impl Analysis<Math> for SynthAnalysis {
         let v = |i: &Id| &egraph[*i].data;
         let param = &egraph.analysis;
         match enode {
-            Math::Neg(a) => v(a).fold1(|a| Some(Constant { val: (-a.val.clone()) })),
+            Math::Neg(a) => v(a).fold1(|a| mk_constant(a.numer(), a.denom())),
             Math::Add([a, b]) => v(a).fold2(v(b), |a, b| {
-                let inner = a.val + b.val;
-                Some(Constant { val: inner })
+                let res = a + b;
+                mk_constant(res.numer(), res.denom())
             }),
             Math::Sub([a, b]) => v(a).fold2(v(b), |a, b| {
-                let inner = a.val - b.val;
-                Some(Constant { val: inner })
+                let res = a - b;
+                mk_constant(res.numer(), res.denom())
             }),
             Math::Mul([a, b]) => v(a).fold2(v(b), |a, b| {
-                let inner = a.val * b.val;
-                Some(Constant { val: inner })
+                let res = a * b;
+                mk_constant(res.numer(), res.denom())
             }),
             Math::Num(n) => {
-                let cv: Vec<Option<Constant>> =
-                    (0..param.cvec_len).map(|_| Some(n.clone())).collect();
+                let cv: Vec<Option<Constant>> = (0..param.cvec_len)
+                    .map(|_| mk_constant(n.numer(), n.denom()))
+                    .collect();
                 Signature {
                     cvec: cv.clone(),
                     exact: true,
+                    constant: Some(n.clone()),
                 }
             }
             Math::Var(_) => Signature {
                 cvec: vec![],
                 exact: false,
+                constant: None,
             },
+            // (na / da) /  (nb / db) = na * db / da * nb
             Math::Div([a, b]) => v(a).fold2(v(b), |a, b| {
-                let inner = a.val / b.val;
-                Some(Constant { val: inner })
+                if b.numer() * a.denom() != 0.to_bigint().unwrap() { 
+                    let res = a / b;
+                    mk_constant(res.numer(), res.denom())
+                } else {
+                    None
+                }
             }),
             Math::Abs(a) => v(a).fold1(|a| {
-                let inner = a.val.abs();
-                Some(Constant { val: inner })
+                let res = a.abs();
+                mk_constant(res.numer(), res.denom())
             }),
             Math::Pow([a, b]) => v(a).fold2(v(b), |a, b| {
-                let inner = a.val.pow(b.val.to_i32().unwrap());
-                Some(Constant { val: inner })
+                let power = b.to_i32();
+                if power == None {
+                    None
+                } else {
+                    let res = a.pow(power.unwrap());
+                    mk_constant(res.numer(), res.denom())
+                }
             }),
             Math::Reciprocal(a) => v(a).fold1(|a| {
-                let inner = a.val.recip();
-                Some(Constant { val: inner })
+                if a.denom() != &0.to_bigint().unwrap() {
+                    let res = a.recip();
+                    mk_constant(res.numer(), res.denom())
+                } else {
+                    None
+                }
             }),
         }
     }
 
     fn modify(egraph: &mut EGraph, id: Id) {
         let sig = &egraph[id].data;
-        let cv = &sig.cvec;
-        let exact = sig.exact;
-        if cv.is_empty() || cv.contains(&None) {
+        let c = &sig.constant;
+        if let Some(v) = c {
+            let added = egraph.add(Math::Num(v.clone()));
+            egraph.union(id, added);
+        } else {
             return;
-        }
-        let first = cv[0].clone();
-        if cv.iter().all(|x| *x == first) {
-            match first {
-                Some(n) => {
-                    let added = egraph.add(Math::Num(n.clone()));
-                    if exact {
-                        egraph.union(id, added);
-                    }
-                }
-                None => {}
-            }
         }
     }
 }
@@ -462,14 +456,22 @@ impl Synthesizer {
         for var in &params.variables {
             let id = egraph.add(Math::Var(*var));
             let mut cvec: Vec<Option<Constant>> = (0..params.n_samples)
-                .map(|_| Some(num!(rng.gen_bigint(32), rng.gen_bigint(32))))
+                .map(|_| mk_constant(&rng.gen_bigint(32), &gen_bigint(&rng, 32)))
                 .collect();
-            cvec.push(Some(num!(0.to_bigint().unwrap(), 1.to_bigint().unwrap())));
-            cvec.push(Some(num!(1.to_bigint().unwrap(), 1.to_bigint().unwrap())));
-            cvec.push(Some(num!(-1.to_bigint().unwrap(), 1.to_bigint().unwrap())));
+            cvec.push(mk_constant(
+                &0.to_bigint().unwrap(),
+                &1.to_bigint().unwrap(),
+            ));
+            cvec.push(mk_constant(
+                &1.to_bigint().unwrap(),
+                &1.to_bigint().unwrap(),
+            ));
+            cvec.push(mk_constant(
+                &-1.to_bigint().unwrap(),
+                &1.to_bigint().unwrap(),
+            ));
             egraph[id].data.cvec = cvec.clone();
             var_cvec_map.insert(var, cvec.clone());
-            println!("var: {}, cvec: {:?}", var, cvec.clone());
         }
 
         for n in &params.constants {
@@ -498,14 +500,14 @@ impl Synthesizer {
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
                 // to_add.push(Math::Div([i, j]));
-                to_add.push(Math::Pow([i, j]));
+                // to_add.push(Math::Pow([i, j]));
             }
             if self.egraph[i].data.exact {
                 continue;
             }
-            to_add.push(Math::Neg(i));
             to_add.push(Math::Abs(i));
-            to_add.push(Math::Reciprocal(i));
+            // to_add.push(Math::Reciprocal(i));
+            to_add.push(Math::Neg(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -521,8 +523,6 @@ impl Synthesizer {
             .with_node_limit(usize::MAX)
             .with_iter_limit(2)
             .with_scheduler(SimpleScheduler)
-            // .with_iter_limit(5)
-            // .with_scheduler(BackoffScheduler::default().with_initial_match_limit(5_000))
             .run(rewrites);
 
         // update the clean egraph based on any unions that happened
@@ -543,32 +543,47 @@ impl Synthesizer {
 
     fn cvec_match(&self) -> EqualityMap {
         // build the cvec matching data structure
-        let mut by_cvec: IndexMap<Vec<Option<Constant>>, Vec<Id>> = IndexMap::new();
+        let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
+
         let not_all_nones = self
-            .ids()
-            .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
+        .ids()
+        .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
         for id in not_all_nones {
             let class = &self.egraph[id];
-            // key = first_n_bits(&class.clone().data.cvec);
-            // by_cvec.entry(&key).or_default().push(class.id);
             by_cvec
-                .entry(class.data.cvec.clone())
+                .entry(&class.data.cvec)
                 .or_default()
                 .push(class.id);
         }
 
+        log::info!("# unique cvecs: {}", by_cvec.len());
+
         let mut new_eqs = EqualityMap::default();
         let mut extract = Extractor::new(&self.egraph, AstSize);
-        let mut to_merge: Vec<(Id, Id)> = vec![];
         for ids in by_cvec.values() {
-            let mut id_iter = ids.iter();
-            while let Some(&id1) = id_iter.next() {
-                for &id2 in id_iter.clone() {
-                    to_merge.push((id1, id2));
-                    let (_, e1) = extract.find_best(id1);
-                    let (_, e2) = extract.find_best(id2);
-                    if let Some(eq) = Equality::new(&e1, &e2) {
-                        // log::info!("  Candidate {}", eq);
+            if false {
+                // limit id_iter so the cartesian product doesn't get too big
+                let mut id_iter = ids.iter().take(50);
+                while let Some(&id1) = id_iter.next() {
+                    for &id2 in id_iter.clone() {
+                        let (_, e1) = extract.find_best(id1);
+                        let (_, e2) = extract.find_best(id2);
+                        if let Some(mut eq) = Equality::new(&e1, &e2) {
+                            log::debug!("  Candidate {}", eq);
+                            eq.ids = Some((id1, id2));
+                            new_eqs.insert(eq.name.clone(), eq);
+                        }
+                    }
+                }
+            } else {
+                // try linear cvec matching
+                let mut terms_ids: Vec<_> = ids.iter().map(|&id| (extract.find_best(id), id)).collect();
+                terms_ids.sort_by_key(|x| x.0.0);
+                for win in terms_ids.windows(2) {
+                    let (((_c1, e1), id1), ((_c2, e2), id2)) = (&win[0], &win[1]);
+                    if let Some(mut eq) = Equality::new(e1, e2) {
+                        log::debug!("  Candidate {}", eq);
+                        eq.ids = Some((*id1, *id2));
                         new_eqs.insert(eq.name.clone(), eq);
                     }
                 }
@@ -604,17 +619,14 @@ impl Synthesizer {
                         self.egraph.number_of_classes(),
                     );
 
-                    log::info!("Found {} new candidate rules", new_eqs.len());
-                    let eqs: EqualityMap =
-                        choose_eqs(&self.equalities, new_eqs, self.params.rules_to_take);
+                    let minimize = true;
 
-                    log::info!("filtering {} rules to find poison rules", eqs.len());
+                    let (eqs, bads) = if minimize {
+                        choose_eqs(&self.equalities, new_eqs, self.params.rules_to_take)
+                    } else {
+                        choose_eqs_old(&self.equalities, new_eqs, self.params.rules_to_take)
+                    };
 
-                    let (eqs, bads): (EqualityMap, EqualityMap) = eqs
-                        .into_iter()
-                        .partition(|(_name, eq)| is_valid(eq.lhs.clone(), eq.rhs.clone()));
-
-                    log::info!("{} rules are unsound", bads.len());
                     for bad in bads {
                         log::info!("adding {} to poison set", bad.0);
                         poison_rules.insert(bad.1);
@@ -643,17 +655,25 @@ impl Synthesizer {
     }
 }
 
-fn choose_eqs(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> EqualityMap {
+fn choose_eqs_old(
+    old_eqs: &EqualityMap,
+    mut new_eqs: EqualityMap,
+    n: usize,
+) -> (EqualityMap, EqualityMap) {
     let t = Instant::now();
     let n_new_eqs = new_eqs.len();
     log::info!("Minimizing {} rules...", n_new_eqs);
 
     let mut keepers = EqualityMap::default();
+    let mut bads = EqualityMap::default();
     // make the best last
     new_eqs.sort_by(|_, eq1, _, eq2| score(eq1).cmp(&score(eq2)));
     while let Some((name, eq)) = new_eqs.pop() {
-        // println!("BEST: {}, score {:?}", name, score(&eq));
-        keepers.insert(name, eq);
+        if is_valid(eq.lhs.clone(), eq.rhs.clone()) {
+            keepers.insert(name, eq);
+        } else {
+            bads.insert(name, eq);
+        }
         if new_eqs.is_empty() || keepers.len() >= n {
             log::info!(
                 "Nothing to minimize. new_eqs len: {}, keepers len: {}",
@@ -702,7 +722,105 @@ fn choose_eqs(old_eqs: &EqualityMap, mut new_eqs: EqualityMap, n: usize) -> Equa
         keepers.len(),
         t.elapsed()
     );
-    keepers
+    (keepers, bads)
+}
+
+fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> (EqualityMap, EqualityMap) {
+    let t = Instant::now();
+    let (new_eqs, bads): (EqualityMap, EqualityMap) = new_eqs
+        .into_iter()
+        .partition(|(_name, eq)| is_valid(eq.lhs.clone(), eq.rhs.clone()));
+
+    let n_new_eqs = new_eqs.len();
+    log::info!("Minimizing {} rules...", n_new_eqs);
+    let mut flat: VecDeque<Equality> = new_eqs.into_iter().map(|(_, eq)| eq).collect();
+    let mut test = vec![];
+
+    for mut n_chunks in (2..).map(|i| 1 << i) {
+        if n_chunks > flat.len() {
+            if n_chunks >= flat.len() * 2 {
+                break;
+            }
+            n_chunks = flat.len();
+        }
+
+        log::info!("n chunks {}", n_chunks);
+
+        let mut chunk_sizes = vec![flat.len() / n_chunks; n_chunks];
+        for i in 0..(flat.len() % n_chunks) {
+            chunk_sizes[i] += 1;
+        }
+        assert_eq!(flat.len(), chunk_sizes.iter().sum());
+
+        for size in chunk_sizes {
+            let n_new_eqs_this_loop = flat.len();
+            test.clear();
+            for _ in 0..size {
+                test.push(flat.pop_front().unwrap());
+            }
+            assert_eq!(test.len(), size);
+
+            log::info!("chunk size {}, flat {}", size, flat.len());
+
+            let mut rewrites: Vec<_> = old_eqs
+                .values()
+                .flat_map(|eq| &eq.rewrites)
+                .chain(flat.iter().flat_map(|eq| &eq.rewrites))
+                .collect();
+
+            rewrites.sort_by_key(|rw| rw.name());
+            rewrites.dedup_by_key(|rw| rw.name());
+
+            let mut runner = Runner::default()
+                .with_iter_limit(2)
+                .with_scheduler(SimpleScheduler)
+                .with_time_limit(Duration::from_secs(60))
+                .with_node_limit(10_000_000);
+
+            for candidate_eq in &test {
+                runner = runner.with_expr(&instantiate(&candidate_eq.lhs));
+                runner = runner.with_expr(&instantiate(&candidate_eq.rhs));
+            }
+
+            runner = runner.run(rewrites);
+
+            let mut extract = Extractor::new(&runner.egraph, AstSize);
+            flat.extend(runner.roots.chunks(2).zip(&test).filter_map(|(ids, eq)| {
+                if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+                    None
+                } else {
+                    let lhs = extract.find_best(ids[0]).1;
+                    let rhs = extract.find_best(ids[1]).1;
+                    // TODO get ids so they can be unioned by `run`
+                    if let Some(mut eq2) = Equality::new(&lhs, &rhs) {
+                        eq2.ids = eq.ids;
+                        Some(eq2)
+                    } else {
+                        None
+                    }
+                }
+            }));
+
+            log::info!(
+                "Minimizing... threw away {} rules, {} / {} remain",
+                n_new_eqs_this_loop - flat.len(),
+                flat.len(),
+                n_new_eqs
+            );
+        }
+    }
+
+    log::info!(
+        "Minimized {}->{} rules in {:?}",
+        n_new_eqs,
+        flat.len(),
+        t.elapsed()
+    );
+
+    (
+        flat.into_iter().map(|eq| (eq.name.clone(), eq)).collect(),
+        bads,
+    )
 }
 
 fn score(eq: &Equality) -> (isize, isize) {
@@ -730,6 +848,7 @@ fn score(eq: &Equality) -> (isize, isize) {
 pub struct Equality<L = Math, A = SynthAnalysis> {
     pub name: Rc<str>,
     pub lhs: Pattern<L>,
+    pub ids: Option<(Id, Id)>,
     pub rhs: Pattern<L>,
     // pub cond: Option<Pattern<L>>,
     pub rewrites: Vec<Rewrite<L, A>>,
@@ -796,12 +915,14 @@ impl Equality<Math, SynthAnalysis> {
                 name: name.into(),
                 lhs,
                 rhs,
+                ids: None,
                 rewrites: vec![rw],
             }),
             ((_, lhs, rhs, Some(rw1)), (_, _, _, Some(rw2))) => Some(Self {
                 name: format!("{} <=> {}", lhs, rhs).into(),
                 lhs,
                 rhs,
+                ids: None,
                 rewrites: if rw1.name() == rw2.name() {
                     vec![rw1]
                 } else {
