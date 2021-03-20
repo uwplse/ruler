@@ -1,12 +1,6 @@
 use ruler::*;
 use std::env;
 use std::fs::File;
-use std::io::Write;
-use std::ops::DerefMut;
-use std::sync::Mutex;
-use std::time::Duration;
-
-use rayon::prelude::*;
 
 type Pair = (RecExpr, RecExpr);
 
@@ -85,7 +79,7 @@ fn main() -> std::io::Result<()> {
     // check the other way just for fun, but don't record it
     println!("Using {} to derive {}", args[2], args[1]);
     let (rev_derivable, rev_not_derivable) = derive(&pairs2, &pairs1);
-    println!("\nDone with other way (not recorded)!");
+    println!("\nDone with other way!");
 
     let json = serde_json::json!({
         "files": [&args[1], &args[2]],
