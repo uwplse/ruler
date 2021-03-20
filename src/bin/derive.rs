@@ -16,7 +16,7 @@ pub fn derive(src: &[Pair], test: &[Pair]) -> (Vec<Pair>, Vec<Pair>) {
         let runner = Runner::default()
             .with_expr(&l)
             .with_expr(&r)
-            .with_iter_limit(5)
+            .with_iter_limit(10)
             .with_scheduler(egg::SimpleScheduler)
             .with_hook(|r| {
                 if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
@@ -74,12 +74,12 @@ fn main() -> std::io::Result<()> {
 
     println!("Using {} to derive {}", args[1], args[2]);
     let (derivable, not_derivable) = derive(&pairs1, &pairs2);
-    println!("\nDone!");
+    println!("{} rules are derivable, {} are not.", derivable.len(), not_derivable.len());
 
     // check the other way just for fun, but don't record it
-    println!("Using {} to derive {}", args[2], args[1]);
+    println!("\nUsing {} to derive {}", args[2], args[1]);
     let (rev_derivable, rev_not_derivable) = derive(&pairs2, &pairs1);
-    println!("\nDone with other way!");
+    println!("{} rules are derivable, {} are not.", rev_derivable.len(), rev_not_derivable.len());
 
     let json = serde_json::json!({
         "files": [&args[1], &args[2]],
