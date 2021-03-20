@@ -5,6 +5,7 @@ use num::bigint::{BigInt, RandBigInt, Sign, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive};
 use rand::SeedableRng;
 use rand::{prelude::SliceRandom, Rng};
+use serde::{Deserialize, Serialize};
 use rand_pcg::Pcg64;
 use std::collections::VecDeque;
 use std::rc::Rc;
@@ -16,11 +17,11 @@ use std::{
 };
 use std::{hash::Hash, sync::Mutex};
 
-type Runner = egg::Runner<Math, SynthAnalysis, ()>;
-type Pattern<L = Math> = egg::Pattern<L>;
-type RecExpr<L = Math> = egg::RecExpr<L>;
-type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
-type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
+pub type Runner = egg::Runner<Math, SynthAnalysis, ()>;
+pub type Pattern<L = Math> = egg::Pattern<L>;
+pub type RecExpr<L = Math> = egg::RecExpr<L>;
+pub type Rewrite<L = Math, A = SynthAnalysis> = egg::Rewrite<L, A>;
+pub type EGraph<L = Math, A = SynthAnalysis> = egg::EGraph<L, A>;
 
 pub type Constant = Ratio<BigInt>;
 pub type CVec = Vec<Option<Constant>>;
@@ -258,7 +259,7 @@ pub fn generalize(expr: &RecExpr<Math>, map: &mut HashMap<Symbol, Var>) -> Patte
     Pattern::from(PatternAst::from(nodes))
 }
 
-fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
+pub fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
     let nodes: Vec<_> = pattern
         .ast
         .as_ref()
@@ -424,7 +425,6 @@ impl Analysis<Math> for SynthAnalysis {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct SynthParams {
     pub seed: u64,
     pub n_samples: usize,
@@ -434,13 +434,15 @@ pub struct SynthParams {
     pub iters: usize,
     pub rules_to_take: usize,
     pub chunk_size: usize,
+    pub minimize: bool,
+    pub outfile: String
 }
 
 type EqualityMap<L = Math, A = SynthAnalysis> = IndexMap<Rc<str>, Equality<L, A>>;
 
 #[allow(dead_code)]
 pub struct Synthesizer {
-    params: SynthParams,
+    pub params: SynthParams,
     //rng: Pcg64,
     egraph: EGraph,
     equalities: EqualityMap,
@@ -595,7 +597,7 @@ impl Synthesizer {
         new_eqs
     }
 
-    pub fn run(mut self) -> EqualityMap {
+    pub fn run(mut self) -> Report {
         let mut poison_rules: HashSet<Equality> = HashSet::new();
         let t = Instant::now();
         for _ in 0..self.params.iters {
@@ -619,9 +621,7 @@ impl Synthesizer {
                         self.egraph.number_of_classes(),
                     );
 
-                    let minimize = true;
-
-                    let (eqs, bads) = if minimize {
+                    let (eqs, bads) = if self.params.minimize {
                         choose_eqs(&self.equalities, new_eqs, self.params.rules_to_take)
                     } else {
                         choose_eqs_old(&self.equalities, new_eqs, self.params.rules_to_take)
@@ -646,13 +646,27 @@ impl Synthesizer {
                 }
             }
         }
+        let time = t.elapsed().as_secs_f64();
+        let num_rules = self.equalities.len();
+        let eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
         println!(
             "Learned {} rules in {:?}",
-            self.equalities.len(),
-            t.elapsed()
+            num_rules,
+            time
         );
-        self.equalities
+        Report {
+            time,
+            num_rules,
+            eqs
+        }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Report {
+    pub time: f64,
+    pub num_rules: usize,
+    pub eqs: Vec<Equality>,
 }
 
 fn choose_eqs_old(
@@ -724,6 +738,7 @@ fn choose_eqs_old(
     );
     (keepers, bads)
 }
+
 
 fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> (EqualityMap, EqualityMap) {
     let t = Instant::now();
@@ -844,7 +859,10 @@ fn score(eq: &Equality) -> (isize, isize) {
     (-sz_max_pattern, n_vars_rule)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(from = "SerializedEq")]
+#[serde(into = "SerializedEq")]
+#[serde(bound = "L: Clone + Language + 'static, A: Clone + Analysis<L>")]
 pub struct Equality<L = Math, A = SynthAnalysis> {
     pub name: Rc<str>,
     pub lhs: Pattern<L>,
@@ -852,6 +870,47 @@ pub struct Equality<L = Math, A = SynthAnalysis> {
     pub rhs: Pattern<L>,
     // pub cond: Option<Pattern<L>>,
     pub rewrites: Vec<Rewrite<L, A>>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct SerializedEq {
+    lhs: String,
+    rhs: String,
+    bidirectional: bool,
+}
+
+impl<L: Language + 'static, A: Analysis<L>> From<SerializedEq> for Equality<L, A> {
+    fn from(ser: SerializedEq) -> Self {
+        let lhs: Pattern<L> = ser.lhs.parse().unwrap();
+        let rhs: Pattern<L> = ser.rhs.parse().unwrap();
+        let mut rewrites =
+            vec![Rewrite::new(format!("{} => {}", lhs, rhs), lhs.clone(), rhs.clone()).unwrap()];
+        let name = if ser.bidirectional {
+            rewrites.push(
+                Rewrite::new(format!("{} => {}", rhs, lhs), rhs.clone(), lhs.clone()).unwrap(),
+            );
+            format!("{} <=> {}", lhs, rhs)
+        } else {
+            format!("{} => {}", lhs, rhs)
+        };
+        Self {
+            name: name.into(),
+            lhs,
+            rhs,
+            rewrites,
+            ids: None,
+        }
+    }
+}
+
+impl<L: Language, A: Analysis<L>> From<Equality<L, A>> for SerializedEq {
+    fn from(eq: Equality<L, A>) -> Self {
+        Self {
+            lhs: eq.lhs.to_string(),
+            rhs: eq.rhs.to_string(),
+            bidirectional: eq.rewrites.len() > 1,
+        }
+    }
 }
 
 impl<L: Language, A> Hash for Equality<L, A> {
@@ -871,6 +930,7 @@ impl<L: Language, A> PartialEq for Equality<L, A> {
         self.name == other.name
     }
 }
+
 impl<L: Language, A> Eq for Equality<L, A> {
     fn assert_receiver_is_total_eq(&self) {}
 }

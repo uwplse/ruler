@@ -1,6 +1,6 @@
 use num::bigint::ToBigInt;
 use ruler::*;
-use num::{rational::Ratio, Signed, ToPrimitive};
+use num::{rational::Ratio};
 
 fn main() {
     let _ = env_logger::builder().try_init();
@@ -16,9 +16,13 @@ fn main() {
         iters: 2,
         rules_to_take: 100,
         chunk_size: usize::MAX,
+        minimize: true,
+        outfile: "minimize.json".to_string()
     });
-    let eqs = syn.run();
-    for eq in eqs.values() {
-        println!("{}", eq);
-    }
+    let outfile = &syn.params.outfile.clone();
+    let report = syn.run();
+
+    let file = std::fs::File::create(outfile)
+        .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
+    serde_json::to_writer_pretty(file, &report).expect("failed to write json");
 }
