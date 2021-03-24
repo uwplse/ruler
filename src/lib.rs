@@ -9,6 +9,7 @@ use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::rc::Rc;
+use num::Zero;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
@@ -40,6 +41,13 @@ pub struct Signature {
     constant: Option<Constant>,
 }
 
+impl Signature {
+    fn is_defined(&self) -> bool {
+        // self.cvec.iter().any(|v| v != &None)
+        self.cvec.is_empty() || self.cvec.iter().any(|v| v.is_some())
+    }
+}
+
 define_language! {
     pub enum Math {
         "+" = Add([Id; 2]),
@@ -56,7 +64,7 @@ define_language! {
 }
 
 pub fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
-    if d == &0.to_bigint().unwrap() {
+    if d.is_zero() {
         None
     } else {
         Some(Ratio::new(n.clone(), d.clone()))
@@ -389,15 +397,21 @@ impl Analysis<Math> for SynthAnalysis {
                 constant: None,
             },
             Math::Div([a, b]) => v(a).fold2(v(b), |a, b| {
-                if b.numer() != &0.to_bigint().unwrap()
-                    && b.denom() != &0.to_bigint().unwrap()
-                    && a.denom() != &0.to_bigint().unwrap()
-                {
+                if b.is_zero() {
+                    None
+                } else{
                     let res = a / b;
                     mk_constant(res.numer(), res.denom())
-                } else {
-                    None
                 }
+                // if b.numer() != &0.to_bigint().unwrap()
+                //     && b.denom() != &0.to_bigint().unwrap()
+                //     && a.denom() != &0.to_bigint().unwrap()
+                // {
+                //     let res = a / b;
+                //     mk_constant(res.numer(), res.denom())
+                // } else {
+                //     None
+                // }
             }),
             Math::Abs(a) => v(a).fold1(|a| {
                 let res = a.abs();
@@ -548,7 +562,7 @@ impl Synthesizer {
                     continue;
                 }
                 to_add.push(Math::Add([i, j]));
-                to_add.push(Math::Sub([i, j]));
+                //to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
                 to_add.push(Math::Div([i, j]));
                 // to_add.push(Math::Pow([i, j]));
@@ -556,9 +570,9 @@ impl Synthesizer {
             if self.egraph[i].data.exact {
                 continue;
             }
-            to_add.push(Math::Abs(i));
+            // to_add.push(Math::Abs(i));
             // to_add.push(Math::Reciprocal(i));
-            to_add.push(Math::Neg(i));
+            // to_add.push(Math::Neg(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -590,6 +604,57 @@ impl Synthesizer {
 
         runner.egraph.rebuild();
         runner.egraph
+    }
+
+    fn cvec_match_pair_wise (&self) -> EqualityMap {
+        let mut by_cvec: IndexMap<CVec, Vec<Id>> = IndexMap::new();
+
+        let not_all_nones = self
+            .ids()
+            .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
+        for id in not_all_nones {
+            let class = &self.egraph[id];
+            let cvec = vec![class.data.cvec[0].clone()];
+            by_cvec.entry(cvec).or_default().push(class.id);
+        }
+
+        log::info!("# unique cvecs: {}", by_cvec.len());
+
+        let mut new_eqs = EqualityMap::default();
+        let mut extract = Extractor::new(&self.egraph, AstSize);
+
+        let compare = |cvec1: &CVec, cvec2: &CVec| -> bool {
+            let mut count = 0;
+            for tup in cvec1.iter().zip(cvec2) {
+                count += match tup {
+                    (Some(a), Some(b)) if a != b => return false,
+                    (None, Some(_)) | (Some(_), None) => 1,
+                    _ => 0,
+                };
+            }
+            true
+        };
+
+        for ids in by_cvec.values() {
+            let mut ids = ids.iter().copied();
+            while let Some(id1) = ids.next() {
+                for id2 in ids.clone() {
+                    if compare(&self.egraph[id1].data.cvec, &self.egraph[id2].data.cvec) {
+                        let (_, e1) = extract.find_best(id1);
+                        let (_, e2) = extract.find_best(id2);
+                        if let Some(mut eq) = Equality::new(&e1, &e2) {
+                            log::debug!("  Candidate {}", eq);
+                            eq.ids = Some((id1, id2));
+                            new_eqs.insert(eq.name.clone(), eq);
+                        }
+                    }
+                }
+            }
+        }
+
+        // TODO why is this needed
+        new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
+        new_eqs
     }
 
     fn cvec_match(&self) -> EqualityMap {
@@ -655,7 +720,7 @@ impl Synthesizer {
                 }
                 loop {
                     self.run_rewrites();
-                    let new_eqs = self.cvec_match();
+                    let new_eqs = self.cvec_match_pair_wise();
 
                     let new_eqs: EqualityMap = new_eqs
                         .into_iter()
@@ -880,7 +945,7 @@ fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> (Equalit
     )
 }
 
-fn score(eq: &Equality) -> (isize, isize) {
+fn score(eq: &Equality) -> (isize, isize, isize) {
     let lhs = &eq.lhs.ast;
     let rhs = &eq.rhs.ast;
 
@@ -898,7 +963,8 @@ fn score(eq: &Equality) -> (isize, isize) {
     var_set.extend(eq.rhs.vars());
     let n_vars_rule = var_set.len() as isize;
 
-    (-sz_max_pattern, n_vars_rule)
+    // (-sz_max_pattern, n_vars_rule)
+    (n_vars_rule, -sz_lhs.min(sz_rhs), -sz_lhs.max(sz_rhs))
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -961,9 +1027,9 @@ impl<L: Language, A> Hash for Equality<L, A> {
     }
 }
 
-impl<L: Language, A> Display for Equality<L, A> {
+impl Display for Equality {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
+        write!(f, "{}  cost: {:?}", self.name, score(self))
     }
 }
 
@@ -977,6 +1043,39 @@ impl<L: Language, A> Eq for Equality<L, A> {
     fn assert_receiver_is_total_eq(&self) {}
 }
 
+struct NotUndefined {
+    name: String,
+    rhs: Pattern,
+}
+
+impl Applier<Math, SynthAnalysis> for NotUndefined {
+    fn vars(&self) -> Vec<Var> {
+        self.rhs.vars()
+    }
+
+    fn apply_one(&self, egraph: &mut EGraph, matched_id: Id, subst: &Subst) -> Vec<Id> {
+        if !egraph[matched_id].data.is_defined() {
+            return vec![];
+        }
+        let ids = self.rhs.apply_one(egraph, matched_id, subst);
+        assert_eq!(ids.len(), 1);
+        if !egraph[ids[0]].data.is_defined() {
+            return vec![]
+        }
+
+
+        for (a, b) in egraph[matched_id].data.cvec.iter().zip(&egraph[ids[0]].data.cvec) {
+            match (a, b) {
+                (Some(a), Some(b)) => assert_eq!(a, b, "bad rule {}", self.name),
+                _ => (),
+            }
+        }
+
+        ids
+    }
+}
+
+
 impl Equality<Math, SynthAnalysis> {
     pub fn new(e1: &RecExpr, e2: &RecExpr) -> Option<Self> {
         let mut forward: (String, Pattern, Pattern, Option<Rewrite>) = {
@@ -984,11 +1083,12 @@ impl Equality<Math, SynthAnalysis> {
             let lhs = generalize(&e1, map);
             let rhs = generalize(&e2, map);
             let name = format!("{} => {}", lhs, rhs);
+            let defined_rhs = NotUndefined { name: name.clone(), rhs: rhs.clone() };
             (
                 name.clone(),
                 lhs.clone(),
                 rhs.clone(),
-                Rewrite::new(name, lhs.clone(), rhs.clone()).ok(),
+                Rewrite::new(name, lhs.clone(), defined_rhs).ok(),
             )
         };
 
@@ -997,11 +1097,12 @@ impl Equality<Math, SynthAnalysis> {
             let lhs = generalize(&e2, map);
             let rhs = generalize(&e1, map);
             let name = format!("{} => {}", lhs, rhs);
+            let defined_rhs = NotUndefined {name: name.clone(), rhs: rhs.clone() };
             (
                 name.clone(),
                 lhs.clone(),
                 rhs.clone(),
-                Rewrite::new(name, lhs.clone(), rhs.clone()).ok(),
+                Rewrite::new(name, lhs.clone(), defined_rhs).ok(),
             )
         };
 

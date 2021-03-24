@@ -14,9 +14,9 @@ fn main() {
         ],
         variables: vec!["x".into(), "y".into(), "z".into()],
         iters: 2,
-        rules_to_take: 100,
+        rules_to_take: 1,
         chunk_size: usize::MAX,
-        minimize: true,
+        minimize: false,
         outfile: "minimize.json".to_string()
     });
     let outfile = &syn.params.outfile.clone();
