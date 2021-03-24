@@ -5,8 +5,8 @@ use num::bigint::{BigInt, RandBigInt, Sign, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive};
 use rand::SeedableRng;
 use rand::{prelude::SliceRandom, Rng};
-use serde::{Deserialize, Serialize};
 use rand_pcg::Pcg64;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::rc::Rc;
 use std::{
@@ -65,8 +65,8 @@ pub fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
 
 // randomly sample denoms so that they are not 0
 // Ratio::new will panic if the denom is 0
-pub fn gen_bigint(rng: &Pcg64, bits: u64) -> BigInt {
-    let mut res = 0.to_bigint().unwrap();
+pub fn gen_denom(rng: &Pcg64, bits: u64) -> BigInt {
+    let mut res: BigInt;
     loop {
         res = rng.clone().gen_bigint(bits);
         if res != 0.to_bigint().unwrap() {
@@ -89,9 +89,9 @@ fn is_valid(lhs: Pattern, rhs: Pattern) -> bool {
     for _ in 0..1000 {
         let (xn, yn, zn) = (rng.gen_bigint(32), rng.gen_bigint(32), rng.gen_bigint(32));
         let (xd, yd, zd) = (
-            gen_bigint(&rng, 32),
-            gen_bigint(&rng, 32),
-            gen_bigint(&rng, 32),
+            gen_denom(&rng, 32),
+            gen_denom(&rng, 32),
+            gen_denom(&rng, 32),
         );
         let a = Ratio::new(xn, xd);
         let b = Ratio::new(yn, yd);
@@ -104,8 +104,8 @@ fn is_valid(lhs: Pattern, rhs: Pattern) -> bool {
         match (l, r) {
             (None, _) | (_, None) => {
                 println!("{} => {} failed validation at {} {} {}", lhs, rhs, a, b, c);
-                return false
-            },
+                return false;
+            }
             (Some(l), Some(r)) => {
                 if l == r {
                     valid = true;
@@ -278,10 +278,10 @@ pub fn instantiate(pattern: &Pattern<Math>) -> RecExpr<Math> {
 }
 
 impl Signature {
-    fn fold1(&self, mut f: impl Fn(Constant) -> Option<Constant>) -> Self {
-        let compute = |x : &Option<Constant>| match x {
+    fn fold1(&self, f: impl Fn(Constant) -> Option<Constant>) -> Self {
+        let compute = |x: &Option<Constant>| match x {
             None => None,
-            Some(v) => f(v.clone())
+            Some(v) => f(v.clone()),
         };
         let cvec = self.cvec.iter().map(&compute).collect();
         Self {
@@ -300,7 +300,6 @@ impl Signature {
             (Some(n1), Some(n2)) => f(n1.clone(), n2.clone()),
             (_, _) => None,
         };
-        // let cvec: CVec = self.cvec.iter().zip(&other.cvec).map(|(x, y)| compute((x, y))).collect();
         let cvec: CVec = self.cvec.iter().zip(&other.cvec).map(&compute).collect();
         Self {
             cvec,
@@ -335,6 +334,9 @@ impl Analysis<Math> for SynthAnalysis {
                         to.cvec[i] = from.cvec[i].clone();
                         to_cvec_changed = true;
                     }
+                    (Some(x), Some(y)) => {
+                        assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
+                    }
                     (_, _) => {}
                 }
             }
@@ -362,8 +364,14 @@ impl Analysis<Math> for SynthAnalysis {
                 mk_constant(res.numer(), res.denom())
             }),
             Math::Mul([a, b]) => v(a).fold2(v(b), |a, b| {
-                let res = a * b;
-                mk_constant(res.numer(), res.denom())
+                if b.denom() != &0.to_bigint().unwrap()
+                && a.denom() != &0.to_bigint().unwrap()
+                {
+                    let res = a * b;
+                    mk_constant(res.numer(), res.denom())
+                } else {
+                    None
+                }
             }),
             Math::Num(n) => {
                 let cv: Vec<Option<Constant>> = (0..param.cvec_len)
@@ -380,9 +388,11 @@ impl Analysis<Math> for SynthAnalysis {
                 exact: false,
                 constant: None,
             },
-            // (na / da) /  (nb / db) = na * db / da * nb
             Math::Div([a, b]) => v(a).fold2(v(b), |a, b| {
-                if b.numer() * a.denom() != 0.to_bigint().unwrap() { 
+                if b.numer() != &0.to_bigint().unwrap()
+                    && b.denom() != &0.to_bigint().unwrap()
+                    && a.denom() != &0.to_bigint().unwrap()
+                {
                     let res = a / b;
                     mk_constant(res.numer(), res.denom())
                 } else {
@@ -414,8 +424,7 @@ impl Analysis<Math> for SynthAnalysis {
     }
 
     fn modify(egraph: &mut EGraph, id: Id) {
-        let sig = &egraph[id].data;
-        let c = &sig.constant;
+        let c = egraph[id].data.clone().constant;
         if let Some(v) = c {
             let added = egraph.add(Math::Num(v.clone()));
             egraph.union(id, added);
@@ -424,6 +433,25 @@ impl Analysis<Math> for SynthAnalysis {
         }
     }
 }
+
+fn chain_consts(constants: Vec<Constant>, nvars: u32, i: u32) -> Vec<Option<Constant>> {
+    let mut res = vec![];
+    let mut consts = vec![];
+    for c in constants {
+        consts.push(mk_constant(c.numer(), c.denom()));
+    }
+    let nc = consts.len();
+    let nrows = nc.pow(nvars as u32);
+    while res.len() < nrows {
+        for c in &consts {
+            for _ in 0..nc.pow(i) {
+                res.push(c.clone())
+            }
+        }
+    }
+    res
+}
+
 
 pub struct SynthParams {
     pub seed: u64,
@@ -435,7 +463,7 @@ pub struct SynthParams {
     pub rules_to_take: usize,
     pub chunk_size: usize,
     pub minimize: bool,
-    pub outfile: String
+    pub outfile: String,
 }
 
 type EqualityMap<L = Math, A = SynthAnalysis> = IndexMap<Rc<str>, Equality<L, A>>;
@@ -451,29 +479,50 @@ pub struct Synthesizer {
 impl Synthesizer {
     pub fn new(params: SynthParams) -> Self {
         let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: params.n_samples + params.constants.len(),
+            // cvec_len: params.n_samples + params.constants.len(),
+            cvec_len: params.n_samples + params.constants.len().pow(params.variables.len() as u32),
         });
-        let mut var_cvec_map: IndexMap<&Symbol, Vec<Option<Constant>>> = IndexMap::new();
         let mut rng = Pcg64::seed_from_u64(params.seed);
         for var in &params.variables {
             let id = egraph.add(Math::Var(*var));
-            let mut cvec: Vec<Option<Constant>> = (0..params.n_samples)
-                .map(|_| mk_constant(&rng.gen_bigint(32), &gen_bigint(&rng, 32)))
-                .collect();
-            cvec.push(mk_constant(
-                &0.to_bigint().unwrap(),
-                &1.to_bigint().unwrap(),
-            ));
-            cvec.push(mk_constant(
-                &1.to_bigint().unwrap(),
-                &1.to_bigint().unwrap(),
-            ));
-            cvec.push(mk_constant(
-                &-1.to_bigint().unwrap(),
-                &1.to_bigint().unwrap(),
-            ));
-            egraph[id].data.cvec = cvec.clone();
-            var_cvec_map.insert(var, cvec.clone());
+
+            if var.to_string() == "x" {
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(&rng, 32)))
+                    .chain(chain_consts(
+                        params.constants.clone(),
+                        params.variables.len() as u32,
+                        0,
+                    ))
+                    .collect();
+            }
+            if var.to_string() == "y" {
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(&rng, 32)))
+                    .chain(chain_consts(
+                        params.constants.clone(),
+                        params.variables.len() as u32,
+                        1,
+                    ))
+                    .collect();
+            }
+            if var.to_string() == "z" {
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(&rng, 32)))
+                    .chain(chain_consts(
+                        params.constants.clone(),
+                        params.variables.len() as u32,
+                        2,
+                    ))
+                    .collect();
+            }
+            // let mut cvec: Vec<Option<Constant>> = (0..params.n_samples)
+            //     .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(&rng, 32)))
+            //     .collect();
+            // for c in &params.constants {
+            //     cvec.push(mk_constant(c.numer(), c.denom()));
+            // }
+            // egraph[id].data.cvec = cvec.clone();
         }
 
         for n in &params.constants {
@@ -501,7 +550,7 @@ impl Synthesizer {
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
-                // to_add.push(Math::Div([i, j]));
+                to_add.push(Math::Div([i, j]));
                 // to_add.push(Math::Pow([i, j]));
             }
             if self.egraph[i].data.exact {
@@ -548,14 +597,11 @@ impl Synthesizer {
         let mut by_cvec: IndexMap<&CVec, Vec<Id>> = IndexMap::new();
 
         let not_all_nones = self
-        .ids()
-        .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
+            .ids()
+            .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
         for id in not_all_nones {
             let class = &self.egraph[id];
-            by_cvec
-                .entry(&class.data.cvec)
-                .or_default()
-                .push(class.id);
+            by_cvec.entry(&class.data.cvec).or_default().push(class.id);
         }
 
         log::info!("# unique cvecs: {}", by_cvec.len());
@@ -579,8 +625,9 @@ impl Synthesizer {
                 }
             } else {
                 // try linear cvec matching
-                let mut terms_ids: Vec<_> = ids.iter().map(|&id| (extract.find_best(id), id)).collect();
-                terms_ids.sort_by_key(|x| x.0.0);
+                let mut terms_ids: Vec<_> =
+                    ids.iter().map(|&id| (extract.find_best(id), id)).collect();
+                terms_ids.sort_by_key(|x| x.0 .0);
                 for win in terms_ids.windows(2) {
                     let (((_c1, e1), id1), ((_c2, e2), id2)) = (&win[0], &win[1]);
                     if let Some(mut eq) = Equality::new(e1, e2) {
@@ -649,15 +696,11 @@ impl Synthesizer {
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.equalities.len();
         let eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
-        println!(
-            "Learned {} rules in {:?}",
-            num_rules,
-            time
-        );
+        println!("Learned {} rules in {:?}", num_rules, time);
         Report {
             time,
             num_rules,
-            eqs
+            eqs,
         }
     }
 }
@@ -738,7 +781,6 @@ fn choose_eqs_old(
     );
     (keepers, bads)
 }
-
 
 fn choose_eqs(old_eqs: &EqualityMap, new_eqs: EqualityMap, n: usize) -> (EqualityMap, EqualityMap) {
     let t = Instant::now();
