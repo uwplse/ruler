@@ -86,18 +86,27 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         self.rhs.vars()
     }
 
-    fn apply_one(&self, egraph: &mut EGraph<L, SynthAnalysis>, matched_id: Id, subst: &Subst) -> Vec<Id> {
+    fn apply_one(
+        &self,
+        egraph: &mut EGraph<L, SynthAnalysis>,
+        matched_id: Id,
+        subst: &Subst,
+    ) -> Vec<Id> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
         }
         let ids = self.rhs.apply_one(egraph, matched_id, subst);
         assert_eq!(ids.len(), 1);
         if !egraph[ids[0]].data.is_defined() {
-            return vec![]
+            return vec![];
         }
 
-
-        for (a, b) in egraph[matched_id].data.cvec.iter().zip(&egraph[ids[0]].data.cvec) {
+        for (a, b) in egraph[matched_id]
+            .data
+            .cvec
+            .iter()
+            .zip(&egraph[ids[0]].data.cvec)
+        {
             match (a, b) {
                 (Some(a), Some(b)) => assert_eq!(a, b, "bad rule {}", self.name),
                 _ => (),
@@ -108,7 +117,6 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
     }
 }
 
-
 impl<L: SynthLanguage> Equality<L> {
     pub fn new(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
         let mut forward: (String, Pattern<L>, Pattern<L>, Option<Rewrite<L, _>>) = {
@@ -116,7 +124,10 @@ impl<L: SynthLanguage> Equality<L> {
             let lhs = L::generalize(&e1, map);
             let rhs = L::generalize(&e2, map);
             let name = format!("{} => {}", lhs, rhs);
-            let defined_rhs = NotUndefined { name: name.clone(), rhs: rhs.clone() };
+            let defined_rhs = NotUndefined {
+                name: name.clone(),
+                rhs: rhs.clone(),
+            };
             (
                 name.clone(),
                 lhs.clone(),
@@ -130,7 +141,10 @@ impl<L: SynthLanguage> Equality<L> {
             let lhs = L::generalize(&e2, map);
             let rhs = L::generalize(&e1, map);
             let name = format!("{} => {}", lhs, rhs);
-            let defined_rhs = NotUndefined {name: name.clone(), rhs: rhs.clone() };
+            let defined_rhs = NotUndefined {
+                name: name.clone(),
+                rhs: rhs.clone(),
+            };
             (
                 name.clone(),
                 lhs.clone(),

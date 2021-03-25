@@ -1,9 +1,11 @@
-use ruler::*;
-use egg::*;
+use std::collections::HashMap;
 
-use rand_pcg::Pcg64;
+use egg::*;
+use ruler::*;
+
 use num::bigint::{BigInt, RandBigInt, ToBigInt};
-use num::{Zero, rational::Ratio, Signed, ToPrimitive};
+use num::{rational::Ratio, Signed, ToPrimitive, Zero};
+use rand_pcg::Pcg64;
 
 pub type Constant = Ratio<BigInt>;
 
@@ -35,7 +37,8 @@ impl SynthLanguage for Math {
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
-        F: FnMut(&'a Id) -> &'a CVec<Self> {
+        F: FnMut(&'a Id) -> &'a CVec<Self>,
+    {
         match self {
             Math::Neg(a) => map!(v, a => Some(-a)),
             Math::Add([a, b]) => map!(v, a, b => Some(a + b)),
@@ -132,7 +135,7 @@ impl SynthLanguage for Math {
                     continue;
                 }
                 to_add.push(Math::Add([i, j]));
-                //to_add.push(Math::Sub([i, j]));
+                to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
                 to_add.push(Math::Div([i, j]));
                 // to_add.push(Math::Pow([i, j]));
@@ -140,17 +143,40 @@ impl SynthLanguage for Math {
             if synth.egraph[i].data.exact {
                 continue;
             }
-            // to_add.push(Math::Abs(i));
+            to_add.push(Math::Abs(i));
             // to_add.push(Math::Reciprocal(i));
-            // to_add.push(Math::Neg(i));
+            to_add.push(Math::Neg(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
         to_add
     }
 
-    fn is_valid(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> bool {
-        true
+    fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        let n = 1000;
+        let mut env = HashMap::new();
+
+        for var in lhs.vars() {
+            env.insert(var, vec![]);
+        }
+
+        for var in rhs.vars() {
+            env.insert(var, vec![]);
+        }
+
+        for (var, cvec) in env.iter_mut() {
+            cvec.reserve(n);
+            for _ in 0..n {
+                let numer = rng.gen_bigint(32);
+                let denom = gen_denom(rng, 32);
+                cvec.push(Some(Ratio::new(numer, denom)));
+            }
+        }
+
+        let lvec = Self::eval_pattern(lhs, &env, n);
+        let rvec = Self::eval_pattern(rhs, &env, n);
+
+        lvec == rvec
     }
 }
 
@@ -193,19 +219,19 @@ fn main() {
         constants: vec![
             Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap()),
             Ratio::new(1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
-            Ratio::new(-1.to_bigint().unwrap(), 1.to_bigint().unwrap())
+            Ratio::new(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
         ],
-        variables: 2,
+        variables: 1,
         iters: 2,
         rules_to_take: 1,
         chunk_size: usize::MAX,
         minimize: true,
-        outfile: "minimize.json".to_string()
+        outfile: "minimize.json".to_string(),
     });
     let outfile = &syn.params.outfile.clone();
     let report = syn.run();
 
-    let file = std::fs::File::create(outfile)
-        .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
+    let file =
+        std::fs::File::create(outfile).unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
     serde_json::to_writer_pretty(file, &report).expect("failed to write json");
 }

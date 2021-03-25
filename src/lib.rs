@@ -3,9 +3,12 @@ use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::hash::Hash;
 use std::rc::Rc;
+use std::{
+    borrow::{Borrow, Cow},
+    collections::VecDeque,
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
@@ -18,7 +21,7 @@ pub use equality::*;
 
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
-    &alpha[i..i+1]
+    &alpha[i..i + 1]
 }
 
 #[derive(Debug, Clone)]
@@ -113,17 +116,27 @@ pub trait SynthLanguage: egg::Language + 'static {
     fn init_synth(synth: &mut Synthesizer<Self>);
     fn make_layer(synth: &Synthesizer<Self>) -> Vec<Self>;
 
-    fn eval_pattern(pat: &Pattern<Self>, buf: &mut [CVec<Self>], cvec_len: usize) {
-        assert_eq!(pat.ast.as_ref().len(), buf.len());
-        for (i, enode) in pat.ast.as_ref().iter().enumerate() {
-            if let ENodeOrVar::ENode(enode) = enode {
-                let cvec = enode.eval(cvec_len, |id| &buf[usize::from(*id)]);
-                buf[i] = cvec;
+    fn eval_pattern(
+        pat: &Pattern<Self>,
+        ctx: &HashMap<Var, CVec<Self>>,
+        cvec_len: usize,
+    ) -> CVec<Self> {
+        let mut buf: Vec<Cow<CVec<Self>>> = vec![];
+        for enode in pat.ast.as_ref().iter() {
+            match enode {
+                ENodeOrVar::ENode(enode) => {
+                    let cvec = enode.eval(cvec_len, |id| buf[usize::from(*id)].borrow());
+                    buf.push(Cow::Owned(cvec));
+                }
+                ENodeOrVar::Var(var) => {
+                    buf.push(Cow::Borrowed(&ctx[var]));
+                }
             }
         }
+        buf.pop().unwrap().into_owned()
     }
 
-    fn is_valid(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool;
+    fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool;
 }
 
 pub struct Synthesizer<L: SynthLanguage> {
@@ -304,10 +317,17 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         self.egraph.number_of_classes(),
                     );
 
+                    let rng = &mut self.rng;
                     let (eqs, bads) = if self.params.minimize {
-                        choose_eqs(&starting_egraph, &self.equalities, new_eqs, self.params.rules_to_take)
+                        choose_eqs(
+                            rng,
+                            &starting_egraph,
+                            &self.equalities,
+                            new_eqs,
+                            self.params.rules_to_take,
+                        )
                     } else {
-                        choose_eqs_old(&self.equalities, new_eqs, self.params.rules_to_take)
+                        choose_eqs_old(rng, &self.equalities, new_eqs, self.params.rules_to_take)
                     };
 
                     for bad in bads {
@@ -368,7 +388,6 @@ pub struct SynthParams<L: SynthLanguage> {
 
 pub type EqualityMap<L> = IndexMap<Rc<str>, Equality<L>>;
 pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
-pub type Ctx<L> = HashMap<&'static str, <L as SynthLanguage>::Constant>;
 
 // pub trait CVecExt<L: SynthLanguage>: AsRef<[Option<L::Constant>]> {
 //     fn map1(&self, f: impl Fn(L::Constant) -> Option<L::Constant>) -> CVec<L> {
@@ -403,23 +422,25 @@ pub type Ctx<L> = HashMap<&'static str, <L as SynthLanguage>::Constant>;
 #[macro_export]
 macro_rules! map {
     ($get:ident, $a:ident => $body:expr) => {
-        $get($a).iter().map(|a| {
-            match a {
+        $get($a)
+            .iter()
+            .map(|a| match a {
                 Some($a) => $body,
                 _ => None,
-            }
-        }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
     };
     ($get:ident, $a:ident, $b:ident => $body:expr) => {
-        $get($a).iter().zip($get($b).iter()).map(|tup| {
-            match tup {
+        $get($a)
+            .iter()
+            .zip($get($b).iter())
+            .map(|tup| match tup {
                 (Some($a), Some($b)) => $body,
                 _ => None,
-            }
-        }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
     };
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
@@ -486,6 +507,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
 #[inline(never)]
 fn choose_eqs_old<L: SynthLanguage>(
+    rng: &mut Pcg64,
     old_eqs: &EqualityMap<L>,
     mut new_eqs: EqualityMap<L>,
     n: usize,
@@ -499,7 +521,7 @@ fn choose_eqs_old<L: SynthLanguage>(
     // make the best last
     new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
     while let Some((name, eq)) = new_eqs.pop() {
-        if L::is_valid(&eq.lhs, &eq.rhs) {
+        if L::is_valid(rng, &eq.lhs, &eq.rhs) {
             keepers.insert(name, eq);
         } else {
             bads.insert(name, eq);
@@ -557,6 +579,7 @@ fn choose_eqs_old<L: SynthLanguage>(
 
 #[inline(never)]
 fn choose_eqs<L: SynthLanguage>(
+    rng: &mut Pcg64,
     egraph: &EGraph<L, SynthAnalysis>,
     old_eqs: &EqualityMap<L>,
     new_eqs: EqualityMap<L>,
@@ -565,7 +588,7 @@ fn choose_eqs<L: SynthLanguage>(
     let t = Instant::now();
     let (new_eqs, bads): (EqualityMap<L>, EqualityMap<L>) = new_eqs
         .into_iter()
-        .partition(|(_name, eq)| L::is_valid(&eq.lhs, &eq.rhs));
+        .partition(|(_name, eq)| L::is_valid(rng, &eq.lhs, &eq.rhs));
 
     let n_new_eqs = new_eqs.len();
     log::info!("Minimizing {} rules...", n_new_eqs);
