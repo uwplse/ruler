@@ -164,7 +164,7 @@ impl SynthLanguage for Math {
             env.insert(var, vec![]);
         }
 
-        for (var, cvec) in env.iter_mut() {
+        for cvec in env.values_mut() {
             cvec.reserve(n);
             for _ in 0..n {
                 let numer = rng.gen_bigint(32);

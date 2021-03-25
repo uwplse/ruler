@@ -240,6 +240,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         new_eqs
     }
 
+    #[allow(dead_code)]
     fn cvec_match(&self) -> EqualityMap<L> {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::new();
