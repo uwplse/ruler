@@ -4,8 +4,6 @@ version = "0.1.0"
 authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washington.edu>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 log = "0.4"
 env_logger = { version = "0.7", default-features = false }

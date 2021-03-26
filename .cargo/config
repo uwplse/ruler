@@ -1,0 +1,5 @@
+[alias]
+rational = ["run", "--release", "--bin", "rational", "--"]
+
+[build]
+rustflags = "-C target-cpu=native"
