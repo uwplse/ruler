@@ -4,13 +4,12 @@ use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
-
-use std::hash::Hash;
 use std::rc::Rc;
 use std::{
     borrow::{Borrow, Cow},
     collections::VecDeque,
 };
+use std::{cmp::Ordering, hash::Hash};
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
@@ -20,6 +19,8 @@ use std::{
 
 mod equality;
 pub use equality::*;
+
+const ITER_LIMIT: usize = 2;
 
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
@@ -175,6 +176,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph.classes().map(|c| c.id)
     }
 
+    #[inline(never)]
     fn run_rewrites(&mut self) -> EGraph<L, SynthAnalysis> {
         // run the rewrites
         log::info!("running eqsat with {} rules", self.equalities.len());
@@ -182,26 +184,27 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut runner = Runner::<L, _, ()>::new(self.egraph.analysis.clone())
             .with_egraph(self.egraph.clone())
             .with_node_limit(usize::MAX)
-            .with_iter_limit(2)
+            .with_iter_limit(ITER_LIMIT)
             .with_scheduler(SimpleScheduler)
             .run(rewrites);
 
         // update the clean egraph based on any unions that happened
-        let mut found_unions = vec![];
+        let mut found_unions = HashMap::new();
         for id in self.ids() {
             let id2 = runner.egraph.find(id);
-            if id != id2 {
-                found_unions.push((id, id2))
-            }
+            found_unions.entry(id2).or_insert(vec![]).push(id);
         }
-        for (id, id2) in found_unions {
-            self.egraph.union(id, id2);
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                self.egraph.union(win[0], win[1]);
+            }
         }
 
         runner.egraph.rebuild();
         runner.egraph
     }
 
+    #[inline(never)]
     fn cvec_match_pair_wise(&self) -> EqualityMap<L> {
         let mut by_cvec: IndexMap<CVec<L>, Vec<Id>> = IndexMap::new();
 
@@ -253,6 +256,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         new_eqs
     }
 
+    #[inline(never)]
     fn cvec_match(&self) -> EqualityMap<L> {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::new();
@@ -450,45 +454,56 @@ pub struct Signature<L: SynthLanguage> {
 
 impl<L: SynthLanguage> Signature<L> {
     pub fn is_defined(&self) -> bool {
-        assert!(!self.cvec.is_empty());
         self.cvec.iter().any(|v| v.is_some())
+    }
+}
+
+fn ord_merge(to: &mut Option<Ordering>, from: Ordering) {
+    if let Some(ord) = to.as_mut() {
+        match (*ord, from) {
+            (Ordering::Equal, _) => *ord = from,
+            (_, Ordering::Equal) => (),
+            (_, _) if *ord == from => (),
+            _ => *to = None,
+        }
     }
 }
 
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
-    fn merge(&self, to: &mut Self::Data, from: Self::Data) -> bool {
-        let mut to_exact_changed = false;
-        let mut to_cvec_changed = false;
+    fn merge(&self, to: &mut Self::Data, from: Self::Data) -> Option<Ordering> {
+        let mut ord = Some(Ordering::Equal);
 
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
                     (None, Some(_)) => {
                         to.cvec[i] = from.cvec[i].clone();
-                        to_cvec_changed = true;
+                        ord_merge(&mut ord, Ordering::Less);
                     }
                     (Some(x), Some(y)) => {
                         assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
                     }
-                    (_, _) => {}
+                    (Some(_), None) => {
+                        ord_merge(&mut ord, Ordering::Greater);
+                    }
+                    _ => (),
                 }
             }
-            if !to.exact && from.exact {
-                to.exact = true;
-                to_exact_changed = true;
-            }
-            return to_exact_changed || to_cvec_changed;
+
+            ord_merge(&mut ord, to.exact.cmp(&from.exact));
+            to.exact |= from.exact;
         }
-        false
+
+        ord
     }
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
         let get_cvec = |i: &Id| &egraph[*i].data.cvec;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
-            exact: !enode.is_var() && enode.children().iter().all(|i| egraph[*i].data.exact),
+            exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
         }
     }
 
@@ -541,7 +556,7 @@ fn choose_eqs_old<L: SynthLanguage>(
             .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
         let mut runner = Runner::default()
-            .with_iter_limit(2)
+            .with_iter_limit(ITER_LIMIT)
             .with_scheduler(SimpleScheduler)
             .with_node_limit(1_000_000);
 
@@ -632,7 +647,7 @@ fn choose_eqs<L: SynthLanguage>(
 
             let mut runner = Runner::default()
                 .with_egraph(egraph.clone())
-                .with_iter_limit(2)
+                .with_iter_limit(ITER_LIMIT)
                 .with_scheduler(SimpleScheduler)
                 .with_time_limit(Duration::from_secs(60))
                 .with_node_limit(10_000_000);
