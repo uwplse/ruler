@@ -11,11 +11,19 @@ rand_pcg = "0.2"
 rand = { version = "0.7", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-egg = { git = "https://github.com/egraphs-good/egg", rev = "39415f19acdacd6dde62f40cb2bb08f8669acc85" }
-#egg = "0.6"
 indexmap = "1"
 num = "0.3"
 num-bigint = { version = "0.3", features = ["rand"] }
 lazy_static = "1.4.0"
 itertools = "0.9.0"
 clap = "3.0.0-beta.2"
+
+[dependencies.egg]
+git = "https://github.com/egraphs-good/egg"
+rev = "116295f5c5afc58b34c732066c2e533bc4ad2ce8" # latest
+# rev = "483876ffc7e38a3d1e55a1f249dcd7900093b99e" # use more precise analysis rebuild
+# rev = "5d12e81a43d8eb6bfa8c29b62ba766143ba54a79" # Simplify unionfind
+# rev = "e5ded849f55c735b88cc7fd8b74e111dca6685b5" # Use new rebuilding
+# rev = "18e62918ed3c7b30b55a61108f19d405d6b4c3c7" # Don't use cell
+# path = "../egg"
+# version = "0.6"
