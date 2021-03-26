@@ -20,3 +20,4 @@ num = "0.3"
 num-bigint = { version = "0.3", features = ["rand"] }
 lazy_static = "1.4.0"
 itertools = "0.9.0"
+clap = "3.0.0-beta.2"

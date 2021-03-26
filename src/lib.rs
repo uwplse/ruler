@@ -1,8 +1,10 @@
+use clap::Clap;
 use egg::*;
 use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
+
 use std::hash::Hash;
 use std::rc::Rc;
 use std::{
@@ -137,17 +139,28 @@ pub trait SynthLanguage: egg::Language + 'static {
     }
 
     fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool;
+
+    fn main() {
+        let _ = env_logger::builder().try_init();
+        let params = SynthParams::parse();
+        let outfile = params.outfile.clone();
+        let syn = Synthesizer::<Self>::new(params);
+        let report = syn.run();
+        let file = std::fs::File::create(&outfile)
+            .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
+        serde_json::to_writer_pretty(file, &report).expect("failed to write json");
+    }
 }
 
 pub struct Synthesizer<L: SynthLanguage> {
-    pub params: SynthParams<L>,
+    pub params: SynthParams,
     pub rng: Pcg64,
     pub egraph: EGraph<L, SynthAnalysis>,
     pub equalities: EqualityMap<L>,
 }
 
 impl<L: SynthLanguage> Synthesizer<L> {
-    pub fn new(params: SynthParams<L>) -> Self {
+    pub fn new(params: SynthParams) -> Self {
         let mut synth = Self {
             rng: Pcg64::seed_from_u64(params.seed),
             egraph: Default::default(),
@@ -240,7 +253,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         new_eqs
     }
 
-    #[allow(dead_code)]
     fn cvec_match(&self) -> EqualityMap<L> {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::new();
@@ -305,7 +317,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
                 loop {
                     self.run_rewrites();
-                    let new_eqs = self.cvec_match_pair_wise();
+                    let new_eqs = if self.params.no_conditionals {
+                        self.cvec_match()
+                    } else {
+                        self.cvec_match_pair_wise()
+                    };
 
                     let new_eqs: EqualityMap<L> = new_eqs
                         .into_iter()
@@ -374,51 +390,34 @@ pub struct Report<L: SynthLanguage> {
     pub eqs: Vec<Equality<L>>,
 }
 
-pub struct SynthParams<L: SynthLanguage> {
+#[derive(Clap)]
+#[clap(rename_all = "kebab-case")]
+pub struct SynthParams {
+    #[clap(long, default_value = "0")]
     pub seed: u64,
+    #[clap(long, default_value = "10")]
     pub n_samples: usize,
-    pub constants: Vec<L::Constant>,
+    // #[clap(long, default_value = "")]
+    // pub constants: Vec<String>,
+    #[clap(long, default_value = "2")]
     pub variables: usize,
     // search params
+    #[clap(long, default_value = "1")]
     pub iters: usize,
+    #[clap(long, default_value = "1")]
     pub rules_to_take: usize,
+    #[clap(long, default_value = "999999999999")]
     pub chunk_size: usize,
+    #[clap(long)]
     pub minimize: bool,
+    #[clap(long)]
+    pub no_conditionals: bool,
+    #[clap(long, default_value = "out.json")]
     pub outfile: String,
 }
 
 pub type EqualityMap<L> = IndexMap<Rc<str>, Equality<L>>;
 pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
-
-// pub trait CVecExt<L: SynthLanguage>: AsRef<[Option<L::Constant>]> {
-//     fn map1(&self, f: impl Fn(L::Constant) -> Option<L::Constant>) -> CVec<L> {
-//         let compute = |x: &Option<L::Constant>| match x {
-//             None => None,
-//             Some(v) => f(v.clone()),
-//         };
-//         self.as_ref().iter().map(&compute).collect()
-//     }
-
-//     fn map2(
-//         &self,
-//         other: impl AsRef<[Option<L::Constant>]>,
-//         f: impl Fn(L::Constant, L::Constant) -> Option<L::Constant>,
-//     ) -> CVec<L> {
-//         let this = self.as_ref();
-//         let other = other.as_ref();
-//         if !this.is_empty() && !other.is_empty() {
-//             assert_eq!(this.len(), other.len());
-//         }
-
-//         let compute = |(x, y): (&Option<L::Constant>, &Option<L::Constant>)| match (x, y) {
-//             (Some(n1), Some(n2)) => f(n1.clone(), n2.clone()),
-//             (_, _) => None,
-//         };
-//         this.iter().zip(other).map(&compute).collect()
-//     }
-// }
-
-// impl<L: SynthLanguage> CVecExt<L> for CVec<L> {}
 
 #[macro_export]
 macro_rules! map {
@@ -515,7 +514,7 @@ fn choose_eqs_old<L: SynthLanguage>(
 ) -> (EqualityMap<L>, EqualityMap<L>) {
     let t = Instant::now();
     let n_new_eqs = new_eqs.len();
-    log::info!("Minimizing {} rules...", n_new_eqs);
+    log::info!("Choosing from {} rules...", n_new_eqs);
 
     let mut keepers = EqualityMap::default();
     let mut bads = EqualityMap::default();
@@ -529,7 +528,7 @@ fn choose_eqs_old<L: SynthLanguage>(
         }
         if new_eqs.is_empty() || keepers.len() >= n {
             log::info!(
-                "Nothing to minimize. new_eqs len: {}, keepers len: {}",
+                "Nothing to do. new_eqs len: {}, keepers len: {}",
                 new_eqs.len(),
                 keepers.len()
             );
@@ -610,7 +609,7 @@ fn choose_eqs<L: SynthLanguage>(
         for i in 0..(flat.len() % n_chunks) {
             chunk_sizes[i] += 1;
         }
-        assert_eq!(flat.len(), chunk_sizes.iter().sum());
+        assert_eq!(flat.len(), chunk_sizes.iter().sum::<usize>());
 
         for size in chunk_sizes {
             let n_new_eqs_this_loop = flat.len();

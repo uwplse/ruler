@@ -93,10 +93,23 @@ impl SynthLanguage for Math {
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let params = &synth.params;
+
+        // let constants: Vec<Self::Constant> = params
+        //     .constants
+        //     .iter()
+        //     .map(|c| c.parse().unwrap())
+        //     .collect();
+
+        let constants: Vec<Constant> = ["1", "0", "-1"]
+            .iter()
+            .map(|s| s.parse().unwrap())
+            .collect();
+
         let mut egraph = EGraph::new(SynthAnalysis {
             // cvec_len: params.n_samples + params.constants.len(),
-            cvec_len: params.n_samples + params.constants.len().pow(params.variables as u32),
+            cvec_len: params.n_samples + constants.len().pow(params.variables as u32),
         });
+
         let rng = &mut synth.rng;
         for i in 0..params.variables {
             let var = Symbol::from(letter(i));
@@ -105,7 +118,7 @@ impl SynthLanguage for Math {
             egraph[id].data.cvec = (0..params.n_samples)
                 .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
                 .chain(chain_consts(
-                    params.constants.clone(),
+                    constants.clone(),
                     params.variables as u32,
                     i as u32,
                 ))
@@ -120,7 +133,7 @@ impl SynthLanguage for Math {
             // egraph[id].data.cvec = cvec.clone();
         }
 
-        for n in &params.constants {
+        for n in &constants {
             egraph.add(Math::Num(n.clone()));
         }
 
@@ -212,26 +225,5 @@ pub fn gen_denom(rng: &mut Pcg64, bits: u64) -> BigInt {
 }
 
 fn main() {
-    let _ = env_logger::builder().try_init();
-    let syn = Synthesizer::<Math>::new(SynthParams {
-        seed: 5,
-        n_samples: 10,
-        constants: vec![
-            Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap()),
-            Ratio::new(1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
-            Ratio::new(-1.to_bigint().unwrap(), 1.to_bigint().unwrap()),
-        ],
-        variables: 1,
-        iters: 2,
-        rules_to_take: 1,
-        chunk_size: usize::MAX,
-        minimize: true,
-        outfile: "minimize.json".to_string(),
-    });
-    let outfile = &syn.params.outfile.clone();
-    let report = syn.run();
-
-    let file =
-        std::fs::File::create(outfile).unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
-    serde_json::to_writer_pretty(file, &report).expect("failed to write json");
+    Math::main()
 }
