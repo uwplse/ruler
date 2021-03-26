@@ -450,7 +450,6 @@ pub struct Signature<L: SynthLanguage> {
 
 impl<L: SynthLanguage> Signature<L> {
     pub fn is_defined(&self) -> bool {
-        assert!(!self.cvec.is_empty());
         self.cvec.iter().any(|v| v.is_some())
     }
 }
