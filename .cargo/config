@@ -1,5 +1,6 @@
 [alias]
 rational = ["run", "--release", "--bin", "rational", "--"]
+float = ["run", "--release", "--bin", "float", "--"]
 
 [build]
 rustflags = "-C target-cpu=native"

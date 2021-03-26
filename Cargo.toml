@@ -16,6 +16,9 @@ egg = { git = "https://github.com/egraphs-good/egg", rev = "39415f19acdacd6dde62
 indexmap = "1"
 num = "0.3"
 num-bigint = { version = "0.3", features = ["rand"] }
+ordered-float = "2.0.0"
+libm = "0.2.1"
+float-cmp = "0.8.0"
 lazy_static = "1.4.0"
 itertools = "0.9.0"
 clap = "3.0.0-beta.2"

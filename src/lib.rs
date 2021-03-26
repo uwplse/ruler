@@ -399,7 +399,7 @@ pub struct SynthParams {
     pub n_samples: usize,
     // #[clap(long, default_value = "")]
     // pub constants: Vec<String>,
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "1")]
     pub variables: usize,
     // search params
     #[clap(long, default_value = "1")]

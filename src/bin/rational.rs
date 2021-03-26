@@ -15,10 +15,10 @@ define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
-        "pow" = Pow([Id; 2]),
-        "fabs" = Abs(Id),
-        "recip" = Reciprocal(Id),
         "~" = Neg(Id),
+        "fabs" = Abs(Id),
+        "pow" = Pow([Id; 2]),
+        "recip" = Reciprocal(Id),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -94,12 +94,6 @@ impl SynthLanguage for Math {
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let params = &synth.params;
 
-        // let constants: Vec<Self::Constant> = params
-        //     .constants
-        //     .iter()
-        //     .map(|c| c.parse().unwrap())
-        //     .collect();
-
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
             .map(|s| s.parse().unwrap())
@@ -123,14 +117,6 @@ impl SynthLanguage for Math {
                     i as u32,
                 ))
                 .collect();
-
-            // let mut cvec: Vec<Option<Constant>> = (0..params.n_samples)
-            //     .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(&rng, 32)))
-            //     .collect();
-            // for c in &params.constants {
-            //     cvec.push(mk_constant(c.numer(), c.denom()));
-            // }
-            // egraph[id].data.cvec = cvec.clone();
         }
 
         for n in &constants {
@@ -157,8 +143,8 @@ impl SynthLanguage for Math {
                 continue;
             }
             to_add.push(Math::Abs(i));
-            // to_add.push(Math::Reciprocal(i));
             to_add.push(Math::Neg(i));
+            // to_add.push(Math::Reciprocal(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
