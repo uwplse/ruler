@@ -17,6 +17,8 @@ use std::{
     time::Instant,
 };
 
+mod util;
+pub use util::*;
 mod equality;
 pub use equality::*;
 
