@@ -1,14 +1,13 @@
+use egg::*;
+use ordered_float::OrderedFloat;
+use rand::Rng;
+use rand_pcg::Pcg64;
+use ruler::*;
 use std::collections::HashMap;
 
-use egg::*;
-use ruler::*;
-
-use libm::{erf, erfc, fma, remainder};
-use ordered_float::OrderedFloat;
-use rand::{prelude::SliceRandom, Rng, SeedableRng};
-use rand_pcg::Pcg64;
-
 pub type Constant = OrderedFloat<f64>;
+
+pub static TRICKY_FLOATS: [f64; 5] = [f64::NEG_INFINITY, f64::INFINITY, f64::MIN, f64::MAX, f64::NAN];
 
 define_language! {
     pub enum Math {
@@ -19,30 +18,10 @@ define_language! {
         "/" = Div([Id; 2]),
         "fabs" = Fabs(Id),
         "exp" = Exp(Id),
-        "cbrt" = Cbrt(Id),
-        "sqrt" = Sqrt(Id),
         "pow" = Pow([Id; 2]),
-        "remainder" = Remainder([Id; 2]),
-        "log1p" = Log1p(Id),
-        "expm1" = Expm1(Id),
-        "erf" = Erf(Id),
-        "erfc" = Erfc(Id),
-        "fma" = Fma([Id; 3]),
-        "log" = Log(Id),
         "sin" = Sin(Id),
         "cos" = Cos(Id),
         "tan" = Tan(Id),
-        "atan" = Atan(Id),
-        "acos" = Acos(Id),
-        "asin" = Asin(Id),
-        "tanh" = Tanh(Id),
-        "cosh" = Cosh(Id),
-        "sinh" = Sinh(Id),
-        "atanh" = Atanh(Id),
-        "acosh" = Acosh(Id),
-        "asinh" = Asinh(Id),
-        "atan2" = Atan2([Id; 2]),
-        "hypot" = Hypot([Id; 2]),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -61,7 +40,6 @@ pub fn mk_constant(val: f64) -> Option<Constant> {
         None
     }
 }
-pub static TRICKY_FLOATS: [f64; 4] = [f64::NEG_INFINITY, f64::INFINITY, f64::MIN, f64::MAX];
 
 impl SynthLanguage for Math {
     type Constant = Constant;
@@ -71,27 +49,19 @@ impl SynthLanguage for Math {
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Math::Neg(a) => map!(v, a => Some(OrderedFloat::from(-a.into_inner()))),
-            Math::Add([a, b]) => {
-                map!(v, a, b => Some(OrderedFloat::from(a.into_inner() + b.into_inner())))
-            }
-            Math::Sub([a, b]) => {
-                map!(v, a, b => Some(OrderedFloat::from(a.into_inner() - b.into_inner())))
-            }
-            Math::Mul([a, b]) => {
-                map!(v, a, b => Some(OrderedFloat::from(a.into_inner() * b.into_inner())))
-            }
-            Math::Num(n) => vec![Some(OrderedFloat::from(n.clone())); cvec_len],
+            Math::Neg(a) => map!(v, a => mk_constant(-a.into_inner())),
+            Math::Add([a, b]) => map!(v, a, b => mk_constant((*a + *b).into_inner())),
+            Math::Sub([a, b]) => map!(v, a, b => mk_constant((*a - *b).into_inner())),
+            Math::Mul([a, b]) => map!(v, a, b => mk_constant((*a * *b).into_inner())),
+            Math::Num(n) => vec![mk_constant(n.clone().into_inner()); cvec_len],
             Math::Var(_) => vec![],
-            Math::Div([a, b]) => map!(v, a, b => {
-                if b.into_inner() == 0.0 {
-                    None
-                } else{
-                    Some(OrderedFloat::from(a.into_inner() / b.into_inner()))
-                }
-            }),
-            Math::Fabs(a) => map!(v, a => Some(OrderedFloat::from(a.into_inner().abs()))),
-            _ => todo!(),
+            Math::Div([a, b]) => map!(v, a, b => mk_constant((*a / *b).into_inner())),
+            Math::Pow([a, b]) => map!(v, a, b => mk_constant(a.into_inner().powf(b.into_inner()))),
+            Math::Fabs(a) => map!(v, a => mk_constant(a.into_inner().abs())),
+            Math::Exp(a) => map!(v, a => mk_constant(a.into_inner().exp())),
+            Math::Sin(a) => map!(v, a => mk_constant(a.into_inner().sin())),
+            Math::Cos(a) => map!(v, a => mk_constant(a.into_inner().cos())),
+            Math::Tan(a) => map!(v, a => mk_constant(a.into_inner().tan())),
         }
     }
 
@@ -122,25 +92,32 @@ impl SynthLanguage for Math {
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let params = &synth.params;
 
-        let constants: Vec<Constant> = ["1", "0", "-1"]
-            .iter()
-            .map(|s| s.parse().unwrap())
-            .collect();
+        // let constants: Vec<Constant> = ["1", "0", "-1"]
+        //     .iter()
+        //     .map(|s| s.parse().unwrap())
+        //     .collect();
+
+        let constants = vec![
+            OrderedFloat::from(-1.0),
+            OrderedFloat::from(0.0),
+            OrderedFloat::from(1.0),
+        ];
 
         let mut egraph = EGraph::new(SynthAnalysis {
-            // cvec_len: params.n_samples + params.constants.len(),
             cvec_len: params.n_samples
                 + (constants.len() + TRICKY_FLOATS.len()).pow(params.variables as u32),
         });
 
         let rng = &mut synth.rng;
-        let xyz_samples = gen_rand_xyz(rng, params.n_samples);
+        // let xyz_samples = gen_rand_xyz(rng, params.n_samples);
+
+        let xyz_samples = gen_samples(rng, params.n_samples, params.variables);
         for i in 0..params.variables {
             let var = Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
 
             egraph[id].data.cvec = (0..params.n_samples)
-                .map(|j| mk_constant(xyz_samples[j][i]))
+                .map(|j| mk_constant(xyz_samples[i][j]))
                 .chain(chain_consts(
                     constants.clone(),
                     params.variables as u32,
@@ -167,6 +144,7 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
                 to_add.push(Math::Div([i, j]));
+                // to_add.push(Math::Pow([i, j]));
             }
             if synth.egraph[i].data.exact {
                 continue;
@@ -180,92 +158,29 @@ impl SynthLanguage for Math {
     }
 
     fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
-        true
-        // let n = 1000000;
-        // let mut _failed_with: SampleStrat;
-        // let ulp_rad_sm: u64 = 1000;
-        // let ulp_rad_lg: u64 = 50000000000000;
-        // let mut env = HashMap::new();
+        let n = 1000000;
+        let mut env = HashMap::new();
 
-        // for var in lhs.vars() {
-        //     env.insert(var, vec![]);
-        // }
+        for var in lhs.vars() {
+            env.insert(var, vec![]);
+        }
 
-        // for var in rhs.vars() {
-        //     env.insert(var, vec![]);
-        // }
+        for var in rhs.vars() {
+            env.insert(var, vec![]);
+        }
 
-        // let mut samples = vec![];
-        // for i in 0..n {
-        //     let a = rand_float_repr(rng);
-        //     let b;
-        //     let c;
-        //     match i % 5 {
-        //         0 => {
-        //             b = sample_float_range(rng, a, ulp_rad_sm);
-        //             c = sample_float_range(rng, a, ulp_rad_sm);
-        //             _failed_with = SampleStrat::RSmSm;
-        //         }
-        //         1 => {
-        //             b = sample_float_range(rng, a, ulp_rad_lg);
-        //             c = sample_float_range(rng, a, ulp_rad_sm);
-        //             _failed_with = SampleStrat::RLgSm;
-        //         }
-        //         2 => {
-        //             b = sample_float_range(rng, a, ulp_rad_sm);
-        //             c = sample_float_range(rng, a, ulp_rad_lg);
-        //             _failed_with = SampleStrat::RSmLg;
-        //         }
-        //         3 => {
-        //             b = sample_float_range(rng, a, ulp_rad_lg);
-        //             c = sample_float_range(rng, a, ulp_rad_lg);
-        //             _failed_with = SampleStrat::RLgLg;
-        //         }
-        //         _ => {
-        //             b = rand_float_repr(rng);
-        //             c = rand_float_repr(rng);
-        //             _failed_with = SampleStrat::RRR;
-        //         }
-        //     }
-        //     if !a.is_normal() || !b.is_normal() || !c.is_normal() {
-        //         continue;
-        //     }
-        //     samples.push(vec![
-        //         Some(OrderedFloat::from(a)),
-        //         Some(OrderedFloat::from(b)),
-        //         Some(OrderedFloat::from(c)),
-        //     ]);
-        // }
+        let mut cvecs = gen_samples(rng, n, env.keys().len());
+        for (_, cvec) in env.iter_mut() {
+            let c = cvecs.pop().unwrap();
+            for v in c {
+                cvec.push(Some(OrderedFloat::from(v)));
+            }
+        }
 
-        // for k in env.keys() {
-        //     println!("{:?}", k);
-        // }
-
-        // for (v, cvec) in env.iter_mut() {
-        //     if v.to_string() == "?a" {
-        //         for i in 0..n {
-        //             cvec.push(samples[i][0]);
-        //         }
-        //     }
-        //     if v.to_string() == "?b" {
-        //         for i in 0..n {
-        //             cvec.push(samples[i][1]);
-        //         }
-        //     }
-        //     if v.to_string() == "?c" {
-        //         for i in 0..n {
-        //             cvec.push(samples[i][2]);
-        //         }
-        //     }
-        //     else {
-        //         panic!("Validation failed: variable {} not found", v.to_string());
-        //     }
-        // }
-
-        // let lvec = Self::eval_pattern(lhs, &env, n);
-        // let rvec = Self::eval_pattern(rhs, &env, n);
-
-        // lvec == rvec
+        let lvec = Self::eval_pattern(lhs, &env, n);
+        let rvec = Self::eval_pattern(rhs, &env, n);
+        
+        lvec == rvec
     }
 }
 
@@ -291,15 +206,6 @@ fn chain_consts(constants: Vec<Constant>, nvars: u32, i: u32) -> Vec<Option<Cons
     res
 }
 
-#[derive(Debug)]
-pub enum SampleStrat {
-    RSmSm,
-    RSmLg,
-    RLgLg,
-    RLgSm,
-    RRR,
-}
-
 fn sample_float_range(rng: &mut Pcg64, x: f64, ulps_range: u64) -> f64 {
     let u = rng.gen_range(0, ulps_range);
     f64::from_bits(x.to_bits() + u)
@@ -313,63 +219,79 @@ fn rand_float_repr(rng: &mut Pcg64) -> f64 {
     x
 }
 
-// TODO: only works for 3 variables for now
-fn gen_rand_xyz(rng: &mut Pcg64, n_samples: usize) -> Vec<Vec<f64>> {
+fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>> {
     let ulp_rad_sm: u64 = 1000;
     let ulp_rad_lg: u64 = 50000000000000;
-    let mut samples = vec![];
+    let mut all_vecs = vec![];
+    let mut first = vec![];
     for i in 0..n_samples {
-        let mut a = rand_float_repr(rng);
-        let b;
-        let c;
         match i % 10 {
-            0 => {
-                b = sample_float_range(rng, a, ulp_rad_sm);
-                c = sample_float_range(rng, a, ulp_rad_sm);
-                samples.push(vec![a, b, c]);
-            }
-            1 => {
-                b = sample_float_range(rng, a, ulp_rad_lg);
-                c = sample_float_range(rng, a, ulp_rad_sm);
-                samples.push(vec![a, b, c]);
-            }
-            2 => {
-                b = sample_float_range(rng, a, ulp_rad_sm);
-                c = sample_float_range(rng, a, ulp_rad_lg);
-                samples.push(vec![a, b, c]);
-            }
-            3 => {
-                b = sample_float_range(rng, a, ulp_rad_lg);
-                c = sample_float_range(rng, a, ulp_rad_lg);
-                samples.push(vec![a, b, c]);
-            }
-            4 => {
-                match i % 3 {
-                    0 => {
-                        a = -1.0;
-                    }
-                    1 => {
-                        a = 0.0;
-                    }
-                    _ => {
-                        a = 1.0;
-                    }
-                }
-                b = sample_float_range(rng, a, ulp_rad_lg);
-                c = sample_float_range(rng, a, ulp_rad_lg);
-                samples.push(vec![a, b, c]);
-            }
-            _ => {
-                b = rand_float_repr(rng);
-                c = rand_float_repr(rng);
-                samples.push(vec![a, b, c]);
-            }
-        }
-        if !a.is_normal() || !b.is_normal() || !c.is_normal() {
-            continue;
+            9 => match i % 8 {
+                0 => first.push(-1.0),
+                1 => first.push(1.0),
+                2 => first.push(0.0),
+                3 => first.push(f64::INFINITY),
+                4 => first.push(f64::NEG_INFINITY),
+                5 => first.push(f64::NAN),
+                6 => first.push(f64::MAX),
+                _ => first.push(f64::MIN),
+            },
+            _ => first.push(rand_float_repr(rng)),
         }
     }
-    samples
+    for i in 0..(n_vars - 1) {
+        let mut dep_samples = vec![];
+        for j in 0..n_samples {
+            match j % 10 {
+                0 => {
+                    if i % 2 == 0 {
+                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg));
+                    } else {
+                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm));
+                    }
+                }
+                1 => {
+                    if i % 2 == 0 {
+                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm));
+                    } else {
+                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg));
+                    }
+                }
+                2 => dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm)),
+                3 => dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg)),
+                6 => {
+                    if i % 2 == 0 {
+                        match j % 5 {
+                            0 => dep_samples.push(f64::INFINITY),
+                            1 => dep_samples.push(f64::NEG_INFINITY),
+                            2 => dep_samples.push(f64::NAN),
+                            3 => dep_samples.push(f64::MAX),
+                            _ => dep_samples.push(f64::MIN),
+                        }
+                    } else {
+                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg));
+                    }
+                },
+                7 => {
+                    if i % 2 == 0 {
+                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm));
+                    } else {
+                        match j % 5 {
+                            0 => dep_samples.push(f64::INFINITY),
+                            1 => dep_samples.push(f64::NEG_INFINITY),
+                            2 => dep_samples.push(f64::NAN),
+                            3 => dep_samples.push(f64::MAX),
+                            _ => dep_samples.push(f64::MIN),
+                        }
+                    }
+                },
+                _ => dep_samples.push(rand_float_repr(rng)),
+            }
+        }
+        all_vecs.push(dep_samples);
+    }
+    all_vecs.push(first);
+    return all_vecs;
 }
 
 fn main() {
