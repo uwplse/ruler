@@ -7,7 +7,13 @@ use std::collections::HashMap;
 
 pub type Constant = OrderedFloat<f64>;
 
-pub static TRICKY_FLOATS: [f64; 5] = [f64::NEG_INFINITY, f64::INFINITY, f64::MIN, f64::MAX, f64::NAN];
+pub static TRICKY_FLOATS: [f64; 5] = [
+    f64::NEG_INFINITY,
+    f64::INFINITY,
+    f64::MIN,
+    f64::MAX,
+    f64::NAN,
+];
 
 define_language! {
     pub enum Math {
@@ -179,7 +185,7 @@ impl SynthLanguage for Math {
 
         let lvec = Self::eval_pattern(lhs, &env, n);
         let rvec = Self::eval_pattern(rhs, &env, n);
-        
+
         lvec == rvec
     }
 }
@@ -271,7 +277,7 @@ fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>
                     } else {
                         dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg));
                     }
-                },
+                }
                 7 => {
                     if i % 2 == 0 {
                         dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm));
@@ -284,7 +290,7 @@ fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>
                             _ => dep_samples.push(f64::MIN),
                         }
                     }
-                },
+                }
                 _ => dep_samples.push(rand_float_repr(rng)),
             }
         }
