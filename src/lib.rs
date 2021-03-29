@@ -17,10 +17,13 @@ use std::{
     time::Instant,
 };
 
-mod util;
-pub use util::*;
+mod convert_sexp;
+mod derive;
 mod equality;
+mod util;
+
 pub use equality::*;
+pub use util::*;
 
 const ITER_LIMIT: usize = 2;
 
@@ -143,15 +146,37 @@ pub trait SynthLanguage: egg::Language + 'static {
 
     fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool;
 
+    fn convert_parse(s: &str) -> RecExpr<Self> {
+        s.parse().unwrap()
+    }
+
+    fn convert_eq(s: &str) -> Option<Equality<Self>> {
+        use symbolic_expressions::{parser::parse_str, Sexp};
+        let sexp = parse_str(s).unwrap();
+        let list = sexp.list().unwrap();
+        assert!(
+            list[0] == Sexp::String("candidate-rewrite".into())
+                || list[0] == Sexp::String("rewrite".into())
+        );
+        let l = Self::convert_parse(&list[1].to_string());
+        let r = Self::convert_parse(&list[2].to_string());
+        Equality::new(&l, &r)
+    }
+
     fn main() {
         let _ = env_logger::builder().try_init();
-        let params = SynthParams::parse();
-        let outfile = params.outfile.clone();
-        let syn = Synthesizer::<Self>::new(params);
-        let report = syn.run();
-        let file = std::fs::File::create(&outfile)
-            .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
-        serde_json::to_writer_pretty(file, &report).expect("failed to write json");
+        match Command::parse() {
+            Command::Synth(params) => {
+                let outfile = params.outfile.clone();
+                let syn = Synthesizer::<Self>::new(params);
+                let report = syn.run();
+                let file = std::fs::File::create(&outfile)
+                    .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
+                serde_json::to_writer_pretty(file, &report).expect("failed to write json");
+            }
+            Command::Derive(params) => derive::derive::<Self>(params),
+            Command::ConvertSexp(params) => convert_sexp::convert::<Self>(params),
+        }
     }
 }
 
@@ -381,6 +406,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
 
         Report {
+            params: self.params,
             time,
             num_rules,
             eqs,
@@ -391,12 +417,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "L: SynthLanguage")]
 pub struct Report<L: SynthLanguage> {
+    pub params: SynthParams,
     pub time: f64,
     pub num_rules: usize,
     pub eqs: Vec<Equality<L>>,
 }
 
-#[derive(Clap)]
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "L: SynthLanguage")]
+struct SlimReport<L: SynthLanguage> {
+    time: f64,
+    eqs: Vec<Equality<L>>,
+}
+
+#[derive(Clap, Deserialize, Serialize)]
 #[clap(rename_all = "kebab-case")]
 pub struct SynthParams {
     #[clap(long, default_value = "0")]
@@ -433,6 +467,31 @@ pub struct SynthParams {
     pub no_shift: bool,
 }
 
+#[derive(Clap)]
+#[clap(rename_all = "kebab-case")]
+pub struct DeriveParams {
+    in1: String,
+    in2: String,
+    out: String,
+    #[clap(long, default_value = "10")]
+    iter_limit: usize,
+}
+
+#[derive(Clap)]
+#[clap(rename_all = "kebab-case")]
+pub struct ConvertParams {
+    cvc_log: String,
+    out: String,
+}
+
+#[derive(Clap)]
+#[clap(rename_all = "kebab-case")]
+pub enum Command {
+    Synth(SynthParams),
+    Derive(DeriveParams),
+    ConvertSexp(ConvertParams),
+}
+
 pub type EqualityMap<L> = IndexMap<Rc<str>, Equality<L>>;
 pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
 
@@ -467,7 +526,7 @@ pub struct Signature<L: SynthLanguage> {
 
 impl<L: SynthLanguage> Signature<L> {
     pub fn is_defined(&self) -> bool {
-        self.cvec.iter().any(|v| v.is_some())
+        self.cvec.is_empty() || self.cvec.iter().any(|v| v.is_some())
     }
 }
 

@@ -1,11 +1,15 @@
 [alias]
-rational = ["run", "--release", "--bin", "rational", "--"]
-float =    ["run", "--release", "--bin", "float", "--"]
-bv4 =      ["run", "--release", "--bin", "bv4", "--", "--no-conditionals"]
-bv8 =      ["run", "--release", "--bin", "bv8", "--", "--no-conditionals"]
-bv16 =     ["run", "--release", "--bin", "bv16", "--", "--no-conditionals"]
-bv32 =     ["run", "--release", "--bin", "bv32", "--", "--no-conditionals"]
-bool =     ["run", "--release", "--bin", "bool", "--", "--no-conditionals"]
+rational = ["run", "--quiet", "--release", "--bin", "rational", "--", "synth"]
+float =    ["run", "--quiet", "--release", "--bin", "float",    "--", "synth"]
+bv4 =      ["run", "--quiet", "--release", "--bin", "bv4",      "--", "synth", "--no-conditionals"]
+bool =     ["run", "--quiet", "--release", "--bin", "bool",     "--", "synth", "--no-conditionals"]
+
+bv8 =      ["run", "--release", "--bin", "bv8",  "--", "synth", "--no-conditionals"]
+bv16 =     ["run", "--release", "--bin", "bv16", "--", "synth", "--no-conditionals"]
+bv32 =     ["run", "--release", "--bin", "bv32", "--", "synth", "--no-conditionals"]
+
+derive-bv4 =  ["run", "--quiet", "--release", "--bin", "bv4",  "--", "derive"]
+derive-bool = ["run", "--quiet", "--release", "--bin", "bool", "--", "derive"]
 
 [build]
 rustflags = "-C target-cpu=native"

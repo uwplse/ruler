@@ -19,6 +19,15 @@ define_language! {
 impl SynthLanguage for Math {
     type Constant = bool;
 
+    fn convert_parse(s: &str) -> RecExpr<Self> {
+        let s = s
+            .replace("and", "&")
+            .replace("xor", "^")
+            .replace("or", "|")
+            .replace("not", "~");
+        s.parse().unwrap()
+    }
+
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
