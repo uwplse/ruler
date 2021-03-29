@@ -90,7 +90,9 @@ impl SynthLanguage for Math {
                 }
                 to_add.push(Math::And([i, j]));
                 to_add.push(Math::Or([i, j]));
-                to_add.push(Math::Xor([i, j]));
+                if !synth.params.no_xor {
+                    to_add.push(Math::Xor([i, j]));
+                }
             }
             if synth.egraph[i].data.exact {
                 continue;

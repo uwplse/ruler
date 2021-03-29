@@ -1,8 +1,8 @@
 [alias]
 rational = ["run", "--release", "--bin", "rational", "--"]
 float =    ["run", "--release", "--bin", "float", "--"]
-bv4 =      ["run", "--release", "--bin", "bv4", "--"]
-bool =     ["run", "--release", "--bin", "bool", "--"]
+bv4 =      ["run", "--release", "--bin", "bv4", "--", "--no-conditionals"]
+bool =     ["run", "--release", "--bin", "bool", "--", "--no-conditionals"]
 
 [build]
 rustflags = "-C target-cpu=native"

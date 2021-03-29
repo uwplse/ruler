@@ -403,11 +403,12 @@ pub struct SynthParams {
     pub seed: u64,
     #[clap(long, default_value = "10")]
     pub n_samples: usize,
-    // #[clap(long, default_value = "")]
-    // pub constants: Vec<String>,
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "2")]
     pub variables: usize,
-    // search params
+
+    ///////////////////
+    // search params //
+    ///////////////////
     #[clap(long, default_value = "1")]
     pub iters: usize,
     #[clap(long, default_value = "1")]
@@ -420,6 +421,16 @@ pub struct SynthParams {
     pub no_conditionals: bool,
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
+
+    //////////////////////////
+    // domain specific args //
+    //////////////////////////
+    /// Only for bool/bv
+    #[clap(long)]
+    pub no_xor: bool,
+    /// Only for bv
+    #[clap(long)]
+    pub no_shift: bool,
 }
 
 pub type EqualityMap<L> = IndexMap<Rc<str>, Equality<L>>;

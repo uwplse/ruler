@@ -224,12 +224,16 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
 
-                to_add.push(Math::Shl([i, j]));
-                to_add.push(Math::Shr([i, j]));
+                if !synth.params.no_shift {
+                    to_add.push(Math::Shl([i, j]));
+                    to_add.push(Math::Shr([i, j]));
+                }
 
                 to_add.push(Math::And([i, j]));
                 to_add.push(Math::Or([i, j]));
-                to_add.push(Math::Xor([i, j]));
+                if !synth.params.no_xor {
+                    to_add.push(Math::Xor([i, j]));
+                }
             }
             if synth.egraph[i].data.exact {
                 continue;
