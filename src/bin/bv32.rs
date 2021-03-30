@@ -247,17 +247,23 @@ impl SynthLanguage for Math {
     }
 
     fn is_valid(_rng: &mut Pcg64, lhs: &egg::Pattern<Self>, rhs: &egg::Pattern<Self>) -> bool {
-        let cfg = Config::new();
+        let mut cfg = Config::new();
+        cfg.set_timeout_msec(1000);
         let ctx = Context::new(&cfg);
         let solver = Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&lexpr._eq(&rexpr).not());
-        if solver.check() == SatResult::Unsat {
-            return true;
-        } else {
-            println!("z3 said {} => {} is invalid!!", lhs, rhs);
-            false
+        match solver.check() {
+            SatResult::Unsat => true,
+            SatResult::Sat => {
+                println!("z3 validation: failed for {} => {}", lhs, rhs);
+                false
+            }
+            SatResult::Unknown => {
+                println!("z3 validation: unknown for {} => {}", lhs, rhs);
+                false
+            }
         }
     }
 }
@@ -284,29 +290,5 @@ pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
 }
 
 fn main() {
-    // let cfg = Config::new();
-    // let ctx = Context::new(&cfg);
-    // let solver = Solver::new(&ctx);
-    // let a = ast::BV::new_const(&ctx, "a", 32);
-    // let b = ast::BV::new_const(&ctx, "b", 32);
-    // let one = ast::BV::from_u64(&ctx, 1, 32);
-    // let zero = ast::BV::from_u64(&ctx, 0, 32);
-    // let a_shr_b = a.bvlshr(&b);
-    // let one_shr_a = one.bvlshr(&a);
-    // let res = a_shr_b.bvand(&one_shr_a);
-    // solver.assert(&res._eq(&zero));
-    // println!("{:?}", solver.check());
-
-    let cfg = Config::new();
-    let ctx = Context::new(&cfg);
-    let solver = Solver::new(&ctx);
-    let a = ast::BV::from_u64(&ctx, 128, 32);
-    //let b = ast::BV::new_const(&ctx, "b", 32);
-    //let one = ast::BV::from_u64(&ctx, 1, 32);
-    let zero = ast::BV::from_u64(&ctx, 0, 32);
-    let a_shr_a = a.bvlshr(&a);
-    solver.assert(&a_shr_a._eq(&zero));
-    println!("{:?}", solver.check());
-
     Math::main()
 }
