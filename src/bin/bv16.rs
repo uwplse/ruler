@@ -228,8 +228,8 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
 
-                // to_add.push(Math::Shl([i, j]));
-                // to_add.push(Math::Shr([i, j]));
+                to_add.push(Math::Shl([i, j]));
+                to_add.push(Math::Shr([i, j]));
 
                 to_add.push(Math::And([i, j]));
                 to_add.push(Math::Or([i, j]));
