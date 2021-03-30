@@ -2,7 +2,8 @@
 rational = ["run", "--release", "--bin", "rational", "--"]
 float =    ["run", "--release", "--bin", "float", "--"]
 bv4 =      ["run", "--release", "--bin", "bv4", "--", "--no-conditionals"]
-bv32 =     ["run", "--release", "--bin", "bv32", "--"]
+bv16 =     ["run", "--release", "--bin", "bv16", "--", "--no-conditionals"]
+bv32 =     ["run", "--release", "--bin", "bv32", "--", "--no-conditionals"]
 bool =     ["run", "--release", "--bin", "bool", "--", "--no-conditionals"]
 
 [build]
