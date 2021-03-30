@@ -1,5 +1,7 @@
 /target
 /out
+scripts/herbie-float/output/*
+scripts/herbie-rational/output/*
 Cargo.lock
 .DS_Store
 out/
