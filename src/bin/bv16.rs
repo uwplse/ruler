@@ -248,7 +248,7 @@ impl SynthLanguage for Math {
 
     fn is_valid(_rng: &mut Pcg64, lhs: &egg::Pattern<Self>, rhs: &egg::Pattern<Self>) -> bool {
         let mut cfg = Config::new();
-        //cfg.set_timeout_msec(1000);
+        cfg.set_timeout_msec(1000);
         let ctx = Context::new(&cfg);
         let solver = Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
