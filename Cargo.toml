@@ -20,6 +20,7 @@ float-cmp = "0.8.0"
 lazy_static = "1.4.0"
 itertools = "0.9.0"
 clap = "3.0.0-beta.2"
+z3 = {version="0.6.0", features = ["static-link-z3"]}
 
 [dependencies.egg]
 git = "https://github.com/egraphs-good/egg"
