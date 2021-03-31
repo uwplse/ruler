@@ -47,7 +47,7 @@ mkdir -p "$OUTPUT_DIR/phase-times";
 mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
 echo "Running orat..."
-cp ablation/lib.rs src/lib.rs
+cp scripts/ablation/lib.rs src/lib.rs
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
   (time cargo $DOMAIN --variables 3 --iters $NUM_ITERS --rules-to-take 1 --minimize false) &> "$OUTPUT_DIR/orat/${DOMAIN}_3-${NUM_ITERS}_$i.log" 
@@ -71,7 +71,7 @@ do
 done
 
 echo "Running no run-rewrites..."
-cp ablation/lib_no_run_rewrites.rs src/lib.rs
+cp scripts/ablation/lib_no_run_rewrites.rs src/lib.rs
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
   (time cargo $DOMAIN --variables 3 --iters $NUM_ITERS --minimize true) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_3-${NUM_ITERS}_$i.log" 
