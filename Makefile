@@ -25,7 +25,8 @@ define synthesize # (domain, variables, iters, rules-to-take)
 ruler-reports += results/ruler/$(1)-$(2)vars-$(3)iters.json
 results/ruler/$(1)-$(2)vars-$(3)iters.json: # $(rust-src)
 	mkdir -p results/ruler
-	cargo $(1) --variables $(2) --iters $(3) --rules-to-take $(4) --outfile $$@
+	# cargo $(1) --variables $(2) --iters $(3) --rules-to-take $(4) --outfile $$@
+	cargo $(1) --variables $(2) --iters $(3) --minimize --outfile $$@
 
 cvc4-logs += results/cvc4/$(1)-$(2)vars-$(3)iters.txt
 results/cvc4/$(1)-$(2)vars-$(3)iters.txt: cvc4/$(1)-$(2)vars.sy
@@ -34,7 +35,7 @@ results/cvc4/$(1)-$(2)vars-$(3)iters.txt: cvc4/$(1)-$(2)vars.sy
 
 cvc4-reports += results/cvc4/$(1)-$(2)vars-$(3)iters.json
 results/cvc4/$(1)-$(2)vars-$(3)iters.json: results/cvc4/$(1)-$(2)vars-$(3)iters.txt # $(rust-src)
-	cargo run --quiet --release --bin $(1) -- convert-sexp $$< $$@
+	cargo convert-$(1) $$< $$@
 
 diffs += results/diffs/$(1)-$(2)vars-$(3)iters.json
 $(1) += results/diffs/$(1)-$(2)vars-$(3)iters.json
@@ -55,9 +56,9 @@ $(eval $(call synthesize,bool,3,2,99999))
 # $(eval $(call synthesize,bool,4,3,99999))
 # $(eval $(call synthesize,bool,4,4,99999))
 
-# $(eval $(call synthesize,bv4,2,2,99999))
+$(eval $(call synthesize,bv4,2,2,99999))
 # $(eval $(call synthesize,bv4,2,3,99999))
-# $(eval $(call synthesize,bv4,3,2,99999))
+$(eval $(call synthesize,bv4,3,2,99999))
 # $(eval $(call synthesize,bv4,3,3,99999))
 
 # $(eval $(call synthesize,bv4ns,2,2,99999))

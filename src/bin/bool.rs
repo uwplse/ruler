@@ -90,11 +90,19 @@ impl SynthLanguage for Math {
         synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>) -> Vec<Self> {
+    fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
+        let mut extract = Extractor::new(&synth.egraph, NumberOfOps);
+
+        // maps ids to n_ops
+        let ids: HashMap<Id, usize> = synth
+            .ids()
+            .map(|id| (id, extract.find_best_cost(id)))
+            .collect();
+
         let mut to_add = vec![];
         for i in synth.ids() {
             for j in synth.ids() {
-                if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                if ids[&i] + ids[&j] + 1 != iter {
                     continue;
                 }
                 to_add.push(Math::And([i, j]));
@@ -103,7 +111,7 @@ impl SynthLanguage for Math {
                     to_add.push(Math::Xor([i, j]));
                 }
             }
-            if synth.egraph[i].data.exact {
+            if ids[&i] + 1 != iter {
                 continue;
             }
             to_add.push(Math::Not(i));
