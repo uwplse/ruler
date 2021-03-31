@@ -900,8 +900,10 @@ def remove_simplify_tag(f):
     ret = []
     for l in lines:
         # remove simplify tags from all rules
-        if ("simplify" in l):
-            ret.append(l.replace("simplify", " "))
+        if (" simplify " in l):
+            ret.append(l.replace(" simplify ", " "))
+        elif (" simplify)" in l):
+            ret.append(l.replace(" simplify)", " )"))
         else:
             ret.append(l)
     return ret
