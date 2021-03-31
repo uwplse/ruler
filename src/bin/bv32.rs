@@ -8,7 +8,7 @@ use rand_pcg::Pcg64;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use z3::ast::{Ast, Bool};
+use z3::ast::Ast;
 use z3::*;
 
 macro_rules! impl_bits {
@@ -217,7 +217,7 @@ impl SynthLanguage for Math {
         synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>) -> Vec<Self> {
+    fn make_layer(synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
         let mut to_add = vec![];
         for i in synth.ids() {
             for j in synth.ids() {
