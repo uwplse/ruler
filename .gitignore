@@ -4,13 +4,9 @@ scripts/herbie-float/output/*
 scripts/herbie-rational/output/*
 Cargo.lock
 .DS_Store
-<<<<<<< HEAD
-ablation/*.log
-=======
 out/
 *.bak
 *.dep
 *.zo
 *.json
 .vscode/
->>>>>>> origin/trait

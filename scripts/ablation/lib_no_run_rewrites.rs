@@ -323,7 +323,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
                 loop {
                     let run_rewrites_before = Instant::now();
-                    self.run_rewrites();
+                    // self.run_rewrites();
                     let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
 
                     let rule_discovery_before = Instant::now();
