@@ -7,7 +7,7 @@ from colorsys import hsv_to_rgb
 from random import randint, uniform
 
 
-data = json.load(open("parsed.json"))
+data = json.load(open("output/parsed.json"))
 bool_data = list(filter(lambda x: x['domain'] == "bool", data))
 bv4ns_data = list(filter(lambda x: x['domain'] == "bv4ns", data))
 # print(bool_data)
@@ -71,7 +71,9 @@ def make_choose_eqs_plot(domain, data, compare, compare2):
 
     # minimize.plot()
     fig.suptitle(domain)
-    plt.show()
+    plt.savefig('output/by_config_rules_learned.pdf')
+
+    # plt.show()
 
 def make_choose_eqs_line_plot(data):
     # Collect data
@@ -94,14 +96,11 @@ def make_choose_eqs_line_plot(data):
 
     # Use number of e-classes
     selector = lambda x: x['e']
-    
+
+    fig, ax = plt.subplots(1) 
     plt.scatter(list(range(0, len(orat_egraphs))), [selector(x) for x in orat_egraphs], color="powderblue", label="orat")
     plt.plot(list(range(0, len(orat_egraphs))), [selector(x) for x in orat_egraphs], color="powderblue")
     
-    plt.scatter(list(range(0, len(minimize_egraphs))), [selector(x) for x in minimize_egraphs], color="gold", label="minimize")
-    plt.plot(list(range(0, len(minimize_egraphs))), [selector(x) for x in minimize_egraphs], color="gold")
-
-
     # Generate similar colours for different mrat m
     h_0 = 0.6 # blue in HSV
     increment = 0.7 / len(mrat_egraphs_by_m) 
@@ -119,10 +118,15 @@ def make_choose_eqs_line_plot(data):
         plt.scatter(list(range(0, len(data))), [selector(x) for x in data], color=(r, g, b, 1), label="mrat m=" + m["m"])
         plt.plot(list(range(0, len(data))), [selector(x) for x in data], color=(r, g, b, 1))
 
+    plt.scatter(list(range(0, len(minimize_egraphs))), [selector(x) for x in minimize_egraphs], color="gold", marker="*", s=20, label="minimize")
+    plt.plot(list(range(0, len(minimize_egraphs))), [selector(x) for x in minimize_egraphs], color="gold")
+    
     # minimize.plot()
-    plt.title("Number of eclasses by iterations")
+    fig.suptitle("Number of eclasses by iterations")
+    # plt.title("Number of eclasses by iterations")
     plt.legend()
-    plt.show()
+    plt.savefig('output/by_config_eclasses_per_iter.pdf')
+    #plt.show()
 
 # Aggregate all values from same iteration across runs
 def aggregate_egraphs_list(our_list):
@@ -184,7 +188,9 @@ def make_phase_time_plot(data):
 
     ax.legend()
     fig.suptitle("Time spent in each phase (by run)")
-    plt.show()
+    plt.savefig('output/phase_times.pdf')
+    #plt.show()
+
     # sum over all 
 
 def compare_run_rewrites(data):
@@ -232,13 +238,12 @@ def compare_run_rewrites(data):
     egraphs.set_title("Egraph size (eclasses)")
 
     fig.suptitle("Applying run_rewrites vs not applying run_rewrites")
-
-
     # minimize.plot()
-    plt.show()
+    # plt.show()
+    plt.savefig('output/run_rewrites.pdf')
 
 make_choose_eqs_time_rules_plot("Bool", bool_data)
-make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+# make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
 make_phase_time_plot(bool_data)
 compare_run_rewrites(bool_data)
 make_choose_eqs_line_plot(bool_data)

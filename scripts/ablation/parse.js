@@ -125,6 +125,6 @@ let print_data = (data) => {
 }
 
 console.log(process.cwd())
-input_folder = "C:\\Users\\gijin\\Documents\\uw\\ruler\\scripts\\ablation\\data\\";
-output_path = "C:\\Users\\gijin\\Documents\\uw\\ruler\\scripts\\ablation\\parsed.json";
+input_folder = "output/";
+output_path = "output/parsed.json";
 load_files(input_folder, output_path)
