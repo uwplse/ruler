@@ -52,7 +52,7 @@ fi
 
 if [ -z "${DOMAIN:-}" ]; then
     echo "Please specify a domain with -d"
-    exit 1
+     exit 1
 fi
 
 mkdir -p "$OUTPUT_DIR/mrat";

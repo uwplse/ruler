@@ -10,8 +10,10 @@ while [ -L "$src" ]; do
 done
 MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
-$MYDIR/run_ruler.sh -d bool -o $MYDIR/output -v 1 -i 2 -r 2
-# $MYDIR/run_ruler.sh -d bv4ns -o $MYDIR/output
-# $MYDIR/run_ruler.sh -d rational -o $MYDIR/output
-node parse.js
+TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
+
+"$MYDIR/run_ruler.sh" -d bool -o "$MYDIR/output/$TIMESTAMP" -v 1 -i 2 -r 2
+# "$MYDIR/run_ruler.sh" -d bv4ns -o "$MYDIR/output/$TIMESTAMP"
+# "$MYDIR/run_ruler.sh" -d rational -o "$MYDIR/output/$TIMESTAMP"
+node parse.js "$MYDIR/output/$TIMESTAMP/"
 python visualize.py

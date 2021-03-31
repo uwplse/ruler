@@ -125,6 +125,6 @@ let print_data = (data) => {
 }
 
 console.log(process.cwd())
-input_folder = "output/";
+input_folder = process.argv[2];
 output_path = "output/parsed.json";
 load_files(input_folder, output_path)
