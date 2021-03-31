@@ -26,7 +26,7 @@ def make_same_row(diff):
     domain = base.split('-')[0]
 
     if 'params' in cvc:
-        for field in ['domain', 'iters', 'variables']:
+        for field in ['iters', 'variables']:
             assert ruler['params'][field] == cvc['params'][field]
 
     # assert len(diff['forward'].get('bad', [])) == 0
