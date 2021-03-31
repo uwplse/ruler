@@ -103,7 +103,10 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
 }
 
 impl<L: SynthLanguage> Equality<L> {
-    pub fn new(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
+    pub fn new<'a>(mut e1: &'a RecExpr<L>, mut e2: &'a RecExpr<L>) -> Option<Self> {
+        if e1 < e2 {
+            std::mem::swap(&mut e1, &mut e2);
+        }
         let mut forward: (String, Pattern<L>, Pattern<L>, Option<Rewrite<L, _>>) = {
             let map = &mut HashMap::default();
             let lhs = L::generalize(&e1, map);

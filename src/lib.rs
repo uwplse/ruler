@@ -548,7 +548,7 @@ pub struct DeriveParams {
     in1: String,
     in2: String,
     out: String,
-    #[clap(long, default_value = "4")]
+    #[clap(long, default_value = "5")]
     iter_limit: usize,
 }
 
@@ -727,7 +727,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 .filter_map(|ids| {
                     let left = extract.find_best(ids[0]).1;
                     let right = extract.find_best(ids[1]).1;
-                    Equality::new(&left, &right).map(|eq| (eq.name.clone(), eq))
+                    if let Some(eq) = Equality::new(&left, &right) {
+                        if !self.equalities.contains_key(&eq.name) {
+                            return Some((eq.name.clone(), eq))
+                        }
+                    }
+                    None
                 })
                 .collect();
 
