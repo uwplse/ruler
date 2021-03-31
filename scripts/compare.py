@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 
 import csv
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> origin/trait
 import sys
 import json
 import statistics
 
+<<<<<<< HEAD
+=======
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+>>>>>>> origin/trait
 
 def load_report(filename):
     with open(filename) as f:
@@ -19,6 +28,7 @@ def make_same_row(diff):
     ruler = load_report(ruler_fname)
     cvc = load_report(cvc_fname)
 
+<<<<<<< HEAD
     for field in ['domain', 'iters', 'variables']:
         assert ruler['params'][field] == cvc['params'][field]
 
@@ -27,6 +37,20 @@ def make_same_row(diff):
 
     data = {
         'domain': ruler['params']['domain'],
+=======
+    base = os.path.basename(ruler_fname)
+    domain = base.split('-')[0]
+
+    if 'params' in cvc:
+        for field in ['domain', 'iters', 'variables']:
+            assert ruler['params'][field] == cvc['params'][field]
+
+    # assert len(diff['forward'].get('bad', [])) == 0
+    # assert len(diff['reverse'].get('bad', [])) == 0
+
+    data = {
+        'domain': domain,
+>>>>>>> origin/trait
         'vars': ruler['params']['variables'],
         'iterations': ruler['params']['iters'],
         'ruler time': ruler['time'],
@@ -74,6 +98,10 @@ if __name__ == '__main__':
         row = {k: fmt(v) for k,v in row.items()}
         writer.writerow(row)
 
+<<<<<<< HEAD
     print('avg time diff', 'avg rule diff',
+=======
+    eprint('avg time diff', 'avg rule diff',
+>>>>>>> origin/trait
           avg_time_diff, '{:.1f}x'.format(1/avg_time_diff),
           avg_rule_diff, '{:.1f}x'.format(1/avg_rule_diff))

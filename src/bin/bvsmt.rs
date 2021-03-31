@@ -1,15 +1,16 @@
 use egg::*;
 use ruler::*;
 
+use std::collections::HashSet;
+use std::io::{self, Write};
 use std::ops::*;
+use std::process::{Command, Stdio};
 
 use rand_pcg::Pcg64;
 
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use z3::ast::Ast;
-use z3::*;
 
 macro_rules! impl_bits {
     ($inner:ty, $name:ident, $n:literal) => {
@@ -122,7 +123,7 @@ macro_rules! impl_bits {
     };
 }
 
-impl_bits!(std::primitive::u64, u16, 16);
+impl_bits!(std::primitive::u64, u32, 32);
 
 define_language! {
     pub enum Math {
@@ -136,13 +137,13 @@ define_language! {
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
         "^" = Xor([Id; 2]),
-        Num(u16),
+        Num(u32),
         Var(egg::Symbol),
     }
 }
 
 impl SynthLanguage for Math {
-    type Constant = u16;
+    type Constant = u32;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
@@ -194,7 +195,7 @@ impl SynthLanguage for Math {
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let params = &synth.params;
-        let constants: Vec<u16> = vec![0.into(), 1.into()];
+        let constants: Vec<u32> = vec![0.into(), 1.into()];
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: params.n_samples,
@@ -206,7 +207,7 @@ impl SynthLanguage for Math {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
             egraph[id].data.cvec = (0..params.n_samples)
-                .map(|_| Some(rng.gen::<u16>()))
+                .map(|_| Some(rng.gen::<u32>()))
                 .collect();
         }
 
@@ -228,8 +229,8 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
 
-                to_add.push(Math::Shl([i, j]));
-                to_add.push(Math::Shr([i, j]));
+                // to_add.push(Math::Shl([i, j]));
+                // to_add.push(Math::Shr([i, j]));
 
                 to_add.push(Math::And([i, j]));
                 to_add.push(Math::Or([i, j]));
@@ -247,46 +248,151 @@ impl SynthLanguage for Math {
     }
 
     fn is_valid(_rng: &mut Pcg64, lhs: &egg::Pattern<Self>, rhs: &egg::Pattern<Self>) -> bool {
-        let mut cfg = Config::new();
-        cfg.set_timeout_msec(1000);
-        let ctx = Context::new(&cfg);
-        let solver = Solver::new(&ctx);
-        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check() {
-            SatResult::Unsat => true,
-            SatResult::Sat => {
-                println!("z3 validation: failed for {} => {}", lhs, rhs);
-                false
-            }
-            SatResult::Unknown => {
-                println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                false
-            }
-        }
+        validate(lhs, rhs).unwrap()
     }
 }
 
-pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
-    let mut buf: Vec<z3::ast::BV> = vec![];
-    for node in expr.as_ref().iter() {
-        match node {
-            Math::Var(v) => buf.push(ast::BV::new_const(&ctx, v.to_string(), 16)),
-            Math::Num(c) => buf.push(ast::BV::from_u64(&ctx, c.0 as u64, 16)),
-            Math::Add([a, b]) => buf.push(buf[usize::from(*a)].bvadd(&buf[usize::from(*b)])),
-            Math::Sub([a, b]) => buf.push(buf[usize::from(*a)].bvsub(&buf[usize::from(*b)])),
-            Math::Mul([a, b]) => buf.push(buf[usize::from(*a)].bvmul(&buf[usize::from(*b)])),
-            Math::Shl([a, b]) => buf.push(buf[usize::from(*a)].bvshl(&buf[usize::from(*b)])),
-            Math::Shr([a, b]) => buf.push(buf[usize::from(*a)].bvlshr(&buf[usize::from(*b)])),
-            Math::And([a, b]) => buf.push(buf[usize::from(*a)].bvand(&buf[usize::from(*b)])),
-            Math::Or([a, b]) => buf.push(buf[usize::from(*a)].bvor(&buf[usize::from(*b)])),
-            Math::Xor([a, b]) => buf.push(buf[usize::from(*a)].bvxor(&buf[usize::from(*b)])),
-            Math::Not(a) => buf.push(buf[usize::from(*a)].bvnot()),
-            Math::Neg(a) => buf.push(buf[usize::from(*a)].bvneg()),
+fn validate(lhs: &egg::Pattern<Math>, rhs: &egg::Pattern<Math>) -> io::Result<bool> {
+    let expr = egg_to_smt(
+        Math::instantiate(lhs).as_ref(),
+        Math::instantiate(rhs).as_ref(),
+    );
+
+    let mut smt = Command::new("timeout")
+        .arg("1s")
+        .arg("bitwuzla")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+    let smt_stdin = smt.stdin.as_mut().unwrap();
+    smt_stdin.write_all(expr.as_bytes())?;
+    drop(smt_stdin);
+
+    let out = smt.wait_with_output()?;
+
+    Ok(String::from_utf8_lossy(&out.stdout) == "unsat\n")
+}
+
+pub fn egg_to_smt<'a>(lhs: &[Math], rhs: &[Math]) -> String {
+    let mut vars: HashSet<String> = HashSet::new();
+    let lhs_smt;
+    let rhs_smt;
+    {
+        let mut buf: Vec<String> = vec![];
+        for node in lhs.as_ref().iter() {
+            match node {
+                Math::Var(v) => {
+                    buf.push(v.to_string());
+                    vars.insert(v.to_string());
+                }
+                Math::Num(c) => buf.push(format!("(_ bv{} 32)", c)),
+                Math::Add([a, b]) => buf.push(format!(
+                    "(bvadd {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Sub([a, b]) => buf.push(format!(
+                    "(bvsub {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Mul([a, b]) => buf.push(format!(
+                    "(bvmul {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Shl([a, b]) => buf.push(format!(
+                    "(bvshl {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Shr([a, b]) => buf.push(format!(
+                    "(bvlshr {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::And([a, b]) => buf.push(format!(
+                    "(bvand {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Or([a, b]) => buf.push(format!(
+                    "(bvor {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Xor([a, b]) => buf.push(format!(
+                    "(bvxor {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Not(a) => buf.push(format!("(bvnot {})", buf[usize::from(*a)])),
+                Math::Neg(a) => buf.push(format!("(bvneg {})", buf[usize::from(*a)])),
+            }
         }
+        lhs_smt = buf.pop().unwrap();
     }
-    buf.pop().unwrap()
+    {
+        let mut buf: Vec<String> = vec![];
+        for node in rhs.as_ref().iter() {
+            match node {
+                Math::Var(v) => {
+                    buf.push(v.to_string());
+                    vars.insert(v.to_string());
+                }
+                Math::Num(c) => buf.push(format!("(_ bv{} 32)", c)),
+                Math::Add([a, b]) => buf.push(format!(
+                    "(bvadd {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Sub([a, b]) => buf.push(format!(
+                    "(bvsub {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Mul([a, b]) => buf.push(format!(
+                    "(bvmul {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Shl([a, b]) => buf.push(format!(
+                    "(bvshl {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Shr([a, b]) => buf.push(format!(
+                    "(bvlshr {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::And([a, b]) => buf.push(format!(
+                    "(bvand {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Or([a, b]) => buf.push(format!(
+                    "(bvor {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Xor([a, b]) => buf.push(format!(
+                    "(bvxor {} {})",
+                    buf[usize::from(*a)],
+                    &buf[usize::from(*b)]
+                )),
+                Math::Not(a) => buf.push(format!("(bvnot {})", buf[usize::from(*a)])),
+                Math::Neg(a) => buf.push(format!("(bvneg {})", buf[usize::from(*a)])),
+            }
+        }
+        rhs_smt = buf.pop().unwrap();
+    }
+    let assert = format!("(assert (not (= {} {})))", lhs_smt, rhs_smt);
+    let decl: Vec<_> = vars
+        .iter()
+        .map(|v| format!("(declare-const {} (_ BitVec 32))", v))
+        .collect();
+    format!("(set-logic QF_BV) {} {} (check-sat)", decl.concat(), assert)
 }
 
 fn main() {

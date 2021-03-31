@@ -3,7 +3,6 @@ use ordered_float::OrderedFloat;
 use rand::Rng;
 use rand_pcg::Pcg64;
 use ruler::*;
-use std::collections::HashMap;
 
 pub type Constant = OrderedFloat<f64>;
 
@@ -139,7 +138,7 @@ impl SynthLanguage for Math {
         synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>) -> Vec<Self> {
+    fn make_layer(synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
         let mut to_add = vec![];
         for i in synth.ids() {
             for j in synth.ids() {
@@ -165,7 +164,7 @@ impl SynthLanguage for Math {
 
     fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
         let n = 1000000;
-        let mut env = HashMap::new();
+        let mut env = HashMap::default();
 
         for var in lhs.vars() {
             env.insert(var, vec![]);
