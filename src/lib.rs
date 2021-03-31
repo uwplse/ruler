@@ -392,29 +392,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 for node in chunk {
                     self.egraph.add(node.clone());
                 }
-<<<<<<< HEAD
-                loop {
+                'inner: loop {
                     let run_rewrites_before = Instant::now();
                     self.run_rewrites();
                     let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
 
                     let rule_discovery_before = Instant::now();
-                    let new_eqs = if self.params.no_conditionals {
-=======
-                'inner: loop {
-                    self.run_rewrites();
                     log::info!("cvec matching...");
                     let (new_eqs, id_groups) = if self.params.no_conditionals {
->>>>>>> origin/trait
                         self.cvec_match()
                     } else {
                         (self.cvec_match_pair_wise(), vec![])
                     };
-<<<<<<< HEAD
                     let rule_discovery = rule_discovery_before.elapsed().as_secs_f64();
-=======
                     log::info!("{} candidate eqs", new_eqs.len());
->>>>>>> origin/trait
 
                     let new_eqs: EqualityMap<L> = new_eqs
                         .into_iter()
@@ -427,12 +418,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         self.egraph.number_of_classes(),
                     );
 
-<<<<<<< HEAD
-                    let rng = &mut self.rng;
-                    let rule_minimize_before = Instant::now();
-
-=======
->>>>>>> origin/trait
                     let (eqs, bads) = if self.params.minimize {
                         self.choose_eqs(new_eqs)
                     } else {
@@ -461,12 +446,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                     let n_eqs = eqs.len();
                     self.equalities.extend(eqs);
-<<<<<<< HEAD
 
                     // TODO check formatting for Learned... 
                     log::info!("Time taken in... run_rewrites: {}, rule discovery: {}, rule minimization: {}",
                     run_rewrites,  rule_discovery, rule_minimize);
-=======
                     if self.params.minimize || n_eqs < self.params.rules_to_take {
                         for ids in id_groups {
                             for win in ids.windows(2) {
@@ -478,7 +461,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         log::info!("Stopping early, took all eqs");
                         break 'inner;
                     }
->>>>>>> origin/trait
                 }
             }
         }
