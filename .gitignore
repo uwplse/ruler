@@ -1,5 +1,6 @@
 /target
 /out
+scripts/ablation/output/*
 scripts/herbie-float/output/*
 scripts/herbie-rational/output/*
 Cargo.lock

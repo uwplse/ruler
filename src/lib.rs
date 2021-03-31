@@ -393,13 +393,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     self.egraph.add(node.clone());
                 }
                 'inner: loop {
-                    self.run_rewrites();
+                    let run_rewrites_before = Instant::now();
+                    if !self.params.no_run_rewrites {
+                        self.run_rewrites();
+                    }
+                    let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
+
+                    let rule_discovery_before = Instant::now();
                     log::info!("cvec matching...");
                     let (new_eqs, id_groups) = if self.params.no_conditionals {
                         self.cvec_match()
                     } else {
                         (self.cvec_match_pair_wise(), vec![])
                     };
+                    let rule_discovery = rule_discovery_before.elapsed().as_secs_f64();
                     log::info!("{} candidate eqs", new_eqs.len());
 
                     let new_eqs: EqualityMap<L> = new_eqs
@@ -413,11 +420,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         self.egraph.number_of_classes(),
                     );
 
+                    let rule_minimize_before = Instant::now();
                     let (eqs, bads) = if self.params.minimize {
                         self.choose_eqs(new_eqs)
                     } else {
                         self.choose_eqs_old(new_eqs)
                     };
+
+                    let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
 
                     for bad in bads {
                         log::info!("adding {} to poison set", bad.0);
@@ -431,7 +441,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     log::info!("Chose {} good rules", eqs.len());
                     for eq in eqs.values() {
                         log::info!("  {}", eq);
-                        assert!(!self.equalities.contains_key(&eq.name));
+                        if !self.params.no_run_rewrites {
+                            assert!(!self.equalities.contains_key(&eq.name));
+                        }
                         if let Some((i, j)) = eq.ids {
                             self.egraph.union(i, j);
                         }
@@ -439,6 +451,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                     let n_eqs = eqs.len();
                     self.equalities.extend(eqs);
+
+                    // TODO check formatting for Learned...
+                    log::info!("Time taken in... run_rewrites: {}, rule discovery: {}, rule minimization: {}",
+                    run_rewrites,  rule_discovery, rule_minimize);
                     if self.params.minimize || n_eqs < self.params.rules_to_take {
                         for ids in id_groups {
                             for win in ids.windows(2) {
@@ -510,6 +526,8 @@ pub struct SynthParams {
     pub minimize: bool,
     #[clap(long)]
     pub no_conditionals: bool,
+    #[clap(long)]
+    pub no_run_rewrites: bool,
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
 
@@ -843,7 +861,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
 pub struct NumberOfOps;
 impl<L: Language> egg::CostFunction<L> for NumberOfOps {
     type Cost = usize;
-
     fn cost<C>(&mut self, enode: &L, mut costs: C) -> Self::Cost
     where
         C: FnMut(Id) -> Self::Cost,
