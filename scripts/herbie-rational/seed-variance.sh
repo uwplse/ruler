@@ -57,7 +57,7 @@ function do_seed {
   racket "$HERBIE/src/herbie.rkt" report \
     --threads yes \
     --seed "$seed" \
-    "$HERBIE/bench/hamming" \
+    "$HERBIE/bench/pbrt.fpcore" \
     "$seed_output"
 }
 
