@@ -143,22 +143,6 @@ define_language! {
         Num(u32),
         Var(egg::Symbol),
     }
-
-// define_language! {
-//     pub enum Math {
-//         "bvadd" = Add([Id; 2]),
-//         "bvsub" = Sub([Id; 2]),
-//         "bvmul" = Mul([Id; 2]),
-//         "bvneg" = Neg(Id),
-//         "bvnot" = Not(Id),
-//         "bvshl" = Shl([Id; 2]),
-//         "bvlshr" = Shr([Id; 2]),
-//         "bvand" = And([Id; 2]),
-//         "bvor" = Or([Id; 2]),
-//         "bvxor" = Xor([Id; 2]),
-//         Num(u32),
-//         Var(egg::Symbol),
-//     }
 }
 
 impl SynthLanguage for Math {
@@ -267,33 +251,13 @@ impl SynthLanguage for Math {
     }
 
     fn is_valid(_rng: &mut Pcg64, lhs: &egg::Pattern<Self>, rhs: &egg::Pattern<Self>) -> bool {
-        validate(lhs, rhs);
-
-        let mut cfg = Config::new();
-        cfg.set_timeout_msec(1000);
-        let ctx = Context::new(&cfg);
-        let solver = Solver::new(&ctx);
-        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check() {
-            SatResult::Unsat => true,
-            SatResult::Sat => {
-                println!("z3 validation: failed for {} => {}", lhs, rhs);
-                false
-            }
-            SatResult::Unknown => {
-                println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                false
-            }
-        }
+        validate(lhs, rhs).unwrap()
     }
 }
 
     fn validate(lhs: &egg::Pattern<Math>, rhs: &egg::Pattern<Math>) -> io::Result<bool> {
 
         let expr = egg_to_smt(Math::instantiate(lhs).as_ref(), Math::instantiate(rhs).as_ref());
-        println!("query = {:?}", expr);
 
         let mut smt = Command::new("timeout")
             .arg("1s")
@@ -306,9 +270,8 @@ impl SynthLanguage for Math {
         drop(smt_stdin);
 
         let out = smt.wait_with_output()?;
-        println!("output = {:?}", String::from_utf8_lossy(&out.stdout));
 
-        Ok(true)
+        Ok(String::from_utf8_lossy(&out.stdout) == "unsat\n")
     }
 
 pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
