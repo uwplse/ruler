@@ -1,16 +1,16 @@
 use crate::*;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(from = "SerializedEq")]
 #[serde(into = "SerializedEq")]
 #[serde(bound = "L: SynthLanguage")]
 pub struct Equality<L: SynthLanguage> {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub lhs: Pattern<L>,
     pub ids: Option<(Id, Id)>,
     pub rhs: Pattern<L>,
-    // pub cond: Option<Pattern<L>>,
     pub rewrites: Vec<Rewrite<L, SynthAnalysis>>,
 }
 
@@ -25,23 +25,9 @@ impl<L: SynthLanguage + 'static> From<SerializedEq> for Equality<L> {
     fn from(ser: SerializedEq) -> Self {
         let lhs: Pattern<L> = ser.lhs.parse().unwrap();
         let rhs: Pattern<L> = ser.rhs.parse().unwrap();
-        let mut rewrites =
-            vec![Rewrite::new(format!("{} => {}", lhs, rhs), lhs.clone(), rhs.clone()).unwrap()];
-        let name = if ser.bidirectional {
-            rewrites.push(
-                Rewrite::new(format!("{} => {}", rhs, lhs), rhs.clone(), lhs.clone()).unwrap(),
-            );
-            format!("{} <=> {}", lhs, rhs)
-        } else {
-            format!("{} => {}", lhs, rhs)
-        };
-        Self {
-            name: name.into(),
-            lhs,
-            rhs,
-            rewrites,
-            ids: None,
-        }
+        let lhs = L::instantiate(&lhs);
+        let rhs = L::instantiate(&rhs);
+        Self::new(&lhs, &rhs).unwrap()
     }
 }
 

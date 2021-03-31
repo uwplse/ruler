@@ -11,8 +11,6 @@ use rand_pcg::Pcg64;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use z3::ast::{Ast, Bool};
-use z3::*;
 
 macro_rules! impl_bits {
     ($inner:ty, $name:ident, $n:literal) => {
@@ -220,7 +218,7 @@ impl SynthLanguage for Math {
         synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>) -> Vec<Self> {
+    fn make_layer(synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
         let mut to_add = vec![];
         for i in synth.ids() {
             for j in synth.ids() {
@@ -273,27 +271,6 @@ fn validate(lhs: &egg::Pattern<Math>, rhs: &egg::Pattern<Math>) -> io::Result<bo
     let out = smt.wait_with_output()?;
 
     Ok(String::from_utf8_lossy(&out.stdout) == "unsat\n")
-}
-
-pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
-    let mut buf: Vec<z3::ast::BV> = vec![];
-    for node in expr.as_ref().iter() {
-        match node {
-            Math::Var(v) => buf.push(ast::BV::new_const(&ctx, v.to_string(), 32)),
-            Math::Num(c) => buf.push(ast::BV::from_u64(&ctx, c.0 as u64, 32)),
-            Math::Add([a, b]) => buf.push(buf[usize::from(*a)].bvadd(&buf[usize::from(*b)])),
-            Math::Sub([a, b]) => buf.push(buf[usize::from(*a)].bvsub(&buf[usize::from(*b)])),
-            Math::Mul([a, b]) => buf.push(buf[usize::from(*a)].bvmul(&buf[usize::from(*b)])),
-            Math::Shl([a, b]) => buf.push(buf[usize::from(*a)].bvshl(&buf[usize::from(*b)])),
-            Math::Shr([a, b]) => buf.push(buf[usize::from(*a)].bvlshr(&buf[usize::from(*b)])),
-            Math::And([a, b]) => buf.push(buf[usize::from(*a)].bvand(&buf[usize::from(*b)])),
-            Math::Or([a, b]) => buf.push(buf[usize::from(*a)].bvor(&buf[usize::from(*b)])),
-            Math::Xor([a, b]) => buf.push(buf[usize::from(*a)].bvxor(&buf[usize::from(*b)])),
-            Math::Not(a) => buf.push(buf[usize::from(*a)].bvnot()),
-            Math::Neg(a) => buf.push(buf[usize::from(*a)].bvneg()),
-        }
-    }
-    buf.pop().unwrap()
 }
 
 pub fn egg_to_smt<'a>(lhs: &[Math], rhs: &[Math]) -> String {

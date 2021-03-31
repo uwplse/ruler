@@ -142,6 +142,30 @@ define_language! {
 impl SynthLanguage for Math {
     type Constant = u4;
 
+    fn convert_parse(s: &str) -> RecExpr<Self> {
+        let s = s
+            .replace("bvadd", "+")
+            .replace("bvsub", "--")
+            .replace("bvmul", "*")
+            .replace("bvand", "&")
+            .replace("bvor", "|")
+            .replace("bvneg", "-")
+            .replace("bvnot", "~")
+            .replace("bvlshr", ">>")
+            .replace("bvshl", "<<")
+            .replace("#b0000", "0")
+            .replace("#b0111", "7")
+            .replace("#b1000", "8")
+            .replace("true", "255")
+            .replace("false", "0")
+            .replace("and", "&")
+            .replace("xor", "^")
+            .replace("or", "|")
+            .replace("not", "~");
+        assert!(!s.contains('#'));
+        s.parse().unwrap()
+    }
+
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
@@ -213,13 +237,22 @@ impl SynthLanguage for Math {
         synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>) -> Vec<Self> {
+    fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
+        let mut extract = Extractor::new(&synth.egraph, NumberOfOps);
+
+        // maps ids to n_ops
+        let ids: HashMap<Id, usize> = synth
+            .ids()
+            .map(|id| (id, extract.find_best_cost(id)))
+            .collect();
+
         let mut to_add = vec![];
         for i in synth.ids() {
             for j in synth.ids() {
-                if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                if ids[&i] + ids[&j] + 1 != iter {
                     continue;
                 }
+
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
@@ -231,13 +264,14 @@ impl SynthLanguage for Math {
 
                 to_add.push(Math::And([i, j]));
                 to_add.push(Math::Or([i, j]));
-                if !synth.params.no_xor {
-                    to_add.push(Math::Xor([i, j]));
-                }
+                // if !synth.params.no_xor {
+                //     to_add.push(Math::Xor([i, j]));
+                // }
             }
-            if synth.egraph[i].data.exact {
+            if ids[&i] + 1 != iter {
                 continue;
             }
+
             to_add.push(Math::Not(i));
             to_add.push(Math::Neg(i));
         }
