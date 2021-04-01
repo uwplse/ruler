@@ -924,7 +924,7 @@ def mk_rkt_rules(rules, rkt, unique_vars, config):
             f.write(prelude)
         with open(rkt, 'a') as f:
             # we are only using ruler's rules for simplify, not RR
-            f.write("\n\n(define-ruleset* ruler-rules (ruler simplify)\n")
+            f.write("\n\n(define-ruleset* ruler-rules (ruler arithmetic simplify)\n")
             f.write("#:type (")
             for v in unique_vars:
                 f.write("[" + v.replace("?", "") + " real] ")
@@ -943,7 +943,7 @@ def mk_rkt_rules(rules, rkt, unique_vars, config):
                 f.write(l)
         with open(rkt, 'a') as f:
             # we are only using ruler's rules for simplify, not RR
-            f.write("\n\n(define-ruleset* ruler-rules (ruler simplify)\n")
+            f.write("\n\n(define-ruleset* ruler-rules (ruler arithmetic simplify)\n")
             f.write("#:type (")
             for v in unique_vars:
                 f.write("[" + v.replace("?", "") + " real] ")
