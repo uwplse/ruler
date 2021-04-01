@@ -224,26 +224,36 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
 
         let mut egraph = self.egraph.clone();
-        egraph.analysis.cvec_len = 0;
-        for c in egraph.classes_mut() {
-            c.data.cvec.truncate(0);
-        }
+        let mut runner: Runner<L, _, ()>;
 
-        let mut runner = Runner::<L, _, ()>::new(self.egraph.analysis.clone())
-            .with_egraph(egraph)
-            .with_node_limit(usize::MAX)
-            .with_iter_limit(ITER_LIMIT)
-            .with_scheduler(SimpleScheduler)
-            .with_hook(|r| {
-                for c in r.egraph.classes_mut() {
-                    if c.nodes.iter().any(|n| n.is_constant()) {
-                        c.nodes.retain(|n| n.is_constant());
+        if self.params.no_conditionals {
+            egraph.analysis.cvec_len = 0;
+            for c in egraph.classes_mut() {
+                c.data.cvec.truncate(0);
+            }
+            runner = Runner::<L, _, ()>::new(self.egraph.analysis.clone())
+                .with_egraph(egraph)
+                .with_node_limit(usize::MAX)
+                .with_iter_limit(ITER_LIMIT)
+                .with_scheduler(SimpleScheduler)
+                .with_hook(|r| {
+                    for c in r.egraph.classes_mut() {
+                        if c.nodes.iter().any(|n| n.is_constant()) {
+                            c.nodes.retain(|n| n.is_constant());
+                        }
                     }
-                }
-                Ok(())
-            })
-            .run(rewrites);
-
+                    Ok(())
+                })
+                .run(rewrites);
+        } else {
+            runner = Runner::<L, _, ()>::new(self.egraph.analysis.clone())
+                .with_egraph(egraph)
+                .with_node_limit(usize::MAX)
+                .with_iter_limit(ITER_LIMIT)
+                .with_scheduler(SimpleScheduler)
+                .run(rewrites);
+        }
+        
         log::info!("collecting unions...");
         // update the clean egraph based on any unions that happened
         let mut found_unions = HashMap::default();
@@ -256,7 +266,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 self.egraph.union(win[0], win[1]);
             }
         }
-
         runner.egraph.rebuild();
         log::info!(
             "Ran {} rules in {:?}",
@@ -729,7 +738,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     let right = extract.find_best(ids[1]).1;
                     if let Some(eq) = Equality::new(&left, &right) {
                         if !self.equalities.contains_key(&eq.name) {
-                            return Some((eq.name.clone(), eq))
+                            return Some((eq.name.clone(), eq));
                         }
                     }
                     None
