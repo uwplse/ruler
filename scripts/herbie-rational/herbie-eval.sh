@@ -16,7 +16,7 @@ DIR="$MYDIR/output/ruler-herbie-eval"
 mkdir -p "$DIR"
 
 # run ruler and put rules in output directory
-cargo rational --iters 2 --variables 3 > $DIR/ruler-rules-"$tstamp".txt
+cargo rational --iters 2 --variables 3 --rules-to-take 999999999999 > $DIR/ruler-rules-"$tstamp".txt
 
 # go to output directory
 pushd "$DIR"
