@@ -519,7 +519,7 @@ pub struct SynthParams {
     pub seed: u64,
     #[clap(long, default_value = "10")]
     pub n_samples: usize,
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "1")]
     pub variables: usize,
 
     ///////////////////

@@ -53,7 +53,17 @@ impl SynthLanguage for Math {
             }),
             Math::Abs(a) => map!(v, a => Some(a.abs())),
             Math::Pow([a, b]) => map!(v, a, b => {
-                b.to_i32().map(|b| a.pow(b))
+                match b.to_i32() {
+                    Some(b_int) => {
+                        if a.is_zero() && b_int < 0 {
+                            None
+                        } else {
+                            Some(a.pow(b_int))
+                        }
+                    }
+                    None => None
+                }
+
             }),
             Math::Reciprocal(a) => map!(v, a => {
                 if a.is_zero() {
