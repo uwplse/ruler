@@ -15,6 +15,15 @@ DIR="$MYDIR/output/ruler-herbie-eval"
 
 mkdir -p "$DIR"
 
+# determine number of seeds to sample
+if [ -z "$1" ]; then
+  echo "Usage: $0 NUM_SEEDS"
+  exit 1
+else
+  NSEEDS="$1"
+fi
+
+echo "Running Ruler"
 # run ruler and put rules in output directory
 cargo rational --iters 2 --variables 3 --rules-to-take 999999999999 > $DIR/ruler-rules-"$tstamp".txt
 
@@ -48,7 +57,7 @@ for c in ${configs[@]}; do
     python3 preprocess.py $DIR/ruler-rules-"$tstamp".txt "$HERBIE"/src/syntax/rules.rkt $c
     # do the herbie runs with this config
     # seed-variance.sh will put its output in the right directory
-    ./seed-variance.sh 1 $c $tstamp
+    ./seed-variance.sh "$NSEEDS" $c $tstamp
 done
 
 # make unified all_all.json with all.json from all configs

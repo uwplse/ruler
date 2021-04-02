@@ -88,8 +88,8 @@ prelude = """
   (define input-ops (ops-in-expr input))
   (define output-ops (ops-in-expr output))
   (define valid?
-    (andmap (curry set-member? simplify-ops)
-            (append input-ops output-ops)))
+    (not (andmap (curry set-member? simplify-ops)
+                 (append input-ops output-ops))))
   (when debug-filter?
     (if valid?
         (printf "VALID: ~a -> ~a\n" input output)
@@ -103,11 +103,9 @@ prelude = """
       (all-rules (all-rules)) ; changed for ruler to avoid using ruler rules for RR
     (all-rules (append (all-rules) rules)))
     (when (set-member? groups 'simplify) ; update simplify
-      (define rules*
-        (if filter-simplify?
-            (filter valid-simplify-rule? rules)
-            rules))
-      (simplify-rules (append (simplify-rules) rules*))  
+    ; (define rules* (filter (lambda (x) (or (valid-simplify-rule? x) (set-member? groups 'ruler))) rules)) ;; NO-RAT
+      (define rules* rules) ;; BASELINE
+      (simplify-rules (append (simplify-rules) rules*))
       (when (set-member? groups 'fp-safe) ; update fp-safe
         (fp-safe-simplify-rules (append (fp-safe-simplify-rules) rules*))))))
 
@@ -908,6 +906,19 @@ def remove_simplify_tag(f):
             ret.append(l)
     return ret
 
+def uncomment_filter_line(f):
+    f.seek(0)
+    lines = f.readlines()
+    ret = []
+    for l in lines:
+      if ("NO-RAT" in l):
+        ret.append(l.replace(";", " ", 1))
+      elif ("BASELINE" in l):
+        ret.append("; " + l)
+      else:
+        ret.append(l)
+    return ret
+
 def mk_rkt_rules(rules, rkt, unique_vars, config):
     if config == "herbie-only":
         with open(rkt, 'w') as f:
@@ -915,7 +926,8 @@ def mk_rkt_rules(rules, rkt, unique_vars, config):
     elif config == "herbie-no-simpl":
         with open(rkt, 'w+') as f:
             f.write(prelude)
-            lines = remove_simplify_tag(f)
+            # lines = remove_simplify_tag(f)
+            lines = uncomment_filter_line(f)
         with open(rkt, 'w') as f:
             for l in lines:
                 f.write(l)
@@ -937,7 +949,8 @@ def mk_rkt_rules(rules, rkt, unique_vars, config):
     elif config == "ruler-only":
         with open(rkt, 'w+') as f:
             f.write(prelude)
-            lines = remove_simplify_tag(f)
+            # lines = remove_simplify_tag(f)
+            lines = uncomment_filter_line(f)
         with open(rkt, 'w') as f:
             for l in lines:
                 f.write(l)
