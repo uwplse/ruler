@@ -28,6 +28,16 @@ pub use equality::*;
 pub use util::*;
 
 const ITER_LIMIT: usize = 2;
+const NODE_LIMIT: usize = 300_000;
+const TIME_LIMIT: Duration = Duration::from_secs(10);
+
+pub fn mk_runner<L: SynthLanguage>() -> Runner<L, SynthAnalysis, ()> {
+    Runner::default()
+        .with_node_limit(NODE_LIMIT)
+        .with_iter_limit(ITER_LIMIT)
+        .with_time_limit(TIME_LIMIT)
+        .with_scheduler(SimpleScheduler)
+}
 
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
@@ -224,36 +234,26 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
 
         let mut egraph = self.egraph.clone();
-        let mut runner: Runner<L, _, ()>;
-
-        if self.params.no_conditionals {
+        let mut runner = mk_runner();
+        runner = if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
             for c in egraph.classes_mut() {
                 c.data.cvec.truncate(0);
             }
-            runner = Runner::<L, _, ()>::new(self.egraph.analysis.clone())
-                .with_egraph(egraph)
-                .with_node_limit(usize::MAX)
-                .with_iter_limit(ITER_LIMIT)
-                .with_scheduler(SimpleScheduler)
-                .with_hook(|r| {
-                    for c in r.egraph.classes_mut() {
-                        if c.nodes.iter().any(|n| n.is_constant()) {
-                            c.nodes.retain(|n| n.is_constant());
-                        }
+            runner.with_egraph(egraph).with_hook(|r| {
+                for c in r.egraph.classes_mut() {
+                    if c.nodes.iter().any(|n| n.is_constant()) {
+                        c.nodes.retain(|n| n.is_constant());
                     }
-                    Ok(())
-                })
-                .run(rewrites);
+                }
+                Ok(())
+            })
         } else {
-            runner = Runner::<L, _, ()>::new(self.egraph.analysis.clone())
-                .with_egraph(egraph)
-                .with_node_limit(usize::MAX)
-                .with_iter_limit(ITER_LIMIT)
-                .with_scheduler(SimpleScheduler)
-                .run(rewrites);
-        }
-        
+            runner.with_egraph(egraph)
+        };
+
+        runner = runner.run(rewrites);
+
         log::info!("collecting unions...");
         // update the clean egraph based on any unions that happened
         let mut found_unions = HashMap::default();
@@ -711,10 +711,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 .flat_map(|eq| &eq.rewrites)
                 .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
-            let mut runner = Runner::default()
-                .with_iter_limit(ITER_LIMIT)
-                .with_scheduler(SimpleScheduler)
-                .with_node_limit(1_000_000);
+            let mut runner = mk_runner();
 
             if !self.params.no_conditionals {
                 runner = runner.with_egraph(self.initial_egraph.clone());
@@ -815,15 +812,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 rewrites.sort_by_key(|rw| rw.name());
                 rewrites.dedup_by_key(|rw| rw.name());
 
-                let mut runner = Runner::default();
+                let mut runner = mk_runner();
                 if !self.params.no_conditionals {
                     runner = runner.with_egraph(self.initial_egraph.clone());
                 }
-                runner = runner
-                    .with_iter_limit(ITER_LIMIT)
-                    .with_scheduler(SimpleScheduler)
-                    .with_time_limit(Duration::from_secs(60))
-                    .with_node_limit(10_000_000);
 
                 for candidate_eq in &test {
                     runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));
