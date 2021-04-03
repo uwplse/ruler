@@ -29,7 +29,7 @@ pub use util::*;
 
 const ITER_LIMIT: usize = 2;
 const NODE_LIMIT: usize = 300_000;
-const TIME_LIMIT: Duration = Duration::from_secs(10);
+const TIME_LIMIT: Duration = Duration::from_secs(60);
 
 pub fn mk_runner<L: SynthLanguage>() -> Runner<L, SynthAnalysis, ()> {
     Runner::default()
