@@ -110,6 +110,7 @@ impl SynthLanguage for Math {
         let mut egraph = EGraph::new(SynthAnalysis {
             // cvec_len: params.n_samples + params.constants.len(),
             cvec_len: params.n_samples + constants.len().pow(params.variables as u32),
+            // cvec_len: constants.len().pow(params.variables as u32),
         });
 
         let rng = &mut synth.rng;

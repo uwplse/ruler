@@ -41,6 +41,24 @@ else
     cd ..
 fi
 
+# Filter rational rules
+pushd herbie
+if [ -f "bench/rat-reduced.fpcore" ]
+then
+    echo "Rational FPCore Exists. Not Filtering."
+else
+    echo "Filtering all stable benches..."
+    racket $MYDIR/filter.rkt \
+    --operators "let let* fabs + - * / neg" \
+    --names "Octave 3.8, jcobi/3 ; Rosa's FloatVsDoubleBenchmark ; (- (/ x0 (- 1 x1)) x0) ; Expression 4, p15" \
+    bench/hamming \
+    bench/mathematics \
+    bench/libraries \
+    bench/numerics \
+    bench/physics > bench/rat-reduced.fpcore
+fi
+popd
+
 # set herbie path
 export HERBIE="$DIR/herbie"
 
