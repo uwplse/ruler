@@ -147,6 +147,68 @@ def aggregate_egraphs_list(our_list):
 
     return total
 
+def compare_phase_times(data, dataset_names):
+    names = dataset_names
+    names.sort()
+    phase_times = list(filter(lambda x: x['type'] == 'phase-times', data))
+    phase_times.sort(key=lambda x: x["domain"])
+
+    print(phase_times)
+    # filter for only the ones we asked for 
+    # TODO: maybe just make it all?
+    phase_times = filter(lambda x: x['domain'] in dataset_names, phase_times)
+
+    phases_by_name = [list(v) for k,v in groupby(phase_times, lambda x: x["domain"])]
+
+    
+    # aggregate to get one value per item...
+    sum = lambda acc, x: dict([('run_rewrites', float(x["run_rewrites"]) + acc["run_rewrites"]), \
+        ('rule_discovery', float(x["rule_discovery"]) + acc["rule_discovery"]), \
+        ('rule_minimization', float(x["rule_minimization"]) + acc["rule_minimization"])])
+    avg = lambda res, len: dict([('run_rewrites', res["run_rewrites"] / len), \
+        ('rule_discovery', res['rule_discovery'] / len), \
+            ('rule_minimization', res['rule_minimization'] / len)])
+
+    
+    # first sum all the items in the inner loop
+    # then, avg with the outer loop
+    agg_phases = []
+    reduce_base = {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0}
+    for run in phases_by_name:
+        runs_avg = reduce_base
+        for iter in run:
+            iter_info = iter['phases']
+            inner_sum = reduce(sum, iter_info, reduce_base)
+            runs_avg['run_rewrites'] += inner_sum['run_rewrites']
+            runs_avg['rule_discovery'] += inner_sum['rule_discovery']
+            runs_avg['rule_minimization'] += inner_sum['rule_minimization']
+        runs_avg = avg(runs_avg, len(run))
+        agg_phases.append(runs_avg)
+        
+    print(agg_phases)
+    
+    fig, ax = plt.subplots(1)
+    
+    run_rewrites = list(map(lambda x: x['run_rewrites'], agg_phases))
+    rule_discovery = list(map(lambda x: x['rule_discovery'], agg_phases))
+    rule_minimization = list(map(lambda x: x['rule_minimization'], agg_phases))
+
+    x = np.arange(len(names))
+
+    width = 0.3
+
+    ax.bar(x - width/3, run_rewrites, width/3, label="run_rewrites", color="burlywood")
+    ax.bar(x, rule_discovery, width/3, label="rule_discovery", color="skyblue")
+    ax.bar(x + width/3, rule_minimization, width/3, label="rule_minimization", color="firebrick")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(names)
+    plt.show()
+    # inner_sum = [reduce(sum, iter, reduce_base) for iter in [run for run in phases_by_name]]
+    # runs_avg = [avg(run, len(run)) for run in phases_by_name]
+
+    # print(runs_avg)
+
 
 def make_phase_time_plot(data):
     
@@ -242,8 +304,10 @@ def compare_run_rewrites(data):
     # plt.show()
     plt.savefig('output/run_rewrites.pdf')
 
-make_choose_eqs_time_rules_plot("Bool", bool_data)
+# make_choose_eqs_time_rules_plot("Bool", bool_data)
 # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-make_phase_time_plot(bool_data)
-compare_run_rewrites(bool_data)
-make_choose_eqs_line_plot(bool_data)
+# make_phase_time_plot(bool_data)
+# compare_run_rewrites(bool_data)
+# make_choose_eqs_line_plot(bool_data)
+
+compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
