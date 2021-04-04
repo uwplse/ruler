@@ -10,27 +10,27 @@ while [ -L "$src" ]; do
 done
 MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
+# default values
 NSEEDS=${1:-1}
 NUM_NODES=${2:-5000}
 
-if [ "$#" -eq 0 ]; then
-    echo "Running $0 with $NSEEDS seeds and $NUM_NODES enodes."
+if [ "$#" -eq 1 ]
+then
+    NSEEDS="$1"
+elif [ "$#" -eq 2 ]
+then
+    NEEDS="$1"
+    NUM_NODES="$2"
 else
-    if [ "$#" -eq 1 ]
+    if [ "$#" -gt 2 ]
     then
-        NSEEDS="$1"
-        echo "Running $0 with $NSEEDS seeds and $NUM_NODES enodes."
-    elif [ "$#" -eq 2 ]
-    then
-        NEEDS="$1"
-        NUM_NODES="$2"
-        echo "Running $0 with $NSEEDS seeds and $NUM_NODES enodes."
-    else
         echo "Illegal number of arguments."
         echo "Usage: $0 NSEEDS NUM_NODES."
         exit 1
     fi
 fi
+
+echo "Running $0 with $NSEEDS seeds and $NUM_NODES enodes."
 
 tstamp="$(date "+%Y-%m-%d_%H%M")"
 DIR="$MYDIR/output/ruler-herbie-eval"
