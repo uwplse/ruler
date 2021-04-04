@@ -10,18 +10,32 @@ while [ -L "$src" ]; do
 done
 MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
+# default values
+NSEEDS=${1:-1}
+NUM_NODES=${2:-5000}
+
+if [ "$#" -eq 1 ]
+then
+    NSEEDS="$1"
+elif [ "$#" -eq 2 ]
+then
+    NEEDS="$1"
+    NUM_NODES="$2"
+else
+    if [ "$#" -gt 2 ]
+    then
+        echo "Illegal number of arguments."
+        echo "Usage: $0 NSEEDS NUM_NODES."
+        exit 1
+    fi
+fi
+
+echo "Running $0 with $NSEEDS seeds and $NUM_NODES enodes."
+
 tstamp="$(date "+%Y-%m-%d_%H%M")"
 DIR="$MYDIR/output/ruler-herbie-eval"
 
 mkdir -p "$DIR"
-
-# determine number of seeds to sample
-if [ -z "$1" ]; then
-  echo "Usage: $0 NUM_SEEDS"
-  exit 1
-else
-  NSEEDS="$1"
-fi
 
 echo "Running Ruler"
 # run ruler and put rules in output directory
@@ -37,9 +51,29 @@ then
 else
     git clone git@github.com:uwplse/herbie.git
     cd herbie
+    # TODO: remove this once merged.
+    git checkout egg-interface-fixes
     make install
     cd ..
 fi
+
+# Filter rational rules
+pushd herbie
+if [ -f "bench/rat-reduced.fpcore" ]
+then
+    echo "Rational FPCore Exists. Not Filtering."
+else
+    echo "Filtering all stable benches..."
+    racket $MYDIR/filter.rkt \
+    --operators "let let* fabs + - * / neg" \
+    --names "Octave 3.8, jcobi/3 ; Rosa's FloatVsDoubleBenchmark ; (- (/ x0 (- 1 x1)) x0) ; Expression 4, p15" \
+    bench/hamming \
+    bench/mathematics \
+    bench/libraries \
+    bench/numerics \
+    bench/physics > bench/rat-reduced.fpcore
+fi
+popd
 
 # set herbie path
 export HERBIE="$DIR/herbie"
@@ -48,7 +82,7 @@ export HERBIE="$DIR/herbie"
 popd
 
 # all configs
-configs=("herbie-only" "herbie-ruler" "herbie-no-simpl" "ruler-only")
+configs=("herbie-no-simpl" "herbie-only" "ruler-only" "herbie-ruler")
 
 # for all the configs
 for c in ${configs[@]}; do
@@ -57,7 +91,7 @@ for c in ${configs[@]}; do
     python3 preprocess.py $DIR/ruler-rules-"$tstamp".txt "$HERBIE"/src/syntax/rules.rkt $c
     # do the herbie runs with this config
     # seed-variance.sh will put its output in the right directory
-    ./seed-variance.sh "$NSEEDS" $c $tstamp
+    ./seed-variance.sh "$NSEEDS" "$NUM_NODES" $c $tstamp
 done
 
 # make unified all_all.json with all.json from all configs

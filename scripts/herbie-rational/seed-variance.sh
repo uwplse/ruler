@@ -19,13 +19,14 @@ if [ -z "$HERBIE" ]; then
 fi
 
 # determine number of seeds to sample
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
-  echo "Usage: $0 NUM_SEEDS CONFIG tstamp"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+  echo "Usage: $0 NUM_SEEDS NUM_NODES CONFIG tstamp"
   exit 1
 else
   NSEEDS="$1"
-  cfg="$2"
-  tstamp="$3"
+  NUM_NODES="$2"
+  cfg="$3"
+  tstamp="$4"
 fi
 
 # advise user of execution plan
@@ -57,6 +58,8 @@ function do_seed {
   racket "$HERBIE/src/herbie.rkt" report \
     --threads yes \
     --seed "$seed" \
+    --num-enodes "$NUM_NODES" \
+    --timeout 1000 \
     "$HERBIE/bench/rat-reduced.fpcore" \
     "$seed_output"
 }
