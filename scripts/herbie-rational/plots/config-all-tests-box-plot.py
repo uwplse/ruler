@@ -17,16 +17,21 @@ ho = ('herbie-only', pairs['herbie-only'])
 ro = ('ruler-only', pairs['ruler-only'])
 hr = ('herbie-ruler', pairs['herbie-ruler'])
 
-new_pairs = dict([hno, ho, ro, hr])
+listify = [hno, ho, ro, hr]
+labs = []
+vals = []
+for c, ds in listify:
+    labs.append(c)
+    vals.append(ds)
 
 fig, ax = plt.subplots()
-ax.boxplot(new_pairs.values())
+ax.boxplot(vals)
 
 title = "config vs " + str(field) + " over seeds, summed over all tests"
 ax.set_title(title)
 ax.set_xlabel('config')
 ax.set_ylabel(str(field))
-ax.set_xticklabels(new_pairs.keys())
+ax.set_xticklabels(labs)
 
 plt.tight_layout()
 plt.savefig('by-config-all-tests-{}-boxplot.pdf'.format(field))
