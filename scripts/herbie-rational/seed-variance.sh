@@ -59,7 +59,7 @@ function do_seed {
     --threads yes \
     --seed "$seed" \
     --num-enodes "$NUM_NODES" \
-    --timeout 500 \
+    --timeout 2000 \
     "$HERBIE/bench/rat-reduced.fpcore" \
     "$seed_output"
 }
