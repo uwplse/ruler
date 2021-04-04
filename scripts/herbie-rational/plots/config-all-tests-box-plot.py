@@ -13,7 +13,7 @@ labs = [s['config'] for s in ss]
 data = [s['data'] for s in ss]
 
 fig, ax = plt.subplots()
-ax.boxplot(data, order=["herbie-no-simpl", "herbie-only", "ruler-only", "herbie-ruler"])
+ax.boxplot(data)
 
 title = "config vs " + str(field) + " over seeds, summed over all tests"
 ax.set_title(title)
