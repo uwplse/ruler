@@ -13,6 +13,7 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 # default values
 NSEEDS=${1:-1}
 NUM_NODES=${2:-5000}
+TIMEOUT=${3:-180}
 
 if [ "$#" -eq 1 ]
 then
@@ -21,16 +22,21 @@ elif [ "$#" -eq 2 ]
 then
     NEEDS="$1"
     NUM_NODES="$2"
+elif [ "$#" -eq 3 ]
+then
+    NEEDS="$1"
+    NUM_NODES="$2"
+    TIMEOUT="$3"
 else
-    if [ "$#" -gt 2 ]
+    if [ "$#" -gt 3 ]
     then
         echo "Illegal number of arguments."
-        echo "Usage: $0 NSEEDS NUM_NODES."
+        echo "Usage: $0 NSEEDS NUM_NODES TIMEOUT."
         exit 1
     fi
 fi
 
-echo "Running $0 with $NSEEDS seeds and $NUM_NODES enodes."
+echo "Running $0 with $NSEEDS seeds, $NUM_NODES enodes, $TIMEOUT seconds herbie timeout."
 
 tstamp="$(date "+%Y-%m-%d_%H%M")"
 DIR="$MYDIR/output/ruler-herbie-eval"
@@ -43,6 +49,16 @@ cargo rational --iters 2 --variables 3 --rules-to-take 999999999999 > $DIR/ruler
 
 # go to output directory
 pushd "$DIR"
+
+# write config info to a file with all details of this run
+cd results/$tstamp/
+# log all the rules, and other parameters used.
+cp $DIR/ruler-rules-"$tstamp".txt config-"$tstamp".txt
+echo "Number of seeds: $NSEEDS" >> config-"$tstamp".txt
+echo "Herbie node limit: $NUM_NODES" >> config-"$tstamp".txt
+echo "Herbie timeout: $TIMEOUT" >> config-"$tstamp".txt
+# go back to $DIR
+cd ..
 
 # clone Herbie inside the output directory
 if [ -d "$DIR/herbie" ]
@@ -57,8 +73,11 @@ else
     cd ..
 fi
 
+# set herbie path
+export HERBIE="$DIR/herbie"
+
 # Filter rational rules
-pushd herbie
+pushd "$HERBIE"
 if [ -f "bench/rat-reduced.fpcore" ]
 then
     echo "Rational FPCore Exists. Not Filtering."
@@ -73,11 +92,8 @@ else
     bench/numerics \
     bench/physics > bench/rat-reduced.fpcore
 fi
+# pop back to $DIR
 popd
-
-# set herbie path
-export HERBIE="$DIR/herbie"
-
 # pop back to MYDIR
 popd
 
@@ -91,18 +107,18 @@ for c in ${configs[@]}; do
     python3 preprocess.py $DIR/ruler-rules-"$tstamp".txt "$HERBIE"/src/syntax/rules.rkt $c
     # do the herbie runs with this config
     # seed-variance.sh will put its output in the right directory
-    ./seed-variance.sh "$NSEEDS" "$NUM_NODES" $c $tstamp
+    ./seed-variance.sh "$NSEEDS" "$NUM_NODES" "$TIMEOUT" $c $tstamp
 done
 
 # make unified all_all.json with all.json from all configs
 jq -s . \
-    $DIR/configs/$tstamp/herbie-only/all.json \
-    $DIR/configs/$tstamp/herbie-no-simpl/all.json \
-    $DIR/configs/$tstamp/herbie-ruler/all.json \
-    $DIR/configs/$tstamp/ruler-only/all.json \
-    > $DIR/configs/$tstamp/all-all.json
+    $DIR/results/$tstamp/herbie-only/all.json \
+    $DIR/results/$tstamp/herbie-no-simpl/all.json \
+    $DIR/results/$tstamp/herbie-ruler/all.json \
+    $DIR/results/$tstamp/ruler-only/all.json \
+    > $DIR/results/$tstamp/all-all.json
 
-pushd "$DIR/configs/$tstamp" 
+pushd "$DIR/results/$tstamp"
 
 jq 'flatten' all-all.json > all-all.json.tmp
 mv all-all.json.tmp all-all.json
@@ -127,5 +143,5 @@ popd
 #   PLOT RESULTS
 #
 
-$MYDIR/seed-stats-per-test.sh "$DIR/configs/$tstamp"
-$MYDIR/plots/plot-results.sh "$DIR/configs/$tstamp"
+$MYDIR/seed-stats-per-test.sh "$DIR/results/$tstamp"
+$MYDIR/plots/plot-results.sh "$DIR/results/$tstamp"

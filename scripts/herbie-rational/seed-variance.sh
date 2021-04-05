@@ -19,14 +19,15 @@ if [ -z "$HERBIE" ]; then
 fi
 
 # determine number of seeds to sample
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
-  echo "Usage: $0 NUM_SEEDS NUM_NODES CONFIG tstamp"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ] || [ -z "$5" ]; then
+  echo "Usage: $0 NUM_SEEDS NUM_NODES TIMEOUT CONFIG tstamp"
   exit 1
 else
   NSEEDS="$1"
   NUM_NODES="$2"
-  cfg="$3"
-  tstamp="$4"
+  TIMEOUT="$3"
+  cfg="$4"
+  tstamp="$5"
 fi
 
 # advise user of execution plan
@@ -46,8 +47,12 @@ fi
 #
 
 # allocate space for output
-output="$MYDIR/output/ruler-herbie-eval/configs/$tstamp/$cfg"
+output="$MYDIR/output/ruler-herbie-eval/results/$tstamp/$cfg"
 mkdir -p "$output"
+
+# keep a copy of the rule file used in this experiment
+echo "Copying the rule file for backup..."
+cp "$HERBIE"/src/syntax/rules.rkt "$output"/"$cfg".rkt
 
 function do_seed {
   seed="$1"
@@ -59,7 +64,7 @@ function do_seed {
     --threads yes \
     --seed "$seed" \
     --num-enodes "$NUM_NODES" \
-    --timeout 1000 \
+    --timeout "$TIMEOUT" \
     "$HERBIE/bench/rat-reduced.fpcore" \
     "$seed_output"
 }
@@ -162,7 +167,7 @@ for rj in $(find . -name 'results.json' | sort); do
          , "avg_bits_err_input": .start
          , "avg_bits_err_output": .end
          , "avg_bits_err_improve": (.start - .end)
-         , "time_improve": .time
+         , "time": .time
          , "seed": $SEED
          , "npts": $NPTS
          , "herbie_iters": $HERBIE_ITERS
