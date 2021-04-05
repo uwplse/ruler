@@ -385,6 +385,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     pub fn run(mut self) -> Report<L> {
+        // normalize some params
+        if self.params.rules_to_take == 0 {
+            self.params.rules_to_take = usize::MAX;
+        }
+        if self.params.chunk_size == 0 {
+            self.params.chunk_size = usize::MAX;
+        }
+
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
         assert!(self.params.iters > 0);
@@ -522,7 +530,7 @@ pub struct SynthParams {
     pub seed: u64,
     #[clap(long, default_value = "10")]
     pub n_samples: usize,
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "3")]
     pub variables: usize,
 
     ///////////////////
@@ -530,9 +538,11 @@ pub struct SynthParams {
     ///////////////////
     #[clap(long, default_value = "1")]
     pub iters: usize,
-    #[clap(long, default_value = "1")]
+    /// 0 is unlimited
+    #[clap(long, default_value = "0")]
     pub rules_to_take: usize,
-    #[clap(long, default_value = "999999999999")]
+    /// 0 is unlimited
+    #[clap(long, default_value = "0")]
     pub chunk_size: usize,
     #[clap(long, conflicts_with = "rules-to-take")]
     pub minimize: bool,
@@ -706,8 +716,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
         while let Some((name, eq)) = new_eqs.pop() {
             let rule_validation = Instant::now();
-            let valid = L::is_valid (&mut self.rng, &eq.lhs, &eq.rhs);
-            log::info!("Time taken in validation: {}", rule_validation.elapsed().as_secs_f64());
+            let valid = L::is_valid(&mut self.rng, &eq.lhs, &eq.rhs);
+            log::info!(
+                "Time taken in validation: {}",
+                rule_validation.elapsed().as_secs_f64()
+            );
 
             if valid {
                 keepers.insert(name, eq);
@@ -791,7 +804,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .into_iter()
             .partition(|(_name, eq)| L::is_valid(&mut self.rng, &eq.lhs, &eq.rhs));
 
-        log::info!("Time taken in validation: {}", rule_validation.elapsed().as_secs_f64());
+        log::info!(
+            "Time taken in validation: {}",
+            rule_validation.elapsed().as_secs_f64()
+        );
 
         let n_new_eqs = new_eqs.len();
         log::info!("Minimizing {} rules...", n_new_eqs);
