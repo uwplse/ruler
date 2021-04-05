@@ -58,8 +58,10 @@ let load_dir = (path, type, k) => {
 let make_entry = (text) => {
     let total_time_pattern = /Learned (?<quantity>[\d]+)[\w\s]*(?<time>[.\d]+)$/gm;
     let egraph_size_pattern = /egraph n=([\d]+), e=([\d]+)/gm;
-    let phase_time_pattern = /Time taken in... [\w.\s]+: ([\d.]+), [\w.\s]+: ([\d.]+), [\w.\s]+: ([\d.]+)$/gm // may not exist 
+    let phase_time_pattern = /Time taken in... [\w.\s]+: ([\d.]+), [\w.\s]+: ([\d.]+), [\w.\s]+: ([\d.]+)$/gm
+    let validation_pattern = /Time taken in validation+: ([\d.]+)$/gm // may not exist 
 
+    // N.B. because of how this works, we need to subtract validation time from the minimization time.
     
     let item = total_time_pattern.exec(text);
     // let times = Array.from(text.matchAll(total_time_pattern), item => {
@@ -69,6 +71,14 @@ let make_entry = (text) => {
         return { n: item[1], e: item[2], cv: item[3] };
     });
     let phases = Array.from(text.matchAll(phase_time_pattern), item => { return { run_rewrites: item[1], rule_discovery: item[2], rule_minimization: item[3] } });
+    let validation = Array.from(text.matchAll(validation_pattern), item => { if (item != undefined) return parseFloat(item[1]); return 0 });
+    // Assuming they would be the same length
+    phases.forEach((d, i) => {
+        v = validation[i] || 0.0;
+        d["rule_minimization"] = (parseFloat(d["rule_minimization"]) - v).toString();
+        d["rule_validation"] = v.toString();
+    })
+
     let real = (/^real\s*([\w.]+)$/gm).exec(text)[1];
     let user = (/^user\s*([\w.]+)$/gm).exec(text)[1];
     let sys = (/^sys\s*([\w.]+)$/gm).exec(text)[1];

@@ -691,7 +691,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // make the best last
         new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
         while let Some((name, eq)) = new_eqs.pop() {
-            if L::is_valid(&mut self.rng, &eq.lhs, &eq.rhs) {
+            let rule_validation = Instant::now();
+            let valid = L::is_valid (&mut self.rng, &eq.lhs, &eq.rhs);
+            log::info!("Time taken in validation: {}", rule_validation.elapsed().as_secs_f64());
+            
+            if valid {
                 keepers.insert(name, eq);
             } else {
                 bads.insert(name, eq);
@@ -767,9 +771,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         assert!(self.params.minimize);
 
         let t = Instant::now();
+
+        let rule_validation = Instant::now();
         let (new_eqs, bads): (EqualityMap<L>, EqualityMap<L>) = new_eqs
             .into_iter()
             .partition(|(_name, eq)| L::is_valid(&mut self.rng, &eq.lhs, &eq.rhs));
+        
+        log::info!("Time taken in validation: {}", rule_validation.elapsed().as_secs_f64());
 
         let n_new_eqs = new_eqs.len();
         log::info!("Minimizing {} rules...", n_new_eqs);

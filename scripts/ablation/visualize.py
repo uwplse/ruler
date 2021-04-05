@@ -164,16 +164,18 @@ def compare_phase_times(data, dataset_names):
     # aggregate to get one value per item...
     sum = lambda acc, x: dict([('run_rewrites', float(x["run_rewrites"]) + acc["run_rewrites"]), \
         ('rule_discovery', float(x["rule_discovery"]) + acc["rule_discovery"]), \
-        ('rule_minimization', float(x["rule_minimization"]) + acc["rule_minimization"])])
+        ('rule_minimization', float(x["rule_minimization"]) + acc["rule_minimization"]),\
+        ('rule_validation', float(x["rule_validation"]) + acc["rule_validation"])])
     avg = lambda res, len: dict([('run_rewrites', res["run_rewrites"] / len), \
         ('rule_discovery', res['rule_discovery'] / len), \
-            ('rule_minimization', res['rule_minimization'] / len)])
+            ('rule_minimization', res['rule_minimization'] / len), \
+                ('rule_validation', res['rule_validation'] / len)])
 
     
     # first sum all the items in the inner loop
     # then, avg with the outer loop
     agg_phases = []
-    reduce_base = {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0}
+    reduce_base = {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0, 'rule_validation': 0.0}
     for run in phases_by_name:
         runs_avg = reduce_base
         for iter in run:
@@ -182,6 +184,7 @@ def compare_phase_times(data, dataset_names):
             runs_avg['run_rewrites'] += inner_sum['run_rewrites']
             runs_avg['rule_discovery'] += inner_sum['rule_discovery']
             runs_avg['rule_minimization'] += inner_sum['rule_minimization']
+            runs_avg['rule_validation'] += inner_sum['rule_validation']
         runs_avg = avg(runs_avg, len(run))
         agg_phases.append(runs_avg)
         
@@ -192,18 +195,22 @@ def compare_phase_times(data, dataset_names):
     run_rewrites = list(map(lambda x: x['run_rewrites'], agg_phases))
     rule_discovery = list(map(lambda x: x['rule_discovery'], agg_phases))
     rule_minimization = list(map(lambda x: x['rule_minimization'], agg_phases))
+    rule_validation = list(map(lambda x: x['rule_validation'], agg_phases))
 
     x = np.arange(len(names))
 
     width = 0.3
 
-    ax.bar(x - width/3, run_rewrites, width/3, label="run_rewrites", color="burlywood")
-    ax.bar(x, rule_discovery, width/3, label="rule_discovery", color="skyblue")
-    ax.bar(x + width/3, rule_minimization, width/3, label="rule_minimization", color="firebrick")
+    ax.bar(x, run_rewrites, width/4, label="run_rewrites", color="burlywood")
+    ax.bar(x + width/4, rule_discovery, width/4, label="rule_discovery", color="skyblue")
+    ax.bar(x + width/2, rule_minimization, width/4, label="rule_minimization", color="firebrick")
+    ax.bar(x + width * 0.75, rule_validation, width/4, label="rule_validation", color="indigo")
 
-    ax.set_xticks(x)
+    ax.set_xticks(x + width * 3 / 8)
     ax.set_xticklabels(names)
-    plt.show()
+
+    plt.savefig("output/by_domain_phase_times.pdf")
+    # plt.show()
     # inner_sum = [reduce(sum, iter, reduce_base) for iter in [run for run in phases_by_name]]
     # runs_avg = [avg(run, len(run)) for run in phases_by_name]
 
@@ -222,14 +229,16 @@ def make_phase_time_plot(data):
         reduce(lambda acc, x: \
         dict([('run_rewrites', float(x["run_rewrites"]) + acc["run_rewrites"]), \
         ('rule_discovery', float(x["rule_discovery"]) + acc["rule_discovery"]), \
-        ('rule_minimization', float(x["rule_minimization"]) + acc["rule_minimization"])]), \
+        ('rule_minimization', float(x["rule_minimization"]) + acc["rule_minimization"]), \
+        ('rule_validation', float(x["rule_validation"]) + acc["rule_validation"])]), \
         times, 
-        {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0}),\
+        {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0, 'rule_validation': 0.0}),\
         times_only)))
 
     run_rewrites = list(map(lambda x: x['run_rewrites'], agg_times))
     rule_discovery = list(map(lambda x: x['rule_discovery'], agg_times))
     rule_minimization = list(map(lambda x: x['rule_minimization'], agg_times))
+    rule_validation = list(map(lambda x: x['rule_validation'], agg_times))
 
     legends = list(map(lambda x: x['run'], phase_times))
     width = 0.8
@@ -240,13 +249,17 @@ def make_phase_time_plot(data):
     ax.bar(legends, run_rewrites, width, label="run_rewrites", color="burlywood")
     ax.bar(legends, rule_discovery, width, label="rule_discovery", bottom=run_rewrites, color="skyblue")
     ax.bar(legends, rule_minimization, width, label="rule_minimzation", bottom=[sum(x) for x in zip(run_rewrites, rule_discovery)], color="firebrick")
+    ax.bar(legends, rule_validation, width, label="rule_validation", bottom=[sum(x) for x in zip(run_rewrites, rule_discovery, rule_minimization)], color="indigo")
 
     # get iter locations
     x = np.arange(len(run_rewrites))
 
-    axg.bar(x - width/3, run_rewrites, width/3, label="run_rewrites", color="burlywood")
-    axg.bar(x, rule_discovery, width/3, label="rule_discovery", color="skyblue")
-    axg.bar(x + width/3, rule_minimization, width/3, label="rule_minimization", color="firebrick")
+    axg.bar(x - width/2, run_rewrites, width/4, label="run_rewrites", color="burlywood")
+    axg.bar(x - width / 4, rule_discovery, width/4, label="rule_discovery", color="skyblue")
+    axg.bar(x + width/4, rule_minimization, width/4, label="rule_minimization", color="firebrick")
+    axg.bar(x + width/2, rule_validation, width/4, label="rule_validation", color="indigo")
+
+    # TODO: fix the legend now
 
     ax.legend()
     fig.suptitle("Time spent in each phase (by run)")
@@ -304,10 +317,11 @@ def compare_run_rewrites(data):
     # plt.show()
     plt.savefig('output/run_rewrites.pdf')
 
-# make_choose_eqs_time_rules_plot("Bool", bool_data)
+make_choose_eqs_time_rules_plot("Bool", bool_data)
 # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-# make_phase_time_plot(bool_data)
-# compare_run_rewrites(bool_data)
-# make_choose_eqs_line_plot(bool_data)
+make_phase_time_plot(bool_data)
+compare_run_rewrites(bool_data)
+make_choose_eqs_line_plot(bool_data)
 
-compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
+compare_phase_times(data, ["bool"])
+# compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
