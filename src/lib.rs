@@ -478,6 +478,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             }
         }
+
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.equalities.len();
         let eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
@@ -596,6 +597,17 @@ macro_rules! map {
             .zip($get($b).iter())
             .map(|tup| match tup {
                 (Some($a), Some($b)) => $body,
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    ($get:ident, $a:ident, $b:ident, $c:ident => $body:expr) => {
+        $get($a)
+            .iter()
+            .zip($get($b).iter())
+            .zip($get($c).iter())
+            .map(|tup| match tup {
+                ((Some($a), Some($b)), Some($c)) => $body,
                 _ => None,
             })
             .collect::<Vec<_>>()

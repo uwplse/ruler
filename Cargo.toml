@@ -24,6 +24,7 @@ clap = "3.0.0-beta.2"
 rustc-hash = "1"
 symbolic_expressions = "5"
 rayon = "1"
+smallvec = { version = "1.6", features = ["union", "const_generics"] }
 
 [dependencies.egg]
 git = "https://github.com/egraphs-good/egg"

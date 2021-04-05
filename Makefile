@@ -14,7 +14,8 @@ cvc4=cvc4 \
   --no-sygus-sym-break-dynamic  \
   --sygus-rr-synth-filter-cong  \
   --sygus-rr-synth-filter-match \
-  --sygus-rr-synth-filter-order
+  --sygus-rr-synth-filter-order \
+  --strings-exp
 
 ruler-reports=
 cvc4-logs=
@@ -25,8 +26,8 @@ define synthesize # (domain, variables, iters, rules-to-take)
 ruler-reports += results/ruler/$(1)-$(2)vars-$(3)iters.json
 results/ruler/$(1)-$(2)vars-$(3)iters.json: # $(rust-src)
 	mkdir -p results/ruler
-	# cargo $(1) --variables $(2) --iters $(3) --rules-to-take $(4) --outfile $$@
-	cargo $(1) --variables $(2) --iters $(3) --minimize --outfile $$@
+	cargo $(1) --variables $(2) --iters $(3) --rules-to-take $(4) --outfile $$@
+	# cargo $(1) --variables $(2) --iters $(3) --minimize --outfile $$@
 
 cvc4-logs += results/cvc4/$(1)-$(2)vars-$(3)iters.txt
 results/cvc4/$(1)-$(2)vars-$(3)iters.txt: cvc4/$(1)-$(2)vars.sy
@@ -65,6 +66,8 @@ $(eval $(call synthesize,bv4,3,2,99999))
 # $(eval $(call synthesize,bv4ns,2,3,99999))
 # $(eval $(call synthesize,bv4ns,3,2,99999))
 # $(eval $(call synthesize,bv4ns,3,3,99999))
+
+# $(eval $(call synthesize,str,3,2,99999))
 
 
 .PHONY: latex-report
