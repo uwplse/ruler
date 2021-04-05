@@ -16,6 +16,7 @@ use std::{
     time::Instant,
 };
 
+mod bv;
 mod convert_sexp;
 mod derive;
 mod equality;
@@ -24,6 +25,7 @@ mod util;
 pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
 pub type HashSet<K> = rustc_hash::FxHashSet<K>;
 
+pub use bv::*;
 pub use equality::*;
 pub use util::*;
 
@@ -706,7 +708,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let rule_validation = Instant::now();
             let valid = L::is_valid (&mut self.rng, &eq.lhs, &eq.rhs);
             log::info!("Time taken in validation: {}", rule_validation.elapsed().as_secs_f64());
-            
+
             if valid {
                 keepers.insert(name, eq);
             } else {
@@ -788,7 +790,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let (new_eqs, bads): (EqualityMap<L>, EqualityMap<L>) = new_eqs
             .into_iter()
             .partition(|(_name, eq)| L::is_valid(&mut self.rng, &eq.lhs, &eq.rhs));
-        
+
         log::info!("Time taken in validation: {}", rule_validation.elapsed().as_secs_f64());
 
         let n_new_eqs = new_eqs.len();
