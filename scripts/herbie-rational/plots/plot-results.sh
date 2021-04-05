@@ -83,7 +83,7 @@ fields="
   avg_bits_err_input
   avg_bits_err_output
   avg_bits_err_improve
-  time_improve"
+  time"
 
 for f in $fields; do
   gen-config-seed-field "$f"
