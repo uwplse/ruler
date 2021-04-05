@@ -29,6 +29,7 @@ ax.boxplot(vals)
 
 title = "config vs " + str(field) + " over seeds, summed over all tests"
 ax.set_title(title)
+ax.set_ylim(bottom=0)
 ax.set_xlabel('config')
 ax.set_ylabel(str(field))
 ax.set_xticklabels(labs)

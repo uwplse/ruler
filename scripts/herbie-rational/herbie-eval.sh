@@ -36,12 +36,12 @@ else
     fi
 fi
 
+echo "Usage: $0 NSEEDS NUM_NODES TIMEOUT."
 echo "Running $0 with $NSEEDS seeds, $NUM_NODES enodes, $TIMEOUT seconds herbie timeout."
 
 tstamp="$(date "+%Y-%m-%d_%H%M")"
 DIR="$MYDIR/output/ruler-herbie-eval"
-
-mkdir -p "$DIR"
+mkdir -p "$DIR"/results/"$tstamp"
 
 echo "Running Ruler"
 # run ruler and put rules in output directory
@@ -51,14 +51,14 @@ cargo rational --iters 2 --variables 3 --rules-to-take 999999999999 > $DIR/ruler
 pushd "$DIR"
 
 # write config info to a file with all details of this run
-cd results/$tstamp/
+pushd results/"$tstamp"
 # log all the rules, and other parameters used.
 cp $DIR/ruler-rules-"$tstamp".txt config-"$tstamp".txt
 echo "Number of seeds: $NSEEDS" >> config-"$tstamp".txt
 echo "Herbie node limit: $NUM_NODES" >> config-"$tstamp".txt
 echo "Herbie timeout: $TIMEOUT" >> config-"$tstamp".txt
 # go back to $DIR
-cd ..
+popd
 
 # clone Herbie inside the output directory
 if [ -d "$DIR/herbie" ]
