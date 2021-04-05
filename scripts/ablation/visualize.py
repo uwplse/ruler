@@ -160,6 +160,8 @@ def compare_phase_times(data, dataset_names):
 
     phases_by_name = [list(v) for k,v in groupby(phase_times, lambda x: x["domain"])]
 
+    if (len(phases_by_name) != len(dataset_names)):
+        raise ValueError("You are plotting datasets not present in parsed.json")
     
     # aggregate to get one value per item...
     sum = lambda acc, x: dict([('run_rewrites', float(x["run_rewrites"]) + acc["run_rewrites"]), \
@@ -208,6 +210,12 @@ def compare_phase_times(data, dataset_names):
 
     ax.set_xticks(x + width * 3 / 8)
     ax.set_xticklabels(names)
+
+    # TODO: bools, etc. have a nonzero validation rn because the logging is not 
+    # properly done inside new choose_eqs. Need to fix (inside partition)
+    ax.set_yscale('log')
+
+    plt.legend()
 
     plt.savefig("output/by_domain_phase_times.pdf")
     # plt.show()
@@ -323,5 +331,5 @@ make_phase_time_plot(bool_data)
 compare_run_rewrites(bool_data)
 make_choose_eqs_line_plot(bool_data)
 
-compare_phase_times(data, ["bool"])
-# compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
+# compare_phase_times(data, ["bool"])
+compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
