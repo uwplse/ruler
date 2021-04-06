@@ -68,7 +68,7 @@ else
     git clone git@github.com:uwplse/herbie.git
     cd herbie
     # TODO: remove this once merged.
-    git checkout egg-interface-fixes
+    # git checkout egg-interface-fixes
     make install
     cd ..
 fi
