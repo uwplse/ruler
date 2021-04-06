@@ -11,10 +11,10 @@ data = json.load(open("output/parsed.json"))
 bool_data = list(filter(lambda x: x['domain'] == "bool", data))
 bv4ns_data = list(filter(lambda x: x['domain'] == "bv4ns", data))
 # print(bool_data)
-def make_choose_eqs_time_rules_plot(domain, data):
-    make_choose_eqs_plot(domain, data, lambda x: x["learned"]["time"], lambda x: x["learned"]["rules"])
+def make_choose_eqs_time_rules_plot(domain, data, boxplot=False):
+    make_choose_eqs_plot(domain, data, lambda x: x["learned"]["time"], lambda x: x["learned"]["rules"], boxplot)
 
-def make_choose_eqs_plot(domain, data, compare, compare2):
+def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     # Collect data
     orat = list(filter(lambda x: x['type'] == 'orat', data))
     for item in orat: 
@@ -29,18 +29,19 @@ def make_choose_eqs_plot(domain, data, compare, compare2):
     x.append("min.")
 
     # average over each item, for each comparison
-    orat_y = list(map(lambda x: float(compare(x)), orat))
-    orat_y = sum(orat_y) / len(orat_y)
+    orat_y_l= list(map(lambda x: float(compare(x)), orat))
+    orat_y = sum(orat_y_l) / len(orat_y_l)
     orat_y2 = list(map(lambda x: float(compare2(x)), orat))
     orat_y2 = sum(orat_y2) / len(orat_y2)
 
-    min_y = list(map(lambda x: float(compare(x)), minimize))
-    min_y = sum(min_y) / len(min_y)
+    min_y_l = list(map(lambda x: float(compare(x)), minimize))
+    min_y = sum(min_y_l) / len(min_y_l)
     min_y2 = list(map(lambda x: float(compare2(x)), minimize))
     min_y2 = sum(min_y2) / len(min_y2)
 
     # average mrat by each m
     mrat_ys = []
+    mrat_ys_l = []
     mrat_y2s = []
     grouped = {}
     for elem in mrat:
@@ -51,17 +52,26 @@ def make_choose_eqs_plot(domain, data, compare, compare2):
     for lst in grouped:
         res = list(map(lambda x: float(compare(x)), lst))
         mrat_ys.append(sum(res) / len(res))
+        mrat_ys_l.append(res)
         res2 = list(map(lambda x: float(compare2(x)), lst))
         mrat_y2s.append(sum(res2) / len(res2))
 
     y = [orat_y] + mrat_ys + [min_y]
     y2 = [orat_y2] + mrat_y2s + [min_y2]
-
+    y_l = [orat_y_l] + mrat_ys_l + [min_y_l]
+ 
     fig, (compare1, compare2) = plt.subplots(1,2)
 
     width = 0.4
 
-    compare1.bar(x, y, width, color='lightblue')
+    if boxplot:
+        boxplot = compare1.boxplot(y_l, patch_artist=True)
+        for patch in boxplot['boxes']:
+            patch.set(facecolor="lightblue")  
+        compare1.set_xticklabels(x)
+    else:
+        compare1.bar(x, y, width, color='lightblue')
+
     compare1.set(xlabel="choose_eqs setting", ylabel="s")
     compare1.set_title("Time")
 
@@ -325,11 +335,11 @@ def compare_run_rewrites(data):
     # plt.show()
     plt.savefig('output/run_rewrites.pdf')
 
-make_choose_eqs_time_rules_plot("Bool", bool_data)
+make_choose_eqs_time_rules_plot("Bool", bool_data, boxplot=True)
 # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
 make_phase_time_plot(bool_data)
 compare_run_rewrites(bool_data)
 make_choose_eqs_line_plot(bool_data)
 
-# compare_phase_times(data, ["bool"])
-compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
+compare_phase_times(data, ["bool"])
+# compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
