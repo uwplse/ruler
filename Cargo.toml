@@ -20,10 +20,11 @@ float-cmp = "0.8.0"
 lazy_static = "1.4.0"
 itertools = "0.9.0"
 clap = "3.0.0-beta.2"
-#z3 = {version="0.10.0", features = ["static-link-z3"]}
+z3 = {version="0.10.0", features = ["static-link-z3"]}
 rustc-hash = "1"
 symbolic_expressions = "5"
 rayon = "1"
+smallvec = { version = "1.6", features = ["union", "const_generics"] }
 
 [dependencies.egg]
 git = "https://github.com/egraphs-good/egg"
