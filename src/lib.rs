@@ -550,7 +550,7 @@ pub struct SynthParams {
     ///////////////////
     // search params //
     ///////////////////
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "2")]
     pub iters: usize,
     /// 0 is unlimited
     #[clap(long, default_value = "0")]
