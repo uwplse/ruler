@@ -251,7 +251,21 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 Ok(())
             })
         } else {
-            runner.with_egraph(egraph)
+            // for conditional rule domains like rationals
+            let trunc = 3;
+            egraph.analysis.cvec_len = trunc;
+            for c in egraph.classes_mut() {
+                c.data.cvec.truncate(trunc);
+            }
+            runner.with_egraph(egraph).with_hook(|r| {
+                for c in r.egraph.classes_mut() {
+                    if c.nodes.iter().any(|n| n.is_constant()) {
+                        c.nodes.retain(|n| n.is_constant());
+                    }
+                }
+                Ok(())
+            })
+            // runner.with_egraph(egraph)
         };
 
         runner = runner.run(rewrites);
