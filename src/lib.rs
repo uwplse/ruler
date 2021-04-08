@@ -116,7 +116,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         RecExpr::from(nodes)
     }
 
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 3] {
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 4] {
         let sz_lhs = AstSize.cost_rec(&lhs.ast) as i32;
         let sz_rhs = AstSize.cost_rec(&rhs.ast) as i32;
         // let sz_max_pattern = sz_lhs.max(sz_rhs);
@@ -131,16 +131,21 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         var_set.extend(rhs.vars());
         let n_vars_rule = var_set.len() as i32;
 
-        // let mut op_set: HashSet<String> = Default::default();
-        // for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-        //     if !node.is_leaf() {
-        //         op_set.insert(node.display_op().to_string());
-        //     }
-        // }
-        // let n_ops = op_set.len() as i32;
+        let mut op_set: HashSet<String> = Default::default();
+        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+            if !node.is_leaf() {
+                op_set.insert(node.display_op().to_string());
+            }
+        }
+        let n_ops = op_set.len() as i32;
 
         // (-sz_max_pattern, n_vars_rule)
-        [n_vars_rule, -sz_lhs.min(sz_rhs), -sz_lhs.max(sz_rhs)]
+        [
+            -n_ops,
+            n_vars_rule,
+            -sz_lhs.min(sz_rhs),
+            -sz_lhs.max(sz_rhs),
+        ]
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>);

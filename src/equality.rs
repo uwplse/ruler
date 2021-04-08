@@ -170,7 +170,7 @@ impl<L: SynthLanguage> Equality<L> {
         }
     }
 
-    pub fn score(&self) -> [i32; 3] {
+    pub fn score(&self) -> impl Ord + Debug {
         L::score(&self.lhs, &self.rhs)
     }
 }
