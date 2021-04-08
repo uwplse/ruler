@@ -572,7 +572,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "0")]
     pub rules_to_take: usize,
     /// 0 is unlimited
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "100000")]
     pub chunk_size: usize,
     #[clap(long, conflicts_with = "rules-to-take")]
     pub minimize: bool,
