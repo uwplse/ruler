@@ -29,18 +29,6 @@ pub use bv::*;
 pub use equality::*;
 pub use util::*;
 
-const ITER_LIMIT: usize = 2;
-const NODE_LIMIT: usize = 300_000;
-const TIME_LIMIT: Duration = Duration::from_secs(60);
-
-pub fn mk_runner<L: SynthLanguage>() -> Runner<L, SynthAnalysis, ()> {
-    Runner::default()
-        .with_node_limit(NODE_LIMIT)
-        .with_iter_limit(ITER_LIMIT)
-        .with_time_limit(TIME_LIMIT)
-        .with_scheduler(SimpleScheduler)
-}
-
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
     &alpha[i..i + 1]
@@ -234,7 +222,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
-        let mut runner = mk_runner();
+        let mut runner = Runner::default()
+            .with_node_limit(self.params.eqsat_node_limit)
+            .with_iter_limit(self.params.eqsat_iter_limit)
+            .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
+            .with_scheduler(SimpleScheduler);
         runner = if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
             for c in egraph.classes_mut() {
@@ -356,9 +348,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
 
-        // let not_all_nones = self
-        //     .ids()
-        //     .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
         for id in self.ids() {
             let class = &self.egraph[id];
             if class.data.is_defined() {
@@ -371,22 +360,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut new_eqs = EqualityMap::default();
         let mut extract = Extractor::new(&self.egraph, AstSize);
         for ids in by_cvec.values() {
-            if false {
-                // limit id_iter so the cartesian product doesn't get too big
-                let mut id_iter = ids.iter().take(50);
-                while let Some(&id1) = id_iter.next() {
-                    for &id2 in id_iter.clone() {
-                        let (_, e1) = extract.find_best(id1);
-                        let (_, e2) = extract.find_best(id2);
-                        if let Some(mut eq) = Equality::new(&e1, &e2) {
-                            log::debug!("  Candidate {}", eq);
-                            eq.ids = Some((id1, id2));
-                            new_eqs.insert(eq.name.clone(), eq);
-                        }
-                    }
-                }
-            } else {
-                // try linear cvec matching
+            if self.params.linear_cvec_matching {
                 let mut terms_ids: Vec<_> =
                     ids.iter().map(|&id| (extract.find_best(id), id)).collect();
                 terms_ids.sort_by_key(|x| x.0 .0);
@@ -396,6 +370,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         log::debug!("  Candidate {}", eq);
                         eq.ids = Some((*id1, *id2));
                         new_eqs.insert(eq.name.clone(), eq);
+                    }
+                }
+            } else {
+                let mut id_iter = ids.iter();
+                while let Some(&id1) = id_iter.next() {
+                    for &id2 in id_iter.clone() {
+                        let (_, e1) = extract.find_best(id1);
+                        let (_, e2) = extract.find_best(id2);
+                        if let Some(mut eq) = Equality::new(&e1, &e2) {
+                            log::debug!("  Candidate {}", eq);
+                            eq.ids = Some((id1, id2));
+                            new_eqs.insert(eq.name.clone(), eq);
+                        }
                     }
                 }
             }
@@ -422,6 +409,25 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("[[[ Iteration {} ]]]", iter);
             let mut layer = L::make_layer(&self, iter);
             layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
+
+            if iter > self.params.no_constants_above_iter {
+                let mut extract = Extractor::new(&self.egraph, NumberOfOps);
+
+                // maps ids to n_ops
+                let has_constants: HashSet<Id> = self
+                    .ids()
+                    .filter_map(|id| {
+                        let (_cost, best) = extract.find_best(id);
+                        if best.as_ref().iter().any(|n| n.is_constant()) {
+                            Some(id)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                layer.retain(|n| n.all(|id| !has_constants.contains(&id)));
+            }
 
             log::info!("Made layer of {} nodes", layer.len());
             for chunk in layer.chunks(self.params.chunk_size) {
@@ -570,12 +576,30 @@ pub struct SynthParams {
     pub chunk_size: usize,
     #[clap(long, conflicts_with = "rules-to-take")]
     pub minimize: bool,
+    /// disallows enumerating terms with constants past this iteration
+    #[clap(long, default_value = "999999")]
+    pub no_constants_above_iter: usize,
     #[clap(long)]
     pub no_conditionals: bool,
     #[clap(long)]
     pub no_run_rewrites: bool,
+    #[clap(long)]
+    pub linear_cvec_matching: bool,
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
+
+    ////////////////
+    // eqsat args //
+    ////////////////
+    /// node limit for all the eqsats
+    #[clap(long, default_value = "300000")]
+    pub eqsat_node_limit: usize,
+    /// iter limit for all the eqsats
+    #[clap(long, default_value = "2")]
+    pub eqsat_iter_limit: usize,
+    /// time limit (seconds) for all the eqsats
+    #[clap(long, default_value = "60")]
+    pub eqsat_time_limit: u64,
 
     //////////////////////////
     // domain specific args //
@@ -583,6 +607,9 @@ pub struct SynthParams {
     /// Only for bv, controls the size of cvecs
     #[clap(long, default_value = "5")]
     pub important_cvec_offsets: u32,
+    /// Only for bv, makes it do a complete cvec
+    #[clap(long, conflicts_with = "important_cvec_offsets")]
+    pub complete_cvec: bool,
     /// Only for bool/bv
     #[clap(long)]
     pub no_xor: bool,
