@@ -116,9 +116,12 @@ rational="#lang rosette
      (~ x)))
 "
 
+squote="'"
 if [ $DOMAIN == 'rat' ]; then
     echo "$rational" > verify-rat.rkt
     jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' $RULES >> verify-rat.rkt
+    # jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
+    #      $RULES >> verify-rat.rkt
     echo "(printf \"\n num unsound: ~a \n\" num_unsound)" >> verify-rat.rkt
     echo "(close-output-port failed)" >> verify-rat.rkt
     racket verify-rat.rkt
