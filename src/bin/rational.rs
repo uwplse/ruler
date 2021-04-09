@@ -102,67 +102,51 @@ impl SynthLanguage for Math {
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let params = &synth.params;
 
+        // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
             .map(|s| s.parse().unwrap())
             .collect();
 
-        // for eqsat soundness experiment
-        let cvec_size = if params.cvec_none {
-            0
-        } else if params.only_consts {
-            constants.len()
-        } else if params.only_rand {
-            params.n_samples
-        } else if params.cross_prod {
-            constants.len().pow(params.variables as u32)
-        } else if params.rand_and_consts {
-            params.n_samples + constants.len()
-        } else {
-            params.n_samples + constants.len().pow(params.variables as u32)
-        };
+        let mut consts: Vec<Option<Constant>> = vec![];
+
+        for i in 0..synth.params.important_cvec_offsets {
+            consts.push(mk_constant(
+                &i.to_bigint().unwrap(),
+                &(1.to_bigint().unwrap()),
+            ));
+            consts.push(mk_constant(
+                &(-i.to_bigint().unwrap()),
+                &(1.to_bigint().unwrap()),
+            ));
+        }
+
+        consts.sort();
+        consts.dedup();
+
+        let mut consts = self_product(&consts, synth.params.variables);
+        // add the necessary random values, if any
+        for row in consts.iter_mut() {
+            let n_samples = synth.params.n_samples;
+            let vals: Vec<Option<Constant>> = (0..n_samples)
+                .map(|_| mk_constant(&synth.rng.gen_bigint(32), &gen_denom(&mut synth.rng, 32)))
+                .collect();
+            row.extend(vals);
+        }
 
         let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: cvec_size,
+            cvec_len: consts[0].len(),
         });
 
-        let rng = &mut synth.rng;
-
-        for i in 0..params.variables {
+        for i in 0..synth.params.variables {
             let var = Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
-
-            if params.cvec_none {
-                egraph[id].data.cvec = vec![];
-            } else if params.only_consts {
-                for c in &constants {
-                    egraph[id].data.cvec.push(Some(c.clone()));
-                }
-            } else if params.only_rand {
-                egraph[id].data.cvec = (0..params.n_samples)
-                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
-                    .collect();
-            } else if params.cross_prod {
-                egraph[id].data.cvec =
-                    chain_consts(constants.clone(), params.variables as u32, i as u32);
-            } else if params.rand_and_consts {
-                egraph[id].data.cvec = (0..params.n_samples)
-                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
-                    .collect();
-                for c in &constants {
-                    egraph[id].data.cvec.push(Some(c.clone()));
-                }
-            } else {
-                egraph[id].data.cvec = (0..params.n_samples)
-                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
-                    .chain(chain_consts(
-                        constants.clone(),
-                        params.variables as u32,
-                        i as u32,
-                    ))
-                    .collect();
-            }
+            egraph[id].data.cvec = consts[i].clone();
         }
+
+        // I want 1. only interesting constants. I want to play with the number of such constants
+        // I want cross prod of N interesting constants
+        // I want cross prod of N interesting constants + n_samples
 
         for n in &constants {
             egraph.add(Math::Num(n.clone()));
@@ -230,24 +214,6 @@ impl SynthLanguage for Math {
             lvec == rvec
         }
     }
-}
-
-fn chain_consts(constants: Vec<Constant>, nvars: u32, i: u32) -> Vec<Option<Constant>> {
-    let mut res = vec![];
-    let mut consts = vec![];
-    for c in constants {
-        consts.push(mk_constant(c.numer(), c.denom()));
-    }
-    let nc = consts.len();
-    let nrows = nc.pow(nvars as u32);
-    while res.len() < nrows {
-        for c in &consts {
-            for _ in 0..nc.pow(i) {
-                res.push(c.clone())
-            }
-        }
-    }
-    res
 }
 
 // randomly sample denoms so that they are not 0
