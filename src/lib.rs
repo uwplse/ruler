@@ -605,13 +605,13 @@ pub struct SynthParams {
     /// time limit (seconds) for all the eqsats
     #[clap(long, default_value = "60")]
     pub eqsat_time_limit: u64,
+    /// Controls the size of cvecs
+    #[clap(long, default_value = "5")]
+    pub important_cvec_offsets: u32,
 
     //////////////////////////
     // domain specific args //
     //////////////////////////
-    /// Only for bv, controls the size of cvecs
-    #[clap(long, default_value = "5")]
-    pub important_cvec_offsets: u32,
     /// Only for bv, makes it do a complete cvec
     #[clap(long, conflicts_with = "important_cvec_offsets")]
     pub complete_cvec: bool,
