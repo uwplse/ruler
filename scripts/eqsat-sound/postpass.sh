@@ -80,51 +80,103 @@ bv="#lang rosette
 (splicing-syntax-parameterize
     ([coerce-to-bv? #t])
 "
-
 rational="#lang rosette
-
-(define num_unsound 0)
-
-(provide (all-defined-out))
-(define-symbolic ?a ?b ?c real?)
 
 (define failed
   (let ([fnm \"failed-validation.txt\"])
-  (if (file-exists? fnm)
-    (begin
-      (delete-file fnm)
-      (open-output-file fnm))
-    (open-output-file fnm))
-  ))
+    (if (file-exists? fnm)
+        (begin
+          (delete-file fnm)
+          (open-output-file fnm))
+        (open-output-file fnm))
+    ))
+
+(define num_unsound 0)
+(provide (all-defined-out))
+
+(define (mk_query as l r)
+  (append as (list \`(assert (eq? ,l ,r)))))
+
+(define (invoke-solver defs)
+  (letrec (
+           [symbv (thunk* (define-symbolic* x real?) x)]
+           [sym-map (make-hash)]
+           [rec 
+               (lambda (def acc)
+                 (match def 
+                   [(list 'assume (list '! (list 'eq? l r)))  (assume (! (eq? (rec l acc) (rec r acc))))]
+                   [(list 'assert (list 'eq? l r)) (verify (assert (eq? (rec l acc) (rec r acc))))]
+                   [(list '/ x y) (/ (rec x acc) (rec y acc))]
+                   [(list '+ x y) (+ (rec x acc) (rec y acc))]
+                   [(list '- x y) (- (rec x acc) (rec y acc))]
+                   [(list '* x y) (* (rec x acc) (rec y acc))]
+                   [(list '~ x) (~ (rec x acc))]
+                   [(list 'fabs x) (fabs (rec x acc))]
+                   [(? number? x) x]
+                   [x (hash-ref! sym-map x symbv)]
+                   ))])
+    (foldl rec (void) defs)))
+
 
 (define (<=> l r)
-  (define sol (verify (assert (eq? l r))))
-  (cond [(! (unsat? sol))
-    (let* (
-      [lhs (format \"~a\" l)] 
-      [rhs (format \"~a\" r)] 
-      [st (string-append lhs \" => \" rhs \"\n\")]
-      )
-    (set! num_unsound (add1 num_unsound))
-    (display st failed))
-  ])
-)
+  (clear-vc!)
+  (let* ([ds (append (denoms l) (denoms r))]
+         [as (map (lambda (d) (mk_div_vc d)) ds)]
+         )
+    (define queries (mk_query as l r))
+    (define sol (invoke-solver queries))
+    (cond [(! (unsat? sol))
+           (let* (
+                  [lhs (format \"~a\" l)] 
+                  [rhs (format \"~a\" r)] 
+                  [st (string-append lhs \" => \" rhs \"\n\")]
+                  )
+             (set! num_unsound (add1 num_unsound))
+             (display st failed))
+           ])))
 
 (define => <=>)
 
 (define (~ x) (- 0 x))
+
 (define (fabs x)
-  (if (|| (positive? x) (zero? x))
-     (x)
-     (~ x)))
-"
+  (if (or (positive? x) (zero? x))
+      x
+      (~ x)))
+
+(define (denoms expr)
+  (cond
+    [(null? expr) null]
+    [(list? expr)
+     (cond
+       [(equal? (car expr) '/)
+        (cons (caddr expr)
+              (append (denoms (cadr expr))
+                      (denoms (caddr expr))))]
+       [(equal? (car expr) '+)
+        (append (denoms (cadr expr))
+                (denoms (caddr expr)))]
+       [(equal? (car expr) '*)
+        (append (denoms (cadr expr))
+                (denoms (caddr expr)))]
+       [(equal? (car expr) '-)
+        (append (denoms (cadr expr))
+                (denoms (caddr expr)))]
+       [(equal? (car expr) '~)
+        (denoms (cadr expr))]
+       [(equal? (car expr) 'fabs)
+        (denoms (cadr expr))]
+       [#t null])]
+    [#t null]))
+
+(define (mk_div_vc d)
+  \`(assume (! (eq? ,d 0))))"
 
 squote="'"
 if [ $DOMAIN == 'rat' ]; then
     echo "$rational" > verify-rat.rkt
-    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' $RULES >> verify-rat.rkt
-    # jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
-    #      $RULES >> verify-rat.rkt
+    jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
+        $RULES >> verify-rat.rkt
     echo "(printf \"~a \n\" num_unsound)" >> verify-rat.rkt
     echo "(close-output-port failed)" >> verify-rat.rkt
     racket verify-rat.rkt
