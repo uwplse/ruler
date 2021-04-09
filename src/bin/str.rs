@@ -3,8 +3,6 @@ use ruler::*;
 
 use std::ops::*;
 
-use rand_pcg::Pcg64;
-
 use smallvec::SmallVec;
 use std::fmt;
 
@@ -225,12 +223,9 @@ impl SynthLanguage for Lang {
     }
 
     fn is_valid(
-        _rng: &mut Pcg64,
+        _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
-        _use_smt: &bool,
-        _smt_unknown: &mut usize,
-        _num_fuzz: &usize,
     ) -> bool {
         true
     }

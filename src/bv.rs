@@ -5,7 +5,7 @@ use std::ops::*;
 
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct BV<const N: u32>(Inner);
+pub struct BV<const N: u32>(pub Inner);
 
 type Inner = u32;
 const INNER_N: u32 = 32;
@@ -232,11 +232,17 @@ macro_rules! impl_bv {
                         consts.push(Some(i));
                         consts.push(Some(i.wrapping_neg()));
                     }
-                    consts.sort();
-                    consts.dedup();
                 }
+                consts.sort();
+                consts.dedup();
 
-                let consts = self_product(&consts, synth.params.variables);
+                let mut consts = self_product(&consts, synth.params.variables);
+                // add the necessary random values, if any
+                for row in consts.iter_mut() {
+                    let n_samples = synth.params.n_samples;
+                    let vals = std::iter::repeat_with(|| synth.rng.gen::<BV>());
+                    row.extend(vals.take(n_samples).map(Some));
+                }
                 println!("cvec len: {}", consts[0].len());
 
                 let mut egraph = EGraph::new(SynthAnalysis {
@@ -300,15 +306,80 @@ macro_rules! impl_bv {
                 to_add
             }
 
+
             fn is_valid(
-                _rng: &mut Pcg64,
-                _lhs: &Pattern<Self>,
-                _rhs: &Pattern<Self>,
-                _use_smt: &bool,
-                _smt_unknown: &mut usize,
-                _num_fuzz: &usize,
+                synth: &mut Synthesizer<Self>,
+                lhs: &Pattern<Self>,
+                rhs: &Pattern<Self>,
             ) -> bool {
-                true
+                use z3::{*, ast::Ast};
+
+                fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
+                    let mut buf: Vec<z3::ast::BV> = vec![];
+                    for node in expr.as_ref().iter() {
+                        match node {
+                            Math::Var(v) => buf.push(z3::ast::BV::new_const(&ctx, v.to_string(), $n)),
+                            Math::Num(c) => buf.push(z3::ast::BV::from_u64(&ctx, c.0 as u64, $n)),
+                            Math::Add([a, b]) => buf.push(buf[usize::from(*a)].bvadd(&buf[usize::from(*b)])),
+                            Math::Sub([a, b]) => buf.push(buf[usize::from(*a)].bvsub(&buf[usize::from(*b)])),
+                            Math::Mul([a, b]) => buf.push(buf[usize::from(*a)].bvmul(&buf[usize::from(*b)])),
+                            Math::Shl([a, b]) => buf.push(buf[usize::from(*a)].bvshl(&buf[usize::from(*b)])),
+                            Math::Shr([a, b]) => buf.push(buf[usize::from(*a)].bvlshr(&buf[usize::from(*b)])),
+                            Math::And([a, b]) => buf.push(buf[usize::from(*a)].bvand(&buf[usize::from(*b)])),
+                            Math::Or([a, b]) => buf.push(buf[usize::from(*a)].bvor(&buf[usize::from(*b)])),
+                            Math::Xor([a, b]) => buf.push(buf[usize::from(*a)].bvxor(&buf[usize::from(*b)])),
+                            Math::Not(a) => buf.push(buf[usize::from(*a)].bvnot()),
+                            Math::Neg(a) => buf.push(buf[usize::from(*a)].bvneg()),
+                        }
+                    }
+                    buf.pop().unwrap()
+                }
+
+                if synth.params.use_smt {
+                    let mut cfg = z3::Config::new();
+                    cfg.set_timeout_msec(1000);
+                    let ctx = z3::Context::new(&cfg);
+                    let solver = z3::Solver::new(&ctx);
+                    let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+                    let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+                    solver.assert(&lexpr._eq(&rexpr).not());
+                    match solver.check() {
+                        SatResult::Unsat => true,
+                        SatResult::Sat => {
+                            println!("z3 validation: failed for {} => {}", lhs, rhs);
+                            false
+                        }
+                        SatResult::Unknown => {
+                            synth.smt_unknown += 1;
+                            println!("z3 validation: unknown for {} => {}", lhs, rhs);
+                            false
+                        }
+                    }
+                } else {
+                    let n = synth.params.num_fuzz;
+                    let mut env = HashMap::default();
+
+                    for var in lhs.vars() {
+                        env.insert(var, vec![]);
+                    }
+
+                    for var in rhs.vars() {
+                        env.insert(var, vec![]);
+                    }
+
+                    for cvec in env.values_mut() {
+                        cvec.reserve(n);
+                        for _ in 0..n {
+                            let v = synth.rng.gen::<BV>();
+                            cvec.push(Some(v));
+                        }
+                    }
+
+                    let lvec = Self::eval_pattern(lhs, &env, n);
+                    let rvec = Self::eval_pattern(rhs, &env, n);
+
+                    lvec == rvec
+                }
             }
         }
     };
