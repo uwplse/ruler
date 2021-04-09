@@ -22,6 +22,8 @@ cvc4-logs=
 cvc4-reports=
 diffs=
 
+RAYON_NUM_THREADS=10
+
 define synthesize # (domain, variables, iters, rules-to-take)
 ruler-reports += results/ruler/$(1)-$(2)vars-$(3)iters.json
 results/ruler/$(1)-$(2)vars-$(3)iters.json: # $(rust-src)

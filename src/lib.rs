@@ -1,10 +1,8 @@
 use clap::Clap;
 use egg::*;
-use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::{
     borrow::{Borrow, Cow},
     collections::VecDeque,
@@ -15,6 +13,7 @@ use std::{
     time::Duration,
     time::Instant,
 };
+use std::{hash::BuildHasherDefault, sync::Arc};
 
 mod bv;
 mod convert_sexp;
@@ -24,22 +23,11 @@ mod util;
 
 pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
 pub type HashSet<K> = rustc_hash::FxHashSet<K>;
+pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
 
 pub use bv::*;
 pub use equality::*;
 pub use util::*;
-
-const ITER_LIMIT: usize = 2;
-const NODE_LIMIT: usize = 300_000;
-const TIME_LIMIT: Duration = Duration::from_secs(60);
-
-pub fn mk_runner<L: SynthLanguage>() -> Runner<L, SynthAnalysis, ()> {
-    Runner::default()
-        .with_node_limit(NODE_LIMIT)
-        .with_iter_limit(ITER_LIMIT)
-        .with_time_limit(TIME_LIMIT)
-        .with_scheduler(SimpleScheduler)
-}
 
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
@@ -116,7 +104,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         RecExpr::from(nodes)
     }
 
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 3] {
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 4] {
         let sz_lhs = AstSize.cost_rec(&lhs.ast) as i32;
         let sz_rhs = AstSize.cost_rec(&rhs.ast) as i32;
         // let sz_max_pattern = sz_lhs.max(sz_rhs);
@@ -131,16 +119,21 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         var_set.extend(rhs.vars());
         let n_vars_rule = var_set.len() as i32;
 
-        // let mut op_set: HashSet<String> = Default::default();
-        // for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-        //     if !node.is_leaf() {
-        //         op_set.insert(node.display_op().to_string());
-        //     }
-        // }
-        // let n_ops = op_set.len() as i32;
+        let mut op_set: HashSet<String> = Default::default();
+        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+            if !node.is_leaf() {
+                op_set.insert(node.display_op().to_string());
+            }
+        }
+        let n_ops = op_set.len() as i32;
 
         // (-sz_max_pattern, n_vars_rule)
-        [n_vars_rule, -sz_lhs.min(sz_rhs), -sz_lhs.max(sz_rhs)]
+        [
+            -n_ops,
+            n_vars_rule,
+            -sz_lhs.min(sz_rhs),
+            -sz_lhs.max(sz_rhs),
+        ]
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>);
@@ -235,15 +228,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph.classes().map(|c| c.id)
     }
 
-    #[inline(never)]
-    fn run_rewrites(&mut self) -> EGraph<L, SynthAnalysis> {
-        // run the rewrites
-        log::info!("running eqsat with {} rules", self.equalities.len());
-        let start = Instant::now();
-        let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
-
-        let mut egraph = self.egraph.clone();
-        let mut runner = mk_runner();
+    fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
+        let mut runner = Runner::default()
+            .with_node_limit(self.params.eqsat_node_limit)
+            .with_iter_limit(self.params.eqsat_iter_limit)
+            .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
+            .with_scheduler(SimpleScheduler);
         runner = if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
             for c in egraph.classes_mut() {
@@ -274,10 +264,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
             })
             // runner.with_egraph(egraph)
         };
+        runner
+    }
 
+    #[inline(never)]
+    fn run_rewrites(&mut self) -> EGraph<L, SynthAnalysis> {
+        // run the rewrites
+        log::info!("running eqsat with {} rules", self.equalities.len());
+        let start = Instant::now();
+        let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
+
+        let mut runner = self.mk_runner(self.egraph.clone());
         runner = runner.run(rewrites);
 
-        log::info!("collecting unions...");
+        log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
         // update the clean egraph based on any unions that happened
         let mut found_unions = HashMap::default();
         for id in self.ids() {
@@ -300,7 +300,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     #[inline(never)]
     fn cvec_match_pair_wise(&self) -> EqualityMap<L> {
-        let mut by_cvec: IndexMap<CVec<L>, Vec<Id>> = IndexMap::new();
+        let mut by_cvec: IndexMap<CVec<L>, Vec<Id>> = IndexMap::default();
 
         let not_all_nones = self
             .ids()
@@ -353,11 +353,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     #[inline(never)]
     fn cvec_match(&self) -> (EqualityMap<L>, Vec<Vec<Id>>) {
         // build the cvec matching data structure
-        let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::new();
+        let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
 
-        // let not_all_nones = self
-        //     .ids()
-        //     .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
         for id in self.ids() {
             let class = &self.egraph[id];
             if class.data.is_defined() {
@@ -370,22 +367,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut new_eqs = EqualityMap::default();
         let mut extract = Extractor::new(&self.egraph, AstSize);
         for ids in by_cvec.values() {
-            if false {
-                // limit id_iter so the cartesian product doesn't get too big
-                let mut id_iter = ids.iter().take(50);
-                while let Some(&id1) = id_iter.next() {
-                    for &id2 in id_iter.clone() {
-                        let (_, e1) = extract.find_best(id1);
-                        let (_, e2) = extract.find_best(id2);
-                        if let Some(mut eq) = Equality::new(&e1, &e2) {
-                            log::debug!("  Candidate {}", eq);
-                            eq.ids = Some((id1, id2));
-                            new_eqs.insert(eq.name.clone(), eq);
-                        }
-                    }
-                }
-            } else {
-                // try linear cvec matching
+            if self.params.linear_cvec_matching {
                 let mut terms_ids: Vec<_> =
                     ids.iter().map(|&id| (extract.find_best(id), id)).collect();
                 terms_ids.sort_by_key(|x| x.0 .0);
@@ -395,6 +377,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         log::debug!("  Candidate {}", eq);
                         eq.ids = Some((*id1, *id2));
                         new_eqs.insert(eq.name.clone(), eq);
+                    }
+                }
+            } else {
+                let mut id_iter = ids.iter();
+                while let Some(&id1) = id_iter.next() {
+                    for &id2 in id_iter.clone() {
+                        let (_, e1) = extract.find_best(id1);
+                        let (_, e2) = extract.find_best(id2);
+                        if let Some(mut eq) = Equality::new(&e1, &e2) {
+                            log::debug!("  Candidate {}", eq);
+                            eq.ids = Some((id1, id2));
+                            new_eqs.insert(eq.name.clone(), eq);
+                        }
                     }
                 }
             }
@@ -421,6 +416,25 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("[[[ Iteration {} ]]]", iter);
             let mut layer = L::make_layer(&self, iter);
             layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
+
+            if iter > self.params.no_constants_above_iter {
+                let mut extract = Extractor::new(&self.egraph, NumberOfOps);
+
+                // maps ids to n_ops
+                let has_constants: HashSet<Id> = self
+                    .ids()
+                    .filter_map(|id| {
+                        let (_cost, best) = extract.find_best(id);
+                        if best.as_ref().iter().any(|n| n.is_constant()) {
+                            Some(id)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                layer.retain(|n| n.all(|id| !has_constants.contains(&id)));
+            }
 
             log::info!("Made layer of {} nodes", layer.len());
             for chunk in layer.chunks(self.params.chunk_size) {
@@ -512,7 +526,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.equalities.len();
-        let eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
+        let mut eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
+        eqs.sort_by_key(|eq| eq.score());
+        eqs.reverse();
         println!("Learned {} rules in {:?}", num_rules, time);
         for eq in &eqs {
             println!("  {:?}   {}", eq.score(), eq);
@@ -563,20 +579,44 @@ pub struct SynthParams {
     #[clap(long, default_value = "0")]
     pub rules_to_take: usize,
     /// 0 is unlimited
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "100000")]
     pub chunk_size: usize,
     #[clap(long, conflicts_with = "rules-to-take")]
     pub minimize: bool,
+    /// disallows enumerating terms with constants past this iteration
+    #[clap(long, default_value = "999999")]
+    pub no_constants_above_iter: usize,
     #[clap(long)]
     pub no_conditionals: bool,
     #[clap(long)]
     pub no_run_rewrites: bool,
+    #[clap(long)]
+    pub linear_cvec_matching: bool,
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
+
+    ////////////////
+    // eqsat args //
+    ////////////////
+    /// node limit for all the eqsats
+    #[clap(long, default_value = "300000")]
+    pub eqsat_node_limit: usize,
+    /// iter limit for all the eqsats
+    #[clap(long, default_value = "2")]
+    pub eqsat_iter_limit: usize,
+    /// time limit (seconds) for all the eqsats
+    #[clap(long, default_value = "60")]
+    pub eqsat_time_limit: u64,
 
     //////////////////////////
     // domain specific args //
     //////////////////////////
+    /// Only for bv, controls the size of cvecs
+    #[clap(long, default_value = "5")]
+    pub important_cvec_offsets: u32,
+    /// Only for bv, makes it do a complete cvec
+    #[clap(long, conflicts_with = "important_cvec_offsets")]
+    pub complete_cvec: bool,
     /// Only for bool/bv
     #[clap(long)]
     pub no_xor: bool,
@@ -794,11 +834,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 .flat_map(|eq| &eq.rewrites)
                 .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
-            let mut runner = mk_runner();
-
-            if !self.params.no_conditionals {
-                runner = runner.with_egraph(self.initial_egraph.clone());
-            }
+            let mut runner = self.mk_runner(self.initial_egraph.clone());
 
             for candidate_eq in new_eqs.values() {
                 runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));
@@ -806,6 +842,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
 
             runner = runner.run(rewrites);
+            println!("{:?}, {:?}", runner.stop_reason, runner.iterations.len());
 
             let mut extract = Extractor::new(&runner.egraph, AstSize);
             let old_len = new_eqs.len();
@@ -910,10 +947,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 rewrites.sort_by_key(|rw| rw.name());
                 rewrites.dedup_by_key(|rw| rw.name());
 
-                let mut runner = mk_runner();
-                if !self.params.no_conditionals {
-                    runner = runner.with_egraph(self.initial_egraph.clone());
-                }
+                let mut runner = self.mk_runner(self.initial_egraph.clone());
 
                 for candidate_eq in &test {
                     runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));

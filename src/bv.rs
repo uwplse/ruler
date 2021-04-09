@@ -221,7 +221,20 @@ macro_rules! impl_bv {
             }
 
             fn init_synth(synth: &mut Synthesizer<Self>) {
-                let consts: Vec<Option<BV>> = (0..1 << 4).map(|i| Some(i.into())).collect();
+                let mut consts: Vec<Option<BV>> = vec![];
+                if synth.params.complete_cvec {
+                    consts = (0..1u64 << $n).map(|i| Some((i as u32).into())).collect();
+                } else {
+                    for i in 0..synth.params.important_cvec_offsets {
+                        let i = BV::from(i);
+                        consts.push(Some(BV::MIN.wrapping_add(i)));
+                        consts.push(Some(BV::MAX.wrapping_sub(i)));
+                        consts.push(Some(i));
+                        consts.push(Some(i.wrapping_neg()));
+                    }
+                    consts.sort();
+                    consts.dedup();
+                }
 
                 let consts = self_product(&consts, synth.params.variables);
                 println!("cvec len: {}", consts[0].len());
@@ -230,9 +243,10 @@ macro_rules! impl_bv {
                     cvec_len: consts[0].len(),
                 });
 
-                egraph.add(Math::Num(0.into()));
-                egraph.add(Math::Num(0x7.into()));
-                egraph.add(Math::Num(0x8.into()));
+                egraph.add(Math::Num(BV::ZERO));
+                // egraph.add(Math::Num(1.into()));
+                egraph.add(Math::Num(BV::MIN));
+                egraph.add(Math::Num(BV::MAX));
 
                 for i in 0..synth.params.variables {
                     let var = Symbol::from(letter(i));
