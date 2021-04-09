@@ -197,17 +197,14 @@ impl SynthLanguage for Math {
     }
 
     fn is_valid(
-        rng: &mut Pcg64,
+        synth: &mut Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
         rhs: &egg::Pattern<Self>,
-        use_smt: &bool,
-        _smt_unknown: &mut usize,
-        num_fuzz: &usize,
     ) -> bool {
-        if *use_smt {
-            true
+        if synth.params.use_smt {
+            unimplemented!()
         } else {
-            let n = num_fuzz.clone();
+            let n = synth.params.num_fuzz;
             let mut env = HashMap::default();
 
             for var in lhs.vars() {
@@ -221,8 +218,8 @@ impl SynthLanguage for Math {
             for cvec in env.values_mut() {
                 cvec.reserve(n);
                 for _ in 0..n {
-                    let numer = rng.gen_bigint(32);
-                    let denom = gen_denom(rng, 32);
+                    let numer = synth.rng.gen_bigint(32);
+                    let denom = gen_denom(&mut synth.rng, 32);
                     cvec.push(Some(Ratio::new(numer, denom)));
                 }
             }
