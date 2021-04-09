@@ -1,6 +1,6 @@
 [alias]
 rational = ["run", "--quiet", "--release", "--bin", "rational", "--", "synth"]
-float =    ["run", "--quiet", "--release", "--bin", "float",    "--", "synth"]
+float =    ["run", "--quiet", "--release", "--bin", "float",    "--", "synth", "--num-fuzz", "1000000"]
 bool =     ["run", "--quiet", "--release", "--bin", "bool",     "--", "synth", "--no-conditionals"]
 str =      ["run", "--quiet", "--release", "--bin", "str",      "--", "synth", "--no-conditionals"]
 
@@ -17,6 +17,9 @@ derive-bool  =  ["run", "--quiet", "--release", "--bin", "bool", "--", "derive"]
 convert-bv4   =  ["run", "--quiet", "--release", "--bin", "bv4",  "--", "convert-sexp"]
 convert-bv4ns =  ["run", "--quiet", "--release", "--bin", "bv4",  "--", "convert-sexp"]
 convert-bool  =  ["run", "--quiet", "--release", "--bin", "bool", "--", "convert-sexp"]
+
+bvz3-4 =  ["run", "--quiet", "--release", "--bin", "bvz3_4", "--", "synth", "--no-conditionals"]
+bvz3-32 = ["run", "--quiet", "--release", "--bin", "bvz3_32", "--", "synth", "--no-conditionals"]
 
 [build]
 rustflags = "-C target-cpu=native"

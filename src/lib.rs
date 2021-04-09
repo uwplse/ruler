@@ -166,7 +166,14 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         buf.pop().unwrap().into_owned()
     }
 
-    fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool;
+    fn is_valid(
+        rng: &mut Pcg64,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+        use_smt: &bool,
+        smt_unknown: &mut usize,
+        num_fuzz: &usize,
+    ) -> bool;
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         s.parse().unwrap()
@@ -550,7 +557,7 @@ pub struct SynthParams {
     ///////////////////
     // search params //
     ///////////////////
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "1")]
     pub iters: usize,
     /// 0 is unlimited
     #[clap(long, default_value = "0")]
@@ -576,6 +583,30 @@ pub struct SynthParams {
     /// Only for bv
     #[clap(long)]
     pub no_shift: bool,
+
+    ///////////////////
+    // eqsat soundness params //
+    ///////////////////
+    // for validation approach
+    #[clap(long, default_value = "1000")]
+    pub num_fuzz: usize,
+    #[clap(long, conflicts_with = "num-fuzz")]
+    pub use_smt: bool,
+    #[clap(long, default_value = "0")]
+    pub smt_unknown: usize,
+    // for sampling vs cross-prod cvec
+    // TODO: can we set multiple conflicts_with?
+    // default is rand_and_cross
+    #[clap(long)]
+    pub cvec_none: bool,
+    #[clap(long)]
+    pub only_consts: bool,
+    #[clap(long)]
+    pub only_rand: bool,
+    #[clap(long)]
+    pub cross_prod: bool,
+    #[clap(long)]
+    pub rand_and_consts: bool,
 }
 
 #[derive(Clap)]
@@ -730,7 +761,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
         new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
         while let Some((name, eq)) = new_eqs.pop() {
             let rule_validation = Instant::now();
-            let valid = L::is_valid(&mut self.rng, &eq.lhs, &eq.rhs);
+            let valid = L::is_valid(
+                &mut self.rng,
+                &eq.lhs,
+                &eq.rhs,
+                &self.params.use_smt,
+                &mut self.params.smt_unknown,
+                &self.params.num_fuzz,
+            );
             log::info!(
                 "Time taken in validation: {}",
                 rule_validation.elapsed().as_secs_f64()
@@ -814,9 +852,17 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let t = Instant::now();
 
         let rule_validation = Instant::now();
-        let (new_eqs, bads): (EqualityMap<L>, EqualityMap<L>) = new_eqs
-            .into_iter()
-            .partition(|(_name, eq)| L::is_valid(&mut self.rng, &eq.lhs, &eq.rhs));
+        let (new_eqs, bads): (EqualityMap<L>, EqualityMap<L>) =
+            new_eqs.into_iter().partition(|(_name, eq)| {
+                L::is_valid(
+                    &mut self.rng,
+                    &eq.lhs,
+                    &eq.rhs,
+                    &self.params.use_smt,
+                    &mut self.params.smt_unknown,
+                    &self.params.num_fuzz,
+                )
+            });
 
         log::info!(
             "Time taken in validation: {}",

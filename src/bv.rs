@@ -286,11 +286,17 @@ macro_rules! impl_bv {
                 to_add
             }
 
-            fn is_valid(_rng: &mut Pcg64, _lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> bool {
+            fn is_valid(
+                _rng: &mut Pcg64,
+                _lhs: &Pattern<Self>,
+                _rhs: &Pattern<Self>,
+                _use_smt: &bool,
+                _smt_unknown: &mut usize,
+                _num_fuzz: &usize,
+            ) -> bool {
                 true
             }
         }
-
     };
 }
 

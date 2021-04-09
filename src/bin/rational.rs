@@ -107,25 +107,61 @@ impl SynthLanguage for Math {
             .map(|s| s.parse().unwrap())
             .collect();
 
+        // for eqsat soundness experiment
+        let cvec_size = if params.cvec_none {
+            0
+        } else if params.only_consts {
+            constants.len()
+        } else if params.only_rand {
+            params.n_samples
+        } else if params.cross_prod {
+            constants.len().pow(params.variables as u32)
+        } else if params.rand_and_consts {
+            params.n_samples + constants.len()
+        } else {
+            params.n_samples + constants.len().pow(params.variables as u32)
+        };
+
         let mut egraph = EGraph::new(SynthAnalysis {
-            // cvec_len: params.n_samples + params.constants.len(),
-            cvec_len: params.n_samples + constants.len().pow(params.variables as u32),
-            // cvec_len: constants.len().pow(params.variables as u32),
+            cvec_len: cvec_size,
         });
 
         let rng = &mut synth.rng;
+
         for i in 0..params.variables {
             let var = Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
 
-            egraph[id].data.cvec = (0..params.n_samples)
-                .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
-                .chain(chain_consts(
-                    constants.clone(),
-                    params.variables as u32,
-                    i as u32,
-                ))
-                .collect();
+            if params.cvec_none {
+                egraph[id].data.cvec = vec![];
+            } else if params.only_consts {
+                for c in &constants {
+                    egraph[id].data.cvec.push(Some(c.clone()));
+                }
+            } else if params.only_rand {
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
+                    .collect();
+            } else if params.cross_prod {
+                egraph[id].data.cvec =
+                    chain_consts(constants.clone(), params.variables as u32, i as u32);
+            } else if params.rand_and_consts {
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
+                    .collect();
+                for c in &constants {
+                    egraph[id].data.cvec.push(Some(c.clone()));
+                }
+            } else {
+                egraph[id].data.cvec = (0..params.n_samples)
+                    .map(|_| mk_constant(&rng.gen_bigint(32), &gen_denom(rng, 32)))
+                    .chain(chain_consts(
+                        constants.clone(),
+                        params.variables as u32,
+                        i as u32,
+                    ))
+                    .collect();
+            }
         }
 
         for n in &constants {
@@ -160,31 +196,42 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
-        let n = 1000;
-        let mut env = HashMap::default();
+    fn is_valid(
+        rng: &mut Pcg64,
+        lhs: &egg::Pattern<Self>,
+        rhs: &egg::Pattern<Self>,
+        use_smt: &bool,
+        _smt_unknown: &mut usize,
+        num_fuzz: &usize,
+    ) -> bool {
+        if *use_smt {
+            true
+        } else {
+            let n = num_fuzz.clone();
+            let mut env = HashMap::default();
 
-        for var in lhs.vars() {
-            env.insert(var, vec![]);
-        }
-
-        for var in rhs.vars() {
-            env.insert(var, vec![]);
-        }
-
-        for cvec in env.values_mut() {
-            cvec.reserve(n);
-            for _ in 0..n {
-                let numer = rng.gen_bigint(32);
-                let denom = gen_denom(rng, 32);
-                cvec.push(Some(Ratio::new(numer, denom)));
+            for var in lhs.vars() {
+                env.insert(var, vec![]);
             }
+
+            for var in rhs.vars() {
+                env.insert(var, vec![]);
+            }
+
+            for cvec in env.values_mut() {
+                cvec.reserve(n);
+                for _ in 0..n {
+                    let numer = rng.gen_bigint(32);
+                    let denom = gen_denom(rng, 32);
+                    cvec.push(Some(Ratio::new(numer, denom)));
+                }
+            }
+
+            let lvec = Self::eval_pattern(lhs, &env, n);
+            let rvec = Self::eval_pattern(rhs, &env, n);
+
+            lvec == rvec
         }
-
-        let lvec = Self::eval_pattern(lhs, &env, n);
-        let rvec = Self::eval_pattern(rhs, &env, n);
-
-        lvec == rvec
     }
 }
 

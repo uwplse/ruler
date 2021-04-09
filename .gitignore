@@ -1,6 +1,7 @@
 /target
 /out
 scripts/ablation/output/*
+scripts/eqsat-sound/output/*
 scripts/herbie-float/output/*
 scripts/herbie-rational/output/*
 Cargo.lock

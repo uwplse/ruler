@@ -162,8 +162,15 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(rng: &mut Pcg64, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
-        let n = 1000000;
+    fn is_valid(
+        rng: &mut Pcg64,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+        _use_smt: &bool,
+        _smt_unknown: &mut usize,
+        num_fuzz: &usize,
+    ) -> bool {
+        let n = num_fuzz.clone();
         let mut env = HashMap::default();
 
         for var in lhs.vars() {
