@@ -104,7 +104,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         RecExpr::from(nodes)
     }
 
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 4] {
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
         let sz_lhs = AstSize.cost_rec(&lhs.ast) as i32;
         let sz_rhs = AstSize.cost_rec(&rhs.ast) as i32;
         // let sz_max_pattern = sz_lhs.max(sz_rhs);
@@ -127,12 +127,26 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         }
         let n_ops = op_set.len() as i32;
 
+        let n_consts = lhs
+            .ast
+            .as_ref()
+            .iter()
+            .chain(rhs.ast.as_ref())
+            .filter(|n| match n {
+                ENodeOrVar::ENode(n) => n.is_constant(),
+                ENodeOrVar::Var(_) => false,
+            })
+            .count() as i32;
+
         // (-sz_max_pattern, n_vars_rule)
         [
-            -n_ops,
             n_vars_rule,
-            -sz_lhs.min(sz_rhs),
-            -sz_lhs.max(sz_rhs),
+            -n_consts,
+            -i32::max(sz_lhs, sz_rhs),
+            // -i32::min(sz_lhs, sz_rhs),
+            -(sz_lhs + sz_rhs),
+            -n_ops,
+            // 0
         ]
     }
 
@@ -224,8 +238,17 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
+        let node_limit = self.params.eqsat_node_limit;
         let mut runner = Runner::default()
-            .with_node_limit(self.params.eqsat_node_limit)
+            .with_node_limit(usize::MAX)
+            .with_hook(move |r| {
+                let size = r.egraph.total_number_of_nodes();
+                if size > node_limit {
+                    Err(format!("Node limit: {}", size))
+                } else {
+                    Ok(())
+                }
+            })
             .with_iter_limit(self.params.eqsat_iter_limit)
             .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
@@ -362,23 +385,23 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut new_eqs = EqualityMap::default();
         let mut extract = Extractor::new(&self.egraph, AstSize);
         for ids in by_cvec.values() {
-            if self.params.linear_cvec_matching {
+            if self.params.linear_cvec_matching || ids.len() > 0 {
                 let mut terms_ids: Vec<_> =
                     ids.iter().map(|&id| (extract.find_best(id), id)).collect();
                 terms_ids.sort_by_key(|x| x.0 .0);
-                for win in terms_ids.windows(2) {
-                    let (((_c1, e1), id1), ((_c2, e2), id2)) = (&win[0], &win[1]);
-                    if let Some(mut eq) = Equality::new(e1, e2) {
+                let ((_c1, e1), id1) = terms_ids.remove(0);
+                for ((_c2, e2), id2) in terms_ids {
+                    if let Some(mut eq) = Equality::new(&e1, &e2) {
                         log::debug!("  Candidate {}", eq);
-                        eq.ids = Some((*id1, *id2));
+                        eq.ids = Some((id1, id2));
                         new_eqs.insert(eq.name.clone(), eq);
                     }
                 }
             } else {
                 let mut id_iter = ids.iter();
                 while let Some(&id1) = id_iter.next() {
+                    let (_, e1) = extract.find_best(id1);
                     for &id2 in id_iter.clone() {
-                        let (_, e1) = extract.find_best(id1);
                         let (_, e2) = extract.find_best(id2);
                         if let Some(mut eq) = Equality::new(&e1, &e2) {
                             log::debug!("  Candidate {}", eq);
@@ -471,9 +494,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                     let rule_minimize_before = Instant::now();
                     let (eqs, bads) = if self.params.minimize {
-                        self.choose_eqs(new_eqs)
+                        self.minimize(new_eqs)
                     } else {
-                        self.choose_eqs_old(new_eqs)
+                        self.choose_eqs(new_eqs)
                     };
 
                     let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
@@ -773,39 +796,43 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
 impl<L: SynthLanguage> Synthesizer<L> {
     #[inline(never)]
-    fn choose_eqs_old(&mut self, mut new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
-        assert!(!self.params.minimize);
-        let n = self.params.rules_to_take;
-
-        let t = Instant::now();
-        let n_new_eqs = new_eqs.len();
-        log::info!("Choosing from {} rules...", n_new_eqs);
-
+    fn shrink(
+        &mut self,
+        mut new_eqs: EqualityMap<L>,
+        step: usize,
+        should_validate: bool,
+    ) -> (EqualityMap<L>, EqualityMap<L>) {
         let mut keepers = EqualityMap::default();
         let mut bads = EqualityMap::default();
-        // make the best last
-        new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
-        while let Some((name, eq)) = new_eqs.pop() {
-            let rule_validation = Instant::now();
-            let valid = L::is_valid(self, &eq.lhs, &eq.rhs);
-            log::info!(
-                "Time taken in validation: {}",
-                rule_validation.elapsed().as_secs_f64()
-            );
+        let initial_len = new_eqs.len();
+        while !new_eqs.is_empty() {
+            // best are last
+            new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
 
-            if valid {
-                keepers.insert(name, eq);
-            } else {
-                bads.insert(name, eq);
+            // take step valid rules from the end of new_eqs
+            let mut took = 0;
+            while let Some((name, eq)) = new_eqs.pop() {
+                if !should_validate || L::is_valid(self, &eq.lhs, &eq.rhs) {
+                    let old = keepers.insert(name, eq);
+                    took += old.is_none() as usize;
+                } else {
+                    bads.insert(name, eq);
+                }
+                if took >= step {
+                    break;
+                }
             }
-            if new_eqs.is_empty() || keepers.len() >= n {
-                log::info!(
-                    "Nothing to do. new_eqs len: {}, keepers len: {}",
-                    new_eqs.len(),
-                    keepers.len()
-                );
+
+            if new_eqs.is_empty() {
                 break;
             }
+
+            if keepers.len() >= self.params.rules_to_take {
+                keepers.truncate(self.params.rules_to_take);
+                break;
+            }
+
+            log::info!("Shrinking with {} keepers", keepers.len());
 
             let rewrites = self
                 .equalities
@@ -814,55 +841,72 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
             let mut runner = self.mk_runner(self.initial_egraph.clone());
-
             for candidate_eq in new_eqs.values() {
                 runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));
                 runner = runner.with_expr(&L::instantiate(&candidate_eq.rhs));
             }
 
             runner = runner.run(rewrites);
-            println!("{:?}, {:?}", runner.stop_reason, runner.iterations.len());
+            log::info!(
+                "Stopping {:?}, {:?}",
+                runner.stop_reason.clone().unwrap(),
+                runner.iterations.len()
+            );
 
-            let mut extract = Extractor::new(&runner.egraph, AstSize);
             let old_len = new_eqs.len();
-            new_eqs = runner
-                .roots
-                .chunks(2)
-                .filter(|ids| runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]))
-                .filter_map(|ids| {
+            let mut extract = Extractor::new(&runner.egraph, AstSize);
+            new_eqs.clear();
+            for ids in runner.roots.chunks(2) {
+                if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
                     let left = extract.find_best(ids[0]).1;
                     let right = extract.find_best(ids[1]).1;
                     if let Some(eq) = Equality::new(&left, &right) {
                         if !self.equalities.contains_key(&eq.name) {
-                            return Some((eq.name.clone(), eq));
+                            new_eqs.insert(eq.name.clone(), eq);
                         }
                     }
-                    None
-                })
-                .collect();
-
-            let redundant = old_len - new_eqs.len();
-            new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
+                }
+            }
 
             log::info!(
                 "Minimizing... threw away {} rules, {} / {} remain",
-                redundant,
+                old_len - new_eqs.len(),
                 new_eqs.len(),
-                n_new_eqs
+                initial_len,
             );
         }
-
-        log::info!(
-            "Minimized {}->{} rules in {:?}",
-            n_new_eqs,
-            keepers.len(),
-            t.elapsed()
-        );
+        if self.params.rules_to_take == usize::MAX {
+            assert!(new_eqs.is_empty());
+        }
         (keepers, bads)
     }
 
     #[inline(never)]
-    fn choose_eqs(&mut self, new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
+    fn choose_eqs(&mut self, mut new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
+        let mut bads = EqualityMap::default();
+        let mut should_validate = true;
+        for step in vec![100, 10, 1] {
+            if self.params.rules_to_take < step {
+                continue;
+            }
+            let n_rules = usize::min(self.params.rules_to_take, new_eqs.len());
+            if step < 10 && n_rules > 200 {
+                break;
+            }
+            let (n, b) = self.shrink(new_eqs, step, should_validate);
+            new_eqs = n;
+            bads.extend(b);
+
+            // if we taking all the rules, we don't need to validate anymore
+            if self.params.rules_to_take == usize::MAX {
+                should_validate = false;
+            }
+        }
+        (new_eqs, bads)
+    }
+
+    #[inline(never)]
+    fn minimize(&mut self, new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
         assert!(self.params.minimize);
 
         let t = Instant::now();
