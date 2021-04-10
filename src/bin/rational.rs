@@ -1,9 +1,11 @@
 use egg::*;
 use ruler::*;
 
-use num::bigint::{BigInt, RandBigInt, ToBigInt};
+use num::bigint::{BigInt, BigUint, RandBigInt, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive, Zero};
 use rand_pcg::Pcg64;
+use z3::ast::Ast;
+use z3::*;
 
 pub type Constant = Ratio<BigInt>;
 
@@ -75,7 +77,7 @@ impl SynthLanguage for Math {
         }
     }
 
-    fn to_var(&self) -> Option<Symbol> {
+    fn to_var(&self) -> Option<egg::Symbol> {
         if let Math::Var(sym) = self {
             Some(*sym)
         } else {
@@ -83,7 +85,7 @@ impl SynthLanguage for Math {
         }
     }
 
-    fn mk_var(sym: Symbol) -> Self {
+    fn mk_var(sym: egg::Symbol) -> Self {
         Math::Var(sym)
     }
 
@@ -100,8 +102,6 @@ impl SynthLanguage for Math {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        let params = &synth.params;
-
         // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
@@ -139,14 +139,10 @@ impl SynthLanguage for Math {
         });
 
         for i in 0..synth.params.variables {
-            let var = Symbol::from(letter(i));
+            let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
             egraph[id].data.cvec = consts[i].clone();
         }
-
-        // I want 1. only interesting constants. I want to play with the number of such constants
-        // I want cross prod of N interesting constants
-        // I want cross prod of N interesting constants + n_samples
 
         for n in &constants {
             egraph.add(Math::Num(n.clone()));
@@ -186,7 +182,25 @@ impl SynthLanguage for Math {
         rhs: &egg::Pattern<Self>,
     ) -> bool {
         if synth.params.use_smt {
-            unimplemented!()
+            let mut cfg = z3::Config::new();
+            cfg.set_timeout_msec(1000);
+            let ctx = z3::Context::new(&cfg);
+            let solver = z3::Solver::new(&ctx);
+            let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+            let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+            solver.assert(&lexpr._eq(&rexpr).not());
+            match solver.check() {
+                SatResult::Unsat => true,
+                SatResult::Sat => {
+                    println!("z3 validation: failed for {} => {}", lhs, rhs);
+                    false
+                }
+                SatResult::Unknown => {
+                    synth.smt_unknown += 1;
+                    println!("z3 validation: unknown for {} => {}", lhs, rhs);
+                    false
+                }
+            }
         } else {
             let n = synth.params.num_fuzz;
             let mut env = HashMap::default();
@@ -227,6 +241,59 @@ pub fn gen_denom(rng: &mut Pcg64, bits: u64) -> BigInt {
         }
     }
     res
+}
+
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
+    let mut buf: Vec<z3::ast::Real> = vec![];
+    let zero = z3::ast::Real::from_real(&ctx, 0, 1);
+    let t = z3::ast::Bool::from_bool(&ctx, true);
+    for node in expr.as_ref().iter() {
+        match node {
+            Math::Var(v) => buf.push(z3::ast::Real::new_const(&ctx, v.to_string())),
+            Math::Num(c) => buf.push(z3::ast::Real::from_real(
+                &ctx,
+                to_i32(c.numer()),
+                to_i32(c.denom()),
+            )),
+            Math::Add([a, b]) => buf.push(z3::ast::Real::add(
+                &ctx,
+                &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
+            )),
+            Math::Sub([a, b]) => buf.push(z3::ast::Real::sub(
+                &ctx,
+                &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
+            )),
+            Math::Mul([a, b]) => buf.push(z3::ast::Real::mul(
+                &ctx,
+                &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
+            )),
+            Math::Div([a, b]) => buf.push(z3::ast::Real::div(
+                &buf[usize::from(*a)],
+                &buf[usize::from(*b)],
+            )),
+            Math::Neg(a) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)])),
+            Math::Abs(a) => {
+                if z3::ast::Real::le(&buf[usize::from(*a)], &zero) == t {
+                    buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)]))
+                } else {
+                    buf.push(buf[usize::from(*a)].clone())
+                }
+            }
+            _ => unimplemented!(),
+        }
+    }
+    buf.pop().unwrap()
+}
+
+fn to_i32(v: &BigInt) -> i32 {
+    let is_neg = v.is_negative();
+    let u32_v = |v: &BigUint| (v & (BigUint::from(u32::MAX))).to_u32().unwrap();
+    let converted = u32_v(&(v.abs().to_biguint().unwrap()));
+    if is_neg {
+        (converted as i32) * -1
+    } else {
+        converted as i32
+    }
 }
 
 fn main() {

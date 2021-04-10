@@ -182,7 +182,7 @@ if [ $DOMAIN == 'rat' ]; then
     racket verify-rat.rkt
 elif [ $DOMAIN == '4' ] || [ $DOMAIN == '8' ] || [ $DOMAIN == '16' ] || [ $DOMAIN == '32' ]; then
     # | => ||, racket doesn't like |
-    sed 's/\|/||/g' $RULES > tmp.json
+    sed 's/|/||/g' $RULES > tmp.json
     echo "$bv" > verify-bv.rkt
     jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmp.json >> verify-bv.rkt
     echo ")"  >> verify-bv.rkt

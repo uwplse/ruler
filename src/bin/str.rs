@@ -63,6 +63,14 @@ define_language! {
     pub enum Lang {
         "str.++" = Concat([Id; 2]),
         "str.replace" = Replace([Id; 3]),
+        "str.at" = At([Id; 2]),
+        "str.substr" = SubStr([Id; 3]),
+        "str.from_int" = FromInt(Id),
+        "str.to_int" = ToInt(Id),
+        "str.len" = Len(Id),
+        "str.indexof" = IndexOf([Id; 3]),
+        "+" = Add([Id; 2]),
+        "-" = Sub([Id; 2]),
         Lit(Constant),
         Var(egg::Symbol),
     }
@@ -92,8 +100,66 @@ impl SynthLanguage for Lang {
                 let out = s.replacen(t, t2, 1);
                 Some(Constant::Str(out.into_bytes().into()))
             }),
-            // Math::Add([a, b]) => map!(v, a, b => Some(a.wrapping_add(*b))),
-            // Math::Sub([a, b]) => map!(v, a, b => Some(a.wrapping_sub(*b))),
+            Lang::At([a, i]) => map!(v, a, i => {
+                let a = a.to_slice().unwrap();
+                let i = i.to_num().unwrap();
+                if 0 <= i && i < (a.len() as _) {
+                    let i = i as usize;
+                    Some(Constant::Str(a[i..i+1].into()))
+                } else {
+                    Some(Constant::Str(SmallStr::default()))
+                }
+            }),
+            Lang::SubStr([a, i, len]) => map!(v, a, i, len => {
+                let a = a.to_slice().unwrap();
+                let n = a.len() as i64;
+                let i = i.to_num().unwrap();
+                let len = len.to_num().unwrap();
+                if 0 <= i && i < n && len > 0 {
+                    let j = (i + len).min(n) as usize;
+                    let i = i as usize;
+                    Some(Constant::Str(a[i..j].into()))
+                } else {
+                    Some(Constant::Str(SmallStr::default()))
+                }
+            }),
+            Lang::FromInt(i) => map!(v, i => {
+                let i = i.to_num().unwrap();
+                Some(Constant::Str(i.to_string().into_bytes().into()))
+            }),
+            Lang::ToInt(s) => map!(v, s => {
+                let s = s.to_str().unwrap();
+                let i = s.parse::<i64>().unwrap_or(-1);
+                Some(Constant::Num(i))
+            }),
+            Lang::Len(s) => map!(v, s => {
+                let s = s.to_str().unwrap();
+                Some(Constant::Num(s.len() as _))
+            }),
+            Lang::IndexOf([s, t, i]) => map!(v, s, t, i => {
+                let s = s.to_str().unwrap();
+                let t = t.to_str().unwrap();
+                let i = i.to_num().unwrap();
+                if 0 <= i && i <= (s.len() as _) {
+                    let i = i as usize;
+                    match s[i..].find(t) {
+                        None => Some(Constant::Num(-1)),
+                        Some(j) => Some(Constant::Num(j as _))
+                    }
+                } else {
+                    Some(Constant::Num(-1))
+                }
+            }),
+            Lang::Add([i, j]) => map!(v, i, j => {
+                let i = i.to_num().unwrap();
+                let j = j.to_num().unwrap();
+                Some(Constant::Num(i.checked_add(j).unwrap()))
+            }),
+            Lang::Sub([i, j]) => map!(v, i, j => {
+                let i = i.to_num().unwrap();
+                let j = j.to_num().unwrap();
+                Some(Constant::Num(i.checked_sub(j).unwrap()))
+            }),
             Lang::Lit(n) => vec![Some(n.clone()); cvec_len],
             Lang::Var(_) => vec![],
         }
@@ -137,6 +203,8 @@ impl SynthLanguage for Lang {
             }
             str_consts = new
         }
+        str_consts.push(b"1".iter().copied().collect());
+        str_consts.push(b"-1000".iter().copied().collect());
 
         let str_consts: Vec<Option<Constant>> = str_consts
             .into_iter()
@@ -147,31 +215,41 @@ impl SynthLanguage for Lang {
             println!("const: {}", s.as_ref().unwrap());
         }
 
-        let int_consts: Vec<Option<Constant>> =
-            vec![Some(Constant::Num(0)), Some(Constant::Num(1))];
+        let int_consts = vec![
+            Some(Constant::Num(-1)),
+            Some(Constant::Num(0)),
+            Some(Constant::Num(1)),
+            Some(Constant::Num(1000)),
+        ];
+        let int_consts = self_product(&int_consts, synth.params.str_int_variables);
 
-        let str_consts = self_product(&str_consts, synth.params.variables - 1);
+        let str_consts = self_product(&str_consts, synth.params.variables);
 
         let cvec_len = str_consts[0].len();
         println!("cvec_len: {}", cvec_len);
         let mut egraph = EGraph::<Self, _>::new(SynthAnalysis { cvec_len });
 
-        egraph.add(Lang::Lit("0".parse().unwrap()));
-        egraph.add(Lang::Lit("1".parse().unwrap()));
+        egraph.add(Lang::Lit(Constant::Num(-1)));
+        egraph.add(Lang::Lit(Constant::Num(0)));
+        egraph.add(Lang::Lit(Constant::Num(1)));
         // egraph.add(Lang::Lit("\"A\"".parse().unwrap()));
         // egraph.add(Lang::Lit("\"B\"".parse().unwrap()));
-        egraph.add(Lang::Lit("\"\"".parse().unwrap()));
+        egraph.add(Lang::Lit(Constant::Str(Default::default())));
 
         for i in 0..synth.params.variables {
-            if i < synth.params.variables - 1 {
-                let var = Symbol::from(letter(i));
-                let id = egraph.add(Lang::Var(var));
-                egraph[id].data.cvec = str_consts[i].clone();
-            } else {
-                let int_var = Symbol::from(letter(i));
-                let id = egraph.add(Lang::Var(int_var));
-                egraph[id].data.cvec = int_consts.iter().cycle().cloned().take(cvec_len).collect();
-            }
+            let var = Symbol::from(letter(i));
+            let id = egraph.add(Lang::Var(var));
+            egraph[id].data.cvec = str_consts[i].clone();
+        }
+        for i in 0..synth.params.str_int_variables {
+            let int_var = Symbol::from(letter(i + synth.params.variables));
+            let id = egraph.add(Lang::Var(int_var));
+            egraph[id].data.cvec = int_consts[i]
+                .iter()
+                .cycle()
+                .cloned()
+                .take(cvec_len)
+                .collect();
         }
 
         synth.egraph = egraph;
@@ -186,35 +264,58 @@ impl SynthLanguage for Lang {
             .map(|id| (id, extract.find_best_cost(id)))
             .collect();
 
-        let is_str = |id: Id| -> bool {
+        let is_str = |&id: &Id| -> bool {
             match synth.egraph[id].data.cvec[0] {
                 Some(Constant::Num(_)) => false,
                 Some(Constant::Str(_)) => true,
                 None => panic!(),
             }
         };
+        let is_num = |id: &Id| !is_str(id);
 
         let mut to_add = vec![];
-        for i in synth.ids() {
-            for j in synth.ids() {
-                for k in synth.ids() {
-                    if ids[&i] + ids[&j] + ids[&k] + 1 == iter {
-                        if is_str(i) && is_str(j) && is_str(k) {
-                            to_add.push(Lang::Replace([i, j, k]));
-                        }
+        for a in synth.ids().filter(is_str) {
+            if ids[&a] + 1 == iter {
+                to_add.push(Lang::ToInt(a));
+                to_add.push(Lang::Len(a));
+            }
+            for b in synth.ids().filter(is_str) {
+                for c in synth.ids().filter(is_str) {
+                    if ids[&a] + ids[&b] + ids[&c] + 1 == iter {
+                        to_add.push(Lang::Replace([a, b, c]));
                     }
                 }
 
-                if ids[&i] + ids[&j] + 1 != iter {
-                    continue;
+                if ids[&a] + ids[&b] + 1 == iter {
+                    to_add.push(Lang::Concat([a, b]));
                 }
 
-                if is_str(i) && is_str(j) {
-                    to_add.push(Lang::Concat([i, j]));
+                for i in synth.ids().filter(is_num) {
+                    if ids[&a] + ids[&b] + ids[&i] + 1 == iter {
+                        to_add.push(Lang::IndexOf([a, b, i]));
+                    }
                 }
             }
-            if ids[&i] + 1 != iter {
-                continue;
+            for i in synth.ids().filter(is_num) {
+                for j in synth.ids().filter(is_num) {
+                    if ids[&a] + ids[&i] + ids[&j] + 1 == iter {
+                        to_add.push(Lang::SubStr([a, i, j]));
+                    }
+                }
+                if ids[&a] + ids[&i] + 1 == iter {
+                    to_add.push(Lang::At([a, i]));
+                }
+            }
+        }
+        for i in synth.ids().filter(is_num) {
+            if ids[&i] + 1 == iter {
+                to_add.push(Lang::FromInt(i));
+            }
+            for j in synth.ids().filter(is_num) {
+                if ids[&i] + ids[&j] + 1 == iter {
+                    to_add.push(Lang::Add([i, j]));
+                    to_add.push(Lang::Sub([i, j]));
+                }
             }
         }
 
