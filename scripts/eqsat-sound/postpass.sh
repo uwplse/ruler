@@ -179,13 +179,13 @@ TIMEOUT="3s"
 
 if [ $DOMAIN == 'rat' ]; then
     jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
-        $RULES >> to-check.txt
+        $RULES > to-check.txt
     while read p; do
       echo "$rational" > verify-rat.rkt
       echo "$p" >> verify-rat.rkt
       echo "(printf \"~a \n\" num_unsound)" >> verify-rat.rkt
       echo "(close-output-port failed)" >> verify-rat.rkt
-      res=$(time -k $TIMEOUT $TIMEOUT racket verify-rat.rkt)
+      res=$(timeout -k $TIMEOUT $TIMEOUT racket verify-rat.rkt)
       if [ $? -ne 0 ]; then
           ((UNKNOWN=UNKNOWN+1))
           echo "Rosette timed out." >&2
