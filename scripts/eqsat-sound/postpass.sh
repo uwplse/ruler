@@ -12,7 +12,7 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 if [ -z "$1" ] || [ -z  "$2" ]; then
     echo "
     Rosette and z3 needed for this to work.
-    Usage: ./postpass.sh rulefile.json < rat | bool | 8 | 16 | 32 >
+    Usage: ./postpass.sh rulefile.json < rational | 8 | 16 | 32 >
     "
     exit 1
 else
@@ -177,7 +177,7 @@ UNKNOWN=0
 UNSOUND=0
 TIMEOUT="3s"
 
-if [ $DOMAIN == 'rat' ]; then
+if [ $DOMAIN == "rational" ]; then
     jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
         $RULES > to-check.txt
     while read p; do
@@ -195,7 +195,7 @@ if [ $DOMAIN == 'rat' ]; then
           fi
       fi
     done < to-check.txt
-elif [ $DOMAIN == '4' ] || [ $DOMAIN == '8' ] || [ $DOMAIN == '16' ] || [ $DOMAIN == '32' ]; then
+elif [ $DOMAIN = "4" ] || [ $DOMAIN = "8" ] || [ $DOMAIN = "16" ] || [ $DOMAIN = "32" ]; then
     # | => ||, racket doesn't like |
     sed 's/|/||/g' $RULES > tmp.json
     jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmp.json > to-check.txt

@@ -31,7 +31,7 @@ for d in ${domain[@]}; do
            resn="$DIR/$d-const-$c-fuzz-$n"
            mkdir -p "$resn"
            pushd "$resn"
-           if [ "$d" -eq "4" ] || [ "$d" -eq "32" ]; then
+           if [ "$d" = "4" ] || [ "$d" = "32" ]; then
                cargo run --bin bv"$d" --release -- synth \
                     --iters "$is" \
                     --variables "$vs" \
@@ -48,8 +48,8 @@ for d in ${domain[@]}; do
            fi
            if [ -s out.json ]; then
                post=$("$MYDIR"/postpass.sh out.json $d)
-               unknown=$(echo $post | jq '.unknown')
-               unsound=$(echo $post | jq '.unsound')
+               unknown="$(echo $post | jq '.unknown')"
+               unsound="$(echo $post | jq '.unsound')"
                cat out.json | \
                     jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
                     '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json
@@ -65,7 +65,7 @@ for d in ${domain[@]}; do
        res="$DIR/$d-const-$c/smt"
        mkdir -p "$res"
        pushd "$res"
-       if [ "$d" -eq "4" ] || [ "$d" -eq "32" ]; then
+       if [ "$d" = "4" ] || [ "$d" = "32" ]; then
            cargo run --bin bv"$d" --release -- synth \
                 --iters "$is" \
                 --variables "$vs" \
@@ -83,8 +83,8 @@ for d in ${domain[@]}; do
        # this should always be 0 for sure since the rules are already smt validated.
        if [ -s out.json ]; then
            post=$("$MYDIR"/postpass.sh out.json $d)
-           unknown=$(echo $post | jq '.unknown')
-           unsound=$(echo $post | jq '.unsound')
+           unknown="$(echo $post | jq '.unknown')"
+           unsound="$(echo $post | jq '.unsound')"
            cat out.json | \
                 jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
                 '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json
@@ -102,7 +102,7 @@ for d in ${domain[@]}; do
         def="$DIR/$d/sample-$samples-const-$default_num_const/$n"
         mkdir -p "$def"
         pushd "$def"
-        if [ "$d" -eq "4" ] || [ "$d" -eq "32" ]; then
+        if [ "$d" = "4" ] || [ "$d" = "32" ]; then
             cargo run --bin bv"$d" --release -- synth \
                 --iters "$is" \
                 --variables "$vs" \
@@ -121,8 +121,8 @@ for d in ${domain[@]}; do
         fi
         if [ -s out.json ]; then
             post=$("$MYDIR"/postpass.sh out.json $d)
-            unknown=$(echo $post | jq '.unknown')
-            unsound=$(echo $post | jq '.unsound')
+            unknown="$(echo $post | jq '.unknown')"
+            unsound="$(echo $post | jq '.unsound')"
             cat out.json | \
                  jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
                  '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json            
@@ -139,7 +139,7 @@ for d in ${domain[@]}; do
     defs="$DIR/$d/sample-$samples-const-$default_num_const/smt"
     mkdir -p "$defs"
     pushd "$defs"
-    if [ "$d" -eq "4" ] || [ "$d" -eq "32" ]; then
+    if [ "$d" = "4" ] || [ "$d" = "32" ]; then
         cargo run --bin bv"$d" --release -- synth \
             --iters "$is" \
             --variables "$vs" \
@@ -158,8 +158,8 @@ for d in ${domain[@]}; do
     fi
     if [ -s out.json ]; then
         post=$("$MYDIR"/postpass.sh out.json $d)
-        unknown=$(echo $post | jq '.unknown')
-        unsound=$(echo $post | jq '.unsound')
+        unknown="$(echo $post | jq '.unknown')"
+        unsound="$(echo $post | jq '.unsound')"
         cat out.json | \
              jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
              '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json
@@ -192,14 +192,14 @@ for out in $(find . -name 'out.json' | sort); do
         cat "$out" \
             | jq --arg SUCCESS "$success" \
                 '{"status": $SUCCESS, "domain" : .domain, "time": .time, 
-                  "num_rules": .num_rules, "post_unsound": .unsound,
-                  "post_unknown": .ununknown, "params": .params}' \
+                  "num_rules": .num_rules, "unsound": .unsound,
+                  "unknown": .unknown, "params": .params}' \
             >> all.json
     else
         jq --arg CRASH "$crash" \
             '{"status": $CRASH, "domain" : .domain, "time": 0.0,
-              "num_rules": 0, "post_unsound": 0,
-              "post_unknown": 0, "params": {} }' >> all.json
+              "num_rules": 0, "unsound": 0,
+              "unknown": 0, "params": {} }' >> all.json
     fi
 done
 
