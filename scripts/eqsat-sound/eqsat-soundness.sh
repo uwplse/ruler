@@ -82,8 +82,8 @@ for d in ${domain[@]}; do
        if [ -s out.json ]; then
            post=$("$MYDIR"/postpass.sh out.json $d)
            cat out.json | \
-                jq --arg POST "$post" --arg DOM \
-                "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+                jq --arg POST "$post" --arg DOM "$d" \
+                '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
            mv tmp.json out.json
            echo "Generated $res/out.json"
        else
@@ -152,14 +152,15 @@ for d in ${domain[@]}; do
     fi
     if [ -s out.json ]; then
         post=$("$MYDIR"/postpass.sh out.json $d)
+        cat out.json | \
+            jq --arg POST "$post" --arg DOM \
+            "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+        mv tmp.json out.json
+        echo "Generated $defs/out.json"
     else
-        post="ruler-crash"
+        touch out.json
+        echo "Generated empty $defs/out.json"
     fi
-    cat out.json | \
-        jq --arg POST "$post" --arg DOM \
-        "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
-    mv tmp.json out.json
-    echo "Generated $defs/out.json"
     popd
 done
 
