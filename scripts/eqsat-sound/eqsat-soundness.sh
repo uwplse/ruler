@@ -17,7 +17,7 @@ mkdir -p "$DIR"
 is=2
 vs=3
 domain=("4" "32" "rational")
-numfuzz=("0" "10" "100" "1000" "10000")
+numfuzz=("0" "10" "100" "1000")
 consts=("1" "2" "3" "4" "5")
 
 default_num_const=5
@@ -46,12 +46,17 @@ for d in ${domain[@]}; do
                     --no-conditionals \
                     --num-fuzz "$n"
            fi
-           post=$("$MYDIR"/postpass.sh out.json $d)
-           cat out.json | \
-                jq --argjson POST "$post" --argjson DOM "$d" \
-                '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
-           mv tmp.json out.json
-           echo "Generated $resn/out.json"
+           if [ -s out.json ]; then
+               post=$("$MYDIR"/postpass.sh out.json $d)
+               cat out.json | \
+                    jq --arg POST "$post" --arg DOM "$d" \
+                    '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+               mv tmp.json out.json
+               echo "Generated $resn/out.json"
+           else
+               touch out.json
+               echo "Generated empty $resn/out.json"
+           fi
            popd
        done
        # smt validation for each domain and cvec config
@@ -74,12 +79,17 @@ for d in ${domain[@]}; do
                 --use-smt
        fi
        # this should always be 0 for sure since the rules are already smt validated.
-       post=$("$MYDIR"/postpass.sh out.json $d)
-       cat out.json | \
-            jq --argjson POST "$post" --argjson DOM \
-            "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
-       mv tmp.json out.json
-       echo "Generated $res/out.json"
+       if [ -s out.json ]; then
+           post=$("$MYDIR"/postpass.sh out.json $d)
+           cat out.json | \
+                jq --arg POST "$post" --arg DOM \
+                "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+           mv tmp.json out.json
+           echo "Generated $res/out.json"
+       else
+           touch out.json
+           echo "Generated empty $res/out.json"
+       fi
        popd
     done
 
@@ -105,12 +115,17 @@ for d in ${domain[@]}; do
                 --important-cvec-offsets "$default_num_const" \
                 --n-samples "$samples"
         fi
-        post=$("$MYDIR"/postpass.sh out.json $d)
-        cat out.json | \
-            jq --argjson POST "$post" --argjson DOM \
-            "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
-        mv tmp.json out.json
-        echo "Generated $def/out.json"
+        if [ -s out.json ]; then
+            post=$("$MYDIR"/postpass.sh out.json $d)
+            cat out.json | \
+                jq --arg POST "$post" --arg DOM \
+                "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+            mv tmp.json out.json
+            echo "Generated $def/out.json"
+        else
+            touch out.json
+            echo "Generated empty $def/out.json"
+        fi
         popd
     done
 
@@ -135,9 +150,13 @@ for d in ${domain[@]}; do
             --important-cvec-offsets "$default_num_const" \
             --n-samples "$samples"
     fi
-    post=$("$MYDIR"/postpass.sh out.json $d)
+    if [ -s out.json ]; then
+        post=$("$MYDIR"/postpass.sh out.json $d)
+    else
+        post="ruler-crash"
+    fi
     cat out.json | \
-        jq --argjson POST "$post" --argjson DOM \
+        jq --arg POST "$post" --arg DOM \
         "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
     mv tmp.json out.json
     echo "Generated $defs/out.json"
