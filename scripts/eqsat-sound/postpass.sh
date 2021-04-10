@@ -173,25 +173,52 @@ rational="#lang rosette
   \`(assume (! (eq? ,d 0))))"
 
 squote="'"
+UNKNOWN=0
+UNSOUND=0
+TIMEOUT="3s"
+
 if [ $DOMAIN == 'rat' ]; then
-    echo "$rational" > verify-rat.rkt
     jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
-        $RULES >> verify-rat.rkt
-    echo "(printf \"~a \n\" num_unsound)" >> verify-rat.rkt
-    echo "(close-output-port failed)" >> verify-rat.rkt
-    racket verify-rat.rkt
+        $RULES >> to-check.txt
+    while read p; do
+      echo "$rational" > verify-rat.rkt
+      echo "$p" >> verify-rat.rkt
+      echo "(printf \"~a \n\" num_unsound)" >> verify-rat.rkt
+      echo "(close-output-port failed)" >> verify-rat.rkt
+      res=$(time -k $TIMEOUT $TIMEOUT racket verify-rat.rkt)
+      if [ $? -ne 0 ]; then
+          ((UNKNOWN=UNKNOWN+1))
+          echo "Rosette timed out." >&2
+      else
+          if [ $res -eq 1 ]; then
+              ((UNSOUND=UNSOUND+1))
+          fi
+      fi
+    done < to-check.txt
 elif [ $DOMAIN == '4' ] || [ $DOMAIN == '8' ] || [ $DOMAIN == '16' ] || [ $DOMAIN == '32' ]; then
     # | => ||, racket doesn't like |
     sed 's/|/||/g' $RULES > tmp.json
-    echo "$bv" > verify-bv.rkt
-    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmp.json >> verify-bv.rkt
-    echo ")"  >> verify-bv.rkt
-    echo "(close-output-port failed)" >> verify-bv.rkt
-    echo "(printf \"~a \n\" num_unsound)" >> verify-bv.rkt
-    racket verify-bv.rkt
+    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmp.json > to-check.txt
+    while read p; do
+      echo "$bv" > verify-bv.rkt
+      echo "$p" >> verify-bv.rkt
+      echo ")"  >> verify-bv.rkt
+      echo "(close-output-port failed)" >> verify-bv.rkt
+      echo "(printf \"~a \n\" num_unsound)" >> verify-bv.rkt
+      res=$(timeout -k $TIMEOUT $TIMEOUT racket verify-bv.rkt)
+      if [ $? -ne 0 ]; then
+          ((UNKNOWN=UNKNOWN+1))
+          echo "Rosette timed out." >&2
+      else
+          if [ $res -eq 1 ]; then
+              ((UNSOUND=UNSOUND+1))
+          fi
+      fi
+    done < to-check.txt 
     rm tmp.json
 else
     echo "$2 is a bad domain"
     exit 1
 fi
 
+echo '{"unsound": $UNSOUND, "unknown": $UNKNOWN}'

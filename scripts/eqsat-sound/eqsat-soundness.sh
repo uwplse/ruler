@@ -48,9 +48,11 @@ for d in ${domain[@]}; do
            fi
            if [ -s out.json ]; then
                post=$("$MYDIR"/postpass.sh out.json $d)
+               unknown=$(echo $post | jq '.unknown')
+               unsound=$(echo $post | jq '.unsound')
                cat out.json | \
-                    jq --arg POST "$post" --arg DOM "$d" \
-                    '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+                    jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
+                    '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json
                mv tmp.json out.json
                echo "Generated $resn/out.json"
            else
@@ -81,9 +83,11 @@ for d in ${domain[@]}; do
        # this should always be 0 for sure since the rules are already smt validated.
        if [ -s out.json ]; then
            post=$("$MYDIR"/postpass.sh out.json $d)
+           unknown=$(echo $post | jq '.unknown')
+           unsound=$(echo $post | jq '.unsound')
            cat out.json | \
-                jq --arg POST "$post" --arg DOM "$d" \
-                '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+                jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
+                '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json
            mv tmp.json out.json
            echo "Generated $res/out.json"
        else
@@ -117,9 +121,11 @@ for d in ${domain[@]}; do
         fi
         if [ -s out.json ]; then
             post=$("$MYDIR"/postpass.sh out.json $d)
+            unknown=$(echo $post | jq '.unknown')
+            unsound=$(echo $post | jq '.unsound')
             cat out.json | \
-                jq --arg POST "$post" --arg DOM \
-                "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+                 jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
+                 '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json            
             mv tmp.json out.json
             echo "Generated $def/out.json"
         else
@@ -152,9 +158,11 @@ for d in ${domain[@]}; do
     fi
     if [ -s out.json ]; then
         post=$("$MYDIR"/postpass.sh out.json $d)
+        unknown=$(echo $post | jq '.unknown')
+        unsound=$(echo $post | jq '.unsound')
         cat out.json | \
-            jq --arg POST "$post" --arg DOM \
-            "$d" '. + {"domain": $DOM} + {"post_pass": $POST}' > tmp.json
+             jq --arg UNKNOWN "$unknown" --arg UNSOUND "$unsound" --arg DOM "$d" \
+             '. + {"domain": $DOM} + {"unsound": $UNSOUND} + {"unknown": $UNKNOWN}' > tmp.json
         mv tmp.json out.json
         echo "Generated $defs/out.json"
     else
@@ -183,11 +191,15 @@ for out in $(find . -name 'out.json' | sort); do
     if [ -s "$out" ]; then
         cat "$out" \
             | jq --arg SUCCESS "$success" \
-                '{"status": $SUCCESS, "domain" : .domain, "time": .time, "num_rules": .num_rules, "post_unsound": .post_pass, "params": .params}' \
+                '{"status": $SUCCESS, "domain" : .domain, "time": .time, 
+                  "num_rules": .num_rules, "post_unsound": .unsound,
+                  "post_unknown": .ununknown, "params": .params}' \
             >> all.json
     else
         jq --arg CRASH "$crash" \
-            '{"status": $CRASH, "domain" : .domain, "time": 0.0, "num_rules": 0, "post_unsound": 0, "params": {} }' >> all.json
+            '{"status": $CRASH, "domain" : .domain, "time": 0.0,
+              "num_rules": 0, "post_unsound": 0,
+              "post_unknown": 0, "params": {} }' >> all.json
     fi
 done
 
