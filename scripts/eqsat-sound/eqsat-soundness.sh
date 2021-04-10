@@ -19,9 +19,6 @@ vs=3
 domain=("4" "32" "rational")
 numfuzz=("0" "10" "100" "1000" "10000")
 consts=("1" "2" "3" "4" "5")
-domain=("4")
-numfuzz=("10" "100")
-consts=("1" "2")
 
 default_num_const=5
 samples=10
