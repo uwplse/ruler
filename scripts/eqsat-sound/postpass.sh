@@ -205,12 +205,12 @@ elif [ $DOMAIN == '4' ] || [ $DOMAIN == '8' ] || [ $DOMAIN == '16' ] || [ $DOMAI
       echo ")"  >> verify-bv.rkt
       echo "(close-output-port failed)" >> verify-bv.rkt
       echo "(printf \"~a \n\" num_unsound)" >> verify-bv.rkt
-      res=$(timeout -k $TIMEOUT $TIMEOUT racket verify-bv.rkt)
+      res="$(timeout -k $TIMEOUT $TIMEOUT racket verify-bv.rkt)"
       if [ $? -ne 0 ]; then
           ((UNKNOWN=UNKNOWN+1))
           echo "Rosette timed out." >&2
       else
-          if [ $res -eq 1 ]; then
+          if [ "$res" -eq 1 ]; then
               ((UNSOUND=UNSOUND+1))
           fi
       fi
@@ -221,4 +221,4 @@ else
     exit 1
 fi
 
-echo '{"unsound": $UNSOUND, "unknown": $UNKNOWN}'
+echo "{\"unsound\": $UNSOUND, \"unknown\": $UNKNOWN}"
