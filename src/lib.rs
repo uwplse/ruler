@@ -237,10 +237,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph.classes().map(|c| c.id)
     }
 
-    fn mk_runner(
-        &self,
-        mut egraph: EGraph<L, SynthAnalysis>,
-    ) -> Runner<L, SynthAnalysis, ()> {
+    fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
 
         let mut runner = Runner::default()
