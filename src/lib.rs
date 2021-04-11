@@ -240,7 +240,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn mk_runner(
         &self,
         mut egraph: EGraph<L, SynthAnalysis>,
-        is_final: bool,
     ) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
 
@@ -257,7 +256,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .with_iter_limit(self.params.eqsat_iter_limit)
             .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
-        runner = if self.params.no_conditionals && !is_final {
+        runner = if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
             for c in egraph.classes_mut() {
                 c.data.cvec.truncate(0);
@@ -283,7 +282,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let start = Instant::now();
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
 
-        let mut runner = self.mk_runner(self.egraph.clone(), false);
+        let mut runner = self.mk_runner(self.egraph.clone());
         runner = runner.run(rewrites);
 
         log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
@@ -523,12 +522,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     // a non-empty list of ids that have the same cvec,
                     // won't this cause eclasses to merge even if the rule is actually not valid?
                     if self.params.minimize || n_eqs < self.params.rules_to_take {
-                        for ids in id_groups {
-                            for win in ids.windows(2) {
-                                self.egraph.union(win[0], win[1]);
-                            }
-                        }
-                        self.egraph.rebuild();
+                        // for ids in id_groups {
+                        //     for win in ids.windows(2) {
+                        //         self.egraph.union(win[0], win[1]);
+                        //     }
+                        // }
+                        // self.egraph.rebuild();
 
                         log::info!("Stopping early, took all eqs");
                         break 'inner;
@@ -549,9 +548,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         eqs.reverse();
 
         // final run_rewrites
-        let rws = self.equalities.values().flat_map(|eq| &eq.rewrites);
-        let final_runner = self.mk_runner(self.egraph.clone(), true);
-        final_runner.run(rws);
+        if self.params.do_final_run {
+            let old = std::mem::replace(&mut self.params.no_conditionals, false);
+            let rws = self.equalities.values().flat_map(|eq| &eq.rewrites);
+            let final_runner = self.mk_runner(self.egraph.clone());
+            final_runner.run(rws);
+            self.params.no_conditionals = old;
+        }
 
         println!("Learned {} rules in {:?}", num_rules, time);
         for eq in &eqs {
@@ -661,6 +664,9 @@ pub struct SynthParams {
     pub num_fuzz: usize,
     #[clap(long, conflicts_with = "num-fuzz")]
     pub use_smt: bool,
+    // for final round of run_rewrites
+    #[clap(long)]
+    pub do_final_run: bool,
 }
 
 #[derive(Clap)]
@@ -845,7 +851,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 .flat_map(|eq| &eq.rewrites)
                 .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
-            let mut runner = self.mk_runner(self.initial_egraph.clone(), false);
+            let mut runner = self.mk_runner(self.initial_egraph.clone());
             for candidate_eq in new_eqs.values() {
                 runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));
                 runner = runner.with_expr(&L::instantiate(&candidate_eq.rhs));
@@ -967,7 +973,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 rewrites.sort_by_key(|rw| rw.name());
                 rewrites.dedup_by_key(|rw| rw.name());
 
-                let mut runner = self.mk_runner(self.initial_egraph.clone(), false);
+                let mut runner = self.mk_runner(self.initial_egraph.clone());
 
                 for candidate_eq in &test {
                     runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));

@@ -15,6 +15,7 @@ mkdir -p "$DIR"
 
 is=2
 vs=3
+
 domain=("4" "32" "rational")
 numfuzz=("0" "10" "100" "1000")
 consts=("1" "2" "3" "4" "5")
@@ -22,6 +23,12 @@ consts=("1" "2" "3" "4" "5")
 default_num_const=("0" "2" "5")
 samples=("10" "50" "100")
 
+# domain=("4")
+# numfuzz=("100")
+# consts=("1")
+# # to compare consts vs sampling
+# default_num_const=()
+# samples=()
 
 # TODO: lkup table
 
@@ -46,15 +53,18 @@ for d in ${domain[@]}; do
                     --num-fuzz "$n"
            fi
            if [ -s out.json ]; then
-               post=$("$MYDIR"/postpass.sh out.json $d)
-               unknown="$(echo $post | jq '.unknown')"
-               unsound="$(echo $post | jq '.unsound')"
+               "$MYDIR"/postpass.sh out.json "$d"
+               unknown=$(cat post_pass.json | jq '.unknown')
+               unsound=$(cat post_pass.json | jq '.unsound')
+               # post=$("$MYDIR"/postpass.sh out.json $d)
+               # unknown="$(echo $post | jq '.unknown')"
+               # unsound="$(echo $post | jq '.unsound')"
                cat out.json | \
-                    jq --arg UNKNOWN "$unknown" \
-                       --arg UNSOUND "$unsound" \
-                       --arg DOM "$d" \
-                       --arg CONSTS "$c" \
-                       --arg FUZZ "$n" \
+                    jq --argjson UNKNOWN "$unknown" \
+                       --argjson UNSOUND "$unsound" \
+                       --argjson DOM "$d" \
+                       --argjson CONSTS "$c" \
+                       --argjson FUZZ "$n" \
                     '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": 0} +
                      {"fuzz": $FUZZ} + {"smt": "NO"} +
                      {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + {"status": "SUCCESS"} + .' > tmp.json
@@ -63,11 +73,11 @@ for d in ${domain[@]}; do
            else
                echo "{\"status\" : \"CRASH\"}" > out.json
                cat out.json | \
-                    jq --arg UNKNOWN "$unknown" \
-                       --arg UNSOUND "$unsound" \
-                       --arg DOM "$d" \
-                       --arg CONSTS "$c" \
-                       --arg FUZZ "$n" \
+                    jq --argjson UNKNOWN "0" \
+                       --argjson UNSOUND "0" \
+                       --argjson DOM "$d" \
+                       --argjson CONSTS "$c" \
+                       --argjson FUZZ "$n" \
                     '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": 0} +
                      {"fuzz": $FUZZ} + {"smt": "NO"} +
                      {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + .' > tmp.json 
@@ -96,14 +106,17 @@ for d in ${domain[@]}; do
        fi
        # this should always be 0 for sure since the rules are already smt validated.
        if [ -s out.json ]; then
-           post=$("$MYDIR"/postpass.sh out.json $d)
-           unknown="$(echo $post | jq '.unknown')"
-           unsound="$(echo $post | jq '.unsound')"
+             "$MYDIR"/postpass.sh out.json "$d"
+             unknown=$(cat post_pass.json | jq '.unknown')
+             unsound=$(cat post_pass.json | jq '.unsound')
+        #    post=$("$MYDIR"/postpass.sh out.json $d)
+        #    unknown="$(echo $post | jq '.unknown')"
+        #    unsound="$(echo $post | jq '.unsound')"
            cat out.json | \
-                jq --arg UNKNOWN "$unknown" \
-                   --arg UNSOUND "$unsound" \
-                   --arg DOM "$d" \
-                   --arg CONSTS "$c" \
+                jq --argjson UNKNOWN "$unknown" \
+                   --argjson UNSOUND "$unsound" \
+                   --argjson DOM "$d" \
+                   --argjson CONSTS "$c" \
                 '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": 0} +
                  {"fuzz": 0} + {"smt":  "YES"} +
                  {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + {"status": "SUCCESS"} + .' > tmp.json 
@@ -112,10 +125,10 @@ for d in ${domain[@]}; do
        else
            echo "{\"status\" : \"CRASH\"}" > out.json
            cat out.json | \
-                jq --arg UNKNOWN "$unknown" \
-                   --arg UNSOUND "$unsound" \
-                   --arg DOM "$d" \
-                   --arg CONSTS "$c" \
+                jq --argjson UNKNOWN "0" \
+                   --argjson UNSOUND "0" \
+                   --argjson DOM "$d" \
+                   --argjson CONSTS "$c" \
                 '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": 0} +
                  {"fuzz": 0} + {"smt" : "YES"} + 
                  {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + .' > tmp.json 
@@ -152,16 +165,19 @@ for d in ${domain[@]}; do
                         --n-samples "$s"
                 fi
                 if [ -s out.json ]; then
-                    post=$("$MYDIR"/postpass.sh out.json $d)
-                    unknown="$(echo $post | jq '.unknown')"
-                    unsound="$(echo $post | jq '.unsound')"
+                    "$MYDIR"/postpass.sh out.json "$d"
+                    unknown=$(cat post_pass.json | jq '.unknown')
+                    unsound=$(cat post_pass.json | jq '.unsound')
+                    # post=$("$MYDIR"/postpass.sh out.json $d)
+                    # unknown="$(echo $post | jq '.unknown')"
+                    # unsound="$(echo $post | jq '.unsound')"
                     cat out.json | \
-                        jq --arg UNKNOWN "$unknown" \
-                           --arg UNSOUND "$unsound" \
-                           --arg DOM "$d" \
-                           --arg CONSTS "$c" \
-                           --arg SAMPLES "$s" \
-                           --arg FUZZ "$n" \
+                        jq --argjson UNKNOWN "$unknown" \
+                           --argjson UNSOUND "$unsound" \
+                           --argjson DOM "$d" \
+                           --argjson CONSTS "$c" \
+                           --argjson SAMPLES "$s" \
+                           --argjson FUZZ "$n" \
                            '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": $SAMPLES} +
                             {"fuzz": $FUZZ} + {"smt" : "NO"} + 
                             {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + {"status": "SUCCESS"} + .' > tmp.json  
@@ -170,12 +186,12 @@ for d in ${domain[@]}; do
                 else
                     echo "{\"status\" : \"CRASH\"}" > out.json
                     cat out.json | \
-                        jq --arg UNKNOWN "$unknown" \
-                           --arg UNSOUND "$unsound" \
-                           --arg DOM "$d" \
-                           --arg CONSTS "$c" \
-                           --arg SAMPLES "$s" \
-                           --arg FUZZ "$n" \
+                        jq --argjson UNKNOWN "0" \
+                           --argjson UNSOUND "0" \
+                           --argjson DOM "$d" \
+                           --argjson CONSTS "$c" \
+                           --argjson SAMPLES "$s" \
+                           --argjson FUZZ "$n" \
                            '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": $SAMPLES} +
                             {"fuzz": $FUZZ} + {"smt" : "NO"} + 
                             {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + .' > tmp.json  
@@ -206,15 +222,18 @@ for d in ${domain[@]}; do
                     --n-samples "$s"
             fi
             if [ -s out.json ]; then
-                post=$("$MYDIR"/postpass.sh out.json $d)
-                unknown="$(echo $post | jq '.unknown')"
-                unsound="$(echo $post | jq '.unsound')"
+                "$MYDIR"/postpass.sh out.json "$d"
+                unknown=$(cat post_pass.json | jq '.unknown')
+                unsound=$(cat post_pass.json | jq '.unsound')
+                # post=$("$MYDIR"/postpass.sh out.json $d)
+                # unknown="$(echo $post | jq '.unknown')"
+                # unsound="$(echo $post | jq '.unsound')"
                 cat out.json | \
-                    jq --arg UNKNOWN "$unknown" \
-                       --arg UNSOUND "$unsound" \
-                       --arg DOM "$d" \
-                       --arg CONSTS "$c" \
-                       --arg SAMPLES "$s" \
+                    jq --argjson UNKNOWN "$unknown" \
+                       --argjson UNSOUND "$unsound" \
+                       --argjson DOM "$d" \
+                       --argjson CONSTS "$c" \
+                       --argjson SAMPLES "$s" \
                        '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": $SAMPLES} +
                         {"fuzz": 0} + {"smt" : "YES"} + 
                         {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + {"status": "SUCCESS"} + .' > tmp.json                        
@@ -223,11 +242,11 @@ for d in ${domain[@]}; do
             else
                 echo "{\"status\" : \"CRASH\"}" > out.json
                 cat out.json | \
-                    jq --arg UNKNOWN "$unknown" \
-                       --arg UNSOUND "$unsound" \
-                       --arg DOM "$d" \
-                       --arg CONSTS "$c" \
-                       --arg SAMPLES "$s" \
+                    jq --argjson UNKNOWN "0" \
+                       --argjson UNSOUND "0" \
+                       --argjson DOM "$d" \
+                       --argjson CONSTS "$c" \
+                       --argjson SAMPLES "$s" \
                        '{"domain": $DOM} + {"num_consts": $CONSTS} + {"samples": $SAMPLES} +
                         {"fuzz": 0} + {"smt" : "YES"} + 
                         {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + .' > tmp.json                        
