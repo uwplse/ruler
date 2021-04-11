@@ -239,6 +239,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
+
         let mut runner = Runner::default()
             .with_node_limit(usize::MAX)
             .with_hook(move |r| {
@@ -266,15 +267,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 Ok(())
             })
         } else {
-            runner.with_egraph(egraph).with_hook(|r| {
-                for c in r.egraph.classes_mut() {
-                    if c.nodes.iter().any(|n| n.is_constant()) {
-                        c.nodes.retain(|n| n.is_constant());
-                    }
-                }
-                Ok(())
-            })
-            // runner.with_egraph(egraph)
+            runner.with_egraph(egraph)
         };
         runner
     }
@@ -427,6 +420,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
             let mut layer = L::make_layer(&self, iter);
+
             layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
 
             if iter > self.params.no_constants_above_iter {
@@ -521,13 +515,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     // TODO check formatting for Learned...
                     log::info!("Time taken in... run_rewrites: {}, rule discovery: {}, rule minimization: {}",
                     run_rewrites,  rule_discovery, rule_minimize);
+                    // For the no-conditional case which returns
+                    // a non-empty list of ids that have the same cvec,
+                    // won't this cause eclasses to merge even if the rule is actually not valid?
                     if self.params.minimize || n_eqs < self.params.rules_to_take {
-                        for ids in id_groups {
-                            for win in ids.windows(2) {
-                                self.egraph.union(win[0], win[1]);
-                            }
-                        }
-                        self.egraph.rebuild();
+                        // for ids in id_groups {
+                        //     for win in ids.windows(2) {
+                        //         self.egraph.union(win[0], win[1]);
+                        //     }
+                        // }
+                        // self.egraph.rebuild();
 
                         log::info!("Stopping early, took all eqs");
                         break 'inner;
@@ -538,15 +535,29 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.equalities.len();
-        let mut eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
+        let mut eqs: Vec<_> = self
+            .equalities
+            .clone()
+            .into_iter()
+            .map(|(_, eq)| eq)
+            .collect();
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
+
+        // final run_rewrites
+        if self.params.do_final_run {
+            let old = std::mem::replace(&mut self.params.no_conditionals, false);
+            let rws = self.equalities.values().flat_map(|eq| &eq.rewrites);
+            let final_runner = self.mk_runner(self.egraph.clone());
+            final_runner.run(rws);
+            self.params.no_conditionals = old;
+        }
+
         println!("Learned {} rules in {:?}", num_rules, time);
         for eq in &eqs {
             println!("  {:?}   {}", eq.score(), eq);
         }
         println!("Learned {} rules in {:?}", num_rules, time);
-
         Report {
             params: self.params,
             time,
@@ -650,6 +661,9 @@ pub struct SynthParams {
     pub num_fuzz: usize,
     #[clap(long, conflicts_with = "num-fuzz")]
     pub use_smt: bool,
+    // for final round of run_rewrites
+    #[clap(long)]
+    pub do_final_run: bool,
 }
 
 #[derive(Clap)]

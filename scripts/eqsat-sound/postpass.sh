@@ -188,8 +188,8 @@ if [ $DOMAIN == "rational" ]; then
     done < to-check.txt
 elif [ $DOMAIN = "4" ] || [ $DOMAIN = "8" ] || [ $DOMAIN = "16" ] || [ $DOMAIN = "32" ]; then
     # | => ||, racket doesn't like |
-    sed 's/|/||/g' $RULES > tmp.json
-    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmp.json > to-check.txt
+    sed 's/|/||/g' $RULES > tmpf.json
+    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmpf.json > to-check.txt
     while read p; do
       echo "$bv" > verify-bv.rkt
       echo "$p" >> verify-bv.rkt
@@ -206,10 +206,10 @@ elif [ $DOMAIN = "4" ] || [ $DOMAIN = "8" ] || [ $DOMAIN = "16" ] || [ $DOMAIN =
           fi
       fi
     done < to-check.txt 
-    rm tmp.json
+    rm tmpf.json
 else
-    echo "$2 is a bad domain"
+    echo "$2 is a bad domain" >&2
     exit 1
 fi
 
-echo "{\"unsound\": $UNSOUND, \"unknown\": $UNKNOWN}"
+echo "{\"unsound\": $UNSOUND, \"unknown\": $UNKNOWN}" > post_pass.json
