@@ -237,7 +237,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph.classes().map(|c| c.id)
     }
 
-    fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>, is_final: bool) -> Runner<L, SynthAnalysis, ()> {
+    fn mk_runner(
+        &self,
+        mut egraph: EGraph<L, SynthAnalysis>,
+        is_final: bool,
+    ) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
 
         let mut runner = Runner::default()
@@ -535,7 +539,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.equalities.len();
-        let mut eqs: Vec<_> = self.equalities.clone().into_iter().map(|(_, eq)| eq).collect();
+        let mut eqs: Vec<_> = self
+            .equalities
+            .clone()
+            .into_iter()
+            .map(|(_, eq)| eq)
+            .collect();
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
 
