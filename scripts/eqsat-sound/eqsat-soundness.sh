@@ -141,15 +141,15 @@ for d in ${domain[@]}; do
                         --variables "$vs" \
                         --no-conditionals \
                         --num-fuzz "$n" \
-                        --important-cvec-offsets "$default_num_const" \
-                        --n-samples "$samples"
+                        --important-cvec-offsets "$c" \
+                        --n-samples "$s"
                 else
                     cargo run --bin "$d" --release -- synth \
                         --iters "$is" \
                         --variables "$vs" \
                         --num-fuzz "$n" \
-                        --important-cvec-offsets "$default_num_const" \
-                        --n-samples "$samples"
+                        --important-cvec-offsets "$c" \
+                        --n-samples "$s"
                 fi
                 if [ -s out.json ]; then
                     post=$("$MYDIR"/postpass.sh out.json $d)
@@ -195,15 +195,15 @@ for d in ${domain[@]}; do
                     --variables "$vs" \
                     --no-conditionals \
                     --use-smt \
-                    --important-cvec-offsets "$default_num_const" \
-                    --n-samples "$samples"
+                    --important-cvec-offsets "$c" \
+                    --n-samples "$s"
             else
                 cargo run --bin "$d" --release -- synth \
                     --iters "$is" \
                     --variables "$vs" \
                     --use-smt \
-                    --important-cvec-offsets "$default_num_const" \
-                    --n-samples "$samples"
+                    --important-cvec-offsets "$c" \
+                    --n-samples "$s"
             fi
             if [ -s out.json ]; then
                 post=$("$MYDIR"/postpass.sh out.json $d)
