@@ -132,7 +132,7 @@ for d in ${domain[@]}; do
     for c in ${default_num_const[@]}; do
         for s in ${samples[@]}; do
             for n in ${numfuzz[@]}; do
-                def="$DIR/$d-const-$default_num_const-sample-$samples-fuzz-$n"
+                def="$DIR/$d-const-$c-sample-$s-fuzz-$n"
                 mkdir -p "$def"
                 pushd "$def"
                 if [ "$d" = "4" ] || [ "$d" = "32" ]; then
@@ -186,7 +186,7 @@ for d in ${domain[@]}; do
             done
 
             # smt validation with cvecs made by cross prod of default_num_const important numbers and samples
-            defs="$DIR/$d-const-$default_num_const-sample-$samples-smt"
+            defs="$DIR/$d-const-$c-sample-$s-smt"
             mkdir -p "$defs"
             pushd "$defs"
             if [ "$d" = "4" ] || [ "$d" = "32" ]; then
