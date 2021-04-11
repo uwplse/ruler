@@ -45,12 +45,8 @@ bv="#lang rosette
 
 (define failed
   (let ([fnm \"failed-validation.txt\"])
-  (if (file-exists? fnm)
-    (begin
-      (delete-file fnm)
-      (open-output-file fnm))
-    (open-output-file fnm))
-  ))
+  (open-output-file #:exists'append fnm)))
+
 
 (define (<=> l r)
   (define sol (verify (assert (eq? l r))))
@@ -84,12 +80,7 @@ rational="#lang rosette
 
 (define failed
   (let ([fnm \"failed-validation.txt\"])
-    (if (file-exists? fnm)
-        (begin
-          (delete-file fnm)
-          (open-output-file fnm))
-        (open-output-file fnm))
-    ))
+  (open-output-file #:exists'append fnm)))
 
 (define num_unsound 0)
 (provide (all-defined-out))
