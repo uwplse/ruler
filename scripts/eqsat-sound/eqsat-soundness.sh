@@ -44,13 +44,15 @@ for d in ${domain[@]}; do
                     --variables "$vs" \
                     --important-cvec-offsets "$c" \
                     --no-conditionals \
-                    --num-fuzz "$n"
+                    --num-fuzz "$n" \
+                    --do-final-run
            else
                cargo run --bin "$d" --release -- synth \
                     --iters "$is" \
                     --variables "$vs" \
                     --important-cvec-offsets "$c" \
-                    --num-fuzz "$n"
+                    --num-fuzz "$n" \
+                    --do-final-run
            fi
            if [ -s out.json ]; then
                "$MYDIR"/postpass.sh out.json "$d"
@@ -96,13 +98,15 @@ for d in ${domain[@]}; do
                 --variables "$vs" \
                 --important-cvec-offsets "$c" \
                 --no-conditionals \
-                --use-smt
+                --use-smt \
+                --do-final-run
        else
            cargo run --bin "$d" --release -- synth \
                 --iters "$is" \
                 --variables "$vs" \
                 --important-cvec-offsets "$c" \
-                --use-smt
+                --use-smt \
+                --do-final-run
        fi
        # this should always be 0 for sure since the rules are already smt validated.
        if [ -s out.json ]; then
@@ -155,14 +159,16 @@ for d in ${domain[@]}; do
                         --no-conditionals \
                         --num-fuzz "$n" \
                         --important-cvec-offsets "$c" \
-                        --n-samples "$s"
+                        --n-samples "$s" \
+                        --do-final-run
                 else
                     cargo run --bin "$d" --release -- synth \
                         --iters "$is" \
                         --variables "$vs" \
                         --num-fuzz "$n" \
                         --important-cvec-offsets "$c" \
-                        --n-samples "$s"
+                        --n-samples "$s" \
+                        --do-final-run
                 fi
                 if [ -s out.json ]; then
                     "$MYDIR"/postpass.sh out.json "$d"
@@ -212,14 +218,16 @@ for d in ${domain[@]}; do
                     --no-conditionals \
                     --use-smt \
                     --important-cvec-offsets "$c" \
-                    --n-samples "$s"
+                    --n-samples "$s" \
+                    --do-final-run
             else
                 cargo run --bin "$d" --release -- synth \
                     --iters "$is" \
                     --variables "$vs" \
                     --use-smt \
                     --important-cvec-offsets "$c" \
-                    --n-samples "$s"
+                    --n-samples "$s" \
+                    --do-final-run
             fi
             if [ -s out.json ]; then
                 "$MYDIR"/postpass.sh out.json "$d"
