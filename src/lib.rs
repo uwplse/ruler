@@ -237,8 +237,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph.classes().map(|c| c.id)
     }
 
-    fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
+    fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>, is_final: bool) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
+
         let mut runner = Runner::default()
             .with_node_limit(usize::MAX)
             .with_hook(move |r| {
@@ -252,7 +253,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .with_iter_limit(self.params.eqsat_iter_limit)
             .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
-        runner = if self.params.no_conditionals {
+        runner = if self.params.no_conditionals && !is_final {
             egraph.analysis.cvec_len = 0;
             for c in egraph.classes_mut() {
                 c.data.cvec.truncate(0);
@@ -266,15 +267,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 Ok(())
             })
         } else {
-            runner.with_egraph(egraph).with_hook(|r| {
-                for c in r.egraph.classes_mut() {
-                    if c.nodes.iter().any(|n| n.is_constant()) {
-                        c.nodes.retain(|n| n.is_constant());
-                    }
-                }
-                Ok(())
-            })
-            // runner.with_egraph(egraph)
+            runner.with_egraph(egraph)
         };
         runner
     }
@@ -286,7 +279,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let start = Instant::now();
         let rewrites = self.equalities.values().flat_map(|eq| &eq.rewrites);
 
-        let mut runner = self.mk_runner(self.egraph.clone());
+        let mut runner = self.mk_runner(self.egraph.clone(), false);
         runner = runner.run(rewrites);
 
         log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
@@ -427,6 +420,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
             let mut layer = L::make_layer(&self, iter);
+
             layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
 
             if iter > self.params.no_constants_above_iter {
@@ -521,6 +515,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     // TODO check formatting for Learned...
                     log::info!("Time taken in... run_rewrites: {}, rule discovery: {}, rule minimization: {}",
                     run_rewrites,  rule_discovery, rule_minimize);
+                    // For the no-conditional case which returns
+                    // a non-empty list of ids that have the same cvec,
+                    // won't this cause eclasses to merge even if the rule is actually not valid?
                     if self.params.minimize || n_eqs < self.params.rules_to_take {
                         for ids in id_groups {
                             for win in ids.windows(2) {
@@ -538,15 +535,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.equalities.len();
-        let mut eqs: Vec<_> = self.equalities.into_iter().map(|(_, eq)| eq).collect();
+        let mut eqs: Vec<_> = self.equalities.clone().into_iter().map(|(_, eq)| eq).collect();
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
+
+        // final run_rewrites
+        let rws = self.equalities.values().flat_map(|eq| &eq.rewrites);
+        let final_runner = self.mk_runner(self.egraph.clone(), true);
+        final_runner.run(rws);
+
         println!("Learned {} rules in {:?}", num_rules, time);
         for eq in &eqs {
             println!("  {:?}   {}", eq.score(), eq);
         }
         println!("Learned {} rules in {:?}", num_rules, time);
-
         Report {
             params: self.params,
             time,
@@ -834,7 +836,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 .flat_map(|eq| &eq.rewrites)
                 .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
-            let mut runner = self.mk_runner(self.initial_egraph.clone());
+            let mut runner = self.mk_runner(self.initial_egraph.clone(), false);
             for candidate_eq in new_eqs.values() {
                 runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));
                 runner = runner.with_expr(&L::instantiate(&candidate_eq.rhs));
@@ -956,7 +958,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 rewrites.sort_by_key(|rw| rw.name());
                 rewrites.dedup_by_key(|rw| rw.name());
 
-                let mut runner = self.mk_runner(self.initial_egraph.clone());
+                let mut runner = self.mk_runner(self.initial_egraph.clone(), false);
 
                 for candidate_eq in &test {
                     runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));
