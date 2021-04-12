@@ -644,7 +644,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "1")]
     pub str_int_variables: usize,
     /// Only for bv, makes it do a complete cvec
-    #[clap(long, conflicts_with = "important_cvec_offsets")]
+    #[clap(long, conflicts_with = "important-cvec-offsets")]
     pub complete_cvec: bool,
     /// Only for bool/bv
     #[clap(long)]
