@@ -64,9 +64,11 @@ mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 echo "Running orat..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo run --bin $DOMAIN --release -- synth  \
+  (time cargo $DOMAIN  \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
+  --do-final-run \
+  --use-smt \
   --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
 done
 
@@ -75,9 +77,11 @@ for r in 5 10 15 25 50 100
 do
     for (( i=0; i<$NUM_RUNS; i++ ))
     do
-        (time cargo run --bin $DOMAIN --release -- synth \
+        (time cargo $DOMAIN \
         --variables $NUM_VARIABLES \
         --iters $NUM_ITERS \
+        --do-final-run \
+        --use-smt \
         --rules-to-take $r) &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log" 
     done
 done
@@ -85,10 +89,11 @@ done
 echo "Running phase-times..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo run --bin $DOMAIN --release -- synth \
+  (time cargo $DOMAIN \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
-  --use-smt ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  --do-final-run \
+  --use-smt) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
@@ -96,9 +101,10 @@ done
 echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo run --bin $DOMAIN --release -- synth \
+  (time cargo $DOMAIN \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
+  --do-final-run \
   --use-smt \
   --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
 done
