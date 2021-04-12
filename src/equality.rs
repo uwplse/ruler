@@ -82,18 +82,31 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         }
         let ids = self.rhs.apply_one(egraph, matched_id, subst);
         assert_eq!(ids.len(), 1);
-        if !egraph[ids[0]].data.is_defined() {
+        let id = ids[0];
+        if !egraph[id].data.is_defined() {
             return vec![];
         }
 
-        for (a, b) in egraph[matched_id]
+        for (i, (a, b)) in egraph[matched_id]
             .data
             .cvec
             .iter()
-            .zip(&egraph[ids[0]].data.cvec)
+            .zip(&egraph[id].data.cvec)
+            .enumerate()
         {
             match (a, b) {
-                (Some(a), Some(b)) => assert_eq!(a, b, "bad rule {}", self.name),
+                (Some(a), Some(b)) if a != b => {
+                    for class in egraph.classes() {
+                        if let Some(var) = class.nodes.iter().find_map(|n| n.to_var()) {
+                            if let Some(Some(val)) = class.data.cvec.get(i).as_ref() {
+                                eprintln!("  {} = {}", var, val);
+                            } else {
+                                eprintln!("  {} = none", var);
+                            }
+                        }
+                    }
+                    assert_eq!(a, b, "bad rule {}", self.name)
+                }
                 _ => (),
             }
         }
