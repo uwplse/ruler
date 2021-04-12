@@ -41,7 +41,7 @@ def to_table(filename):
 
 
         # how many columns do we need? fuzz + smt + domain (fuzz includes smt)
-        cols = num_fuzz + 1
+        cols = num_fuzz + 2
         cs = "|" + ("c|" * cols)
 
         table_tex = ""
@@ -49,7 +49,9 @@ def to_table(filename):
         table_tex += "\\hline\n"
 
         # add headers
-        headers = ["cvec"] + (list(set([x["fuzz"] for x in entries])))
+        fuzzes = list(set([x["fuzz"] for x in entries]))
+        fuzzes.remove(0) # setting we used for SMT
+        headers = ["cvec"] + fuzzes + ["SMT"]
         table_tex += " & ".join([str(x) for x in headers])
         table_tex += "\n \\\\ \\hline\n"
 
@@ -62,6 +64,7 @@ def to_table(filename):
 
             for row in rows: 
                 for entry in loe:
+                    print(len(loe))
                     table_tex += " & "
                     table_tex += str(entry[row])
                 table_tex += " \\\\"
