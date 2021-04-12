@@ -3471,6 +3471,6 @@
 (define-fun f ((r (_ BitVec 4)) (s (_ BitVec 4)) (t (_ BitVec 4))) (_ BitVec 4) (bvlshr (bvadd #b0111 #b0111) t))
 (define-fun f ((r (_ BitVec 4)) (s (_ BitVec 4)) (t (_ BitVec 4))) (_ BitVec 4) (bvshl (bvadd #b0111 #b0111) t))
 (error "Maximum term size (2) for enumerative SyGuS exceeded.")
-real 24.11
-user 23.90
-sys 0.12
+real 25.78
+user 25.64
+sys 0.09
