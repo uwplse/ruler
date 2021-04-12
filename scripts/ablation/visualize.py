@@ -8,8 +8,9 @@ from random import randint, uniform
 
 
 data = json.load(open("output/parsed.json"))
-bool_data = list(filter(lambda x: x['domain'] == "bool", data))
-bv4ns_data = list(filter(lambda x: x['domain'] == "bv4ns", data))
+bv4_data = list(filter(lambda x: x['domain'] == "bv4", data))
+bv32_data = list(filter(lambda x: x['domain'] == "bv32", data))
+rat_data = list(filter(lambda x: x['domain'] == "rational", data))
 # print(bool_data)
 def make_choose_eqs_time_rules_plot(domain, data, boxplot=False):
     make_choose_eqs_plot(domain, data, lambda x: x["learned"]["time"], lambda x: x["learned"]["rules"], boxplot)
@@ -335,11 +336,23 @@ def compare_run_rewrites(data):
     # plt.show()
     plt.savefig('output/run_rewrites.pdf')
 
-make_choose_eqs_time_rules_plot("Bool", bool_data, boxplot=True)
+make_choose_eqs_time_rules_plot("bv4", bv4_data, boxplot=True)
 # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-make_phase_time_plot(bool_data)
-compare_run_rewrites(bool_data)
-make_choose_eqs_line_plot(bool_data)
+make_phase_time_plot(bv4_data)
+compare_run_rewrites(bv4_data)
+make_choose_eqs_line_plot(bv4_data)
 
-compare_phase_times(data, ["bool"])
+make_choose_eqs_time_rules_plot("bv32", bv32_data, boxplot=True)
+# make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+make_phase_time_plot(bv32_data)
+compare_run_rewrites(bv32_data)
+make_choose_eqs_line_plot(bv32_data)
+
+make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=True)
+# make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+make_phase_time_plot(rat_data)
+compare_run_rewrites(rat_data)
+make_choose_eqs_line_plot(rat_data)
+
+compare_phase_times(data, ["bv4", "bv32", "rational"])
 # compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
