@@ -45,7 +45,7 @@ mkdir -p "$DIR"/results/"$tstamp"
 
 echo "Running Ruler"
 # run ruler and put rules in output directory
-cargo rational --iters 2 --variables 3 --important-cvec-offsets 2 --num-fuzz 1000 > $DIR/ruler-rules-"$tstamp".txt
+cargo rational --iters 2 --variables 3 --important-cvec-offsets 2 --num-fuzz 1000 --do-final-run > $DIR/ruler-rules-"$tstamp".txt
 
 # go to output directory
 pushd "$DIR"

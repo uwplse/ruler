@@ -461,7 +461,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                     let rule_discovery_before = Instant::now();
                     log::info!("cvec matching...");
-                    let (new_eqs, id_groups) = if self.params.no_conditionals {
+                    let (new_eqs, _) = if self.params.no_conditionals {
                         self.cvec_match()
                     } else {
                         (self.cvec_match_pair_wise(), vec![])

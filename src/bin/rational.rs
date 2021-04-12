@@ -4,6 +4,7 @@ use ruler::*;
 use num::bigint::{BigInt, BigUint, RandBigInt, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive, Zero};
 use rand_pcg::Pcg64;
+use rand::Rng;
 use z3::ast::Ast;
 use z3::*;
 
@@ -128,16 +129,21 @@ impl SynthLanguage for Math {
         // add the necessary random values, if any
         for row in consts.iter_mut() {
             let n_samples = synth.params.n_samples;
-            let vals: Vec<Option<Constant>> = (0..n_samples)
-                .map(|_| mk_constant(&synth.rng.gen_bigint(32), &gen_denom(&mut synth.rng, 32)))
-                .collect();
+            let svals: Vec<Constant> = sampler(&mut synth.rng, 8, 6, n_samples);
+            let mut vals: Vec<Option<Constant>> = vec![];
+            for v in svals {
+                vals.push(Some(v));
+            }
+            // let vals: Vec<Option<Constant>> = (0..n_samples)
+            //     .map(|_| mk_constant(&synth.rng.gen_bigint(32), &gen_denom(&mut synth.rng, 32)))
+            //     .collect();
             row.extend(vals);
         }
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: consts[0].len(),
         });
-
+        
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
@@ -215,11 +221,14 @@ impl SynthLanguage for Math {
 
             for cvec in env.values_mut() {
                 cvec.reserve(n);
-                for _ in 0..n {
-                    let numer = synth.rng.gen_bigint(32);
-                    let denom = gen_denom(&mut synth.rng, 32);
-                    cvec.push(Some(Ratio::new(numer, denom)));
+                for s in sampler(&mut synth.rng, 8, 6, n) {
+                    cvec.push(Some(s));
                 }
+                // for _ in 0..n {
+                //     let numer = synth.rng.gen_bigint(32);
+                //     let denom = gen_denom(&mut synth.rng, 32);
+                //     cvec.push(Some(Ratio::new(numer, denom)));
+                // }
             }
 
             let lvec = Self::eval_pattern(lhs, &env, n);
@@ -230,9 +239,9 @@ impl SynthLanguage for Math {
     }
 }
 
-// randomly sample denoms so that they are not 0
+// randomly sample so that they are not 0
 // Ratio::new will panic if the denom is 0
-pub fn gen_denom(rng: &mut Pcg64, bits: u64) -> BigInt {
+pub fn gen_pos(rng: &mut Pcg64, bits: u64) -> BigInt {
     let mut res: BigInt;
     loop {
         res = rng.gen_bigint(bits);
@@ -241,6 +250,21 @@ pub fn gen_denom(rng: &mut Pcg64, bits: u64) -> BigInt {
         }
     }
     res
+}
+
+pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Ratio<BigInt>> {
+    let mut ret = vec![];
+    for _ in 0..num_samples {
+        let big = gen_pos(rng, b1);
+        let small = gen_pos(rng, b2);
+        let flip = rng.gen::<bool>();
+        if flip {
+            ret.push(Ratio::new(big, small));
+        } else {
+            ret.push(Ratio::new(small, big))
+        }
+    }
+    ret
 }
 
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
