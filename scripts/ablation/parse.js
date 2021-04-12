@@ -7,17 +7,15 @@ let load_files = (base_folder, output_path) => {
     // check if slash, add if none
 
     let phase_time = "phase-times";
-    let minimize = "minimize";
     let orat = "orat";
     let mrat = "mrat";
     let no_run_rewrites = "no-run-rewrites";
 
     load_dir(base_folder + phase_time, "phase-times",
-        () => load_dir(base_folder + minimize, "minimize",
-            () => load_dir(base_folder + orat, "orat",
-                () => load_dir(base_folder + mrat, "mrat",
-                    () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
-                        () => print_data(data))))));
+        () => load_dir(base_folder + orat, "orat",
+            () => load_dir(base_folder + mrat, "mrat",
+                () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
+                    () => print_data(data)))));
 }
 
 // I should really just make promises... but whatever

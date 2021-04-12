@@ -12,8 +12,8 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
 TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
 
-"$MYDIR/run_ruler.sh" -d bool -o "$MYDIR/output/$TIMESTAMP" -v 1 -i 2 -r 2
-# "$MYDIR/run_ruler.sh" -d bv4ns -o "$MYDIR/output/$TIMESTAMP"
-# "$MYDIR/run_ruler.sh" -d rational -o "$MYDIR/output/$TIMESTAMP"
+"$MYDIR/run_ruler.sh" -d bv4 -o "$MYDIR/output/$TIMESTAMP"
+"$MYDIR/run_ruler.sh" -d bv32 -o "$MYDIR/output/$TIMESTAMP"
+"$MYDIR/run_ruler.sh" -d rational -o "$MYDIR/output/$TIMESTAMP"
 node parse.js "$MYDIR/output/$TIMESTAMP/"
 python visualize.py

@@ -57,14 +57,13 @@ fi
 
 mkdir -p "$OUTPUT_DIR/mrat";
 mkdir -p "$OUTPUT_DIR/orat";
-mkdir -p "$OUTPUT_DIR/minimize";
 mkdir -p "$OUTPUT_DIR/phase-times";
 mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
 echo "Running orat..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo $DOMAIN \
+  (time cargo run --bin $DOMAIN --release -- synth  \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
   --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
@@ -75,31 +74,26 @@ for r in 5 10 15 25 50 100
 do
     for (( i=0; i<$NUM_RUNS; i++ ))
     do
-        (time cargo $DOMAIN \
+        (time cargo run --bin $DOMAIN --release -- synth \
         --variables $NUM_VARIABLES \
         --iters $NUM_ITERS \
         --rules-to-take $r) &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log" 
     done
 done
 
-echo "Running minimize and phase-times..."
+echo "Running phase-times..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo $DOMAIN \
+  (time cargo run --bin $DOMAIN --release -- synth \
   --variables $NUM_VARIABLES \
-  --iters $NUM_ITERS \
-  --minimize) &> "$OUTPUT_DIR/minimize/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
-  # it's the same but save it in a different location
-  cp "$OUTPUT_DIR/minimize/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
-  "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
+  --iters $NUM_ITERS ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
 
 echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo $DOMAIN \
+  (time cargo run --bin $DOMAIN --release -- synth \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
-  --minimize \
   --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
 done
