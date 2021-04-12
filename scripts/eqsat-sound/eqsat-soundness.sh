@@ -16,12 +16,20 @@ mkdir -p "$DIR"
 is=2
 vs=3
 
-domain=("4" "32" "less-const" "rational")
-numfuzz=("0" "100" "1000" "10000" "smt")
-consts=("1" "2" "3" "5")
+domain=("less-const")
+numfuzz=("smt")
+consts=("5")
 # actual lengths of the cvecs, used for the sampling configs
-bv_cvec=("27" "343" "1331" "6859")
-rat_cvec=("1" "27" "125" "729")
+bv_cvec=()
+rat_cvec=("729")
+
+
+# domain=("less-const" "rational")
+# numfuzz=("100" "smt")
+# consts=("2" "5")
+# # actual lengths of the cvecs, used for the sampling configs
+# bv_cvec=("343" "6859")
+# rat_cvec=("27" "729")
 
 
 # domain cvec-offset fuzz
@@ -75,12 +83,13 @@ function run_bv_const () {
 
 # domain samples fuzz
 function run_bv_sampled () {
-    if [ "$3" -eq "smt" ]; then
+    if [ "$3" = "smt" ]; then
         if [ "$1" = "4" ] || [ "$1" = "32" ]; then
             cargo run --bin bv"$1" --release -- synth \
                  --iters "$is" \
                  --variables "$vs" \
                  --n-samples "$2" \
+                 --important-cvec-offsets 0 \
                  --no-conditionals \
                  --use-smt \
                  --do-final-run
@@ -90,6 +99,7 @@ function run_bv_sampled () {
                  --iters "$is" \
                  --variables "$vs" \
                  --n-samples "$2" \
+                 --important-cvec-offsets 0 \
                  --no-conditionals \
                  --use-smt \
                  --no-constants-above-iter 1 \
@@ -103,6 +113,7 @@ function run_bv_sampled () {
                 --iters "$is" \
                 --variables "$vs" \
                 --n-samples "$2" \
+                --important-cvec-offsets 0 \
                 --no-conditionals \
                 --num-fuzz "$3" \
                 --do-final-run
@@ -112,6 +123,7 @@ function run_bv_sampled () {
                 --iters "$is" \
                 --variables "$vs" \
                 --n-samples "$2" \
+                --important-cvec-offsets 0 \
                 --no-conditionals \
                 --num-fuzz "$3" \
                 --no-constants-above-iter 1 \
@@ -148,6 +160,7 @@ function run_rats_sampled () {
         --iters "$is" \
         --variables "$vs" \
         --n-samples "$1" \
+        --important-cvec-offsets 0 \
         --use-smt \
         --do-final-run
     else
@@ -155,6 +168,7 @@ function run_rats_sampled () {
         --iters "$is" \
         --variables "$vs" \
         --n-samples "$1" \
+        --important-cvec-offsets 0 \
         --num-fuzz "$2" \
         --do-final-run
     fi
@@ -171,13 +185,19 @@ function mk_report () {
         "$MYDIR"/postpass.sh "$1/out.json" "$DM"
         unknown=$(cat post_pass.json | jq '.unknown')
         unsound=$(cat post_pass.json | jq '.unsound')
+        echo "$unknown"
+        echo "$unsound"
+        echo "$DM"
+        echo "$3"
+        echo "$4"
+        echo "$5"
         cat "$1/out.json" | \
              jq --argjson UNKNOWN "$unknown" \
                 --argjson UNSOUND "$unsound" \
                 --argjson DOM "$DM" \
                 --argjson CONSTS "$3" \
                 --argjson SAMPLES "$4" \
-                --argjson FUZZ "$5" \
+                --arg FUZZ "$5" \
              '{"domain": $DOM} + {"num_consts": $CONSTS} +
               {"samples": $SAMPLES} + {"fuzz": $FUZZ} +
               {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + {"status": "SUCCESS"} + .' > "$1/tmp.json"
@@ -191,7 +211,7 @@ function mk_report () {
                 --argjson DOM "$DM" \
                 --argjson CONSTS "$3" \
                 --argjson SAMPLES "$4" \
-                --argjson FUZZ "$5" \
+                --arg FUZZ "$5" \
              '{"domain": $DOM} + {"num_consts": $CONSTS} +
               {"samples": $SAMPLES} + {"fuzz": $FUZZ} +
               {"unsound": $UNSOUND} + {"unknown": $UNKNOWN} + .' > "$1/tmp.json" 
@@ -200,6 +220,7 @@ function mk_report () {
     fi
 }
 
+# const based cvec
 for d in ${domain[@]}; do
     for n in ${numfuzz[@]}; do
         for c in ${consts[@]}; do
@@ -217,6 +238,7 @@ for d in ${domain[@]}; do
     done
 done
 
+# sampling based cvec
 for d in ${domain[@]}; do
     if [ "$d" = "4" ] ||  [ "$d" = "32" ] ||  [ "$d" = "less-const" ]; then 
         for s in ${bv_cvec[@]}; do
