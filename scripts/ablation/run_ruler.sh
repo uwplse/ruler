@@ -87,7 +87,8 @@ for (( i=0; i<$NUM_RUNS; i++ ))
 do
   (time cargo run --bin $DOMAIN --release -- synth \
   --variables $NUM_VARIABLES \
-  --iters $NUM_ITERS ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  --iters $NUM_ITERS \
+  --use-smt ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
@@ -98,5 +99,6 @@ do
   (time cargo run --bin $DOMAIN --release -- synth \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
+  --use-smt \
   --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
 done
