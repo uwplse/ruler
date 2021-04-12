@@ -15,6 +15,7 @@ cvc4=cvc4 \
   --sygus-rr-synth-filter-cong  \
   --sygus-rr-synth-filter-match \
   --sygus-rr-synth-filter-order \
+  --sygus-expr-miner-check-timeout=1000 \
   --strings-exp
 
 ruler-reports=
@@ -22,14 +23,13 @@ cvc4-logs=
 cvc4-reports=
 diffs=
 
-RAYON_NUM_THREADS=10
+export RAYON_NUM_THREADS ?= 10
 
 define synthesize # (domain, variables, iters, rules-to-take)
 ruler-reports += results/ruler/$(1)-$(2)vars-$(3)iters.json
 results/ruler/$(1)-$(2)vars-$(3)iters.json: # $(rust-src)
 	mkdir -p results/ruler
 	cargo $(1) --variables $(2) --iters $(3) --rules-to-take $(4) --outfile $$@
-	# cargo $(1) --variables $(2) --iters $(3) --minimize --outfile $$@
 
 cvc4-logs += results/cvc4/$(1)-$(2)vars-$(3)iters.txt
 results/cvc4/$(1)-$(2)vars-$(3)iters.txt: cvc4/$(1)-$(2)vars.sy
@@ -47,29 +47,49 @@ results/diffs/$(1)-$(2)vars-$(3)iters.json: results/ruler/$(1)-$(2)vars-$(3)iter
 	cargo derive-$(1) $$^ $$@
 endef
 
+define synthesize-no-consts # (domain, variables, iters, rules-to-take)
+ruler-no-consts-reports += results/ruler/$(1)noconsts-$(2)vars-$(3)iters.json
+results/ruler/$(1)noconsts-$(2)vars-$(3)iters.json: # $(rust-src)
+	mkdir -p results/ruler
+	cargo $(1) --variables $(2) --iters $(3) --rules-to-take $(4) --no-constants-above-iter=1 --outfile $$@
+
+diffs-no-consts += results/diffs/$(1)noconsts-$(2)vars-$(3)iters.json
+results/diffs/$(1)noconsts-$(2)vars-$(3)iters.json: results/ruler/$(1)noconsts-$(2)vars-$(3)iters.json results/ruler/$(1)-$(2)vars-$(3)iters.json
+	mkdir -p results/diffs
+	cargo derive-$(1) $$^ $$@
+endef
+
 PRECIOUS: $(cvc4-logs) $(ruler-reports) $(diffs)
 
 # params: (domain, variables, iters, rules-to-take)
 # You can't have spaces between them
-$(eval $(call synthesize,bool,2,2,99999))
-# $(eval $(call synthesize,bool,2,3,99999))
-$(eval $(call synthesize,bool,3,2,99999))
-# $(eval $(call synthesize,bool,3,3,99999))
-# $(eval $(call synthesize,bool,4,2,99999))
-# $(eval $(call synthesize,bool,4,3,99999))
-# $(eval $(call synthesize,bool,4,4,99999))
+# $(eval $(call synthesize,bool,2,2,0))
+# $(eval $(call synthesize,bool,2,3,0))
+$(eval $(call synthesize,bool,3,2,0))
+$(eval $(call synthesize,bool,3,3,0))
+# $(eval $(call synthesize,bool,4,2,0))
+# $(eval $(call synthesize,bool,4,3,0))
+# $(eval $(call synthesize,bool,4,4,0))
 
-$(eval $(call synthesize,bv4,2,2,99999))
-# $(eval $(call synthesize,bv4,2,3,99999))
-$(eval $(call synthesize,bv4,3,2,99999))
-# $(eval $(call synthesize,bv4,3,3,99999))
+# $(eval $(call synthesize,bv4,2,2,0))
+# $(eval $(call synthesize,bv4,2,3,0))
+$(eval $(call synthesize,bv4,3,2,0))
+$(eval $(call synthesize,bv4,3,3,0))
 
-# $(eval $(call synthesize,bv4ns,2,2,99999))
-# $(eval $(call synthesize,bv4ns,2,3,99999))
-# $(eval $(call synthesize,bv4ns,3,2,99999))
-# $(eval $(call synthesize,bv4ns,3,3,99999))
+$(eval $(call synthesize-no-consts,bv4,3,2,0))
+$(eval $(call synthesize-no-consts,bv4,3,3,0))
+$(eval $(call synthesize-no-consts,bv32,3,2,0))
+$(eval $(call synthesize-no-consts,bv32,3,3,0))
 
-# $(eval $(call synthesize,str,3,2,99999))
+$(eval $(call synthesize,bv32,3,2,0))
+$(eval $(call synthesize,bv32,3,3,0))
+
+# $(eval $(call synthesize,bv4ns,2,2,0))
+# $(eval $(call synthesize,bv4ns,2,3,0))
+# $(eval $(call synthesize,bv4ns,3,2,0))
+# $(eval $(call synthesize,bv4ns,3,3,0))
+
+# $(eval $(call synthesize,str,3,2,0))
 
 
 .PHONY: latex-report
@@ -78,6 +98,10 @@ latex-report: $(diffs)
 
 .PHONY: report
 report: $(diffs)
+	./scripts/compare.py $^ | xsv table
+
+.PHONY: report
+report-no-consts: $(diffs-no-consts)
 	./scripts/compare.py $^ | xsv table
 
 .PHONY: ruler-reports

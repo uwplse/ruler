@@ -250,6 +250,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     Ok(())
                 }
             })
+            .with_node_limit(self.params.eqsat_node_limit * 2)
             .with_iter_limit(self.params.eqsat_iter_limit)
             .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
@@ -519,13 +520,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     // a non-empty list of ids that have the same cvec,
                     // won't this cause eclasses to merge even if the rule is actually not valid?
                     if self.params.minimize || n_eqs < self.params.rules_to_take {
-                        // for ids in id_groups {
-                        //     for win in ids.windows(2) {
-                        //         self.egraph.union(win[0], win[1]);
-                        //     }
-                        // }
-                        // self.egraph.rebuild();
-
                         log::info!("Stopping early, took all eqs");
                         break 'inner;
                     }
@@ -672,7 +666,7 @@ pub struct DeriveParams {
     in1: String,
     in2: String,
     out: String,
-    #[clap(long, default_value = "5")]
+    #[clap(long, default_value = "4")]
     iter_limit: usize,
 }
 

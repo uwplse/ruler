@@ -104,6 +104,10 @@ impl<const N: u32> Distribution<BV<N>> for rand::distributions::Standard {
 impl<const N: u32> std::str::FromStr for BV<N> {
     type Err = std::num::ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("#b") {
+            let i = Inner::from_str_radix(&s[2..], 2).unwrap();
+            return Ok(Self::new(i));
+        }
         s.parse().map(|inner: Inner| Self::new(inner))
     }
 }
@@ -161,14 +165,10 @@ macro_rules! impl_bv {
                     .replace("bvnot", "~")
                     .replace("bvlshr", ">>")
                     .replace("bvshl", "<<")
-                    .replace("#b0000", "0")
-                    .replace("#b0111", "7")
-                    .replace("#b1000", "8")
                     .replace("and", "&")
                     .replace("xor", "^")
                     .replace("or", "|")
                     .replace("not", "~");
-                assert!(!s.contains('#'));
                 s.parse().unwrap()
             }
 

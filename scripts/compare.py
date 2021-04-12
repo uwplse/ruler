@@ -18,7 +18,7 @@ def make_same_row(diff):
     ruler_fname = diff['files'][0]
     assert('ruler' in ruler_fname)
     cvc_fname = diff['files'][1]
-    assert('cvc4' in cvc_fname)
+    # assert('cvc4' in cvc_fname)
     ruler = load_report(ruler_fname)
     cvc = load_report(cvc_fname)
 
