@@ -20,13 +20,13 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     for item in orat: 
         item['mrat_m'] = 1
     mrat = list(filter(lambda x: x['type'] == 'mrat', data))
-    minimize = list(filter(lambda x: x['type'] == 'minimize', data))
+    default_conf = list(filter(lambda x: x['type'] == 'default', data))
 
     x = list(map(lambda x: int(x['mrat_m']) , (orat + mrat)))
     x = list(set(x))
     x.sort()
     x = [str(d) for d in x]
-    x.append("min.")
+    x.append("def.")
 
     # average over each item, for each comparison
     orat_y_l= list(map(lambda x: float(compare(x)), orat))
@@ -34,9 +34,9 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     orat_y2 = list(map(lambda x: float(compare2(x)), orat))
     orat_y2 = sum(orat_y2) / len(orat_y2)
 
-    min_y_l = list(map(lambda x: float(compare(x)), minimize))
+    min_y_l = list(map(lambda x: float(compare(x)), default_conf))
     min_y = sum(min_y_l) / len(min_y_l)
-    min_y2 = list(map(lambda x: float(compare2(x)), minimize))
+    min_y2 = list(map(lambda x: float(compare2(x)), default_conf))
     min_y2 = sum(min_y2) / len(min_y2)
 
     # average mrat by each m
@@ -92,12 +92,12 @@ def make_choose_eqs_line_plot(data):
         item['mrat_m'] = 1
     
     mrat = list(filter(lambda x: x['type'] == 'mrat', data))
-    minimize = list(filter(lambda x: x['type'] == 'minimize', data))
+    default_conf = list(filter(lambda x: x['type'] == 'default', data))
 
     
     # Aggregate all values from the same iteration across runs
     orat_egraphs = aggregate_egraphs_list(list(map(lambda x: x["egraphs"], orat)))
-    minimize_egraphs = aggregate_egraphs_list(list(map(lambda x: x["egraphs"], minimize)))
+    default_conf_egraphs = aggregate_egraphs_list(list(map(lambda x: x["egraphs"], default_conf)))
     mrat.sort(key=lambda x: x["mrat_m"])
     mrat_egraphs_by_m = [list(v) for k,v in groupby(mrat, lambda x: x["mrat_m"])]
     mrat_egraphs_by_m = [dict([('m', lst[0]["mrat_m"]), \
@@ -128,8 +128,8 @@ def make_choose_eqs_line_plot(data):
         plt.scatter(list(range(0, len(data))), [selector(x) for x in data], color=(r, g, b, 1), label="mrat m=" + m["m"])
         plt.plot(list(range(0, len(data))), [selector(x) for x in data], color=(r, g, b, 1))
 
-    plt.scatter(list(range(0, len(minimize_egraphs))), [selector(x) for x in minimize_egraphs], color="gold", marker="*", s=20, label="minimize")
-    plt.plot(list(range(0, len(minimize_egraphs))), [selector(x) for x in minimize_egraphs], color="gold")
+    plt.scatter(list(range(0, len(default_conf_egraphs))), [selector(x) for x in default_conf_egraphs], color="gold", marker="*", s=20, label="default")
+    plt.plot(list(range(0, len(default_conf_egraphs))), [selector(x) for x in default_conf_egraphs], color="gold")
     
     # minimize.plot()
     fig.suptitle("Number of eclasses by iterations")
@@ -294,7 +294,7 @@ def compare_run_rewrites(data):
     y3 = lambda x: sum([int(d["e"]) for d in x["egraphs"]]) / len(x["egraphs"])
 
     run_rewrites = list(filter(lambda x: x['type'] == 'no-run-rewrites', data))
-    no_run_rewrites = list(filter(lambda x: x['type'] == 'minimize', data)) # regular data
+    no_run_rewrites = list(filter(lambda x: x['type'] == 'default', data)) # regular data
 
     x = ["No RR", "RR"]
     rr_y1 = list(map(lambda d: y1(d) , run_rewrites))

@@ -9,13 +9,15 @@ let load_files = (base_folder, output_path) => {
     let phase_time = "phase-times";
     let orat = "orat";
     let mrat = "mrat";
+    let default_conf = "default";
     let no_run_rewrites = "no-run-rewrites";
 
     load_dir(base_folder + phase_time, "phase-times",
-        () => load_dir(base_folder + orat, "orat",
-            () => load_dir(base_folder + mrat, "mrat",
-                () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
-                    () => print_data(data)))));
+        () => load_dir(base_folder + default_conf, "default",
+            () => load_dir(base_folder + orat, "orat",
+                () => load_dir(base_folder + mrat, "mrat",
+                    () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
+                        () => print_data(data))))));
 }
 
 // I should really just make promises... but whatever

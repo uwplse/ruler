@@ -57,6 +57,7 @@ fi
 
 mkdir -p "$OUTPUT_DIR/mrat";
 mkdir -p "$OUTPUT_DIR/orat";
+mkdir -p "$OUTPUT_DIR/default";
 mkdir -p "$OUTPUT_DIR/phase-times";
 mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
@@ -87,6 +88,8 @@ do
   (time cargo run --bin $DOMAIN --release -- synth \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
+        "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
 
 echo "Running no run-rewrites..."
