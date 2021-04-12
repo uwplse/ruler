@@ -12,7 +12,7 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 if [ -z "$1" ] || [ -z  "$2" ]; then
     echo "
     Rosette and z3 needed for this to work.
-    Usage: ./postpass.sh rulefile.json < rat | bool | 8 | 16 | 32 >
+    Usage: ./postpass.sh rulefile.json < rational | 8 | 16 | 32 >
     "
     exit 1
 else
@@ -45,12 +45,8 @@ bv="#lang rosette
 
 (define failed
   (let ([fnm \"failed-validation.txt\"])
-  (if (file-exists? fnm)
-    (begin
-      (delete-file fnm)
-      (open-output-file fnm))
-    (open-output-file fnm))
-  ))
+  (open-output-file #:exists'append fnm)))
+
 
 (define (<=> l r)
   (define sol (verify (assert (eq? l r))))
@@ -84,12 +80,7 @@ rational="#lang rosette
 
 (define failed
   (let ([fnm \"failed-validation.txt\"])
-    (if (file-exists? fnm)
-        (begin
-          (delete-file fnm)
-          (open-output-file fnm))
-        (open-output-file fnm))
-    ))
+  (open-output-file #:exists'append fnm)))
 
 (define num_unsound 0)
 (provide (all-defined-out))
@@ -173,25 +164,52 @@ rational="#lang rosette
   \`(assume (! (eq? ,d 0))))"
 
 squote="'"
-if [ $DOMAIN == 'rat' ]; then
-    echo "$rational" > verify-rat.rkt
+UNKNOWN=0
+UNSOUND=0
+TIMEOUT="3s"
+
+if [ $DOMAIN == "rational" ]; then
     jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
-        $RULES >> verify-rat.rkt
-    echo "(printf \"~a \n\" num_unsound)" >> verify-rat.rkt
-    echo "(close-output-port failed)" >> verify-rat.rkt
-    racket verify-rat.rkt
-elif [ $DOMAIN == '4' ] || [ $DOMAIN == '8' ] || [ $DOMAIN == '16' ] || [ $DOMAIN == '32' ]; then
+        $RULES > to-check.txt
+    while read p; do
+      echo "$rational" > verify-rat.rkt
+      echo "$p" >> verify-rat.rkt
+      echo "(printf \"~a \n\" num_unsound)" >> verify-rat.rkt
+      echo "(close-output-port failed)" >> verify-rat.rkt
+      res=$(timeout -k $TIMEOUT $TIMEOUT racket verify-rat.rkt)
+      if [ $? -ne 0 ]; then
+          ((UNKNOWN=UNKNOWN+1))
+          echo "Rosette timed out." >&2
+      else
+          if [ $res -eq 1 ]; then
+              ((UNSOUND=UNSOUND+1))
+          fi
+      fi
+    done < to-check.txt
+elif [ $DOMAIN = "4" ] || [ $DOMAIN = "8" ] || [ $DOMAIN = "16" ] || [ $DOMAIN = "32" ]; then
     # | => ||, racket doesn't like |
-    sed 's/|/||/g' $RULES > tmp.json
-    echo "$bv" > verify-bv.rkt
-    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmp.json >> verify-bv.rkt
-    echo ")"  >> verify-bv.rkt
-    echo "(close-output-port failed)" >> verify-bv.rkt
-    echo "(printf \"~a \n\" num_unsound)" >> verify-bv.rkt
-    racket verify-bv.rkt
-    rm tmp.json
+    sed 's/|/||/g' $RULES > tmpf.json
+    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmpf.json > to-check.txt
+    while read p; do
+      echo "$bv" > verify-bv.rkt
+      echo "$p" >> verify-bv.rkt
+      echo ")"  >> verify-bv.rkt
+      echo "(close-output-port failed)" >> verify-bv.rkt
+      echo "(printf \"~a \n\" num_unsound)" >> verify-bv.rkt
+      res="$(timeout -k $TIMEOUT $TIMEOUT racket verify-bv.rkt)"
+      if [ $? -ne 0 ]; then
+          ((UNKNOWN=UNKNOWN+1))
+          echo "Rosette timed out." >&2
+      else
+          if [ "$res" -eq 1 ]; then
+              ((UNSOUND=UNSOUND+1))
+          fi
+      fi
+    done < to-check.txt 
+    rm tmpf.json
 else
-    echo "$2 is a bad domain"
+    echo "$2 is a bad domain" >&2
     exit 1
 fi
 
+echo "{\"unsound\": $UNSOUND, \"unknown\": $UNKNOWN}" > post_pass.json
