@@ -16,21 +16,13 @@ mkdir -p "$DIR"
 is=2
 vs=3
 
-domain=("less-const")
-numfuzz=("smt")
-consts=("5")
+
+domain=("4" "32" "less-const" "rational")
+numfuzz=("0" "100" "1000" "10000" "smt")
+consts=("1" "2" "3" "5")
 # actual lengths of the cvecs, used for the sampling configs
-bv_cvec=()
-rat_cvec=("729")
-
-
-# domain=("less-const" "rational")
-# numfuzz=("100" "smt")
-# consts=("2" "5")
-# # actual lengths of the cvecs, used for the sampling configs
-# bv_cvec=("343" "6859")
-# rat_cvec=("27" "729")
-
+bv_cvec=("27" "343" "1331" "6859")
+rat_cvec=("1" "27" "125" "729")
 
 # domain cvec-offset fuzz
 function run_bv_const () {
