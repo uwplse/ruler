@@ -25,10 +25,13 @@ for out in $(find . -name 'out.json' | sort); do
     jq '{"domain": .domain,
          "num_consts": .num_consts,
          "samples": .samples,
-         "fuzz": .fuzz,
-         "smt": .smt,
-         "unsound": .unsound,
-         "unknown": .unknown,
+         "v_fuzz": .fuzz,
+         "v_smt": .smt,
+         "v_smt_uknown": .smt_unknown,
+         "time": .time,
+         "num_rules": .num_rules,
+         "post_unsound": .unsound,
+         "post_unknown": .unknown,
          "status": .status}' >> all.json
 done
 
