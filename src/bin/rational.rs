@@ -3,8 +3,8 @@ use ruler::*;
 
 use num::bigint::{BigInt, BigUint, RandBigInt, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive, Zero};
-use rand_pcg::Pcg64;
 use rand::Rng;
+use rand_pcg::Pcg64;
 use z3::ast::Ast;
 use z3::*;
 
@@ -143,7 +143,6 @@ impl SynthLanguage for Math {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: consts[0].len(),
         });
-        
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
