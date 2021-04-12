@@ -13,7 +13,7 @@ pub fn convert<L: SynthLanguage>(params: ConvertParams) {
 
     for line in reader.lines() {
         let line = line.unwrap();
-        if line.contains("rewrite") {
+        if line.contains("(rewrite") {
             if let Some(eq) = L::convert_eq(&line) {
                 report.eqs.push(eq);
             } else {
