@@ -197,12 +197,12 @@ impl SynthLanguage for Math {
             match solver.check() {
                 SatResult::Unsat => true,
                 SatResult::Sat => {
-                    println!("z3 validation: failed for {} => {}", lhs, rhs);
+                    // println!("z3 validation: failed for {} => {}", lhs, rhs);
                     false
                 }
                 SatResult::Unknown => {
                     synth.smt_unknown += 1;
-                    println!("z3 validation: unknown for {} => {}", lhs, rhs);
+                    // println!("z3 validation: unknown for {} => {}", lhs, rhs);
                     false
                 }
             }
@@ -269,7 +269,6 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
     let mut buf: Vec<z3::ast::Real> = vec![];
     let zero = z3::ast::Real::from_real(&ctx, 0, 1);
-    let t = z3::ast::Bool::from_bool(&ctx, true);
     for node in expr.as_ref().iter() {
         match node {
             Math::Var(v) => buf.push(z3::ast::Real::new_const(&ctx, v.to_string())),
@@ -296,11 +295,12 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
             )),
             Math::Neg(a) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)])),
             Math::Abs(a) => {
-                if z3::ast::Real::le(&buf[usize::from(*a)], &zero) == t {
-                    buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)]))
-                } else {
-                    buf.push(buf[usize::from(*a)].clone())
-                }
+                let inner = &buf[usize::from(*a)].clone();
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Real::le(inner, &zero),
+                    &z3::ast::Real::unary_minus(inner),
+                    &inner,
+                ));
             }
             _ => unimplemented!(),
         }

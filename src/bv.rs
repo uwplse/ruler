@@ -346,12 +346,12 @@ macro_rules! impl_bv {
                     match solver.check() {
                         SatResult::Unsat => true,
                         SatResult::Sat => {
-                            println!("z3 validation: failed for {} => {}", lhs, rhs);
+                            // println!("z3 validation: failed for {} => {}", lhs, rhs);
                             false
                         }
                         SatResult::Unknown => {
                             synth.smt_unknown += 1;
-                            println!("z3 validation: unknown for {} => {}", lhs, rhs);
+                            // println!("z3 validation: unknown for {} => {}", lhs, rhs);
                             false
                         }
                     }
