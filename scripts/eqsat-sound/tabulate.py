@@ -1,184 +1,117 @@
 import sys
 import json
-from itertools import groupby
 
-# NOTE: post_unknown and post_unsound are for postpass
-# NOTE: v_smt_unknown is for smt validation during Ruler
+def mk_table(domain, data):
+    const_values = sorted(list(set(d["num_consts"] for d in data)))
+    sample_values = sorted(list(set(d["samples"] for d in data)))
+    fuzz_values = sorted(list(set(d["v_fuzz"] for d in data)))
 
-#consts=[1, 2, 3, 5]
-bv_cvec = [27, 343, 1331, 6859]
-rat_cvec = [1, 27, 125, 729]
+    def get(c, s, f):
+        for d in data:
+            if d["num_consts"] == c and d["samples"] == s and d["v_fuzz"] == f:
+                return d
+        assert false
 
-def num_const_to_cvec (domain, c):
-    if (domain == "rational"):
-        if c == 0:
-            return 0
-        if c == 1:
-            return rat_cvec[0]
-        elif c == 2:
-            return rat_cvec[1]
-        elif c == 3:
-            return rat_cvec[2]
-        elif c == 5:
-            return rat_cvec[3]
+    assert const_values[0] == 0
+    assert sample_values[0] == 0
+    assert fuzz_values[0] == '0'
+
+    table = []
+
+    for c in const_values[1:]:
+        row_data = [get(c, 0, f) for f in fuzz_values]
+        row = ["$C$ & {}".format(c)]
+        row.extend(format_cell(cell) for cell in row_data)
+        table.append(row)
+
+    for s in sample_values[1:]:
+        row_data = [get(0, s, f) for f in fuzz_values]
+        row = ["$R$ & {}".format(s)]
+        row.extend(format_cell(cell) for cell in row_data)
+        table.append(row)
+
+    return table
+
+
+def format_cell(cell):
+    stat = cell['status'].lower()
+    if stat == 'crash':
+        return ' & '
+    elif stat == 'success':
+        rules = cell['num_rules']
+        unsound = cell['post_unsound']
+        unknown = cell['post_unknown']
+        sound = rules - (unsound + unknown)
+        if unsound == 0: unsound = '-'
+        if unknown == 0: unknown = '-'
+        return '{}/{}/{} & {:.1f}s'.format(sound, unsound, unknown, cell['time'])
+    else:
+        assert false
+
+def print_table(table):
+    def get_len(i, row):
+        if i < len(row):
+            return len(row[i])
         else:
-            print("value of c is not supported." + str(c))
-    elif (domain == "32" or domain == "4" or domain == "less-const"):
-        if c == 0:
             return 0
-        if c == 1:
-            return bv_cvec[0]
-        elif c == 2:
-            return bv_cvec[1]
-        elif c == 3:
-            return bv_cvec[2]
-        elif c == 5:
-            return bv_cvec[3]
-        else:
-            print("value of c is not supported." + str(c))
 
-def to_table(filename): 
+    n_cols = len(table[0])
+    widths = [max(get_len(i, row) for row in table) for i in range(n_cols)]
+    for row in table:
+        s = " & ".join(str(x).ljust(w) for x,w in zip(row, widths))
+        print('   ', s, '\\\\')
+
+def main(filename):
     with open(filename) as f:
         data = json.load(f)
 
-        # get the items we need
-        # and put into a list of dicts
-        entries = []
+    by_domain = {}
+    fuzz_values = sorted(list(set(d["v_fuzz"] for d in data)))
 
-# TODO perhaps this processing is unnecessary
-        for info in data:
-            entry = {}
-            entry["status"] = info['status']
-            entry["domain"] = str(info['domain'])
-            if (info["time"] == None):
-                entry["time"] = str(0.0)
-            else:
-                entry["time"] = str(round(float(info["time"]), 2))
-            entry["rules"] = info["num_rules"]
-            entry["unsound"] = str(info["post_unsound"])
-            entry["unknown"] =  str(info["post_unknown"])
-            entry["cvec"] = num_const_to_cvec(info["domain"], info["num_consts"])
-            entry["samples"] = info["samples"]
-            entry["fuzz"] = info["v_fuzz"]
-            entry["smt"] = info["v_fuzz"] == "smt"
-            entries.append(entry)
+    for run in data:
+        domain = by_domain.setdefault(run["domain"], [])
+        domain.append(run)
 
-        # now we must begin to construct something of a table
-        # the columns of the table are the fuzz/smt, so we should
-        # collect/group
-        # should I group by...?
+    domains = sorted(list(by_domain.keys()))
 
-        print("\n % rational")
-        make_table(list(filter(lambda x: x["domain"] == "rational", entries)))
-        print("\n % bv less consts")
-        make_table(list(filter(lambda x: x["domain"] == "less-const", entries)))
-        print("\n % bv 32")
-        make_table(list(filter(lambda x: x["domain"] == "32", entries)))
-        print("\n % bv 4")
-        make_table(list(filter(lambda x: x["domain"] == "4", entries)))
-        
+    tables = {domain: mk_table(domain, data)
+              for domain, data in by_domain.items()}
 
 
-def mk_domain_name(domain):
-    if (domain == "less-const"):
-        return "BV32 with less consts"
-    elif (domain == "4" or domain == "32"):
-        return ("BV-" + domain)
-    elif (domain == "rational"):
-        return "Rationals"
-    else:
-        print("mk_domain_name: domain not supported.")
+    n_cols = len(tables[domains[0]][0])
+    widths = [max(len(row[i]) for table in tables.values()
+                              for row in table)
+              for i in range(n_cols)]
 
-# \multirow{3}*{1} & success & success & success \\
-# & 0.07563307 & 0.067024701 & 0.718618355 \\
-# & unsound: 1 & unsound: 0 & unsound: 0 \\
-
-def make_table(entries):
-    entries = entries # I don't know about arguments and I don't plan to
-
-    name = mk_domain_name(entries[0]["domain"])
-
-    fuzz_cols = len(set([x["fuzz"] for x in entries]))
-
-    by_cvec = list(filter(lambda x: x["cvec"] != 0, entries))
-    by_cvec.sort(key=lambda x: x["cvec"])
-    entries_by_cvec = [list(v) for k,v in groupby(by_cvec, lambda x: x["cvec"])]
-
-    by_sample = list(filter(lambda x: x["samples"] != 0, entries))
-    by_sample.sort(key=lambda x: x["samples"])
-    entries_by_sample = [list(v) for k,v in groupby(by_sample, lambda x: x["samples"])]
-
-    for cvecs in entries_by_cvec:
-        # SMT goes at the back
-        cvecs.sort(key=lambda x: (float("inf") if x["smt"] else int(x["fuzz"])))
-
-    for samples in entries_by_sample:
-        # SMT goes at the back
-        samples.sort(key=lambda x: (float("inf") if x["smt"] else int(x["fuzz"])))
-
-
-    # how many columns do we need? fuzz (includes smt), domain
-    cols = fuzz_cols + 1
-    cs = ("c|" * (cols - 1)) + "c" #to avoid lines on the sides
-
-    table_tex = ""
-    table_tex += "\\begin{table} \n"
-    table_tex += "\\begin{center} \n \\begin{tabular}{" + cs + "}\n"
-    table_tex += "\\hline\n"
-
-    # add headers
-    fuzzes = list(set([x["fuzz"] for x in entries]))
-    fuzzes.sort(key=lambda x: x)
-    final_cols = []
-    for f in fuzzes:
-        if (f != "smt"):
-            final_cols.append("fuzz " + str(f))
-    final_cols.append("smt")
-
-    headers = ["cvec"] + final_cols
-    
-    table_tex += " & ".join([str(x) for x in headers])
-    table_tex += "\n \\\\ \\hline\n"
-
-    # we need to make each cell data. it should all be in a row now
-    for loe in entries_by_cvec:
-        rows = ["status", "time", "rules", "unsound", "unknown"]
-        table_tex += "\\multirow{" + str(len(rows)) + "}{*}{" + "$C$: " + str(loe[0]["cvec"]) + "}"
-        # guaranteed to exist I think
-        for row in rows: 
-            for entry in loe:
-                table_tex += " & "
-                table_tex += row + " : " + (str(entry[row])).lower()
-            table_tex += " \\\\"
-        table_tex += " \\hline"
-
-    table_tex += "\\hline"
-
-    # make the sampled data separate
-    for loe in entries_by_sample:
-        rows = ["status", "time", "rules", "unsound", "unknown"]
-        table_tex += "\\multirow{" + str(len(rows)) + "}{*}{" + "R: " + str(loe[0]["samples"]) + "}"
-        # guaranteed to exist I think
-        for row in rows: 
-            for entry in loe:
-                table_tex += " & "
-                table_tex += row + " : " + (str(entry[row])).lower()
-            table_tex += " \\\\"
-        table_tex += " \\hline"
-
-    table_tex += "\n\\hline \n \\end{tabular} \n \\end{center}"
-    table_tex += "\n  \\caption{"+ name +  "} \n \\end{table}"
-    print(table_tex)   
+    col_alignment = '{|' + '|'.join(['lr'] * n_cols) + '|}'
+    print('\\begin{table} \small')
+    print('  \\begin{tabular}', col_alignment)
+    print('    \\multicolumn{2}{c}{cvec}')
+    for f in fuzz_values:
+        print('    & \\multicolumn{{2}}{{c}}{{{}}}'.format(f))
+    print('    \\\\')
+    for domain in domains:
+        table = tables[domain]
+        print('    \\multicolumn{{{}}}{{l}}{{}} \\\\'.format(n_cols * 2))
+        print('    \\multicolumn{{{}}}{{l}}{{{}}} \\\\'.format(n_cols * 2, domain))
+        print('    \\hline')
+        for row in table:
+            s = " & ".join(str(x).ljust(w) for x,w in zip(row, widths))
+            print('   ', s, '\\\\')
+        print('    \\hline')
+    print('  \\end{tabular}')
+    print('  \\caption{}')
+    print('\\end{table}')
 
 if __name__ == "__main__":
-    to_table(sys.argv[1])
+    main(sys.argv[1])
 
 # \begin{center}
-# \begin{tabular}{ |c|c|c| } 
+# \begin{tabular}{ |c|c|c| }
 #  \hline
-#  cell1 & cell2 & cell3 \\ 
-#  cell4 & cell5 & cell6 \\ 
-#  cell7 & cell8 & cell9 \\ 
+#  cell1 & cell2 & cell3 \\
+#  cell4 & cell5 & cell6 \\
+#  cell7 & cell8 & cell9 \\
 #  \hline
 # \end{tabular}
 # \end{center}
