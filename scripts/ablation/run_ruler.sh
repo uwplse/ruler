@@ -15,7 +15,7 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
 export RUST_LOG="ruler=info,egg=warn";
 
-#num_runs
+# num_runs
 # num_iterations
 # domain 
 while getopts "i:v:r:d:o:" OPTION
@@ -41,8 +41,8 @@ if [ -z "${NUM_VARIABLES:-}" ] ; then
 fi
 
 if [ -z "${NUM_ITERS:-}" ] ; then
-    echo "Running with num_iters = 3 (-i 3)"
-    NUM_ITERS=3
+    echo "Running with num_iters = 2 (-i 2)"
+    NUM_ITERS=2
 fi
 
 if [ -z "${OUTPUT_DIR:-}" ] ; then
@@ -64,11 +64,11 @@ mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 echo "Running orat..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo $DOMAIN  \
-  --variables $NUM_VARIABLES \
-  --iters $NUM_ITERS \
+  (time cargo "$DOMAIN"  \
+  --variables "$NUM_VARIABLES" \
+  --iters "$NUM_ITERS" \
   --do-final-run \
-  --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
+  --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
 
 echo "Running mrat..."
@@ -76,20 +76,20 @@ for r in 5 10 15 25 50 100
 do
     for (( i=0; i<$NUM_RUNS; i++ ))
     do
-        (time cargo $DOMAIN \
-        --variables $NUM_VARIABLES \
-        --iters $NUM_ITERS \
+        (time cargo "$DOMAIN" \
+        --variables "$NUM_VARIABLES" \
+        --iters "$NUM_ITERS" \
         --do-final-run \
-        --rules-to-take $r) &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log" 
+        --rules-to-take "$r") &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log"
     done
 done
 
 echo "Running phase-times..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo $DOMAIN \
-  --variables $NUM_VARIABLES \
-  --iters $NUM_ITERS \
+  (time cargo "$DOMAIN" \
+  --variables "$NUM_VARIABLES" \
+  --iters "$NUM_ITERS" \
   --do-final-run ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
@@ -98,9 +98,9 @@ done
 echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  (time cargo $DOMAIN \
-  --variables $NUM_VARIABLES \
-  --iters $NUM_ITERS \
+  (time cargo "$DOMAIN" \
+  --variables "$NUM_VARIABLES" \
+  --iters "$NUM_ITERS" \
   --do-final-run \
-  --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
+  --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
