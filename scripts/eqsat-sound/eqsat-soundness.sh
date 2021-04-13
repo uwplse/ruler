@@ -25,10 +25,11 @@ vs=3
 
 domain=("4" "32" "less-const" "rational")
 numfuzz=("0" "10" "100" "1000" "smt")
-consts=("1" "2" "3" "5")
+consts=("2" "3" "5")
 # actual lengths of the cvecs, used for the sampling configs
-bv_cvec=("27" "343" "1331" "6859")
-rat_cvec=("1" "27" "125" "729")
+# todo add a const row for 1 manually if you want.
+bv_cvec=("343" "1331" "6859")
+rat_cvec=("27" "125" "729")
 
 # domain cvec-offset fuzz
 function run_bv_const () {
