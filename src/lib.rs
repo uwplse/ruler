@@ -666,7 +666,7 @@ pub struct DeriveParams {
     in1: String,
     in2: String,
     out: String,
-    #[clap(long, default_value = "4")]
+    #[clap(long, default_value = "5")]
     iter_limit: usize,
 }
 
