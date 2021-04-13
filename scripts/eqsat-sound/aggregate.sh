@@ -26,7 +26,6 @@ for out in $(find . -name 'out.json' | sort); do
          "num_consts": .num_consts,
          "samples": .samples,
          "v_fuzz": .fuzz,
-         "v_smt": .smt,
          "v_smt_uknown": .smt_unknown,
          "time": .time,
          "num_rules": .num_rules,
