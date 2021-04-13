@@ -186,7 +186,7 @@ function mk_report () {
         cat "$1/out.json" | \
              jq --argjson UNKNOWN "$unknown" \
                 --argjson UNSOUND "$unsound" \
-                --argjson DOM "$DM" \
+                --arg DOM "$DM" \
                 --argjson CONSTS "$3" \
                 --argjson SAMPLES "$4" \
                 --arg FUZZ "$5" \
@@ -200,7 +200,7 @@ function mk_report () {
         cat "$1/out.json" | \
              jq --argjson UNKNOWN "0" \
                 --argjson UNSOUND "0" \
-                --argjson DOM "$DM" \
+                --arg DOM "$DM" \
                 --argjson CONSTS "$3" \
                 --argjson SAMPLES "$4" \
                 --arg FUZZ "$5" \
