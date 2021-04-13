@@ -186,14 +186,14 @@ function mk_report () {
         unsound=$(cat post_pass.json | jq '.unsound')
         echo "$unknown"
         echo "$unsound"
-        echo "$DM"
+        echo "$2"
         echo "$3"
         echo "$4"
         echo "$5"
         cat "$1/out.json" | \
              jq --argjson UNKNOWN "$unknown" \
                 --argjson UNSOUND "$unsound" \
-                --arg DOM "$DM" \
+                --arg DOM "$2" \
                 --argjson CONSTS "$3" \
                 --argjson SAMPLES "$4" \
                 --arg FUZZ "$5" \
@@ -207,7 +207,7 @@ function mk_report () {
         cat "$1/out.json" | \
              jq --argjson UNKNOWN "0" \
                 --argjson UNSOUND "0" \
-                --arg DOM "$DM" \
+                --arg DOM "$2" \
                 --argjson CONSTS "$3" \
                 --argjson SAMPLES "$4" \
                 --arg FUZZ "$5" \

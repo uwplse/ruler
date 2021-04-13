@@ -90,7 +90,7 @@ def make_table(entries):
     by_sample = list(filter(lambda x: x["samples"] != 0, entries))
     by_sample.sort(key=lambda x: x["samples"])
     entries_by_sample = [list(v) for k,v in groupby(by_sample, lambda x: x["samples"])]
-    
+
     for cvecs in entries_by_cvec:
         # SMT goes at the back
         cvecs.sort(key=lambda x: (float("inf") if x["smt"] else int(x["fuzz"])))
@@ -98,6 +98,9 @@ def make_table(entries):
     for samples in entries_by_sample:
         # SMT goes at the back
         samples.sort(key=lambda x: (float("inf") if x["smt"] else int(x["fuzz"])))
+
+    for c in entries_by_cvec:
+        print(c, sep="\n")
 
     # how many columns do we need? fuzz (includes smt), domain
     cols = fuzz_cols + 1
@@ -109,11 +112,11 @@ def make_table(entries):
 
     # add headers
     fuzzes = list(set([x["fuzz"] for x in entries]))
+    fuzzes.sort(key=lambda x: x)
     final_cols = []
     for f in fuzzes:
         if (f != "smt"):
             final_cols.append("fuzz " + str(f))
-    final_cols.reverse()
     final_cols.append("smt")
 
     headers = ["cvec"] + final_cols
