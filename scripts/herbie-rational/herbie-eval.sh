@@ -45,7 +45,7 @@ mkdir -p "$DIR"/results/"$tstamp"
 
 echo "Running Ruler"
 # run ruler and put rules in output directory
-cargo rational --iters 2 --variables 3 --important-cvec-offsets 2 --num-fuzz 1000 --do-final-run > $DIR/ruler-rules-"$tstamp".txt
+cargo rational --iters 2 --variables 3 --important-cvec-offsets 2 --num-fuzz 10 --do-final-run > $DIR/ruler-rules-"$tstamp".txt
 
 # go to output directory
 pushd "$DIR"
@@ -67,8 +67,8 @@ then
 else
     git clone git@github.com:uwplse/herbie.git
     cd herbie
-    # TODO: remove this once merged.
-    # git checkout egg-interface-fixes
+    # To use old Herbie before racket 8 was merged.
+     git checkout 1c32e484210bac6cd4423e9372082d6b547e9d48
     make install
     cd ..
 fi
