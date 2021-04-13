@@ -14,6 +14,6 @@ TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
 
 "$MYDIR/run_ruler.sh" -d bv4 -o "$MYDIR/output/$TIMESTAMP"
 "$MYDIR/run_ruler.sh" -d bv32 -o "$MYDIR/output/$TIMESTAMP"
-"$MYDIR/run_ruler.sh" -d rational -o "$MYDIR/output/$TIMESTAMP"
+"$MYDIR/run_ruler.sh" -d rational -o "$MYDIR/output/$TIMESTAMP" --use-smt
 node parse.js "$MYDIR/output/$TIMESTAMP/"
 python visualize.py

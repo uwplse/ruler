@@ -18,7 +18,7 @@ export RUST_LOG="ruler=info,egg=warn";
 # num_runs
 # num_iterations
 # domain 
-while getopts "i:v:r:d:o:" OPTION
+while getopts ":i:v:r:d:o:" OPTION
 do 
     case "$OPTION" in 
         i) NUM_ITERS="$OPTARG" ;;
@@ -29,6 +29,9 @@ do
         \?) break ;;
     esac
 done
+
+# Save the other variables just in case
+shift "$((OPTIND-1))"
 
 if [ -z "${NUM_RUNS:-}" ] ; then
     echo "Running with num_runs = 5 (-r 5)"
@@ -67,7 +70,7 @@ do
   (time cargo "$DOMAIN"  \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
-  --do-final-run \
+  --do-final-run $@ \
   --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
 
@@ -79,7 +82,7 @@ do
         (time cargo "$DOMAIN" \
         --variables "$NUM_VARIABLES" \
         --iters "$NUM_ITERS" \
-        --do-final-run \
+        --do-final-run $@ \
         --rules-to-take "$r") &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log"
     done
 done
@@ -90,7 +93,7 @@ do
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
-  --do-final-run ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  --do-final-run $@ ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
@@ -101,6 +104,6 @@ do
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
-  --do-final-run \
+  --do-final-run $@ \
   --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
