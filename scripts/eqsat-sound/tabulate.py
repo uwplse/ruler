@@ -50,7 +50,10 @@ def to_table(filename):
             entry = {}
             entry["status"] = info['status']
             entry["domain"] = str(info['domain'])
-            entry["time"] = str(info["time"])
+            if (info["time"] == None):
+                entry["time"] = str(0.0)
+            else:
+                entry["time"] = str(round(float(info["time"]), 2))
             entry["rules"] = info["num_rules"]
             entry["unsound"] = str(info["post_unsound"])
             entry["unknown"] =  str(info["post_unknown"])
@@ -75,12 +78,26 @@ def to_table(filename):
         make_table(list(filter(lambda x: x["domain"] == "4", entries)))
         
 
+
+def mk_domain_name(domain):
+    if (domain == "less-const"):
+        return "BV32 with less consts"
+    elif (domain == "4" or domain == "32"):
+        return ("BV-" + domain)
+    elif (domain == "rational"):
+        return "Rationals"
+    else:
+        print("mk_domain_name: domain not supported.")
+
 # \multirow{3}*{1} & success & success & success \\
 # & 0.07563307 & 0.067024701 & 0.718618355 \\
 # & unsound: 1 & unsound: 0 & unsound: 0 \\
 
 def make_table(entries):
     entries = entries # I don't know about arguments and I don't plan to
+
+    name = mk_domain_name(entries[0]["domain"])
+
     fuzz_cols = len(set([x["fuzz"] for x in entries]))
 
     by_cvec = list(filter(lambda x: x["cvec"] != 0, entries))
@@ -99,14 +116,13 @@ def make_table(entries):
         # SMT goes at the back
         samples.sort(key=lambda x: (float("inf") if x["smt"] else int(x["fuzz"])))
 
-    for c in entries_by_cvec:
-        print(c, sep="\n")
 
     # how many columns do we need? fuzz (includes smt), domain
     cols = fuzz_cols + 1
     cs = ("c|" * (cols - 1)) + "c" #to avoid lines on the sides
 
     table_tex = ""
+    table_tex += "\\begin{table} \n"
     table_tex += "\\begin{center} \n \\begin{tabular}{" + cs + "}\n"
     table_tex += "\\hline\n"
 
@@ -127,12 +143,12 @@ def make_table(entries):
     # we need to make each cell data. it should all be in a row now
     for loe in entries_by_cvec:
         rows = ["status", "time", "rules", "unsound", "unknown"]
-        table_tex += "\\multirow{" + str(len(rows)) + "}{*}{" + "cross: " + str(loe[0]["cvec"]) + "}"
+        table_tex += "\\multirow{" + str(len(rows)) + "}{*}{" + "$C$: " + str(loe[0]["cvec"]) + "}"
         # guaranteed to exist I think
         for row in rows: 
             for entry in loe:
                 table_tex += " & "
-                table_tex += row + " : " + str(entry[row])
+                table_tex += row + " : " + (str(entry[row])).lower()
             table_tex += " \\\\"
         table_tex += " \\hline"
 
@@ -141,16 +157,17 @@ def make_table(entries):
     # make the sampled data separate
     for loe in entries_by_sample:
         rows = ["status", "time", "rules", "unsound", "unknown"]
-        table_tex += "\\multirow{" + str(len(rows)) + "}{*}{" + "rand: " + str(loe[0]["samples"]) + "}"
+        table_tex += "\\multirow{" + str(len(rows)) + "}{*}{" + "R: " + str(loe[0]["samples"]) + "}"
         # guaranteed to exist I think
         for row in rows: 
             for entry in loe:
                 table_tex += " & "
-                table_tex += row + " : " + str(entry[row])
+                table_tex += row + " : " + (str(entry[row])).lower()
             table_tex += " \\\\"
         table_tex += " \\hline"
 
     table_tex += "\n\\hline \n \\end{tabular} \n \\end{center}"
+    table_tex += "\n  \\caption{"+ name +  "} \n \\end{table}"
     print(table_tex)   
 
 if __name__ == "__main__":
