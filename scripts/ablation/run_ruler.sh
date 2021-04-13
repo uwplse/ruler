@@ -36,8 +36,8 @@ if [ -z "${NUM_RUNS:-}" ] ; then
 fi
 
 if [ -z "${NUM_VARIABLES:-}" ] ; then
-    echo "Running with num_variables = 5 (-v 5)"
-    NUM_VARIABLES=5
+    echo "Running with num_variables = 3 (-v 3)"
+    NUM_VARIABLES=3
 fi
 
 if [ -z "${NUM_ITERS:-}" ] ; then
@@ -68,7 +68,6 @@ do
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
   --do-final-run \
-  --use-smt \
   --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
 done
 
@@ -81,7 +80,6 @@ do
         --variables $NUM_VARIABLES \
         --iters $NUM_ITERS \
         --do-final-run \
-        --use-smt \
         --rules-to-take $r) &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log" 
     done
 done
@@ -92,8 +90,7 @@ do
   (time cargo $DOMAIN \
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
-  --do-final-run \
-  --use-smt) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  --do-final-run ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
 done
@@ -105,6 +102,5 @@ do
   --variables $NUM_VARIABLES \
   --iters $NUM_ITERS \
   --do-final-run \
-  --use-smt \
   --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" 
 done
