@@ -16,9 +16,15 @@ mkdir -p "$DIR"
 is=2
 vs=3
 
+# domain=("32" "less-const" "rational")
+# numfuzz=("100" "1000" "smt")
+# consts=("2" "5")
+# # actual lengths of the cvecs, used for the sampling configs
+# bv_cvec=("343" "6859")
+# rat_cvec=("27" "729")
 
 domain=("4" "32" "less-const" "rational")
-numfuzz=("0" "100" "1000" "10000" "smt")
+numfuzz=("0" "10" "100" "1000" "smt")
 consts=("1" "2" "3" "5")
 # actual lengths of the cvecs, used for the sampling configs
 bv_cvec=("27" "343" "1331" "6859")
