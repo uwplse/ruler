@@ -56,7 +56,7 @@ let load_dir = (path, type, k) => {
 }
 
 let make_entry = (text) => {
-    let total_time_pattern = /Learned (?<quantity>[\d]+)[\w\s]*(?<time>[.\d]+)$/gm;
+    let total_time_pattern = /Learned (?<quantity>[\d]+)[a-z\s]*(?<time>[.\d]+)$/gm;
     let egraph_size_pattern = /egraph n=([\d]+), e=([\d]+)/gm;
     let phase_time_pattern = /Time taken in... [\w.\s]+: ([\d.]+), [\w.\s]+: ([\d.]+), [\w.\s]+: ([\d.]+)$/gm
     let validation_pattern = /Time taken in validation+: ([\d.]+)$/gm // may not exist 
