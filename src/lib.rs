@@ -510,7 +510,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         }
                     }
 
-                    let n_eqs = eqs.len();
                     self.equalities.extend(eqs);
 
                     // TODO check formatting for Learned...
