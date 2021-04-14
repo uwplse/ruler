@@ -67,6 +67,7 @@ mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 echo "Running orat..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
+  echo "Running iter $i."
   (time cargo "$DOMAIN"  \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
@@ -79,6 +80,7 @@ for r in 5 10 15 25 50 100
 do
     for (( i=0; i<$NUM_RUNS; i++ ))
     do
+        echo "Running iter $i with mrat_m=$r."
         (time cargo "$DOMAIN" \
         --variables "$NUM_VARIABLES" \
         --iters "$NUM_ITERS" \
@@ -90,6 +92,7 @@ done
 echo "Running phase-times..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
+  echo "Running iter $i."
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
@@ -101,6 +104,7 @@ done
 echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
+  echo "Running iter $i."   
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
