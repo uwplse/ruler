@@ -5,6 +5,7 @@ from functools import reduce
 from itertools import groupby
 from colorsys import hsv_to_rgb
 from random import randint, uniform
+from math import log10, floor
 
 
 data = json.load(open("output/parsed.json"))
@@ -77,7 +78,7 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     else:
         compare1.bar(x, y, width, color='lightblue')
 
-    compare1.set(xlabel="choose_eqs setting", ylabel="s")
+    compare1.set(xlabel="choose_eqs setting", ylabel="Time (seconds)")
     compare1.set_title("Time")
 
     compare2.bar(x, y2, width, color='lightsalmon')
@@ -198,11 +199,10 @@ def compare_phase_times(data, dataset_names):
         for iter in run:
             iter_info = iter['phases']
             inner_sum = reduce(sum, iter_info, reduce_base)
-            runs_avg['run_rewrites'] += inner_sum['run_rewrites']
-            runs_avg['rule_discovery'] += inner_sum['rule_discovery']
-            runs_avg['rule_minimization'] += inner_sum['rule_minimization']
-            runs_avg['rule_validation'] += inner_sum['rule_validation']
+            runs_avg = inner_sum
+            print(runs_avg)
         runs_avg = avg(runs_avg, len(run))
+        print(runs_avg)
         agg_phases.append(runs_avg)
         
     print(agg_phases)
@@ -216,7 +216,7 @@ def compare_phase_times(data, dataset_names):
 
     x = np.arange(len(names))
 
-    width = 0.3
+    width = 0.6
 
     ax.bar(x, run_rewrites, width/4, label="run_rewrites", color="burlywood")
     ax.bar(x + width/4, rule_discovery, width/4, label="rule_discovery", color="skyblue")
@@ -229,6 +229,23 @@ def compare_phase_times(data, dataset_names):
     # TODO: bools, etc. have a nonzero validation rn because the logging is not 
     # properly done inside new choose_eqs. Need to fix (inside partition)
     ax.set_yscale('log')
+
+    # https://stackoverflow.com/questions/28931224/adding-value-labels-on-a-matplotlib-bar-chart
+    rects = ax.patches
+    labels = [[x["run_rewrites"], x["rule_discovery"], x["rule_minimization"], x["rule_validation"]] for x in agg_phases]
+    labels = run_rewrites + rule_discovery + rule_minimization + rule_validation
+    # https://stackoverflow.com/questions/3410976/how-to-round-a-number-to-significant-figures-in-python
+    round_to_n = lambda x, n: round(x, -int(floor(log10(x))) + (n - 1))
+
+    # Flatten
+    labels = [round_to_n(item,2) for item in labels]
+    
+    print(labels)
+
+    for rect, label in zip(rects, labels):
+        # rects are probably in order
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width() / 2, height, label, ha='center', va='bottom', size=6)
 
     plt.legend()
 
@@ -340,23 +357,22 @@ def compare_run_rewrites(data):
     # plt.show()
     plt.savefig('output/run_rewrites.pdf')
 
-# make_choose_eqs_time_rules_plot("bv4", bv4_data, boxplot=True)
-# make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+# make_choose_eqs_time_rules_plot("bv4", bv4_data, boxplot=False)
 # make_phase_time_plot(bv4_data)
 # compare_run_rewrites(bv4_data)
 # make_choose_eqs_line_plot(bv4_data)
 
-make_choose_eqs_time_rules_plot("bv32", bv32_data, boxplot=False)
+# make_choose_eqs_time_rules_plot("bv32", bv32_data, boxplot=False)
 # # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-make_phase_time_plot(bv32_data)
-compare_run_rewrites(bv32_data)
-make_choose_eqs_line_plot(bv32_data)
+# make_phase_time_plot(bv32_data)
+# compare_run_rewrites(bv32_data)
+# make_choose_eqs_line_plot(bv32_data)
 
-# make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=True)
-# # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+# make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=False)
+# # # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
 # make_phase_time_plot(rat_data)
 # compare_run_rewrites(rat_data)
 # make_choose_eqs_line_plot(rat_data)
 
-compare_phase_times(data, ["bv32"])
+compare_phase_times(data, ["bv4", "bv32", "rational"])
 # compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
