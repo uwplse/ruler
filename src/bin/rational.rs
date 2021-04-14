@@ -205,10 +205,13 @@ impl SynthLanguage for Math {
             cfg.set_timeout_msec(1000);
             let ctx = z3::Context::new(&cfg);
             let solver = z3::Solver::new(&ctx);
-            let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-            let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+            let (lexpr, mut lasses) = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+            let (rexpr, mut rasses) = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+            lasses.append(&mut rasses);
+            let all = &lasses[..];
             solver.assert(&lexpr._eq(&rexpr).not());
-            match solver.check() {
+            match solver.check_assumptions(all) {
+            // match solver.check() {
                 SatResult::Unsat => true,
                 SatResult::Sat => {
                     // println!("z3 validation: failed for {} => {}", lhs, rhs);
@@ -280,8 +283,9 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
     ret
 }
 
-fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
     let mut buf: Vec<z3::ast::Real> = vec![];
+    let mut assumes: Vec<z3::ast::Bool> = vec![];
     let zero = z3::ast::Real::from_real(&ctx, 0, 1);
     for node in expr.as_ref().iter() {
         match node {
@@ -303,10 +307,16 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 &ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
-            Math::Div([a, b]) => buf.push(z3::ast::Real::div(
+            Math::Div([a, b]) => {
+                let denom = &buf[usize::from(*b)];
+                let lez = z3::ast::Real::le(denom, &zero);
+                let gez = z3::ast::Real::ge(denom, &zero);
+                let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
+                assumes.push(assume);
+                buf.push(z3::ast::Real::div(
                 &buf[usize::from(*a)],
                 &buf[usize::from(*b)],
-            )),
+            ))},
             Math::Neg(a) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)])),
             Math::Abs(a) => {
                 let inner = &buf[usize::from(*a)].clone();
@@ -319,7 +329,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
             _ => unimplemented!(),
         }
     }
-    buf.pop().unwrap()
+    (buf.pop().unwrap(), assumes)
 }
 
 fn to_i32(v: &BigInt) -> i32 {
