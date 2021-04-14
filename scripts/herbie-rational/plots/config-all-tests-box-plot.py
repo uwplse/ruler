@@ -27,11 +27,23 @@ for c, ds in listify:
 fig, ax = plt.subplots()
 ax.boxplot(vals)
 
-title = "config vs " + str(field) + " over seeds, summed over all tests"
+if str(field) == "output_parens":
+    yname = "ast size"
+    ax.set_ylim([0, 1000])
+elif str(field) == "time":
+    yname = "time"
+    ax.set_ylim([0, 2000000])
+elif str(field) == "avg_bits_err_improve":
+    yname = "average bits of error improved"
+    ax.set_ylim([0, 500])
+else:
+    yname = str(field)
+    ax.set_ylim(bottom=0)
+
+title = "config vs " + yname + " over 30 seeds"
 ax.set_title(title)
-ax.set_ylim(bottom=0)
 ax.set_xlabel('config')
-ax.set_ylabel(str(field))
+ax.set_ylabel(yname)
 ax.set_xticklabels(labs)
 
 plt.tight_layout()

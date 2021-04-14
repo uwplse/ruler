@@ -510,7 +510,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         }
                     }
 
-                    let n_eqs = eqs.len();
                     self.equalities.extend(eqs);
 
                     // TODO check formatting for Learned...
@@ -519,7 +518,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     // For the no-conditional case which returns
                     // a non-empty list of ids that have the same cvec,
                     // won't this cause eclasses to merge even if the rule is actually not valid?
-                    if self.params.minimize || n_eqs < self.params.rules_to_take {
+                    if self.params.minimize || self.params.rules_to_take == usize::MAX {
                         log::info!("Stopping early, took all eqs");
                         break 'inner;
                     }
