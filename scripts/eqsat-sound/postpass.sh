@@ -179,6 +179,7 @@ if [ $DOMAIN == "rational" ]; then
       res=$(timeout -k $TIMEOUT $TIMEOUT racket verify-rat.rkt)
       if [ $? -ne 0 ]; then
           ((UNKNOWN=UNKNOWN+1))
+          echo "$p" >&2
           echo "Rosette timed out." >&2
       else
           if [ $res -eq 1 ]; then
@@ -199,7 +200,8 @@ elif [ $DOMAIN = "4" ] || [ $DOMAIN = "8" ] || [ $DOMAIN = "16" ] || [ $DOMAIN =
       res="$(timeout -k $TIMEOUT $TIMEOUT racket verify-bv.rkt)"
       if [ $? -ne 0 ]; then
           ((UNKNOWN=UNKNOWN+1))
-          echo "Rosette timed out." >&2
+          echo "$p" >&2
+	  echo "Rosette timed out." >&2
       else
           if [ "$res" -eq 1 ]; then
               ((UNSOUND=UNSOUND+1))
