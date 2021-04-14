@@ -249,10 +249,10 @@ macro_rules! impl_bv {
                     cvec_len: consts[0].len(),
                 });
 
-                egraph.add(Math::Num(BV::ZERO));
-                egraph.add(Math::Num(1.into()));
-                egraph.add(Math::Num(BV::MIN));
-                egraph.add(Math::Num(BV::MAX));
+                // egraph.add(Math::Num(BV::ZERO));
+                // egraph.add(Math::Num(1.into()));
+                // egraph.add(Math::Num(BV::MIN));
+                // egraph.add(Math::Num(BV::MAX));
 
                 for i in 0..synth.params.variables {
                     let var = Symbol::from(letter(i));
