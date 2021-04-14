@@ -56,7 +56,7 @@ results/ruler/$(1)noconsts-$(2)vars-$(3)iters.json: # $(rust-src)
 diffs-no-consts += results/diffs/$(1)noconsts-$(2)vars-$(3)iters.json
 results/diffs/$(1)noconsts-$(2)vars-$(3)iters.json: results/ruler/$(1)noconsts-$(2)vars-$(3)iters.json results/ruler/$(1)-$(2)vars-$(3)iters.json
 	mkdir -p results/diffs
-	cargo derive-$(1) $$^ $$@
+	cargo derive-$(1) $$^ $$@ --iter-limit=4
 endef
 
 PRECIOUS: $(cvc4-logs) $(ruler-reports) $(diffs)
@@ -100,9 +100,13 @@ latex-report: $(diffs)
 report: $(diffs)
 	./scripts/compare.py $^ | xsv table
 
-.PHONY: report
+.PHONY: report-no-consts
 report-no-consts: $(diffs-no-consts)
 	./scripts/compare.py $^ | xsv table
+
+.PHONY: latex-report-no-consts
+latex-report-no-consts: $(diffs-no-consts)
+	./scripts/compare.py $^ | pandoc -f csv -t latex --columns 200 | sed 's/tabularnewline/\\/'
 
 .PHONY: ruler-reports
 ruler-reports: $(ruler-reports)
