@@ -211,7 +211,7 @@ impl SynthLanguage for Math {
             let all = &lasses[..];
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check_assumptions(all) {
-            // match solver.check() {
+                // match solver.check() {
                 SatResult::Unsat => true,
                 SatResult::Sat => {
                     // println!("z3 validation: failed for {} => {}", lhs, rhs);
@@ -283,7 +283,10 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
     ret
 }
 
-fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
+fn egg_to_z3<'a>(
+    ctx: &'a z3::Context,
+    expr: &[Math],
+) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
     let mut buf: Vec<z3::ast::Real> = vec![];
     let mut assumes: Vec<z3::ast::Bool> = vec![];
     let zero = z3::ast::Real::from_real(&ctx, 0, 1);
@@ -314,9 +317,10 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> (z3::ast::Real<'a>, Vec
                 let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
                 assumes.push(assume);
                 buf.push(z3::ast::Real::div(
-                &buf[usize::from(*a)],
-                &buf[usize::from(*b)],
-            ))},
+                    &buf[usize::from(*a)],
+                    &buf[usize::from(*b)],
+                ))
+            }
             Math::Neg(a) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)])),
             Math::Abs(a) => {
                 let inner = &buf[usize::from(*a)].clone();
