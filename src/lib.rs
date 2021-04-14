@@ -814,12 +814,25 @@ impl<L: SynthLanguage> Synthesizer<L> {
             // take step valid rules from the end of new_eqs
             let mut took = 0;
             while let Some((name, eq)) = new_eqs.pop() {
-                if !should_validate || L::is_valid(self, &eq.lhs, &eq.rhs) {
+                if should_validate {
+                    let rule_validation = Instant::now();
+                    let valid = L::is_valid(self, &eq.lhs, &eq.rhs);
+                    log::info!(
+                        "Time taken in validation: {}",
+                        rule_validation.elapsed().as_secs_f64()
+                    );
+
+                    if valid {
+                        let old = keepers.insert(name, eq);
+                        took += old.is_none() as usize;
+                    } else {
+                        bads.insert(name, eq);
+                    }
+                } else {
                     let old = keepers.insert(name, eq);
                     took += old.is_none() as usize;
-                } else {
-                    bads.insert(name, eq);
                 }
+
                 if took >= step {
                     break;
                 }

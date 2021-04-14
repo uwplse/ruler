@@ -45,6 +45,7 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     mrat_ys_l = []
     mrat_y2s = []
     grouped = {}
+    mrat.sort(key=lambda x: int(x["mrat_m"]))
     for elem in mrat:
         key = elem["mrat_m"]
         grouped.setdefault(key, []).append(elem)
@@ -56,6 +57,9 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
         mrat_ys_l.append(res)
         res2 = list(map(lambda x: float(compare2(x)), lst))
         mrat_y2s.append(sum(res2) / len(res2))
+
+    print([x[0]["mrat_m"] for x in grouped])
+    # print(json.dumps(data, indent=4, sort_keys=True))
 
     y = [orat_y] + mrat_ys + [min_y]
     y2 = [orat_y2] + mrat_y2s + [min_y2]
@@ -336,23 +340,23 @@ def compare_run_rewrites(data):
     # plt.show()
     plt.savefig('output/run_rewrites.pdf')
 
-make_choose_eqs_time_rules_plot("bv4", bv4_data, boxplot=True)
+# make_choose_eqs_time_rules_plot("bv4", bv4_data, boxplot=True)
 # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-make_phase_time_plot(bv4_data)
-compare_run_rewrites(bv4_data)
-make_choose_eqs_line_plot(bv4_data)
+# make_phase_time_plot(bv4_data)
+# compare_run_rewrites(bv4_data)
+# make_choose_eqs_line_plot(bv4_data)
 
-make_choose_eqs_time_rules_plot("bv32", bv32_data, boxplot=True)
-# make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+make_choose_eqs_time_rules_plot("bv32", bv32_data, boxplot=False)
+# # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
 make_phase_time_plot(bv32_data)
 compare_run_rewrites(bv32_data)
 make_choose_eqs_line_plot(bv32_data)
 
-make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=True)
-# make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-make_phase_time_plot(rat_data)
-compare_run_rewrites(rat_data)
-make_choose_eqs_line_plot(rat_data)
+# make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=True)
+# # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+# make_phase_time_plot(rat_data)
+# compare_run_rewrites(rat_data)
+# make_choose_eqs_line_plot(rat_data)
 
-compare_phase_times(data, ["bv4", "bv32", "rational"])
+compare_phase_times(data, ["bv32"])
 # compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
