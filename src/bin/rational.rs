@@ -295,8 +295,10 @@ fn egg_to_z3<'a>(
             Math::Var(v) => buf.push(z3::ast::Real::new_const(&ctx, v.to_string())),
             Math::Num(c) => buf.push(z3::ast::Real::from_real(
                 &ctx,
-                to_i32(c.numer()),
-                to_i32(c.denom()),
+                (c.numer()).to_i32().unwrap(),
+                (c.denom()).to_i32().unwrap(),
+                // to_i32(c.numer()),
+                // to_i32(c.denom()),
             )),
             Math::Add([a, b]) => buf.push(z3::ast::Real::add(
                 &ctx,
@@ -334,17 +336,6 @@ fn egg_to_z3<'a>(
         }
     }
     (buf.pop().unwrap(), assumes)
-}
-
-fn to_i32(v: &BigInt) -> i32 {
-    let is_neg = v.is_negative();
-    let u32_v = |v: &BigUint| (v & (BigUint::from(u32::MAX))).to_u32().unwrap();
-    let converted = u32_v(&(v.abs().to_biguint().unwrap()));
-    if is_neg {
-        (converted as i32) * -1
-    } else {
-        converted as i32
-    }
 }
 
 fn main() {
