@@ -67,8 +67,8 @@ impl SynthLanguage for Math {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        let consts: Vec<Option<bool>> = vec![];
-        // let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
+        // let consts: Vec<Option<bool>> = vec![];
+        let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
 
         let consts = self_product(&consts, synth.params.variables);
         println!("cvec len: {}", consts[0].len());
@@ -77,8 +77,8 @@ impl SynthLanguage for Math {
             cvec_len: consts[0].len(),
         });
 
-        egraph.add(Math::Lit(false));
-        egraph.add(Math::Lit(true));
+        // egraph.add(Math::Lit(false));
+        // egraph.add(Math::Lit(true));
 
         for i in 0..synth.params.variables {
             let var = Symbol::from(letter(i));
