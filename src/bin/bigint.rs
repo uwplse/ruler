@@ -70,17 +70,21 @@ impl SynthLanguage for Math {
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // this is for adding to the egraph, not used for cvec.
-        let constants: Vec<Constant> = ["1", "0", "-1"]
+        // let constants: Vec<Constant> = vec![];
+        // let constants: Vec<Constant> = ["0"]
+        let constants: Vec<Constant> = ["0", "1", "-1"]
             .iter()
             .map(|s| s.parse().unwrap())
             .collect();
-
+        
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
-            consts.push(Some(i.to_bigint().unwrap()));
-            consts.push(Some(-i.to_bigint().unwrap()));
+            consts.push(i.to_bigint());
+            consts.push((0 - i).to_bigint());
         }
+        consts.push(2.to_bigint());
+        consts.push(4.to_bigint());
 
         consts.sort();
         consts.dedup();
@@ -89,7 +93,7 @@ impl SynthLanguage for Math {
         // add the necessary random values, if any
         for row in consts.iter_mut() {
             let n_samples = synth.params.n_samples;
-            let svals: Vec<Constant> = sampler(&mut synth.rng, 8, n_samples);
+            let svals: Vec<Constant> = sampler(&mut synth.rng, 32, n_samples);
             let mut vals: Vec<Option<Constant>> = vec![];
             for v in svals {
                 vals.push(Some(v));
@@ -177,7 +181,7 @@ impl SynthLanguage for Math {
 
             for cvec in env.values_mut() {
                 cvec.reserve(n);
-                for s in sampler(&mut synth.rng, 8, n) {
+                for s in sampler(&mut synth.rng, 32, n) {
                     cvec.push(Some(s));
                 }
             }
