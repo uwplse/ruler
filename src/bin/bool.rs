@@ -67,7 +67,8 @@ impl SynthLanguage for Math {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
+        let consts: Vec<Option<bool>> = vec![];
+        // let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
 
         let consts = self_product(&consts, synth.params.variables);
         println!("cvec len: {}", consts[0].len());
