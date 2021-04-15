@@ -87,7 +87,8 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
 
     # minimize.plot()
     fig.suptitle(domain)
-    plt.savefig('output/by_config_rules_learned.pdf')
+    plt.tight_layout();
+    plt.savefig('output/by-config-rules-learned.pdf')
 
     # plt.show()
 
@@ -141,7 +142,7 @@ def make_choose_eqs_line_plot(data):
     fig.suptitle("Number of eclasses by iterations")
     # plt.title("Number of eclasses by iterations")
     plt.legend()
-    plt.savefig('output/by_config_eclasses_per_iter.pdf')
+    plt.savefig('output/by-config-eclasses-per-iter.pdf')
     #plt.show()
 
 # Aggregate all values from same iteration across runs
@@ -253,7 +254,7 @@ def compare_phase_times(data, dataset_names):
 
     plt.legend()
 
-    plt.savefig("output/by_domain_phase_times.pdf")
+    plt.savefig("output/by-domain-phase-times.pdf")
     # plt.show()
     # inner_sum = [reduce(sum, iter, reduce_base) for iter in [run for run in phases_by_name]]
     # runs_avg = [avg(run, len(run)) for run in phases_by_name]
@@ -307,7 +308,7 @@ def make_phase_time_plot(data):
 
     ax.legend()
     fig.suptitle("Time spent in each phase (by run)")
-    plt.savefig('output/phase_times.pdf')
+    plt.savefig('output/phase-times.pdf')
     #plt.show()
 
     # sum over all 
@@ -354,12 +355,13 @@ def compare_run_rewrites(data):
     rules.set_title("Rules")
     egraphs.bar(x, [rr_y3, no_rr_y3], width, color='gold')
     # egraphs.set(xlabel="X", ylabel="Y")
-    egraphs.set_title("Egraph size (eclasses)")
+    egraphs.set_title("Num E-classes")
 
     fig.suptitle("Applying run_rewrites vs not applying run_rewrites")
     # minimize.plot()
     # plt.show()
-    plt.savefig('output/run_rewrites.pdf')
+    plt.tight_layout()
+    plt.savefig('output/run-rewrites.pdf')
 
 # make_choose_eqs_time_rules_plot("bv4", bv4_data, boxplot=False)
 # make_phase_time_plot(bv4_data)
@@ -372,10 +374,10 @@ def compare_run_rewrites(data):
 # compare_run_rewrites(bv32_data)
 # make_choose_eqs_line_plot(bv32_data)
 
-# make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=False)
-# # # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
+make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=False)
+# # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
 # make_phase_time_plot(rat_data)
-# compare_run_rewrites(rat_data)
+compare_run_rewrites(rat_data)
 # make_choose_eqs_line_plot(rat_data)
 
 compare_phase_times(data, ["bv4", "bv32", "rational"])
