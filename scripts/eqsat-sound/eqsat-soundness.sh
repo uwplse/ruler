@@ -20,15 +20,17 @@ vs=3
 # numfuzz=("100" "1000" "smt")
 # consts=("2" "5")
 # # actual lengths of the cvecs, used for the sampling configs
-# bv_cvec=("343" "6859")
+# bv32_cvec=("343" "6859")
+# bv4_cvec=("343" "4096")
 # rat_cvec=("27" "729")
 
-domain=("4" "32" "less-const" "rational")
+domain=("4" "32")
 numfuzz=("0" "10" "100" "1000" "smt")
 consts=("2" "3" "5")
 # actual lengths of the cvecs, used for the sampling configs
 # todo add a const row for 1 manually if you want.
-bv_cvec=("343" "1331" "6859")
+bv32_cvec=("343" "1331" "6859")
+bv4_cvec=("343" "1331" "4096")
 rat_cvec=("27" "125" "729")
 
 # domain cvec-offset fuzz
@@ -239,8 +241,19 @@ done
 
 # sampling based cvec
 for d in ${domain[@]}; do
-    if [ "$d" = "4" ] ||  [ "$d" = "32" ] ||  [ "$d" = "less-const" ]; then 
-        for s in ${bv_cvec[@]}; do
+    if [ "$d" = "32" ] ||  [ "$d" = "less-const" ]; then
+        for s in ${bv32_cvec[@]}; do
+            for n in ${numfuzz[@]}; do
+                res1="$DIR/$d-fuzz-$n-samples-$s"
+                mkdir -p "$res1"
+                pushd "$res1"
+                run_bv_sampled "$d" "$s" "$n"
+                mk_report "$res1" "$d" "0" "$s" "$n"
+                popd
+            done
+        done
+    elif [ "$d" = "4" ]; then
+        for s in ${bv4_cvec[@]}; do
             for n in ${numfuzz[@]}; do
                 res2="$DIR/$d-fuzz-$n-samples-$s"
                 mkdir -p "$res2"
