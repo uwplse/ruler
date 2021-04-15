@@ -164,10 +164,10 @@ def aggregate_egraphs_list(our_list):
     return total
 
 def compare_phase_times(data, dataset_names):
+    # TODO: sort in order of the dataset_names
     names = dataset_names
-    names.sort()
     phase_times = list(filter(lambda x: x['type'] == 'phase-times', data))
-    phase_times.sort(key=lambda x: x["domain"])
+    phase_times.sort(key=lambda x: dataset_names.index(x["domain"]))
 
     print(phase_times)
     # filter for only the ones we asked for 
@@ -203,6 +203,7 @@ def compare_phase_times(data, dataset_names):
             print(runs_avg)
         runs_avg = avg(runs_avg, len(run))
         print(runs_avg)
+
         agg_phases.append(runs_avg)
         
     print(agg_phases)
@@ -213,6 +214,9 @@ def compare_phase_times(data, dataset_names):
     rule_discovery = list(map(lambda x: x['rule_discovery'], agg_phases))
     rule_minimization = list(map(lambda x: x['rule_minimization'], agg_phases))
     rule_validation = list(map(lambda x: x['rule_validation'], agg_phases))
+
+    # cancel out small validation
+    rule_validation = [0 if (x < 10e-5) else x for x in rule_validation]
 
     x = np.arange(len(names))
 
@@ -235,7 +239,7 @@ def compare_phase_times(data, dataset_names):
     labels = [[x["run_rewrites"], x["rule_discovery"], x["rule_minimization"], x["rule_validation"]] for x in agg_phases]
     labels = run_rewrites + rule_discovery + rule_minimization + rule_validation
     # https://stackoverflow.com/questions/3410976/how-to-round-a-number-to-significant-figures-in-python
-    round_to_n = lambda x, n: round(x, -int(floor(log10(x))) + (n - 1))
+    round_to_n = lambda x, n: x if x == 0 else round(x, -int(floor(log10(abs(x)))) + (n - 1))
 
     # Flatten
     labels = [round_to_n(item,2) for item in labels]
