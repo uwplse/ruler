@@ -10,14 +10,15 @@ while [ -L "$src" ]; do
 done
 MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
-echo "Usage: derivation.sh dir [ rational | bv32 | bv4 ]"
+echo "Usage: derivation.sh [DERIVE_OUTPUT] [ rational | bv32 | bv4 ]"
+echo "DERIVE_OUTPUT should be path to directory containing directories that contain out.json"
 
 DIR="$MYDIR/$1/derive"
 mkdir -p "$DIR"
 
 is_first_rs=true
 prev_rs=""
-for rs in $(find $1 -name 'out.json' | sort); do
+for rs in $(find "$1" -name 'out.json' | sort); do
     if [ "$(jq '.status' "$rs")" = "CRASH" ]; then
         echo "WARNING: SKIPPING CRASHED RULESET!"
         echo "$rs"
@@ -30,13 +31,14 @@ for rs in $(find $1 -name 'out.json' | sort); do
         continue
     fi
 
+    # MYDIR/output/2021-04-12_1705/32-fuzz-1000-samples-343/out.json
 
     IFS='/ ' read -r -a array1 <<< "$prev_rs"
     IFS='/ ' read -r -a array2 <<< "$rs"
 
     # indexing like this will break if directory structure changes.
-    name1="${array1[2]}"
-    name2="${array2[2]}"
+    name1="${array1[-2]}"
+    name2="${array2[-2]}"
 
     IFS='- ' read -r -a dm1 <<< "$name1"
     IFS='- ' read -r -a dm2 <<< "$name2"
