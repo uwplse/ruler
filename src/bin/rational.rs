@@ -1,7 +1,7 @@
 use egg::*;
 use ruler::*;
 
-use num::bigint::{BigInt, BigUint, RandBigInt, ToBigInt};
+use num::bigint::{BigInt, RandBigInt, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive, Zero};
 use rand::Rng;
 use rand_pcg::Pcg64;

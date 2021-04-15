@@ -7,8 +7,8 @@
      y
      z
      w
-     true
-     false
+;     true
+;     false
      (and Start Start)
      (not Start)
      (or Start Start)

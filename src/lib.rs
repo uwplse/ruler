@@ -504,9 +504,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         log::info!("  {}", eq);
                         if !self.params.no_run_rewrites {
                             assert!(!self.equalities.contains_key(&eq.name));
-                        }
-                        if let Some((i, j)) = eq.ids {
-                            self.egraph.union(i, j);
+                            if let Some((i, j)) = eq.ids {
+                                self.egraph.union(i, j);
+                            }
                         }
                     }
 
