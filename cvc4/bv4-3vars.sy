@@ -7,9 +7,9 @@
      r
      s
      t
-     #x0
-     #x8 ; min_val
-     #x7 ; max_val
+     ; #x0
+     ; #x8 ; min_val
+     ; #x7 ; max_val
      (bvneg  Start)
      (bvnot  Start)
      (bvadd  Start Start)
