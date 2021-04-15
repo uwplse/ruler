@@ -72,7 +72,7 @@ impl SynthLanguage for Math {
         // this is for adding to the egraph, not used for cvec.
         // let constants: Vec<Constant> = vec![];
         // let constants: Vec<Constant> = ["0"]
-        let constants: Vec<Constant> = ["0", "1", "-1"]
+        let constants: Vec<Constant> = ["0", "1", "-1", "2"]
             .iter()
             .map(|s| s.parse().unwrap())
             .collect();
