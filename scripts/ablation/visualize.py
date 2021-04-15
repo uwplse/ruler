@@ -164,7 +164,7 @@ def aggregate_egraphs_list(our_list):
 
     return total
 
-def compare_phase_times(data, dataset_names):
+def compare_phase_times(data, dataset_names, legend_outside=False):
     # TODO: sort in order of the dataset_names
     names = dataset_names
     phase_times = list(filter(lambda x: x['type'] == 'phase-times', data))
@@ -200,7 +200,10 @@ def compare_phase_times(data, dataset_names):
         for iter in run:
             iter_info = iter['phases']
             inner_sum = reduce(sum, iter_info, reduce_base)
-            runs_avg = inner_sum
+            runs_avg["run_rewrites"] = inner_sum["run_rewrites"]
+            runs_avg["rule_discovery"] = inner_sum["rule_discovery"]
+            runs_avg["rule_minimization"] = inner_sum["rule_minimization"]
+            runs_avg["rule_validation"] = inner_sum["rule_validation"]
             print(runs_avg)
         runs_avg = avg(runs_avg, len(run))
         print(runs_avg)
@@ -252,9 +255,17 @@ def compare_phase_times(data, dataset_names):
         height = rect.get_height()
         ax.text(rect.get_x() + rect.get_width() / 2, height, label, ha='center', va='bottom', size=6)
 
-    plt.legend()
+    if legend_outside:
+        plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
+        plt.subplots_adjust(right=0.7)
+        fig.set_size_inches(9,5)
+        plt.savefig("output/by-domain-phase-times-legend-outside.pdf")
+    else:
+        plt.legend()
+        plt.savefig("output/by-domain-phase-times.pdf")
 
-    plt.savefig("output/by-domain-phase-times.pdf")
+    
+
     # plt.show()
     # inner_sum = [reduce(sum, iter, reduce_base) for iter in [run for run in phases_by_name]]
     # runs_avg = [avg(run, len(run)) for run in phases_by_name]
@@ -364,21 +375,14 @@ def compare_run_rewrites(data):
     plt.savefig('output/run-rewrites.pdf')
 
 # make_choose_eqs_time_rules_plot("bv4", bv4_data, boxplot=False)
-# make_phase_time_plot(bv4_data)
 # compare_run_rewrites(bv4_data)
-# make_choose_eqs_line_plot(bv4_data)
 
 # make_choose_eqs_time_rules_plot("bv32", bv32_data, boxplot=False)
-# # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-# make_phase_time_plot(bv32_data)
 # compare_run_rewrites(bv32_data)
-# make_choose_eqs_line_plot(bv32_data)
 
-make_choose_eqs_time_rules_plot("rational", rat_data, boxplot=False)
-# # make_choose_eqs_time_rules_plot("4-bit Bitvector no-shift", bv4ns_data)
-# make_phase_time_plot(rat_data)
-compare_run_rewrites(rat_data)
-# make_choose_eqs_line_plot(rat_data)
+# make_choose_eqs_time_rules_plot("Rationals", rat_data, boxplot=False)
+# compare_run_rewrites(rat_data)
 
 compare_phase_times(data, ["bv4", "bv32", "rational"])
+compare_phase_times(data, ["bv4", "bv32", "rational"], legend_outside=True)
 # compare_phase_times(data, ["bool", "bv4ns", "bv8", "bv16", "bv32", "float", "rational"])
