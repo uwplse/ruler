@@ -81,13 +81,22 @@ impl SynthLanguage for Math {
 
         for i in 0..synth.params.important_cvec_offsets {
             consts.push(i.to_bigint());
-            consts.push((0 - i).to_bigint());
+            let v = i.to_bigint();
+            consts.push(Some(-(&v.unwrap())));
         }
-        consts.push(2.to_bigint());
-        consts.push(4.to_bigint());
 
         consts.sort();
         consts.dedup();
+
+        // ensure 0 is not first!
+        if consts[0] == 0.to_bigint() {
+            consts.swap(0, 1);
+        }
+
+        println!("initial cvec");
+        for c in &consts {
+            println!("\t{:?}", c);
+        }
 
         let mut consts = self_product(&consts, synth.params.variables);
         // add the necessary random values, if any
