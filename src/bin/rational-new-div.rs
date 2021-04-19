@@ -193,10 +193,7 @@ impl SynthLanguage for Math {
             let solver = z3::Solver::new(&ctx);
             let (lexpr, _) = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
             let (rexpr, _) = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-            // lasses.append(&mut rasses);
-            // let all = &lasses[..];
             solver.assert(&lexpr._eq(&rexpr).not());
-            // match solver.check_assumptions(all) {
             match solver.check() {
                 SatResult::Unsat => true,
                 SatResult::Sat => {

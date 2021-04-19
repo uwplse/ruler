@@ -42,12 +42,12 @@ for c, ds in listify:
 fig, ax = plt.subplots(figsize=(3, 5))
 ax.boxplot(vals)
 
-
+# manually set before deadline
 if str(field) == "output_parens":
     yname = "AST Size"
     ax.set_ylim([0, 1000])
 elif str(field) == "time":
-    yname = "Time"
+    yname = "Time (s)"
     ax.set_ylim([0, 2])
 elif str(field) == "avg_bits_err_improve":
     yname = "Average bits of error improved"
