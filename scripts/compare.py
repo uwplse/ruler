@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import csv
+import os
 import sys
 import json
 import statistics
 
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 def load_report(filename):
     with open(filename) as f:
@@ -15,18 +18,22 @@ def make_same_row(diff):
     ruler_fname = diff['files'][0]
     assert('ruler' in ruler_fname)
     cvc_fname = diff['files'][1]
-    assert('cvc4' in cvc_fname)
+    # assert('cvc4' in cvc_fname)
     ruler = load_report(ruler_fname)
     cvc = load_report(cvc_fname)
 
-    for field in ['domain', 'iters', 'variables']:
-        assert ruler['params'][field] == cvc['params'][field]
+    base = os.path.basename(ruler_fname)
+    domain = base.split('-')[0]
 
-    assert len(diff['forward']['bad']) == 0
-    assert len(diff['reverse']['bad']) == 0
+    if 'params' in cvc:
+        for field in ['iters', 'variables']:
+            assert ruler['params'][field] == cvc['params'][field]
+
+    # assert len(diff['forward'].get('bad', [])) == 0
+    # assert len(diff['reverse'].get('bad', [])) == 0
 
     data = {
-        'domain': ruler['params']['domain'],
+        'domain': domain,
         'vars': ruler['params']['variables'],
         'iterations': ruler['params']['iters'],
         'ruler time': ruler['time'],
@@ -74,6 +81,6 @@ if __name__ == '__main__':
         row = {k: fmt(v) for k,v in row.items()}
         writer.writerow(row)
 
-    print('avg time diff', 'avg rule diff',
+    eprint('avg time diff', 'avg rule diff',
           avg_time_diff, '{:.1f}x'.format(1/avg_time_diff),
           avg_rule_diff, '{:.1f}x'.format(1/avg_rule_diff))

@@ -1,0 +1,21 @@
+(set-logic SLIA)
+
+(synth-fun f ((x String) (y String) (i Int)) String
+((Start String) (StartInt Int)) (
+(Start String (
+  x y ""
+  (str.++ Start Start)
+  (str.replace Start Start Start)
+  (str.at Start StartInt)
+  (str.from_int StartInt)
+  (str.substr Start StartInt StartInt)))
+(StartInt Int (
+  0 1 i
+  (+ StartInt StartInt)
+  (- StartInt StartInt)
+  (str.len Start)
+  (str.to_int Start)
+  (str.indexof Start Start StartInt)))
+))
+
+(check-synth)
