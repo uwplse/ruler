@@ -101,11 +101,12 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
                             if let Some(Some(val)) = class.data.cvec.get(i).as_ref() {
                                 eprintln!("  {} = {}", var, val);
                             } else {
-                                eprintln!("  {} = none", var);
+                                // By construction, var cvecs don't have None but they may be empty (like in derive).
+                                eprintln!("  {}'s cvec length is {}", var, class.data.cvec.len());
                             }
                         }
                     }
-                    assert_eq!(a, b, "bad rule {}", self.name)
+                    assert_eq!(a, b, "\nbad rule {}\n", self.name)
                 }
                 _ => (),
             }
