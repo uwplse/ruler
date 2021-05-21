@@ -60,22 +60,13 @@ fn one_way<L: SynthLanguage>(
     let results = Mutex::new((vec![], vec![]));
     let test = test.to_vec();
     test.into_par_iter().for_each(|(l, r)| {
-        let mut runner: Runner<L, SynthAnalysis> = Runner::default()
+        let runner = Runner::default()
+            .with_expr(&l)
+            .with_expr(&r)
             .with_iter_limit(params.iter_limit)
             .with_node_limit(100_000)
             .with_time_limit(Duration::from_secs(10))
-            .with_scheduler(egg::SimpleScheduler);
-
-        // cvecs can all be empty for derive.
-        // otherwise it's confusing because constants have cvecs but vars don't.
-        runner.egraph.analysis.cvec_len = 0;
-        for c in runner.egraph.classes_mut() {
-            c.data.cvec.truncate(0);
-        }
-
-        runner = runner
-            .with_expr(&l)
-            .with_expr(&r)
+            .with_scheduler(egg::SimpleScheduler)
             .with_hook(|r| {
                 if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
                     Err(format!("Done"))
