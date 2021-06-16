@@ -822,10 +822,14 @@ def check_exp_split(ln):
     l = remove_cost(ln)
     if len(l.split("<=>")) == 2:
         parts = list(map(strip, l.split("<=>")))
-        r1 = parts[0] + " " + parts[1]
-        r2 = parts[1] + " " + parts[0]
-        rules.append(r1)
-        rules.append(r2)
+        exp1 = (len(parts[0].strip()) <= 2) and (len(parts[1].strip()) > 2)
+        if (not exp1):
+            r1 = parts[0] + " " + parts[1]
+            rules.append(r1)
+        exp2 = (len(parts[1].strip()) <= 2) and (len(parts[0].strip()) > 2)
+        if (not exp2):
+            r2 = parts[1] + " " + parts[0]
+            rules.append(r2)
     elif len(l.split("=>")) == 2:
         # Rules from Ruler already avoid only-constant-as-lhs one directional rules and bidirectional
         # rules where rhs is a constant.
@@ -834,12 +838,14 @@ def check_exp_split(ln):
         # We therefore need not worry that splitting will lead to
         # an expansive rule with a constant on lhs which we again have to remove.
         parts = list(map(strip, l.split("=>")))
-        rules.append(parts[0] + " " + parts[1])
+        expansive = (len(parts[0].strip()) <= 2) and (len(parts[1].strip()) > 2)
+        if (not expansive):
+            rules.append(parts[0] + " " + parts[1])
     else:
         print(l + " is not a valid rule. Must be split by => or <=>")
-    expansive = (len(parts[0].strip()) <= 2) and (len(parts[1].strip()) > 2)
+    #expansive = (len(parts[0].strip()) <= 2) and (len(parts[1].strip()) > 2)
     (rules, unique_vars) = modulo_alpha_rename(rules)
-    return (expansive, rules, unique_vars)
+    return (rules, unique_vars)
 
 def modulo_alpha_rename(rules):
     ret = []
@@ -979,13 +985,12 @@ def process_rules(fnm, rkt, config):
         for l in lines:
             if l.startswith("chosen") or l.startswith("Learned") or (not l.strip()):
                 continue
-            (exp, rules, vs) = check_exp_split(l)
+            (rules, vs) = check_exp_split(l)
             for v in vs:
                 unique_vars.add(v)
-            if (not exp):
-                rules = rename_var(rules)
-                rules = rename_ops(rules)
-                all_rules.extend(rules)
+            rules = rename_var(rules)
+            rules = rename_ops(rules)
+            all_rules.extend(rules)
     mk_rkt_rules(all_rules, rkt, unique_vars, config)
 
 usage = """USAGE: python preprocess.py <input> <output> <config>
