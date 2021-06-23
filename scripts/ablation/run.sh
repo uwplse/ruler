@@ -12,8 +12,15 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
 TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
 
-"$MYDIR/run_ruler.sh" -d bv4 -o "$MYDIR/output/$TIMESTAMP"
-"$MYDIR/run_ruler.sh" -d bv32 -o "$MYDIR/output/$TIMESTAMP"
-#"$MYDIR/run_ruler.sh" -d rational -o "$MYDIR/output/$TIMESTAMP" --use-smt
-node parse.js "$MYDIR/output/$TIMESTAMP/"
-python visualize.py
+"$MYDIR/run_ruler.sh" -d bv4 -v 1 -i 1 -o "$MYDIR/output/$TIMESTAMP/compare" -r 1
+"$MYDIR/run_ruler.sh" -d bv32 -v 1 -i 1 -o "$MYDIR/output/$TIMESTAMP/compare" -r 1
+"$MYDIR/run_ruler.sh" -d rational -v 1 -i 1 -o "$MYDIR/output/$TIMESTAMP/compare" -r 1 --use-smt 
+
+"$MYDIR/run_ruler_rr.sh" -d bv4 -v 1 -i 1 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
+"$MYDIR/run_ruler_rr.sh" -d bv32 -v 1 -i 1 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
+"$MYDIR/run_ruler_rr.sh" -d rational -v 1 -i 1 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1  --use-smt
+
+node parse.js "$MYDIR/output/$TIMESTAMP/compare/"
+node parse.js "$MYDIR/output/$TIMESTAMP/no-rr/" yes
+
+python visualize.py "$MYDIR/output/$TIMESTAMP/compare/" "$MYDIR/output/$TIMESTAMP/no-rr/"

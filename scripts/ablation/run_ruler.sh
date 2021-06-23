@@ -17,10 +17,10 @@ export RUST_LOG="ruler=info,egg=warn";
 
 # num_runs
 # num_iterations
-# domain 
+# domain
 while getopts ":i:v:r:d:o:" OPTION
-do 
-    case "$OPTION" in 
+do
+    case "$OPTION" in
         i) NUM_ITERS="$OPTARG" ;;
         v) NUM_VARIABLES="$OPTARG" ;;
         r) NUM_RUNS="$OPTARG" ;;
@@ -73,10 +73,11 @@ do
   --iters "$NUM_ITERS" \
   --do-final-run $@ \
   --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  cp out.json "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
 
 echo "Running mrat..."
-for r in 5 10 15 25 50 100 
+for r in 5 10 15 25 50 100
 do
     for (( i=0; i<$NUM_RUNS; i++ ))
     do
@@ -86,6 +87,7 @@ do
         --iters "$NUM_ITERS" \
         --do-final-run $@ \
         --rules-to-take "$r") &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log"
+        cp out.json "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i-out.json"
     done
 done
 
@@ -99,15 +101,17 @@ do
   --do-final-run $@ ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  cp out.json "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
 
 echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  echo "Running iter $i."   
+  echo "Running iter $i."
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
   --do-final-run $@ \
   --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  cp out.json "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
