@@ -21,24 +21,26 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     mrat = list(filter(lambda x: x['type'] == 'mrat', data))
     default_conf = list(filter(lambda x: x['type'] == 'default', data))
 
+    # Collect labels for configurations (number of rules picked)
     x = list(map(lambda x: int(x['mrat_m']) , (orat + mrat)))
     x = list(set(x))
     x.sort()
     x = [str(d) for d in x]
     x.append("def.")
 
-    # average over each item, for each comparison
+    # average both metrics over all runs
     orat_y_l= list(map(lambda x: float(compare(x)), orat))
     orat_y = sum(orat_y_l) / len(orat_y_l)
     orat_y2 = list(map(lambda x: float(compare2(x)), orat))
     orat_y2 = sum(orat_y2) / len(orat_y2)
 
+    # same for default configuration
     min_y_l = list(map(lambda x: float(compare(x)), default_conf))
     min_y = sum(min_y_l) / len(min_y_l)
     min_y2 = list(map(lambda x: float(compare2(x)), default_conf))
     min_y2 = sum(min_y2) / len(min_y2)
 
-    # average mrat by each m
+    # same for mrat, but we need it for each m
     mrat_ys = []
     mrat_ys_l = []
     mrat_y2s = []
@@ -68,6 +70,7 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     # print(mrat_ys_l)
     # print(json.dumps(data, indent=4, sort_keys=True))
 
+    # put all y-values together
     y = [orat_y] + mrat_ys + [min_y]
     y2 = [orat_y2] + mrat_y2s + [min_y2]
     y_l = [orat_y_l] + mrat_ys_l + [min_y_l]
@@ -99,6 +102,7 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     # plt.show()
 
 # Aggregate all values from same iteration across runs
+# Specifically statistics about egraph size
 def aggregate_egraphs_list(our_list):
     num_runs = len(our_list[0])
     print(num_runs)
@@ -117,8 +121,8 @@ def aggregate_egraphs_list(our_list):
 
     return total
 
+# Look at how long each phase takes across different domains
 def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False):
-    # TODO: sort in order of the dataset_names
     names = dataset_names
     phase_times = list(filter(lambda x: x['type'] == 'phase-times', data))
     phase_times.sort(key=lambda x: dataset_names.index(x["domain"]))
@@ -149,7 +153,8 @@ def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False
     agg_phases = []
     agg_phases_domain = {'run_rewrites': [], 'rule_discovery': [], 'rule_minimization': [], 'rule_validation': []}
 
-    
+    # Goal is to get one value for each phase per domain
+    # Since there are a bunch of entries (each phase happens multiple times in a run)
     reduce_base = {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0, 'rule_validation': 0.0}
     for run in phases_by_name:
         runs_avg = reduce_base
@@ -214,12 +219,14 @@ def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False
     # properly done inside new choose_eqs. Need to fix (inside partition)
     ax.set_yscale('log')
 
+    # Grouped barchart, so this is important
     # https://stackoverflow.com/questions/28931224/adding-value-labels-on-a-matplotlib-bar-chart
     rects = ax.patches
     labels = [[x["run_rewrites"], x["rule_discovery"], x["rule_minimization"], x["rule_validation"]] for x in agg_phases]
     labels = run_rewrites + rule_discovery + rule_minimization + rule_validation
     # https://stackoverflow.com/questions/3410976/how-to-round-a-number-to-significant-figures-in-python
     # SIGDIGS
+    # Also we want to add some labels to the top of each bar, so format with sigdigs
     if sigdigs:
         round_to_n = lambda x, n: x if x == 0 else round(x, -int(floor(log10(abs(x)))) + (n - 1))
     else:
@@ -240,6 +247,7 @@ def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False
         else:
             ax.text(rect.get_x() + rect.get_width() / 2, height, label, ha='center', va='bottom', size=8)
 
+    # May not be enough space to fit the legend inside
     if legend_outside:
         plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
         plt.subplots_adjust(right=0.7)
@@ -262,11 +270,11 @@ def compare_run_rewrites(data, domain):
 
     y1 = lambda x: float(x["learned"]["time"])
     y2 = lambda x: float(x["learned"]["rules"])
-    # Use e here because number of e-classes
+    # Use e here because we're looking at number of e-classes
     y3 = lambda x: sum([int(d["e"]) for d in x["egraphs"]]) / len(x["egraphs"])
 
-    # TODO: lol these are swapped but the labels swap them back
-    # FIX AFTER DEADLINE
+    # TODO: lol these variable names are swapped but the labels swap them back
+    # FIX WHEN I HAVE TIME
     run_rewrites = list(filter(lambda x: x['type'] == 'no-run-rewrites', data))
     no_run_rewrites = list(filter(lambda x: x['type'] == 'default', data)) # regular data
 
@@ -341,6 +349,7 @@ def compare_phase_times_run_rewrites(domain, data, legend_outside=False):
     # then, avg with the outer loop
     agg_phases = []
 
+    # Again, collect all time information
     for run in phases_by_name:
         runs_avg = {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0, 'rule_validation': 0.0}
         print(len(run))
@@ -367,7 +376,7 @@ def compare_phase_times_run_rewrites(domain, data, legend_outside=False):
     rule_minimization = list(map(lambda x: x['rule_minimization'], agg_phases))
     rule_validation = list(map(lambda x: x['rule_validation'], agg_phases))
 
-    # cancel out small validation
+    # cancel out small validation (just noise from function calls, etc. from logging)
     rule_validation = [0 if (x < 10e-2) else x for x in rule_validation]
     run_rewrites = [0 if (x < 10e-5) else x for x in run_rewrites]
 
@@ -375,6 +384,7 @@ def compare_phase_times_run_rewrites(domain, data, legend_outside=False):
 
     width = 0.6
 
+    # Grouped barchart
     ax.bar(x, run_rewrites, width/4, label="run_rewrites", color="burlywood")
     ax.bar(x + width/4, rule_discovery, width/4, label="rule_discovery", color="skyblue")
     ax.bar(x + width/2, rule_minimization, width/4, label="rule_minimization", color="firebrick")
