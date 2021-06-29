@@ -64,6 +64,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         self.to_constant().is_some()
     }
 
+    /// generalize a pattern
     fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {
         let nodes: Vec<_> = expr
             .as_ref()
