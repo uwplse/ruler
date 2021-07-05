@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 # determine physical directory of this script
-# h/t Zach
 src="${BASH_SOURCE[0]}"
 while [ -L "$src" ]; do
   dir="$(cd -P "$(dirname "$src")" && pwd)"
