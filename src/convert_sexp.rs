@@ -2,6 +2,7 @@ use std::io::BufRead;
 
 use crate::*;
 
+/// Convert CVC4's rewrites to Ruler's rule syntax.
 pub fn convert<L: SynthLanguage>(params: ConvertParams) {
     let infile = std::fs::File::open(&params.cvc_log).expect("can't open file");
     let reader = std::io::BufReader::new(infile);

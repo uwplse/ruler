@@ -1,3 +1,4 @@
+/// Helper function to cross product a list of values `ts` across `n` variables.
 pub fn self_product<T: Clone>(ts: &[T], n: usize) -> Vec<Vec<T>> {
     (0..n)
         .map(|i| {

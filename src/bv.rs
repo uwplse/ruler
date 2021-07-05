@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::*;
 
+
+/// General bitvector implementation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct BV<const N: u32>(pub Inner);
@@ -118,6 +120,7 @@ impl<const N: u32> From<Inner> for BV<N> {
     }
 }
 
+/// Macro for specializing `BV` to different sized bitvectors.
 #[macro_export]
 macro_rules! impl_bv {
     ($n:literal) => {
@@ -154,6 +157,7 @@ macro_rules! impl_bv {
         impl SynthLanguage for Math {
             type Constant = BV;
 
+            /// Converting CVC4's rewrites to Ruler's BV grammar syntax.
             fn convert_parse(s: &str) -> RecExpr<Self> {
                 let s = s
                     .replace("bvadd", "+")

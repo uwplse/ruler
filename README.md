@@ -67,7 +67,9 @@ Our paper has 4 quantitative evaluations:
   `bv32` with varying expression sizes (2, 3). The results are in `Table 1`.
 
 - Integrating with Herbie (`Section 5`): We show that Ruler's rules can 
-  be used to replace human-written rules by comparing the (Herbie)[https://github.com/uwplse/herbie] tool's results in fours different configurations: `None`, `Herbie`, `Ruler`, `Both`.
+  be used to replace human-written rules by
+  comparing the [Herbie](https://github.com/uwplse/herbie)
+  tool's results in fours different configurations: `None`, `Herbie`, `Ruler`, `Both`.
   The results are in `Figure 7`.
 
 - Search Parameter Analyis (`Section 6.1`): We profiled Ruler's search algorithm
@@ -123,15 +125,6 @@ This section describes how to install Ruler in a different machine,
   results in the paper on a different machine,
   and how to extend our tool for other domains.
 
-
-### Installation
-Ruler is implemented in [Rust](rust-lang.org/).
-You can install Rust [here](https://www.rust-lang.org/tools/install).
-You can then clone the repo and run the tool as described below.
-
-We tested our setup on macOS (Big Sur) and on [LINUXTODO].
-To build Ruler, type `cargo build`. This should take ~7 min.
-
 ### Dependencies
 To install and run the evaluation on a different machine,
   the following dependencies must be installed.
@@ -141,6 +134,22 @@ To install and run the evaluation on a different machine,
 - cvc4
 - herbie
 - racket
+
+### Installation
+Ruler is implemented in [Rust](rust-lang.org/).
+You can install Rust [here](https://www.rust-lang.org/tools/install).
+You can then clone the repo and run the tool as described below.
+
+We tested our setup on macOS (Big Sur) and on [LINUXTODO].
+To build Ruler, type `cargo build`. This should take ~7 min.
+
+### Usage:
+You can generate rules for a `domain` as follows:
+
+```cargo run --bin domain --release -- synth --iters i --variables v```
+
+Type `cargo domain --help` to see all available flags and parameters.
+
 
 ### Project Layout
 - The source code resides in the `src` directory.
@@ -166,11 +175,12 @@ To install and run the evaluation on a different machine,
 ### Extending Ruler to Support New Domains
 Ruler's goal is to support rewrite inference for new domains,
   given a grammar, an interpreter, and a validation technique.
+You can generate some basic documentation for the core implementation by typing
+```
+cargo doc --lib --no-deps
+```
+
 To understand how to add support for a new domain,
+  you can look at the documentation for `rational.rs` which
+  provides a detailed guideline.
 
-### Usage:
-You can generate rules for a `domain` as follows:
-
-```cargo run --bin domain --release -- synth --iters i --variables v```
-
-Type `cargo domain --help` to see all available flags and parameters.

@@ -29,13 +29,18 @@ pub use bv::*;
 pub use equality::*;
 pub use util::*;
 
+/// Return the `i`th letter from the English alphabet. 
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
     &alpha[i..i + 1]
 }
 
+/// Properties of cvecs in `Ruler`; currently onyl their length.
+/// cvecs are stored as [eclass analysis data](https://docs.rs/egg/0.6.0/egg/trait.Analysis.html).
 #[derive(Debug, Clone)]
 pub struct SynthAnalysis {
+    /// Length of cvec or characteristic vector.
+    /// All cvecs have the same length.    
     pub cvec_len: usize,
 }
 
@@ -45,6 +50,11 @@ impl Default for SynthAnalysis {
     }
 }
 
+/// Trait for defining a language for which `Ruler` will synthesize rewrites.
+///
+/// Every domain defines it own `Constant` type.
+/// `eval` implements an interpreter for the domain. It returns a `Cvec` of length `cvec_len`
+/// where each cvec element is computed using `eval`.
 pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
     type Constant: Clone + Hash + Eq + Debug + Display;
 
@@ -64,7 +74,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         self.to_constant().is_some()
     }
 
-    /// generalize a pattern
+    /// Generalize a pattern
     fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {
         let nodes: Vec<_> = expr
             .as_ref()
@@ -87,6 +97,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         Pattern::from(PatternAst::from(nodes))
     }
 
+    /// Instantiate a pattern
     fn instantiate(pattern: &Pattern<Self>) -> RecExpr<Self> {
         let nodes: Vec<_> = pattern
             .ast
@@ -105,6 +116,9 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         RecExpr::from(nodes)
     }
 
+    /// Heuristics for ranking rewrites based on number of variables,
+    /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
+    /// and number of ops.
     fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
         let sz_lhs = AstSize.cost_rec(&lhs.ast) as i32;
         let sz_rhs = AstSize.cost_rec(&rhs.ast) as i32;
@@ -151,9 +165,14 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         ]
     }
 
+    /// Initialize an egraph with variables and interesting constants from the domain.
     fn init_synth(synth: &mut Synthesizer<Self>);
+
+    /// Layer wise term enumeration in the egraph.
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self>;
 
+    /// Given a , `ctx`, i.e., mapping from variables to cvecs, evaluate a pattern, `pat`,
+    /// on each element of the cvec.
     fn eval_pattern(
         pat: &Pattern<Self>,
         ctx: &HashMap<Var, CVec<Self>>,
@@ -174,12 +193,15 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         buf.pop().unwrap().into_owned()
     }
 
+    /// Domain specific rule validation.
     fn is_valid(synth: &mut Synthesizer<Self>, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool;
 
+    /// helper functions to convert CVC4 rewrites to Ruler's rule syntax.
     fn convert_parse(s: &str) -> RecExpr<Self> {
         s.parse().unwrap()
     }
-
+    
+    /// convert CVC4 rewrites to Ruler's rule syntax.
     fn convert_eq(s: &str) -> Option<Equality<Self>> {
         use symbolic_expressions::{parser::parse_str, Sexp};
         let sexp = parse_str(s).unwrap();
@@ -193,6 +215,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         Equality::new(&l, &r)
     }
 
+    /// Entry point. Use the `synth` argument from the command line
+    /// for rule synthesis.
     fn main() {
         let _ = env_logger::builder().try_init();
         match Command::parse() {
@@ -210,6 +234,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
     }
 }
 
+/// A synthesizer for a given [SynthLanguage].
 pub struct Synthesizer<L: SynthLanguage> {
     pub params: SynthParams,
     pub rng: Pcg64,
@@ -220,6 +245,8 @@ pub struct Synthesizer<L: SynthLanguage> {
 }
 
 impl<L: SynthLanguage> Synthesizer<L> {
+
+    /// Initialize all the arguments of the [Synthesizer].
     pub fn new(params: SynthParams) -> Self {
         let mut synth = Self {
             rng: Pcg64::seed_from_u64(params.seed),
@@ -234,10 +261,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
         synth
     }
 
+    /// Get the eclass ids for all eclasses in the egraph.
     pub fn ids(&self) -> impl '_ + Iterator<Item = Id> {
         self.egraph.classes().map(|c| c.id)
     }
 
+    /// Create a [runner](https://docs.rs/egg/0.6.0/egg/struct.Runner.html).
     fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
 
@@ -274,6 +303,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         runner
     }
 
+    /// Apply current ruleset to the term egraph to minimize the term space.
     #[inline(never)]
     fn run_rewrites(&mut self) -> EGraph<L, SynthAnalysis> {
         // run the rewrites
@@ -305,6 +335,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
         runner.egraph
     }
 
+    /// Generate potential rewrite rule candidates by cvec_matching.
+    ///
+    /// Note that this is a pair-wise matcher which is invoked when conditional
+    /// rewrite rule inference is enabled.
     #[inline(never)]
     fn cvec_match_pair_wise(&self) -> EqualityMap<L> {
         let mut by_cvec: IndexMap<CVec<L>, Vec<Id>> = IndexMap::default();
@@ -352,11 +386,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
 
-        // TODO why is this needed
         new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
         new_eqs
     }
 
+    /// Generate potential rewrite rule candidates by cvec_matching.
+    /// This is a more efficient implementation that hashes the eclasses by their cvecs.
+    /// 
+    /// Note that this is only used when conditional rewrite rule inference is disabled.
     #[inline(never)]
     fn cvec_match(&self) -> (EqualityMap<L>, Vec<Vec<Id>>) {
         // build the cvec matching data structure
@@ -402,11 +439,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
 
-        // TODO why is this needed
         new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
         (new_eqs, by_cvec.into_iter().map(|pair| pair.1).collect())
     }
 
+    /// Top level function for rule synthesis.
     pub fn run(mut self) -> Report<L> {
         // normalize some params
         if self.params.rules_to_take == 0 {
@@ -563,6 +600,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 }
 
+/// Reports for each run of Ruler.
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "L: SynthLanguage")]
 pub struct Report<L: SynthLanguage> {
@@ -580,20 +618,24 @@ struct SlimReport<L: SynthLanguage> {
     eqs: Vec<Equality<L>>,
 }
 
+/// All parameters for rule synthesis.
 #[derive(Clap, Deserialize, Serialize)]
 #[clap(rename_all = "kebab-case")]
 pub struct SynthParams {
+    /// Seed for random number generator, used for random cvec value generation
     #[clap(long, default_value = "0")]
     pub seed: u64,
     /// How many random values to add to the cvecs
     #[clap(long, default_value = "0")]
     pub n_samples: usize,
+    /// Number of variables to add to the initial egraph
     #[clap(long, default_value = "3")]
     pub variables: usize,
 
     ///////////////////
     // search params //
     ///////////////////
+    /// Number of iterations
     #[clap(long, default_value = "1")]
     pub iters: usize,
     /// 0 is unlimited
@@ -607,12 +649,15 @@ pub struct SynthParams {
     /// disallows enumerating terms with constants past this iteration
     #[clap(long, default_value = "999999")]
     pub no_constants_above_iter: usize,
+    /// For enabling / disabling conditional rule inference
     #[clap(long)]
     pub no_conditionals: bool,
     #[clap(long)]
+    /// For turning off `run_rewrites`
     pub no_run_rewrites: bool,
     #[clap(long)]
     pub linear_cvec_matching: bool,
+    /// Output file name
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
 
@@ -661,6 +706,7 @@ pub struct SynthParams {
     pub do_final_run: bool,
 }
 
+/// Derivability report.
 #[derive(Clap)]
 #[clap(rename_all = "kebab-case")]
 pub struct DeriveParams {
@@ -671,6 +717,7 @@ pub struct DeriveParams {
     iter_limit: usize,
 }
 
+/// Report for rules generated by CVC4. 
 #[derive(Clap)]
 #[clap(rename_all = "kebab-case")]
 pub struct ConvertParams {
@@ -678,6 +725,8 @@ pub struct ConvertParams {
     out: String,
 }
 
+/// Ruler can be run to synthesize rules, compare two rulesets
+/// for derivability, and convert CVC4 rewrites to patterns in Ruler.
 #[derive(Clap)]
 #[clap(rename_all = "kebab-case")]
 pub enum Command {
@@ -723,6 +772,7 @@ macro_rules! map {
     };
 }
 
+/// The Signature represents eclass analysis data.
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
@@ -730,6 +780,7 @@ pub struct Signature<L: SynthLanguage> {
 }
 
 impl<L: SynthLanguage> Signature<L> {
+    /// A cvec is defined either it is empty or has at least one `Some` value.
     pub fn is_defined(&self) -> bool {
         self.cvec.is_empty() || self.cvec.iter().any(|v| v.is_some())
     }
@@ -798,6 +849,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 }
 
 impl<L: SynthLanguage> Synthesizer<L> {
+    /// Shrink the candidate space.
     #[inline(never)]
     fn shrink(
         &mut self,
@@ -897,6 +949,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         (keepers, bads)
     }
 
+    /// Apply rewrites rules as they are being inferred, to minimize the candidate space.
     #[inline(never)]
     fn choose_eqs(&mut self, mut new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
         let mut bads = EqualityMap::default();
@@ -921,6 +974,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         (new_eqs, bads)
     }
 
+    /// Alternate minimization algorithm which is currently not used.
     #[inline(never)]
     fn minimize(&mut self, new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
         assert!(self.params.minimize);
@@ -1027,6 +1081,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 }
 
+/// An alternate cost function that computes the number of operators in an term.
 pub struct NumberOfOps;
 impl<L: Language> egg::CostFunction<L> for NumberOfOps {
     type Cost = usize;

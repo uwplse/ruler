@@ -8,6 +8,7 @@ use rand_pcg::Pcg64;
 use z3::ast::Ast;
 use z3::*;
 
+/// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
 
 define_language! {
@@ -25,6 +26,7 @@ define_language! {
     }
 }
 
+/// Return a non-zero constant.
 fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
     if d.is_zero() {
         None
@@ -36,6 +38,7 @@ fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
 impl SynthLanguage for Math {
     type Constant = Constant;
 
+    /// Interpreter for rationals.
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
@@ -102,6 +105,7 @@ impl SynthLanguage for Math {
         Math::Num(c)
     }
 
+    /// Initialize an egraph with some constants and variables.
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
@@ -156,6 +160,7 @@ impl SynthLanguage for Math {
         synth.egraph = egraph;
     }
 
+    /// Term enumeration.
     fn make_layer(synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
         let mut to_add = vec![];
         for i in synth.ids() {
@@ -167,20 +172,21 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
                 to_add.push(Math::Div([i, j]));
-                // to_add.push(Math::Pow([i, j]));
             }
             if synth.egraph[i].data.exact {
                 continue;
             }
             to_add.push(Math::Abs(i));
             to_add.push(Math::Neg(i));
-            // to_add.push(Math::Reciprocal(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
         to_add
     }
 
+    /// Check the validity of a rewrite rule.
+    /// Depending on the value of `use_smt`, it either uses
+    /// Z3 to verify the rules or fuzzing to validate them.
     fn is_valid(
         synth: &mut Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
@@ -241,7 +247,7 @@ impl SynthLanguage for Math {
     }
 }
 
-// randomly sample so that they are not 0
+/// Return a randomply sampled BigInt that is not 0
 // Ratio::new will panic if the denom is 0
 pub fn gen_pos(rng: &mut Pcg64, bits: u64) -> BigInt {
     let mut res: BigInt;
@@ -254,6 +260,7 @@ pub fn gen_pos(rng: &mut Pcg64, bits: u64) -> BigInt {
     res
 }
 
+/// A sampler that generates both big and small rationals.
 pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Ratio<BigInt>> {
     let mut ret = vec![];
     for _ in 0..num_samples {
@@ -269,6 +276,7 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
     ret
 }
 
+/// Convert expressions to Z3's syntax.
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],
@@ -324,6 +332,7 @@ fn egg_to_z3<'a>(
     (buf.pop().unwrap(), assumes)
 }
 
+/// Entry point 
 fn main() {
     Math::main()
 }
