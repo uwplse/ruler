@@ -549,7 +549,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         println!("Learned {} rules in {:?}", num_rules, time);
         for eq in &eqs {
-            println!("  {:?}   {}", eq.score(), eq);
+            // println!("  {:?}   {}", eq.score(), eq);
+            println!("{}", eq);
         }
         println!("Learned {} rules in {:?}", num_rules, time);
         Report {

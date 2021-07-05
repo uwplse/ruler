@@ -71,7 +71,7 @@ impl SynthLanguage for Math {
         let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
 
         let consts = self_product(&consts, synth.params.variables);
-        println!("cvec len: {}", consts[0].len());
+        // println!("cvec len: {}", consts[0].len());
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: consts[0].len(),

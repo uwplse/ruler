@@ -36,8 +36,8 @@ Please download the `.ova` file [here]
 
 * To allow a quick verification of our artifact,
   we provided pre-generated data and
-results in the VM.
-You can therefore directly view the results (see below on how to do that).
+  results in the VM.
+  You can therefore directly view the results (see below on how to do that).
 
 * You can also generate only the plots from the
 pre-generated data (see below on how to do that).
@@ -54,10 +54,10 @@ cargo bool
 ```
 This should take less than a second (when ruler is pre-built)
   and should generate and print
-  5 rewrite rules on the console.
+  5 rewrite rules on the console and the time it took to infer them.
 
-TODO 1: supress the printing of costs
-TODO 2: supress the warning for cvc4 when some rules are invalid.
+TODO 1: supress the warning for cvc4 when some rules are invalid.
+TODO 2: install cvc4
 
 # Step-by-step
 

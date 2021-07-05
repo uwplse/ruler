@@ -243,7 +243,7 @@ macro_rules! impl_bv {
                     let vals = std::iter::repeat_with(|| synth.rng.gen::<BV>());
                     row.extend(vals.take(n_samples).map(Some));
                 }
-                println!("cvec len: {}", consts[0].len());
+                // println!("cvec len: {}", consts[0].len());
 
                 let mut egraph = EGraph::new(SynthAnalysis {
                     cvec_len: consts[0].len(),
