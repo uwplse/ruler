@@ -8,11 +8,12 @@ that uses equality saturation
  rulesets for a domain,
  given an interpreter.
 
-Below we first provide instructions for "Getting Started"
+- **Available**: The artifact is available on Zenodo at: [link]
+- **Functional**: Below we first provide instructions for "Getting Started"
   which should take [XXX] minutes.
 The next part is "Step-by-Step" which first lists the claims we
   made in the paper and provides instructions on how to validate them.
-Finally, we also provide instructions on "Extending Ruler"
+- **Reusable**: Finally, we also provide instructions on "Further Use / Extending Ruler"
   which describes how to install Ruler
   on a different machine,
   modify the code, and
@@ -56,9 +57,6 @@ This should take less than a second (when ruler is pre-built)
   and should generate and print
   5 rewrite rules on the console and the time it took to infer them.
 
-TODO 1: supress the warning for cvc4 when some rules are invalid.
-TODO 2: install cvc4
-
 ## Step-by-step
 
 Our paper has 4 quantitative evaluations:
@@ -93,17 +91,20 @@ The results are shown in `Table 2`.
 
 Below we describe how to run our artifact and reproduce all of them.
 
-
 ### Comparing with CVC4
+The goal is to reproduce `Table 1`.
+- Type `cd scripts/cvc-eval/` to go to the correct directory.
+- To simply look at the pre-run results,
+type `make` and it will print it to the terminal.
+- To regenerate the table, type `make clean` to remove all
+ pre-generated results and run `make` again.
+This will take [XXX] minutes.
 
 ### Integrating with Herbie
 
+
 ### Search Parameter Analysis
-Search ablation aims to examine how different configurations
-affect the search. 
-In particular, we are interested in the effect of
-run-rewrites, particularly when selecting only one rule at a time,
-and the effect of changing how many rules are selected.
+The goal is to reproduce `Figure 8` and `Figure 9`.
 
 - How to run
 ablation.sh script (choose between pre-gen and your own - long)
@@ -120,9 +121,8 @@ Modify script run.sh
 
 
 ## Further Use / Extending Ruler
-This section describes how to install Ruler in a different machine,
-  the required dependencies and installation guidelines to reproduce the
-  results in the paper on a different machine,
+This section describes how to install Ruler on a different machine,
+  the required dependencies,
   and how to extend our tool for other domains.
 
 ### Dependencies
@@ -166,7 +166,7 @@ Type `cargo domain --help` to see all available flags and parameters.
      but should give an idea of how to add support for other domains.
      See below for more information on supporting other domains.
 - `scripts` has all the scripts used for evaluating Ruler --- each is in a
-    designated subdirectory.
+    designated subdirectory. `compare.py` and `add-arrows.py` are used for the CVC4 comparison.
 - `Makefile` is for the CVC4 evaluation.
 - `cvc4/` has some of the grammars from CVC4's rule inference tool that we used
    for our evaluation in `Section 4`.
@@ -175,12 +175,18 @@ Type `cargo domain --help` to see all available flags and parameters.
 ### Extending Ruler to Support New Domains
 Ruler's goal is to support rewrite inference for new domains,
   given a grammar, an interpreter, and a validation technique.
-You can generate some basic documentation for the core implementation by typing
+You can generate documentation for the core implementation by typing
 ```
 cargo doc --lib --no-deps
 ```
+The main flags come with documentation.
+To run Ruler with different flags,
+see the various example usages in `.cargo/config` and try replacing them with
+other values and look at the results!
+For example, you can try
+`cargo run --release --bin rational -- synth --num-fuzz 10 --iters 2` to synthesize
+rewrite rules for rationals till depth 2, and by using fuzzing (with 10 values) for rule validation.
 
 To understand how to add support for a new domain,
-  you can look at the documentation for `rational.rs` which
-  provides a detailed guideline.
+  you can look at the documentation for `rational.rs`.
 
