@@ -1,0 +1,18 @@
+(set-logic BV)
+(synth-fun f ((x Bool) (y Bool) (z Bool) (w Bool)) Bool
+  ((Start Bool))
+  (
+   (Start Bool (
+     x
+     y
+     z
+     w
+;     true
+;     false
+     (and Start Start)
+     (not Start)
+     (or Start Start)
+     (xor Start Start)
+   ))
+))
+(check-synth)
