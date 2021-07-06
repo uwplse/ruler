@@ -94,14 +94,37 @@ Below we describe how to run our artifact and reproduce all of them.
 ### Comparing with CVC4
 The goal is to reproduce `Table 1`.
 - Type `cd scripts/cvc-eval/` to go to the correct directory.
-- To simply look at the pre-run results,
-type `make` and it will print it to the terminal.
-- To regenerate the table, type `make clean` to remove all
+
+- To generate the table from the pre-run results,
+type `make` and it will print it to the terminal instantly.
+
+- To regenerate the data, type `make clean` to remove all
  pre-generated results and run `make` again.
-This will take [XXX] minutes.
+ This will take approximately 1.5 hours.
+
+Note that the number of rules and the timings
+  will not match exactly with what
+  we reported in the paper because
+  the VM is less powerful than the machine
+  we had for running the eval in the paper, and
+  the heuristics may have slightly different effects.
 
 ### Integrating with Herbie
-
+The goal is to reproduce `Figure 7`.
+Herbie is an external tool which we used for this evaluation.
+Therefore to avoid any issues that may come up due to Herbie,
+  we have uploaded our pre-generated data and the plots that we have in the paper.
+- Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
+- To view the provided plots, go to `output/ruler-herbie-eval/results/2021-04-13-1331-pre-gen`
+and open the followin three PDFs
+    * for `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
+    * for `Figure 7b`: `by-config-all-tests-output_parens-boxplot.pdf`
+    * for `Figure 7c`: `by-config-all-tests-time-boxplot.pdf`
+We also provide various other plots that you are welcome to look at! These are
+however not presented in the paper.
+- To reproduce all the data
+(not recommended as it is slow, and Herbie can be hard to debug),
+type ``
 
 ### Search Parameter Analysis
 The goal is to reproduce `Figure 8` and `Figure 9`.
@@ -183,7 +206,7 @@ You can install Rust [here](https://www.rust-lang.org/tools/install).
 You can then clone the repo and run the tool as described below.
 
 We tested our setup on macOS (Big Sur) and on [LINUXTODO].
-To build Ruler, type `cargo build`. This should take ~7 min.
+To build Ruler, type `cargo build --release`. This should take ~40 min.
 
 ### Usage:
 You can generate rules for a `domain` as follows:

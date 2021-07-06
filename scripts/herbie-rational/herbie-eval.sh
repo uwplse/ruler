@@ -137,6 +137,11 @@ jq '[ .[] | .[] | select(length != 4) ]' by_test_then_seed.json > all-bad.json
 jq 'flatten' all-bad.json > all-bad.json.tmp
 mv all-bad.json.tmp all-bad.json
 
+rm -rf "herbie-only"
+rm -rf "ruler-only"
+rm -rf "herbie-ruler"
+rm -rf "herbie-no-simpl"
+
 popd
 #
 #   PLOT RESULTS
@@ -144,3 +149,4 @@ popd
 
 $MYDIR/seed-stats-per-test.sh "$DIR/results/$tstamp"
 $MYDIR/plots/plot-results.sh "$DIR/results/$tstamp"
+

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# using infra from Zach's scripts
-
 # determine physical directory of this script
 src="${BASH_SOURCE[0]}"
 while [ -L "$src" ]; do
