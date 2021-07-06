@@ -165,12 +165,14 @@ This section describes how to install Ruler on a different machine,
 ### Dependencies
 To install and run the evaluation on a different machine,
   the following dependencies must be installed.
-- xsv
-- python
-- rosette
-- cvc4
+
+- python3
+- rosette 4.0
+- cvc4 version 1.8
 - herbie
 - racket
+- pandoc
+- xsv
 
 ### Installation
 Ruler is implemented in [Rust](rust-lang.org/).
