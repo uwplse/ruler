@@ -7,7 +7,7 @@ SHELL=/usr/bin/env bash
 all:
 
 rust-src=$(shell find ../../src/ -type f)
-cvc4=cvc4 \
+cvc4=./cvc4-1.8-x86_64-linux-opt \
   --sygus-rr-synth              \
   --sygus-rr-synth-check        \
   --no-sygus-sym-break          \
@@ -94,19 +94,19 @@ $(eval $(call synthesize,bv32,3,3,0))
 
 .PHONY: latex-report
 latex-report: $(diffs)
-	compare.py $^ | pandoc -f csv -t latex --columns 200 | sed 's/tabularnewline/\\/'
+	python3 compare.py $^ | pandoc -f csv -t latex --columns 200 | sed 's/tabularnewline/\\/'
 
 .PHONY: report
 report: $(diffs)
-	compare.py $^ | xsv table
+	python3 compare.py $^ | ./xsv table
 
 .PHONY: report-no-consts
 report-no-consts: $(diffs-no-consts)
-	compare.py $^ | xsv table
+	python3 compare.py $^ | ./xsv table
 
 .PHONY: latex-report-no-consts
 latex-report-no-consts: $(diffs-no-consts)
-	compare.py $^ | pandoc -f csv -t latex --columns 200 | sed 's/tabularnewline/\\/'
+	python3 compare.py $^ | pandoc -f csv -t latex --columns 200 | sed 's/tabularnewline/\\/'
 
 .PHONY: ruler-reports
 ruler-reports: $(ruler-reports)
