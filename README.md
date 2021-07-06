@@ -128,9 +128,6 @@ In the published evaluation, we ran with 3 variables,
 Figure 8 in the paper corresponds to the `by-domain-phase-times.pdf`
 plot. Figure 9 comprises the rest of the pdf plots.
 
-- What you might exepct to see
-Do we need this section? It should just be whatever we discussed in the paper, right?
-
 - How to change parameters to get different results
 `run.sh` controls the entire experiment.
 It calls `run-ruler.sh` and `run-ruler-rr.sh`
