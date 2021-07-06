@@ -29,7 +29,7 @@ Please download the `.ova` file [here]
 * Next, please open the virtual machine image in virtual box by clicking on the
   green `Start` button.
 
-* Login is automatic, but in case needed, the password is: `oopsla21`.
+* Login is automatic, but in case needed, the password is: `ruler`.
 
 * The terminal should be open at startup. The project repository is already
   cloned.  Navigate to the `ruler` directory.  All the required packages
@@ -163,13 +163,19 @@ This section describes how to install Ruler on a different machine,
 To install and run the evaluation on a different machine,
   the following dependencies must be installed.
 
+- git
 - python3
 - rosette 4.0
 - cvc4 version 1.8
-- herbie
+- herbie (only if you want to reproduce all the results)
 - racket
 - pandoc
 - xsv
+- moreutils
+- cmake
+- curl
+- rust
+- sudo apt-get install python3-distutils
 
 ### Installation
 Ruler is implemented in [Rust](rust-lang.org/).
@@ -226,3 +232,4 @@ rewrite rules for rationals till depth 2, and by using fuzzing (with 10 values) 
 To understand how to add support for a new domain,
   you can look at the documentation for `rational.rs`.
 
+TODO:; rm -rf .git to remove git history and terminal history
