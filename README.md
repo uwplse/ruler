@@ -53,7 +53,7 @@ To check that you are able to run Ruler, type the following in the command line:
 ```
 cargo bool
 ```
-This should take less than a second (when ruler is pre-built)
+This should take less than a second (when ruler is pre-built, and it is)
   and should generate and print
   5 rewrite rules on the console and the time it took to infer them.
 
