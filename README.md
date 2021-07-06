@@ -137,9 +137,11 @@ will be generated.
 When run with the parameter `-r generate-new`,
 you will be able to run your own evaluation with new data.
 
+
 - What happens
 We run Ruler with different configurations,
-saving each run to its own timestamped folder,
+saving each run to its own timestamped folder
+under `scripts/ablation/output`,
 and then parse statistics from the log outputs.
 These statistics are collected into json files
 and then plotted in matplotlib.
