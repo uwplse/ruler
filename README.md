@@ -106,14 +106,48 @@ This will take [XXX] minutes.
 ### Search Parameter Analysis
 The goal is to reproduce `Figure 8` and `Figure 9`.
 
-- How to run
-ablation.sh script (choose between pre-gen and your own - long)
+The script `ablation.sh` is provided as a convenient
+entrypoint. 
+When run with the parameter `-r use-existing`, 
+lots using the data provided will be generated.
+When run with the parameter `-r generate-new`,
+you will be able to run your own evaluation with new data.
+
 - What happens
-We run each configuration and collect statistics.
-Results availble as pdfs.
+We run Ruler with different configurations,
+saving each run to its own timestamped folder,
+and then parse statistics from the log outputs.
+These statistics are collected into json files
+and then plotted in matplotlib.
+Resultant pdf plots are available inside the 
+timestamped folder for that experiment.
+
+In the published evaluation, we ran with 3 variables,
+5 iterations, over 10 runs.
+Figure 8 in the paper corresponds to the `by-domain-phase-times.pdf`
+plot. Figure 9 comprises the rest of the pdf plots.
+
 - What you might exepct to see
+Do we need this section? It should just be whatever we discussed in the paper, right?
+
 - How to change parameters to get different results
-Modify script run.sh
+`run.sh` controls the entire experiment.
+It calls `run-ruler.sh` and `run-ruler-rr.sh`
+for each domain, then calls the parsing and visualizing scripts.
+`run-ruler.sh` and `run-ruler-rr.sh` will call Ruler 
+for a particular domain
+with the parameters provided, for as many runs as required.
+To change the parameters, simply modify the arguments 
+passed to `run-ruler.sh` and `run-ruler-rr.sh` 
+from inside `run.sh`.
+`-v` is the number of variables, `-i` is the iterations,
+and `-r` is number of runs (i.e. providing 
+how many independent data points we average over).
+`-d` is the domain.
+
+Note that timing results should only be compared between 
+themselves and not as absolute values, since logging is enabled
+during the ablation runs.
 
 ### Validation Analysis
 
