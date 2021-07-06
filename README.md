@@ -109,7 +109,8 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
 The script `ablation.sh` is provided as a convenient
 entrypoint. 
 When run with the parameter `-r use-existing`, 
-lots using the data provided will be generated.
+lots using the data provided (in the folder `submitted-data`) 
+will be generated.
 When run with the parameter `-r generate-new`,
 you will be able to run your own evaluation with new data.
 
@@ -143,7 +144,9 @@ from inside `run.sh`.
 `-v` is the number of variables, `-i` is the iterations,
 and `-r` is number of runs (i.e. providing 
 how many independent data points we average over).
-`-d` is the domain.
+`-d` is the domain. `-o` is the output folder.
+Lastly, any succeeding parameters will be
+passed directly to the Ruler invocation.
 
 Note that timing results should only be compared between 
 themselves and not as absolute values, since logging is enabled

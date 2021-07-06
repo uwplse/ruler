@@ -9,9 +9,6 @@ while [ -L "$src" ]; do
 done
 MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
-# TODO replace bool etc with a parameter
-# TODO properly parameterize the number of iterations
-
 export RUST_LOG="ruler=info,egg=warn";
 
 # num_runs
