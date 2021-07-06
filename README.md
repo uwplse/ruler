@@ -208,7 +208,8 @@ You can install Rust [here](https://www.rust-lang.org/tools/install).
 You can then clone the repo and run the tool as described below.
 
 We tested our setup on macOS (Big Sur) and on [LINUXTODO].
-To build Ruler, type `cargo build --release`. This should take ~40 min.
+To build Ruler, type `cargo build --release`.
+This should take ~40 min.
 
 ### Usage:
 You can generate rules for a `domain` as follows:
@@ -246,15 +247,21 @@ You can generate documentation for the core implementation by typing
 ```
 cargo doc --lib --no-deps
 ```
-The main flags come with documentation.
-To run Ruler with different flags,
+Open `target/doc/ruler/index.html` in your preferred browser to navigate the documentation.
+To run Ruler with different flags (documentation at `SynthParams.html`)
 see the various example usages in `.cargo/config` and try replacing them with
 other values and look at the results!
 For example, you can try
-`cargo run --release --bin rational -- synth --num-fuzz 10 --iters 2` to synthesize
-rewrite rules for rationals till depth 2, and by using fuzzing (with 10 values) for rule validation.
+```
+cargo run --release --bin rational -- synth --num-fuzz 10 --iters 2
+```
+to synthesize
+rewrite rules for rationals till depth 2,
+and by using fuzzing (with 10 values) for rule validation.
 
 To understand how to add support for a new domain,
-  you can look at the documentation for `rational.rs`.
+  you can look at `rational.rs`.
+Essentially,
+
 
 TODO:; rm -rf .git to remove git history and terminal history
