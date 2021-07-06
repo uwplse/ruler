@@ -1,3 +1,7 @@
+/*!
+Experimental String domain.
+!*/
+
 use egg::*;
 use ruler::*;
 
@@ -8,6 +12,7 @@ use std::fmt;
 
 pub type SmallStr = SmallVec<[u8; 24]>;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Two types of Constants: Num and Str.
 pub enum Constant {
     Num(i64),
     Str(SmallStr),
@@ -60,6 +65,7 @@ impl std::str::FromStr for Constant {
 }
 
 define_language! {
+    /// Defines operators for Strings.
     pub enum Lang {
         "str.++" = Concat([Id; 2]),
         "str.replace" = Replace([Id; 3]),
@@ -76,6 +82,7 @@ define_language! {
     }
 }
 
+/// Concatenate strings.
 fn concat(a: &[u8], b: &[u8]) -> SmallStr {
     a.iter().chain(b).copied().collect()
 }
@@ -332,6 +339,7 @@ impl SynthLanguage for Lang {
     }
 }
 
+/// Entry point.
 fn main() {
     Lang::main()
 }

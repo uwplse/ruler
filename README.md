@@ -248,9 +248,9 @@ You can generate documentation for the core implementation by typing
 cargo doc --lib --no-deps
 ```
 Open `target/doc/ruler/index.html` in your preferred browser to navigate the documentation.
+
 To run Ruler with different flags (documentation at `SynthParams.html`)
-see the various example usages in `.cargo/config` and try replacing them with
-other values and look at the results!
+see the various example usages in `.cargo/config` and try replacing them with other values and look at the results!
 For example, you can try
 ```
 cargo run --release --bin rational -- synth --num-fuzz 10 --iters 2
@@ -260,8 +260,12 @@ rewrite rules for rationals till depth 2,
 and by using fuzzing (with 10 values) for rule validation.
 
 To understand how to add support for a new domain,
-  you can look at `rational.rs`.
-Essentially,
-
+  you can look at the documentation of the various supported domains like
+   `rational` (`target/doc/rational/index.html`),
+   `rational_new_div` (`target/doc/rational_new_div/index.html`, relevant for `Section 6.3` in the paper),
+   `bool` (`target/doc/bool/index.html`), etc.
+Note that some domains (e.g., floats, strings, bigints)
+are experimental and not reported in the paper,
+but they all provide examples of how you can add support for new domains.
 
 TODO:; rm -rf .git to remove git history and terminal history

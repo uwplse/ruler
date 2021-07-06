@@ -138,6 +138,7 @@ macro_rules! impl_bv {
         pub type BV = $crate::BV::<$n>;
 
         egg::define_language! {
+            /// Define the operators for the domain.
             pub enum Math {
                 "+" = Add([Id; 2]),
                 "--" = Sub([Id; 2]),

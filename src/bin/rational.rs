@@ -1,3 +1,14 @@
+/*!
+   Here is an example of how to implement a domain for Ruler to infer rewrites.
+   This shows the domain of rationals.
+   You need to
+   - define the operators in the language with `define_language`,
+   - implement `eval` which is the interpreter for your domain,
+   - implement `init_synth` to add the variables and important constants to the initial egraph,
+   - implement `make_layer` to enumerate terms in the egraph,
+   - implement `is_valid` for checking the validity of the rules in your domain.
+!*/
+
 use egg::*;
 use ruler::*;
 
@@ -12,6 +23,7 @@ use z3::*;
 pub type Constant = Ratio<BigInt>;
 
 define_language! {
+    /// Define the operators for the domain.
     pub enum Math {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
@@ -276,7 +288,7 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
     ret
 }
 
-/// Convert expressions to Z3's syntax.
+/// Convert expressions to Z3's syntax for using SMT based rule verification.
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],

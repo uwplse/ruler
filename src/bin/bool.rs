@@ -1,9 +1,16 @@
+/*!
+Domain of Booleans.
+The rewrites for this small domain are correct by construction as
+they are model checked.
+!*/
+
 use egg::*;
 use ruler::*;
 
 use std::ops::*;
 
 define_language! {
+    /// Define the operators for the domain.
     pub enum Math {
         "~" = Not(Id),
         "&" = And([Id; 2]),
@@ -129,6 +136,7 @@ impl SynthLanguage for Math {
     }
 }
 
+/// Entry point.
 fn main() {
     Math::main()
 }
