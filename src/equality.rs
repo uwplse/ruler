@@ -185,7 +185,8 @@ impl<L: SynthLanguage> Equality<L> {
         }
     }
 
-    /// Assign a score to this Equality.
+    /// Assign a score to this Equality using heursitics mentioned in the Ruler paper
+    /// (page 11, footnote 5).
     pub fn score(&self) -> impl Ord + Debug {
         L::score(&self.lhs, &self.rhs)
     }

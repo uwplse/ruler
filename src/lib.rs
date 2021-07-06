@@ -1,3 +1,10 @@
+/*! `Ruler` is a framework for automatically inferring rewrite rules using equality saturation.
+It uses equality saturation in two novel ways to scale the rule synthesis:
+    1. to minimize the term space from which candidate rules are selected,
+   and 2. to minimize the candidate rule space by removing redundant rules based on rules
+   currently in the ruleset.
+
+!*/
 use clap::Clap;
 use egg::*;
 use rand::SeedableRng;
@@ -21,8 +28,13 @@ mod derive;
 mod equality;
 mod util;
 
+/// Faster hashMap implementation used in rustc
 pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
+
+/// Faster hashSet implementation used in rustc
 pub type HashSet<K> = rustc_hash::FxHashSet<K>;
+
+/// IndexMap data implementation used in rustc
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
 
 pub use bv::*;
@@ -444,6 +456,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     /// Top level function for rule synthesis.
+    /// This corresponds to `Figure 4` in the Ruler paper, where
+    /// all the key components of `Ruler` (e.g., `make_layer`, `run_rewrites`, `cvec_match`, `choose_eqs`) are invoked.
     pub fn run(mut self) -> Report<L> {
         // normalize some params
         if self.params.rules_to_take == 0 {
@@ -697,11 +711,13 @@ pub struct SynthParams {
     // eqsat soundness params //
     ///////////////////
     // for validation approach
+    /// random testing based validation
     #[clap(long, default_value = "0")]
     pub num_fuzz: usize,
+    /// SMT based verification (uses Z3 for the current prototype)
     #[clap(long, conflicts_with = "num-fuzz")]
     pub use_smt: bool,
-    // for final round of run_rewrites
+    /// For a final round of run_rewrites to remove redundant rules.
     #[clap(long)]
     pub do_final_run: bool,
 }
@@ -735,9 +751,13 @@ pub enum Command {
     ConvertSexp(ConvertParams),
 }
 
+/// A mapping from a name to an `Equality`.
 pub type EqualityMap<L> = IndexMap<Arc<str>, Equality<L>>;
+
+/// A CVec is a data structure that stores the result of evaluating a term on concrete inputs.
 pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
 
+/// Simple macro for generating cvecs for unary, binary, and ternary ops.
 #[macro_export]
 macro_rules! map {
     ($get:ident, $a:ident => $body:expr) => {
