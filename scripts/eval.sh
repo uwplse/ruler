@@ -1,19 +1,24 @@
-# dummy script for now.
+echo "Starting CVC4 comparison"
 # cvc4 experiment
-cd ..
+pushd cvc4-eval
 make
-cd scripts
-
-# herbie experiment
-pushd herbie-rational
-./herbie-eval.sh 30
 popd
 
+echo "Starting Herbie Eval with 5 seeds"
+# herbie experiment
+pushd herbie-rational
+./herbie-eval.sh 5
+popd
+
+echo "Starting Search Parameter Analysis"
 # search ablation
 pushd ablation
 ./ablation.sh -r generate-new
 popd
 
+echo "Starting eqsat soundness"
 # eqsat soundness
 pushd eqsat-sound
 ./eqsat-soundness.sh
+
+echo "Done"

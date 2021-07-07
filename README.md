@@ -146,11 +146,12 @@ We recommend trying with `5` seeds
 (type `./herbie-eval.sh 5`)
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
 `output/ruler-herbie-eval/results/`) -- they should be similar.
-In the paper we ran with `30` seeds but that will take over 10 hours,
+You may notice some timeouts / errors on some benchmarks but those is due to Herbie, not Ruler.
+In the paper we ran the experiment with `30` seeds but that will take over 10 hours,
 and is better run on a real machine as opposed to a VM because it will
-generate more data.
+generate more data and will be much slower on the VM.
 Other Herbie specific
-arguments are set to their defaults but
+arguments to the `herbie-eval.sh` script are set to their defaults but
 the script has documentation for how to change them.
 The script will print the configuration being used.
 To map them to the figure, use the following guide:
@@ -183,7 +184,7 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
 `Figure 8` in the paper corresponds to the `10-run/by-domain-phase-times.pdf` plot.
 `Figure 9a` plots are the pdfs under `10-run/bv4`, `10-run/bv32`, and `10-run/rat`.
 `Figure 9b` plots are the pdfs under `orat-rr/bv4`, `orat-rr/bv32`, and `orat-rr/rat`
-(`orat` means `One Rule At A Time` which corresponds to `n = 1` in the caption in the paper).
+(`orat` means "One Rule At A Time" which corresponds to `n = 1` in the caption in the paper).
 - To make plots from the pre-generated data,
 type `./ablation.sh -r use-existing`.
 This will make plots using the data provided in the folder `submitted-data`
@@ -241,9 +242,21 @@ the offending log file from the failed run and rerunning
 the parsing and plotting scripts.)
 
 ### Validation Analysis
+The goal is to reproduce `Table 2`.
+This part of the eval requires rosette 4.0 and racket 8.0 which
+are already pre-installed in this directory.
+- Type `cd scripts/eqsat-sound` to go to the correct directory.
+- To view `Table 2` directly from pre-generated data, go to
+    `output/pre-gen-` and type: `python3 ../../tabulate.py all.json` and compare the printed table with the paper.
+- To reproduce all the data, type `./eqsat-soundness.sh`.
+This will take [XXX] hours.
 
-
-
+#### Additional information about the scripts.
+`eqsat-soundness.sh` is the main script which runs
+all three domains (`bv4`, bv32, `rational`)
+for various cvec lengths, ways of generating cvecs, and
+validation approaches.
+It calls the `aggregate.sh` script to gather data into a json file from which `tabulate.py` generates a latex table.
 
 ## Further Use / Extending Ruler
 This section describes how to install Ruler on a different machine,
@@ -277,6 +290,10 @@ To install and run the entire evaluation on a
   * python3-distutils
   * jq
   * matplotlib
+
+The `scripts/eval.sh` can be used to run all the experiments with a single
+script but since they all take varying amounts of time,
+we recommend doing them separately.
 
 ### Installation of Ruler
 Ruler is implemented in [Rust](rust-lang.org/).
