@@ -60,7 +60,7 @@ function do_seed {
   seed_output="$output/$(printf "%03d" "$seed")"
   mkdir -p "$seed_output"
 
-  ./racket/bin/racket "$HERBIE/src/herbie.rkt" report \
+  $MYDIR/racket/bin/racket "$HERBIE/src/herbie.rkt" report \
     --threads yes \
     --seed "$seed" \
     --num-enodes "$NUM_NODES" \
