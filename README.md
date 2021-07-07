@@ -124,7 +124,7 @@ Herbie is an external tool which we used for this evaluation.
 Therefore to avoid any issues that may come up due to Herbie,
   we have uploaded our pre-generated data and the plots that we have in the paper.
 - Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
-- To view the provided plots, go to `output/ruler-herbie-eval/results/2021-04-13-1331-pre-gen`
+- To view the provided plots, go to `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`
 and open the followin three PDFs
     * for `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
     * for `Figure 7b`: `by-config-all-tests-output_parens-boxplot.pdf`
@@ -144,6 +144,9 @@ Other arguments are set to default but the script has documentation for how to c
 
 #### Additional information about the scripts.
 `herbie-eval.sh` is the main script and it has comments to indidate what it does.
+`seed-variance.sh` is the script that runs Herbie with different seeds and generates the reports.
+All results are saved in `output/ruler-herbie-eval/results/` under timestamped directories.
+The rules used are also saved in a txt file.
 Since we are still actively working on Ruler, there
 are some scripts that may not be relevant for this part of the evaluation.
 Below are the scripts relevant for this eval and a brief description of what they do:
