@@ -20,18 +20,21 @@ The next part is "Step-by-Step" which first lists the claims we
   perform further experiments.
 
 ## Getting started
+We recommend running the VM on a machine with at least 32GB RAM.
 Please download the `.ova` file [here]
   and open it with Virtual Box by
   going to `File -> import appliance` and giving the path to the `.ova` file
   and clicking on `continue`. In the next window that pops up, click on
   `Import`. It should take a few minutes to import.
+  Please change the RAM to 24 GB and allocate 4 processors by going to
+  `Settings` under `System -> Motherboard` and `System -> Processor` respectively.
 
 * Next, please open the virtual machine image in virtual box by clicking on the
   green `Start` button.
 
 * Login is automatic, but in case needed, the password is: `ruler`.
 
-* The terminal should be open at startup. The project repository is already
+* Open a terminal window. The project repository is already
   cloned.  Navigate to the `ruler` directory.  All the required packages
   are already installed and Ruler is already compiled for you, ready to be run.
 
