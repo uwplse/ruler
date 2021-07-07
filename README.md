@@ -40,9 +40,6 @@ Please download the `.ova` file [here]
   results in the VM.
   You can therefore directly view the results (see below on how to do that).
 
-* You can also generate only the plots from the
-pre-generated data (see below on how to do that).
-
 * To run the tool yourself entirely from scratch,
 first delete all the results directories (as shown below)
 and follow the instructions.
