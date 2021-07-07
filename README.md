@@ -40,9 +40,13 @@ Please download the `.ova` file [here]
   results in the VM.
   You can therefore directly view the results (see below on how to do that).
 
-* To run the tool yourself entirely from scratch,
-first delete all the results directories (as shown below)
-and follow the instructions.
+* You can also run the tool yourself entirely from scratch,
+as shown below for each section of the evaluation.
+Note that in the paper,
+  the evaluations were often done is larger scale
+  which is not possible on the VM.
+We have provided recommendations on how to run it on a smaller scale (e.g., fewer
+iterations, fewer seeds) when possible.
 
 ### Kick the tires
 
