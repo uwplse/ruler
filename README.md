@@ -215,7 +215,8 @@ We recommend trying with `15` seeds
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
 `output/ruler-herbie-eval/results/`) -- they should be similar.
 In the VM this should take approximately [XXX] hours.
-You may notice some timeouts / errors on some benchmarks but those is due to Herbie, not Ruler.
+You may notice some timeouts / errors on some benchmarks but those are due to Herbie, not Ruler.
+
 In the paper we ran the experiment with `30` seeds (on a large machine) but that takes much longer,
 and is better run on a real machine as opposed to a VM because it will
 generate more data and will be much slower on the VM.
@@ -257,7 +258,7 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
  (`orat` means "One Rule At a Time" which corresponds to `n = 1` in the caption in the paper).
 
 - To make plots from the pre-generated data,
-  type `./ablation.sh -r use-existing`.
+  run `./ablation.sh -r use-existing`.
 This will make plots using the data provided in the folder `submitted-data`
   and put them into the `output` folder.
 It will also print some of the data in the terminal, which we used
@@ -267,7 +268,7 @@ The `.tar` file in the `submitted-data` folder contains the log of each run.
 This is not used, and is provided for interest only.
 
 - To run your own evaluation and make new plots from scratch,
-type  `./ablation.sh -r generate-new`.
+run  `./ablation.sh -r generate-new`.
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
 under `output/`,
@@ -320,12 +321,12 @@ from inside `run.sh`.
 Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
 
-**NOTE: If for some reason a run of Ruler fails to find rules,
+NOTE: If for some reason a run of Ruler fails to find rules,
 the entire pipeline will fail and no plots will be generated,
 so please keep an eye out for failures. 
 You can temporarily generate the plots by removing
 the log file of the aborted run and rerunning
-the parsing and plotting scripts as they are invoked in `run.sh`, i.e.**
+the parsing and plotting scripts as they are invoked in `run.sh`, i.e.,
 
 ```
 node parse.js "output/$TIMESTAMP/compare/"
@@ -353,7 +354,7 @@ are already pre-installed in this directory.
   the ones with only a `-` in the paper's `Table 2`.
 
 - To reproduce all the data,
-type `./eqsat-soundness.sh`.
+run `./eqsat-soundness.sh`.
 This will take [XXX] hours.
 The data will be generated and put in a timestamped directory under `output`.
 Each domain and configuration will have a directory and `all.json` will contain
@@ -455,7 +456,7 @@ Ruler's goal is to support rewrite inference for new domains,
 We have already generated documentation for you.
 Open `target/doc/ruler/index.html` in your preferred browser to navigate the documentation.
 
-You can generate documentation on your own in a new machine by typing:
+You can generate documentation on your own in a new machine by running:
 
 ```
 cargo doc --no-deps
@@ -469,8 +470,8 @@ For example, you can try
 cargo run --release --bin rational -- synth --num-fuzz 10 --iters 2
 ```
 to synthesize
-rewrite rules for rationals till depth 2,
-and by using fuzzing (with 10 values) for rule validation.
+rewrite rules for rationals till depth 2
+using fuzzing (with 10 values) for rule validation.
 
 To understand how to add support for a new domain,
   you can look at the documentation of the various supported domains like
