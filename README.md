@@ -134,16 +134,21 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
 - Type `cd scripts/ablation` to go to the correct directory.
 - To make plots from the pre-generated data,
 type `./ablation.sh -r use-existing`.
-This will make plots using the data provided in the folder `output/submitted-data` TODO?? is this right?.
+This will make plots using the data provided in the folder `submitted-data`
+and put them into the `output` folder.
 It will also print some of the data in the terminal, which we used
 for debugging.
 Feel free to ingore that.
+The .tar file in the `submitted-data` folder contains the log of each run.
+For convenience, we have also included the plots submitted 
+along with the paper in `submitted-plots`.
 - To run your own evaluation and make new plots from scratch,
 type  `./ablation.sh -r generate-new`.
-This will take approximately [XXX] hours.
+With the default settings provided,
+this will take approximately 12 hours.
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
-under `scripts/ablation/output`,
+under `output/`,
 and then parses the statistics from the log outputs.
 These statistics are collected into json files
 and then plotted in matplotlib.
@@ -177,6 +182,13 @@ from inside `run.sh`.
 - `-o` is the output folder.
 Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
+
+If for some reason a run of Ruler fails to find rules,
+the entire pipeline will fail and no plots will be generated,
+so please keep an eye out for failures. 
+(You can temporarily generate the plots by removing
+the offending log file from the failed run and rerunning
+the parsing and plotting scripts.)
 
 ### Validation Analysis
 

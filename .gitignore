@@ -14,3 +14,5 @@ out/
 *.zo
 *.json
 .vscode/
+!scripts/ablation/submitted-plots/*.pdf
+!scripts/ablation/submitted-plots/*.json
