@@ -206,9 +206,9 @@ the required racket 7.9 version.
     plots/plot-results.sh output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331
     ```
 and open the following three PDFs under `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`:
-  - for Figure 7a: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
-  - for Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
-  - for Figure 7c: `by-config-all-tests-time-boxplot.pdf`
+  * for Figure 7a: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
+  * for Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
+  * for Figure 7c: `by-config-all-tests-time-boxplot.pdf`
 
 - To reproduce all the data
 type: `./herbie-eval.sh 15`.
