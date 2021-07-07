@@ -254,7 +254,7 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
    * `Figure 8` in the paper corresponds to the `10-run/by-domain-phase-times.pdf` plot.
    * `Figure 9a` plots are the pdfs under `10-run/bv4`, `10-run/bv32`, and `10-run/rat`.
    * `Figure 9b` plots are the pdfs under `orat-rr/bv4`, `orat-rr/bv32`, and `orat-rr/rat`
- (`orat` means "One Rule At A Time" which corresponds to `n = 1` in the caption in the paper).
+ (`orat` means "One Rule At a Time" which corresponds to `n = 1` in the caption in the paper).
 
 - To make plots from the pre-generated data,
   type `./ablation.sh -r use-existing`.
