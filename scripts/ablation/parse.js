@@ -42,7 +42,7 @@ let load_dir = (path, type, k) => {
     fs.readdir(path, 'utf8', (err, filenames) => {
         console.log(filenames);
         if (err != undefined || err != null) {
-            console.log('lol');
+            console.log('Something went wrong');
         }
 
         // get a list of logfiles to process

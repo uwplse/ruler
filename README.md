@@ -251,6 +251,11 @@ from inside `run.sh`.
 - `-r` is number of runs (i.e. providing how many independent data points we average over),
 - `-d` is the domain
 - `-o` is the output folder.
+Additionally, there is one parameter that only affects
+the the `run-ruler-rr.sh`, since 
+there is a possibility of timeout in 
+`orat` rational `no-rr`:
+- `-t` is the amount of time this run will execute before timing out.
 
 Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
@@ -259,8 +264,14 @@ If for some reason a run of Ruler fails to find rules,
 the entire pipeline will fail and no plots will be generated,
 so please keep an eye out for failures. 
 (You can temporarily generate the plots by removing
-the offending log file from the failed run and rerunning
-the parsing and plotting scripts as they are invoked in `run.sh`.)
+the log file of the aborted run and rerunning
+the parsing and plotting scripts as they are invoked in `run.sh`, i.e.
+```
+node parse.js "output/$TIMESTAMP/compare/"
+node parse.js "output/$TIMESTAMP/no-rr/" yes
+
+python visualize.py "output/$TIMESTAMP/compare/" "$MYDIR/output/$TIMESTAMP/no-rr/"
+```)
 
 ### Validation Analysis
 The goal is to reproduce `Table 2`.

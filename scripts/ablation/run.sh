@@ -17,7 +17,7 @@ TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
 
 "$MYDIR/run_ruler_rr.sh" -d bv4 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
 "$MYDIR/run_ruler_rr.sh" -d bv32 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
-"$MYDIR/run_ruler_rr.sh" -d rational -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1 --use-smt
+"$MYDIR/run_ruler_rr.sh" -d rational -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1 -t 86400 --use-smt
 
 node parse.js "$MYDIR/output/$TIMESTAMP/compare/"
 node parse.js "$MYDIR/output/$TIMESTAMP/no-rr/" yes

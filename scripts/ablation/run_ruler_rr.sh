@@ -14,7 +14,7 @@ export RUST_LOG="ruler=info,egg=warn";
 # num_runs
 # num_iterations
 # domain
-while getopts ":i:v:r:d:o:" OPTION
+while getopts ":i:v:r:d:o:t:" OPTION
 do
     case "$OPTION" in
         i) NUM_ITERS="$OPTARG" ;;
@@ -22,6 +22,7 @@ do
         r) NUM_RUNS="$OPTARG" ;;
         d) DOMAIN="$OPTARG" ;;
         o) OUTPUT_DIR="$OPTARG" ;;
+        t) TIMEOUT="$OPTARG" ;;
         \?) break ;;
     esac
 done
@@ -54,6 +55,11 @@ if [ -z "${DOMAIN:-}" ]; then
     exit 1
 fi
 
+if [ -z "${TIMEOUT:-}" ]; then
+    echo "Setting timeout to 24 hours (86400 seconds)"
+    TIMEOUT="86400s"
+fi
+
 mkdir -p "$OUTPUT_DIR/orat-default";
 mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
@@ -73,11 +79,17 @@ echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
   echo "Running iter $i."
+  (timeout $TIMEOUT \
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
   --do-final-run \
   --rules-to-take 1 $@ \
-  --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
+  --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log")
+  # did we trigger the timeout?
+  if [ $? -eq 124 ]; then
+    mv "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
+    "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log.TIMEOUT"
+  fi
   cp out.json "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
