@@ -76,7 +76,7 @@ Our paper has 4 quantitative evaluations:
   tool's results in fours different configurations: `None`, `Herbie`, `Ruler`, `Both`.
   The results are in `Figure 7`.
 
-- Search Parameter Analyis (`Section 6.1`): We profiled Ruler's search algorithm
+- Search Parameter Analysis (`Section 6.1`): We profiled Ruler's search algorithm
   to measure how much time is spent  in each phase. `Figure 8` shows the results for
   `bv4`, `bv32`, and `rationals` domains.
 We also compared different variations of `choose_eqs`
