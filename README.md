@@ -120,8 +120,10 @@ and open the followin three PDFs
     * for `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
     * for `Figure 7b`: `by-config-all-tests-output_parens-boxplot.pdf`
     * for `Figure 7c`: `by-config-all-tests-time-boxplot.pdf`
+
 We also provide various other plots that you are welcome to look at! These are
-however not presented in the paper.
+however not presented in the paper and not relevant to this artifact.
+
 - To reproduce all the data
 (not recommended as it is slow, and Herbie can be hard to debug),
 type ``
@@ -129,50 +131,52 @@ type ``
 ### Search Parameter Analysis
 The goal is to reproduce `Figure 8` and `Figure 9`.
 
-The script `ablation.sh` is provided as a convenient
-entrypoint. 
-When run with the parameter `-r use-existing`, 
-lots using the data provided (in the folder `submitted-data`) 
-will be generated.
-When run with the parameter `-r generate-new`,
-you will be able to run your own evaluation with new data.
-
-
-- What happens
-We run Ruler with different configurations,
+- Type `cd scripts/ablation` to go to the correct directory.
+- To make plots from the pre-generated data,
+type `./ablation.sh -r use-existing`.
+This will make plots using the data provided in the folder `output/submitted-data` TODO?? is this right?.
+It will also print some of the data in the terminal, which we used
+for debugging.
+Feel free to ingore that.
+- To run your own evaluation and make new plots from scratch,
+type  `./ablation.sh -r generate-new`.
+This will take approximately [XXX] hours.
+This runs Ruler with different configurations,
 saving each run to its own timestamped folder
 under `scripts/ablation/output`,
-and then parse statistics from the log outputs.
+and then parses the statistics from the log outputs.
 These statistics are collected into json files
 and then plotted in matplotlib.
 Resultant pdf plots are available inside the 
 timestamped folder for that experiment.
 
-In the published evaluation, we ran with 3 variables,
+In the published evaluation,
+we ran Ruler with 3 variables,
 5 iterations, over 10 runs.
-Figure 8 in the paper corresponds to the `by-domain-phase-times.pdf`
-plot. Figure 9 comprises the rest of the pdf plots.
-
-- How to change parameters to get different results
-`run.sh` controls the entire experiment.
-It calls `run-ruler.sh` and `run-ruler-rr.sh`
-for each domain, then calls the parsing and visualizing scripts.
-`run-ruler.sh` and `run-ruler-rr.sh` will call Ruler 
-for a particular domain
-with the parameters provided, for as many runs as required.
-To change the parameters, simply modify the arguments 
-passed to `run-ruler.sh` and `run-ruler-rr.sh` 
-from inside `run.sh`.
-`-v` is the number of variables, `-i` is the iterations,
-and `-r` is number of runs (i.e. providing 
-how many independent data points we average over).
-`-d` is the domain. `-o` is the output folder.
-Lastly, any succeeding parameters will be
-passed directly to the Ruler invocation.
-
+`Figure 8` in the paper corresponds to the `by-domain-phase-times.pdf` plot.
+`Figure 9` comprises the rest of the pdf plots.
 Note that timing results should only be compared between 
 themselves and not as absolute values, since logging is enabled
 during the ablation runs.
+
+#### Additional information about the scripts.
+`run.sh` controls the entire experiment.
+It calls `run-ruler.sh` and `run-ruler-rr.sh` for each domain,
+then calls the parsing and visualizing scripts.
+`run-ruler.sh` and `run-ruler-rr.sh` will call Ruler 
+for a particular domain
+with the parameters provided, 
+for as many runs as required.
+To change the parameters, simply modify the arguments 
+passed to `run-ruler.sh` and `run-ruler-rr.sh` 
+from inside `run.sh`.
+- `-v` is the number of variables,
+- `-i` is the iterations,
+- `-r` is number of runs (i.e. providing how many independent data points we average over),
+- `-d` is the domain
+- `-o` is the output folder.
+Lastly, any succeeding parameters will be
+passed directly to the Ruler invocation.
 
 ### Validation Analysis
 
