@@ -20,18 +20,21 @@ The next part is "Step-by-Step" which first lists the claims we
   perform further experiments.
 
 ## Getting started
+We recommend running the VM on a machine with at least 32GB RAM.
 Please download the `.ova` file [here]
   and open it with Virtual Box by
   going to `File -> import appliance` and giving the path to the `.ova` file
   and clicking on `continue`. In the next window that pops up, click on
   `Import`. It should take a few minutes to import.
+  Please change the RAM to 24 GB and allocate 4 processors by going to
+  `Settings` under `System -> Motherboard` and `System -> Processor` respectively.
 
 * Next, please open the virtual machine image in virtual box by clicking on the
   green `Start` button.
 
 * Login is automatic, but in case needed, the password is: `ruler`.
 
-* The terminal should be open at startup. The project repository is already
+* Open a terminal window. The project repository is already
   cloned.  Navigate to the `ruler` directory.  All the required packages
   are already installed and Ruler is already compiled for you, ready to be run.
 
@@ -267,29 +270,34 @@ passed directly to the Ruler invocation.
 If for some reason a run of Ruler fails to find rules,
 the entire pipeline will fail and no plots will be generated,
 so please keep an eye out for failures. 
-(You can temporarily generate the plots by removing
+You can temporarily generate the plots by removing
 the log file of the aborted run and rerunning
 the parsing and plotting scripts as they are invoked in `run.sh`, i.e.
+
 ```
 node parse.js "output/$TIMESTAMP/compare/"
 node parse.js "output/$TIMESTAMP/no-rr/" yes
 
 python visualize.py "output/$TIMESTAMP/compare/" "$MYDIR/output/$TIMESTAMP/no-rr/"
-```)
+```
 
 ### Validation Analysis
 The goal is to reproduce `Table 2`.
 This part of the eval requires rosette 4.0 and racket 8.0 which
 are already pre-installed in this directory.
+
 - Type `cd scripts/eqsat-sound` to go to the correct directory.
 
 - To view `Table 2` directly from pre-generated data,
-go to `output/pre-gen-` and type: `python3 ../../tabulate.py all.json`.
-  Note that the first table is the one for `bv32`, then second for `bv4`, and third for `rational`.
+  go to `output/pre-gen-2021-07-06-2242` and type: `python3 ../../tabulate.py all.json`.
+  Note that the first table is the one for `bv32`,
+  then second for `bv4`, and
+  third for `rational`.
   Compare these printed latex tables with the ones in the paper.
   Other than a few timing numbers which may slightly vary due to machine differences,
   the tables should be similar.
-The cells that are empty correspond to the ones with only a `-` in the paper's `Table 2`.
+  The cells that are empty correspond to
+  the ones with only a `-` in the paper's `Table 2`.
 
 - To reproduce all the data,
 type `./eqsat-soundness.sh`.
@@ -369,10 +377,11 @@ This should take ~40 min.
 ### Usage
 You can generate rules for a `domain` as follows:
 
-```cargo run --bin domain --release -- synth --iters i --variables v```
+```
+cargo run --bin domain --release -- synth --iters i --variables v
+```
 
 Type `cargo domain --help` to see all available flags and parameters.
-
 
 ### Project Layout
 - The source code resides in the `src` directory.
@@ -398,6 +407,7 @@ We have already generated documentation for you.
 Open `target/doc/ruler/index.html` in your preferred browser to navigate the documentation.
 
 You can generate documentation on your own in a new machine by typing:
+
 ```
 cargo doc --no-deps
 ```
@@ -405,6 +415,7 @@ cargo doc --no-deps
 To run Ruler with different flags (documentation at `SynthParams.html`)
 see the various example usages in `.cargo/config` and try replacing them with other values and look at the results!
 For example, you can try
+
 ```
 cargo run --release --bin rational -- synth --num-fuzz 10 --iters 2
 ```
