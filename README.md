@@ -10,7 +10,7 @@ that uses equality saturation
 
 - **Available**: The artifact is available on Zenodo at: [link]
 - **Functional**: Below we first provide instructions for "Getting Started"
-  which should take [XXX] minutes.
+  which should take less than 10 minutes.
 The next part is "Step-by-Step" which first lists the claims we
   made in the paper and provides instructions on how to validate them.
 - **Reusable**: Finally, we also provide instructions on "Further Use / Extending Ruler"
