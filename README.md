@@ -224,6 +224,10 @@ With the default settings provided
 this will take approximately 1.5 hours for all runs that terminate.
 However, it is almost certain that `orat` rationals
 in the `no-rr` setting will not terminate after 24 hours.
+If you do not wish to wait 24 hours (per run), 
+you can change the timeout setting (see the list of 
+arguments available below).
+
 # TODO for Amy: fix the parsing script so that the non-termination doesn't break it (skip it)
 
 In the published evaluation,
@@ -255,7 +259,7 @@ Additionally, there is one parameter that only affects
 the the `run-ruler-rr.sh`, since 
 there is a possibility of timeout in 
 `orat` rational `no-rr`:
-- `-t` is the amount of time this run will execute before timing out.
+- `-t` is the amount of time each run will execute before timing out.
 
 Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.

@@ -17,6 +17,9 @@ TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
 
 "$MYDIR/run_ruler_rr.sh" -d bv4 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
 "$MYDIR/run_ruler_rr.sh" -d bv32 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
+# -t is a timeout for each run. Given that the below command will likely time out,
+# you probably want to avoid multiple 24h timeouts if you want to increase the number of runs.
+# To abort the script after just one timed-out run, uncomment line 96 in run-ruler-rr.sh
 "$MYDIR/run_ruler_rr.sh" -d rational -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1 -t 86400 --use-smt
 
 node parse.js "$MYDIR/output/$TIMESTAMP/compare/"

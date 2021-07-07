@@ -87,9 +87,13 @@ do
   --rules-to-take 1 $@ \
   --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log")
   # did we trigger the timeout?
-  if [ $? -eq 124 ]; then
+  TIMEOUT_EXIT="$?"
+  if [ $TIMEOUT_EXIT -eq 124 ]; then
     mv "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
     "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log.TIMEOUT"
+
+    # uncomment this if you want to abort on timeout
+    # exit $TIMEOUT_EXIT
   fi
   cp out.json "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
