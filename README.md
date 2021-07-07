@@ -328,5 +328,3 @@ To understand how to add support for a new domain,
 Note that some domains (e.g., floats, strings, bigints)
 are experimental and not reported in the paper,
 but they all provide examples of how you can add support for new domains.
-
-TODO:; rm -rf .git to remove git history and terminal history
