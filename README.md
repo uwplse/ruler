@@ -142,9 +142,13 @@ This requires racket 7.9 which is already
 pre-installed in the directory.
 This runs the script with 1 seed by default.
 You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS`.
-In the paper we ran with `30` seeds but that will take over 10 hours.
-We recommend trying with `5` seeds to check the results (look for plots with same names as mentioned above in the timestamped directory under
+We recommend trying with `5` seeds
+(type `./herbie-eval.sh 5`)
+to check the results (look for plots with same names as mentioned above in the timestamped directory under
 `output/ruler-herbie-eval/results/`) -- they should be similar.
+In the paper we ran with `30` seeds but that will take over 10 hours,
+and is better run on a real machine as opposed to a VM because it will
+generate more data.
 Other Herbie specific
 arguments are set to their defaults but
 the script has documentation for how to change them.
