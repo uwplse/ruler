@@ -42,10 +42,12 @@ Please download the `.ova` file [here]
 
 * You can also run the tool yourself entirely from scratch,
 as shown below for each section of the evaluation.
+
 Note that in the paper,
   the evaluations were often done is larger scale
   which is not possible on the VM.
-We have provided recommendations on how to run it on a smaller scale (e.g., fewer
+We have provided recommendations below on how
+to run it on a smaller scale (e.g., fewer
 iterations, fewer seeds) when possible.
 
 ### Kick the tires
@@ -91,6 +93,12 @@ The results are shown in `Figure 9b` for `bv4`, `bv32`, and `rationals`.
 The results are shown in `Table 2`.
 
 Below we describe how to run our artifact and reproduce all of them.
+For each experiment, we provide three step:
+- navigating to the right directory
+- viewing plots/tables from pre-generated data
+- generated all results from scratch.
+We recommend saving the last step for last (you may skip too) and have also
+provided instructions for running them on smaller inputs on the VM.
 
 ### Comparing with CVC4
 The goal is to reproduce `Table 1`.
@@ -127,7 +135,9 @@ Herbie is an external tool which we used for this evaluation.
 Therefore to avoid any issues that may come up due to Herbie,
   we have uploaded our pre-generated data and the plots that we have in the paper.
 Herbie is already installed in the VM.
+
 - Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
+
 - To view the provided plots, go to `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`
 and open the following three PDFs
     * for `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
@@ -181,13 +191,13 @@ Plotting scripts are in `plots/` directory.
 The goal is to reproduce `Figure 8` and `Figure 9`.
 
 - Type `cd scripts/ablation` to go to the correct directory.
+
 - To only view the plots, go to `submitted-plots/`.
 `Figure 8` in the paper corresponds to the `10-run/by-domain-phase-times.pdf` plot.
 `Figure 9a` plots are the pdfs under `10-run/bv4`, `10-run/bv32`, and `10-run/rat`.
 `Figure 9b` plots are the pdfs under `orat-rr/bv4`, `orat-rr/bv32`, and `orat-rr/rat`
 (`orat` means "One Rule At A Time" which corresponds to `n = 1` in the caption in the paper).
-
-- To make plots from the pre-generated data,
+To make plots from the pre-generated data,
 type `./ablation.sh -r use-existing`.
 This will make plots using the data provided in the folder `submitted-data`
 and put them into the `output` folder.
@@ -251,8 +261,10 @@ The goal is to reproduce `Table 2`.
 This part of the eval requires rosette 4.0 and racket 8.0 which
 are already pre-installed in this directory.
 - Type `cd scripts/eqsat-sound` to go to the correct directory.
+
 - To view `Table 2` directly from pre-generated data, go to
     `output/pre-gen-` and type: `python3 ../../tabulate.py all.json` and compare the printed table with the paper.
+
 - To reproduce all the data, type `./eqsat-soundness.sh`.
 This will take [XXX] hours.
 
