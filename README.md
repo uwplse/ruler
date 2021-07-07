@@ -108,11 +108,11 @@ cd scripts
 
 to generate the results
 from existing data that we have provided in the VM.
-We expect it to take [XXX] hours.
+We expect it to take less than 10 seconds.
 This script runs all four experiments and here is how you can view the results.
 
 #### Comparing with CVC4
-`Table 1` will be printed to the terminal.
+`Table 1` will be printed as the first item to the terminal.
 Compare it with the paper.
 Note that in some cases the numbers
   will not match exactly with what
@@ -125,9 +125,9 @@ Note that in some cases the numbers
 The three plots in `Figure 7` will be
 generated and put in `herbie-rational/output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`.
 Open the following three PDFs
-    * `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
-    * `Figure 7b`: `by-config-all-tests-output_parens-boxplot.pdf`
-    * `Figure 7c`: `by-config-all-tests-time-boxplot.pdf`
+  - Figure 7a: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
+  - Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
+  - Figure 7c: `by-config-all-tests-time-boxplot.pdf`
 to compare with the paper.
 
 #### Search Parameter Analysis
@@ -135,17 +135,19 @@ The plots in `Figure 8, 9` will be generated
 using the data provided in the `submitted-data` directory
 and can be found under `output`.
 Open the following PDFs
-  * `Figure 8`: `ablation/output/by-domain-phase-times.pdf`
-  * `Figure 9a`: `ablation/output/bv4-by-config-rules-learned.pdf`,
-     `ablation/output/bv32-by-config-rules-learned.pdf`,
-     `ablation/output/rational-by-config-rules-learned.pdf`
-  * `Figure 9b`: `ablation/output/rr-bv4-run-rewrites.pdf`,
-     `ablation/output/rr-bv32-run-rewrites.pdf`,
-     `ablation/output/rr-rational-timeout.pdf`
+  - Figure 8: `ablation/output/by-domain-phase-times.pdf`
+  - Figure 9a:
+      * `ablation/output/bv4-by-config-rules-learned.pdf`
+      * `ablation/output/bv32-by-config-rules-learned.pdf`
+      * `ablation/output/rational-by-config-rules-learned.pdf`
+  - Figure 9b:
+      * `ablation/output/rr-bv4-run-rewrites.pdf`
+      * `ablation/output/rr-bv32-run-rewrites.pdf`
+      * `ablation/output/rr-rational-timeout.pdf`
 to compare with the paper.
 
 #### Validation Analysis
-`Table 2` will be printed to the terminal.
+`Table 2` will be printed as the last item to the terminal.
 You can compare with the one in the paper.
 Other than some variation in the timing numbers,
 the tables should be identical.
@@ -196,9 +198,6 @@ and open the following three PDFs
     * for `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
     * for `Figure 7b`: `by-config-all-tests-output_parens-boxplot.pdf`
     * for `Figure 7c`: `by-config-all-tests-time-boxplot.pdf`
-
-We also provide various other plots that you are welcome to look at! These are
-however not presented in the paper and not relevant to this artifact.
 
 You can also go to `herbie-rational/output/ruler-herbie-eval/results/submitted-plots` and
  look at the pre-made plots.
