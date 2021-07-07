@@ -223,6 +223,7 @@ With the default settings provided
 this will take approximately 1.5 hours for all runs that terminate.
 However, it is almost certain that `orat` rationals
 in the `no-rr` setting will not terminate after 24 hours.
+# TODO for Amy: fix the parsing script so that the non-termination doesn't break it (skip it)
 
 In the published evaluation,
 we ran Ruler with 3 variables,
