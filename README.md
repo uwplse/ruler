@@ -95,18 +95,27 @@ The results are shown in `Figure 9b` for `bv4`, `bv32`, and `rationals`.
   rule validation methods for `bv4`, `bv32`, and `rationals`.
 The results are shown in `Table 2`.
 
+### Results from Pre-generated Data
+
 Below we describe how to run our artifact and reproduce all of them.
 For each experiment, we provide three step:
 - navigating to the right directory
-- viewing plots/tables from pre-generated data
+- generating/viewing plots (tables) from pre-generated data
 - generated all results from scratch.
-We recommend saving this last step for last (you may skip too) and have also
-provided instructions for running them in smaller inputs on the VM.
+  We recommend saving this last step for last (you may skip it too) and have also
+  provided instructions for running them in smaller inputs on the VM.
 
-The `scripts/eval.sh` can be used to run all the experiments from scratch
-with a single script but since they all take varying amounts of time,
+
+
+
+The `scripts/eval.sh` can be used to run all the experiments 
+with a single script.
+We expect it to take [XXX] hours.
+This script runs all four experiments in a
+
+ but since they all take varying amounts of time,
 we recommend doing them separately.
-If you do end up just calling `eval.sh`, we expect it to take [XXX] hours.
+
 To check the results, follow step 3 instructions below for each experiment.
 
 ### Comparing with CVC4
