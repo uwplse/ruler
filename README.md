@@ -128,7 +128,7 @@ Therefore to avoid any issues that may come up due to Herbie,
 Herbie is already installed in the VM.
 - Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
 - To view the provided plots, go to `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`
-and open the followin three PDFs
+and open the following three PDFs
     * for `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
     * for `Figure 7b`: `by-config-all-tests-output_parens-boxplot.pdf`
     * for `Figure 7c`: `by-config-all-tests-time-boxplot.pdf`
@@ -154,10 +154,10 @@ arguments are set to their defaults but
 the script has documentation for how to change them.
 The script will print the configuration being used.
 To map them to the figure, use the following guide:
-- `herbie-no-simpl` is `None`
-- `herbie-only` is `Herbie`
-- `ruler-only` is `Ruler`
-- `herbie-ruler` is `Both`
+  * `herbie-no-simpl` is `None`
+  * `herbie-only` is `Herbie`
+  * `ruler-only` is `Ruler`
+  * `herbie-ruler` is `Both`
 
 #### Additional information about the scripts.
 `herbie-eval.sh` is the main script and it has comments to indidate what it does.
@@ -179,6 +179,11 @@ Plotting scripts are in `plots/` directory.
 The goal is to reproduce `Figure 8` and `Figure 9`.
 
 - Type `cd scripts/ablation` to go to the correct directory.
+- To only view the plots, go to `submitted-plots/`.
+`Figure 8` in the paper corresponds to the `10-run/by-domain-phase-times.pdf` plot.
+`Figure 9a` plots are the pdfs under `10-run/bv4`, `10-run/bv32`, and `10-run/rat`.
+`Figure 9b` plots are the pdfs under `orat-rr/bv4`, `orat-rr/bv32`, and `orat-rr/rat`
+(`orat` means `One Rule At A Time` which corresponds to `n = 1` in the caption in the paper).
 - To make plots from the pre-generated data,
 type `./ablation.sh -r use-existing`.
 This will make plots using the data provided in the folder `submitted-data`
@@ -187,8 +192,6 @@ It will also print some of the data in the terminal, which we used
 for debugging.
 Feel free to ingore that.
 The .tar file in the `submitted-data` folder contains the log of each run.
-For convenience, we have also included the plots submitted 
-along with the paper in `submitted-plots`.
 - To run your own evaluation and make new plots from scratch,
 type  `./ablation.sh -r generate-new`.
 With the default settings provided,
@@ -205,8 +208,6 @@ timestamped folder for that experiment.
 In the published evaluation,
 we ran Ruler with 3 variables,
 5 iterations, over 10 runs.
-`Figure 8` in the paper corresponds to the `by-domain-phase-times.pdf` plot.
-`Figure 9` comprises the rest of the pdf plots.
 
 Note that timing results should only be compared between 
 themselves and not as absolute values, since logging is enabled
@@ -228,6 +229,7 @@ from inside `run.sh`.
 - `-r` is number of runs (i.e. providing how many independent data points we average over),
 - `-d` is the domain
 - `-o` is the output folder.
+
 Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
 
