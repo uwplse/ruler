@@ -149,6 +149,6 @@ popd
 #   PLOT RESULTS
 #
 
-$MYDIR/seed-stats-per-test.sh "$DIR/results/$tstamp"
+#$MYDIR/seed-stats-per-test.sh "$DIR/results/$tstamp"
 $MYDIR/plots/plot-results.sh "$DIR/results/$tstamp"
 

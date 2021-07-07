@@ -157,8 +157,9 @@ We recommend trying with `5` seeds
 (type `./herbie-eval.sh 5`)
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
 `output/ruler-herbie-eval/results/`) -- they should be similar.
+In the VM this should take approximately 5 hours.
 You may notice some timeouts / errors on some benchmarks but those is due to Herbie, not Ruler.
-In the paper we ran the experiment with `30` seeds but that will take over 10 hours,
+In the paper we ran the experiment with `30` seeds but that will take over 15 hours,
 and is better run on a real machine as opposed to a VM because it will
 generate more data and will be much slower on the VM.
 Other Herbie specific
@@ -268,7 +269,11 @@ are already pre-installed in this directory.
 - Type `cd scripts/eqsat-sound` to go to the correct directory.
 
 - To view `Table 2` directly from pre-generated data, go to
-    `output/pre-gen-` and type: `python3 ../../tabulate.py all.json` and compare the printed table with the paper.
+    `output/pre-gen-` and type: `python3 ../../tabulate.py all.json`.
+  Note that the first table is the one for `bv32`, then second for `bv4`, and third for `rational`.
+  Compare these printed latex tables with the ones in the paper.
+  Other than a few timing numbers which may slightly vary due to machine differences,
+  these should be identiicaal.
 
 - To reproduce all the data, type `./eqsat-soundness.sh`.
 This will take [XXX] hours.
