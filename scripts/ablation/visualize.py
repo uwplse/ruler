@@ -500,8 +500,8 @@ def main():
         
     data = json.load(open(path))
     data_rr = json.load(open(path_rr))
-    filter_data = lambda name: list(filter(lambda x: x['domain'] == "bv4", data))
-    filter_data_rr = lambda name: list(filter(lambda x: x['domain'] == "bv4", data_rr))
+    filter_data = lambda name: list(filter(lambda x: x['domain'] == name, data))
+    filter_data_rr = lambda name: list(filter(lambda x: x['domain'] == name, data_rr))
 
     make_choose_eqs_time_rules_plot("bv4", filter_data("bv4"), boxplot=False)
     # compare_run_rewrites(filter_data("bv4"), "bv4")
