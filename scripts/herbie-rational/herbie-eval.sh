@@ -66,7 +66,7 @@ then
 else
     git clone git@github.com:uwplse/herbie.git
     cd herbie
-    # To use old Herbie before racket 8 was merged.
+    # To use old Herbie before racket 8 was merged because the newer commits were not stable.
      git checkout 1c32e484210bac6cd4423e9372082d6b547e9d48
     make install
     cd ..
