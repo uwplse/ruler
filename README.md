@@ -268,22 +268,43 @@ This part of the eval requires rosette 4.0 and racket 8.0 which
 are already pre-installed in this directory.
 - Type `cd scripts/eqsat-sound` to go to the correct directory.
 
-- To view `Table 2` directly from pre-generated data, go to
-    `output/pre-gen-` and type: `python3 ../../tabulate.py all.json`.
+- To view `Table 2` directly from pre-generated data,
+go to `output/pre-gen-` and type: `python3 ../../tabulate.py all.json`.
   Note that the first table is the one for `bv32`, then second for `bv4`, and third for `rational`.
   Compare these printed latex tables with the ones in the paper.
   Other than a few timing numbers which may slightly vary due to machine differences,
-  these should be identiicaal.
+  the tables should be similar.
+The cells that are empty correspond to the ones with only a `-` in the paper's `Table 2`.
 
-- To reproduce all the data, type `./eqsat-soundness.sh`.
+- To reproduce all the data,
+type `./eqsat-soundness.sh`.
 This will take [XXX] hours.
+The data will be generated and put in a timestamped directory under `output`.
+Each domain and configuration will have a directory and `all.json` will contain
+all of them.
+In each directory, you will find a `failed-validation.txt` file that has the rules
+that failed post-pass validation, a `post_pass.json` which contains the result of postpass
+validation with SMT (rosette in this case),
+and a `rkt` script that uses rosette to validate the rules one at a time.
+You will notice that Rosette times out on some of the post-pass validations.
+For these, we had manually checked the
+soundness of the rules using other solvers but that is not
+in scope for this artifact.
+The script will also print the number of unsound (and unknown) rules,
+the domain (`rational`, `4`, `32`),
+the number of variables, cvec length,
+and sample size used for fuzzing (or `smt` for SMT based verification).
 
 #### Additional information about the scripts.
 `eqsat-soundness.sh` is the main script which runs
 all three domains (`bv4`, bv32, `rational`)
 for various cvec lengths, ways of generating cvecs, and
 validation approaches.
-It calls the `aggregate.sh` script to gather data into a json file from which `tabulate.py` generates a latex table.
+It calls `postpass.sh` to verify the rules as a postpass, after
+Ruler's execution is complete.
+`postpass.sh` uses rosette to verify the rules.
+It calls the `aggregate.sh` script to gather data into a
+json file from which `tabulate.py` generates a latex table.
 
 ## Further Use / Extending Ruler
 This section describes how to install Ruler on a different machine,
