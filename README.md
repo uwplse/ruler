@@ -248,6 +248,8 @@ To install and run the evaluation on a different machine,
 - curl
 - rust
 - sudo apt-get install python3-distutils
+- jq
+- matplotlib
 
 ### Installation
 Ruler is implemented in [Rust](rust-lang.org/).

@@ -82,7 +82,7 @@ then
     echo "Rational FPCore Exists. Not Filtering."
 else
     echo "Filtering all stable benches..."
-    racket $MYDIR/filter.rkt \
+    ./racket/bin/racket $MYDIR/filter.rkt \
     --operators "let let* fabs + - * / neg" \
     --names "Octave 3.8, jcobi/3 ; Rosa's FloatVsDoubleBenchmark ; (- (/ x0 (- 1 x1)) x0) ; Expression 4, p15" \
     bench/hamming \
