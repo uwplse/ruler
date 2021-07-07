@@ -98,7 +98,7 @@ For each experiment, we provide three step:
 - viewing plots/tables from pre-generated data
 - generated all results from scratch.
 We recommend saving this last step for last (you may skip too) and have also
-provided instructions for running them on smaller inputs on the VM.
+provided instructions for running them in smaller inputs on the VM.
 
 ### Comparing with CVC4
 The goal is to reproduce `Table 1`.
