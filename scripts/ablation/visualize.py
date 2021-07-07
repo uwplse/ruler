@@ -57,16 +57,16 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
         mrat_ys.append(sum(res) / len(res))
         avg = sum(res) / len(res)
         var = sum((x-avg)**2 for x in res) / len(res)
-        print(var / avg)
+        # print(var / avg)
 
         mrat_ys_l.append(res)
         res2 = list(map(lambda x: float(compare2(x)), lst))
         mrat_y2s.append(sum(res2) / len(res2))
         avg2 = sum(res2) / len(res2)
         var2 = sum((x-avg2)**2 for x in res2) / len(res2)
-        print(var2 / avg2)
+        # print(var2 / avg2)
 
-    print([x[0]["mrat_m"] for x in grouped])
+    # print([x[0]["mrat_m"] for x in grouped])
     # print(mrat_ys_l)
     # print(json.dumps(data, indent=4, sort_keys=True))
 
@@ -105,7 +105,7 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
 # Specifically statistics about egraph size
 def aggregate_egraphs_list(our_list):
     num_runs = len(our_list[0])
-    print(num_runs)
+    # print(num_runs)
 
     total = []
 
@@ -127,7 +127,7 @@ def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False
     phase_times = list(filter(lambda x: x['type'] == 'phase-times', data))
     phase_times.sort(key=lambda x: dataset_names.index(x["domain"]))
 
-    print(phase_times)
+    # print(phase_times)
     # filter for only the ones we asked for 
     # TODO: maybe just make it all?
     phase_times = filter(lambda x: x['domain'] in dataset_names, phase_times)
@@ -184,8 +184,8 @@ def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False
         # agg_phases_domain["rule_validation"].append(agg_phases_l["rule_validation"])
         
         
-    print(agg_phases)
-    print(agg_phases_domain)
+    # print(agg_phases)
+    # print(agg_phases_domain)
     
     fig, ax = plt.subplots(1)
     
@@ -236,7 +236,7 @@ def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False
     # Flatten
     labels = [round_to_n(item,2) for item in labels]
     
-    print(labels)
+    # print(labels)
 
     for rect, label in zip(rects, labels):
         # rects are probably in order
@@ -284,7 +284,7 @@ def compare_run_rewrites(data, domain):
     rr_y2 = list(map(lambda d: y2(d) , run_rewrites))
     rr_y2 = sum(rr_y2) / len(rr_y2)
     rr_y3 = list(map(lambda d: y3(d) , run_rewrites))
-    print(rr_y3)
+    # print(rr_y3)
     rr_y3 = sum(rr_y3) / len(rr_y3)
     
     no_rr_y1 = list(map(lambda d: y1(d) , no_run_rewrites))
@@ -292,7 +292,7 @@ def compare_run_rewrites(data, domain):
     no_rr_y2 = list(map(lambda d: y2(d) , no_run_rewrites))
     no_rr_y2 = sum(no_rr_y2) / len(no_rr_y2)
     no_rr_y3 = list(map(lambda d: y3(d) , no_run_rewrites))
-    print(no_rr_y3)
+    # print(no_rr_y3)
     no_rr_y3 = sum(no_rr_y3) / len(no_rr_y3)
 
     fig, (time, rules, egraphs) = plt.subplots(1,3)
@@ -352,22 +352,22 @@ def compare_phase_times_run_rewrites(domain, data, legend_outside=False):
     # Again, collect all time information
     for run in phases_by_name:
         runs_avg = {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0, 'rule_validation': 0.0}
-        print(len(run))
+        # print(len(run))
         for iter in run:
             iter_info = iter['phases']
             inner_sum = reduce(sum, iter_info, {'run_rewrites': 0.0, 'rule_discovery': 0.0, 'rule_minimization': 0.0, 'rule_validation': 0.0})
-            print(inner_sum)
+            # print(inner_sum)
             runs_avg["run_rewrites"] += inner_sum["run_rewrites"]
             runs_avg["rule_discovery"] += inner_sum["rule_discovery"]
             runs_avg["rule_minimization"] += inner_sum["rule_minimization"]
             runs_avg["rule_validation"] += inner_sum["rule_validation"]
         # TODO: get variance
         runs_avg = avg(runs_avg, len(run))
-        print(runs_avg)
+        # print(runs_avg)
 
         agg_phases.append(runs_avg)
         
-    print(agg_phases)
+    # print(agg_phases)
     
     fig, ax = plt.subplots(1)
     
@@ -439,7 +439,7 @@ def compare_run_rewrites_with_timeout(domain, data, max, set_max=False):
     rr_y2 = list(map(lambda d: y2(d) , run_rewrites))
     rr_y2 = sum(rr_y2) / len(rr_y2)
     rr_y3 = list(map(lambda d: y3(d) , run_rewrites))
-    print(rr_y3)
+    # print(rr_y3)
     rr_y3 = sum(rr_y3) / len(rr_y3)
     
     # no_rr_y1 = 0
@@ -456,7 +456,7 @@ def compare_run_rewrites_with_timeout(domain, data, max, set_max=False):
 
     # average them together
 
-    print(rr_y1)
+    # print(rr_y1)
     # add a minimize bar
     time.bar(x, [no_rr_y1, rr_y1], width, color=['lightgray', 'thistle'])
     # time.set(xlabel="X", ylabel="Y")
@@ -476,7 +476,7 @@ def compare_run_rewrites_with_timeout(domain, data, max, set_max=False):
             height = rect.get_height()
             plot.text(rect.get_x() + rect.get_width() / 2 + 0.03, height/8*5, label, ha='center', va='bottom', size=20, color="red", rotation=90)
 
-    print(plt.xticks())
+    # print(plt.xticks())
     if set_max:
         time.set_ylim([0, max[0]])
         rules.set_ylim([0, max[1]])
