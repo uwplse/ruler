@@ -145,6 +145,12 @@ We recommend trying with 5 seeds to check the results -- they should be similar.
 Other Herbie specific
 arguments are set to their defaults but
 the script has documentation for how to change them.
+The script will print the configuration being used.
+To map them to the figure, use the following guide:
+- `herbie-no-simpl` is `None`
+- `herbie-only` is `Herbie`
+- `ruler-only` is `Ruler`
+- `herbie-ruler` is `Both`
 
 #### Additional information about the scripts.
 `herbie-eval.sh` is the main script and it has comments to indidate what it does.
