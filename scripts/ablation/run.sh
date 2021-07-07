@@ -11,13 +11,13 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
 TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
 
-"$MYDIR/run_ruler.sh" -d bv4 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/compare" -r 10
-"$MYDIR/run_ruler.sh" -d bv32 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/compare" -r 10
-"$MYDIR/run_ruler.sh" -d rational -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/compare" -r 10 --use-smt 
+"$MYDIR/run_ruler.sh" -d bv4 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/compare" -r 1
+"$MYDIR/run_ruler.sh" -d bv32 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/compare" -r 1
+"$MYDIR/run_ruler.sh" -d rational -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/compare" -r 1 --use-smt 
 
-"$MYDIR/run_ruler_rr.sh" -d bv4 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 10
-"$MYDIR/run_ruler_rr.sh" -d bv32 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 10
-"$MYDIR/run_ruler_rr.sh" -d rational -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 10 --use-smt
+"$MYDIR/run_ruler_rr.sh" -d bv4 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
+"$MYDIR/run_ruler_rr.sh" -d bv32 -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1
+"$MYDIR/run_ruler_rr.sh" -d rational -v 3 -i 2 -o "$MYDIR/output/$TIMESTAMP/no-rr" -r 1 --use-smt
 
 node parse.js "$MYDIR/output/$TIMESTAMP/compare/"
 node parse.js "$MYDIR/output/$TIMESTAMP/no-rr/" yes

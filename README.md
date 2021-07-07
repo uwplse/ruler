@@ -186,6 +186,7 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
 `Figure 9a` plots are the pdfs under `10-run/bv4`, `10-run/bv32`, and `10-run/rat`.
 `Figure 9b` plots are the pdfs under `orat-rr/bv4`, `orat-rr/bv32`, and `orat-rr/rat`
 (`orat` means "One Rule At A Time" which corresponds to `n = 1` in the caption in the paper).
+
 - To make plots from the pre-generated data,
 type `./ablation.sh -r use-existing`.
 This will make plots using the data provided in the folder `submitted-data`
@@ -194,9 +195,11 @@ It will also print some of the data in the terminal, which we used
 for debugging.
 Feel free to ingore that.
 The .tar file in the `submitted-data` folder contains the log of each run.
+
 - To run your own evaluation and make new plots from scratch,
 type  `./ablation.sh -r generate-new`.
-With the default settings provided,
+With the default settings provided
+(1 run instead of the 10 run aggregate reported in the paper),
 this will take approximately 12 hours.
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
@@ -209,7 +212,8 @@ timestamped folder for that experiment.
 
 In the published evaluation,
 we ran Ruler with 3 variables,
-5 iterations, over 10 runs.
+5 iterations, over 10 runs but
+we recommend only running for 1 run on the VM.
 
 Note that timing results should only be compared between 
 themselves and not as absolute values, since logging is enabled
