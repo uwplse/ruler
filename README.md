@@ -147,7 +147,8 @@ Other arguments are set to default but the script has documentation for how to c
 Since we are still actively working on Ruler, there
 are some scripts that may not be relevant for this part of the evaluation.
 Plotting scripts are in `plots/` directory.
-Here are the scripts relevant for this eval and a brief description of what they do.
+Below are the scripts relevant for this eval and a brief description of what they do:
+
 `plots/plot-results.sh` calls these scripts to generate the plots.
 `plots/config-all-tests-box-plot.py` is the script that generates the plots in the paper.
 `filter.rkt` filters benchmarks from Herbie that contain only rational operators.
