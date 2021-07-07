@@ -89,6 +89,7 @@ do
   # did we trigger the timeout?
   TIMEOUT_EXIT="$?"
   if [ $TIMEOUT_EXIT -eq 124 ]; then
+    echo "The run timed out."
     mv "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
     "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log.TIMEOUT"
 
