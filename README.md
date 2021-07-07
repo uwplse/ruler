@@ -97,7 +97,7 @@ For each experiment, we provide three step:
 - navigating to the right directory
 - viewing plots/tables from pre-generated data
 - generated all results from scratch.
-We recommend saving the last step for last (you may skip too) and have also
+We recommend saving this last step for last (you may skip too) and have also
 provided instructions for running them on smaller inputs on the VM.
 
 ### Comparing with CVC4
