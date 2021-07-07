@@ -4,10 +4,10 @@ pushd cvc4-eval
 make
 popd
 
-echo "Starting Herbie Eval with 5 seeds"
+echo "Starting Herbie Eval with 15 seeds"
 # herbie experiment
 pushd herbie-rational
-./herbie-eval.sh 5
+./herbie-eval.sh 15
 popd
 
 echo "Starting Search Parameter Analysis"
