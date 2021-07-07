@@ -79,13 +79,14 @@ echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
   echo "Running iter $i."
-  (timeout $TIMEOUT \
-  (time cargo "$DOMAIN" \
+  timeout $TIMEOUT \
+  bash -c \
+  "(time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
   --do-final-run \
   --rules-to-take 1 $@ \
-  --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log")
+  --no-run-rewrites) &> \"$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log\""
   # did we trigger the timeout?
   TIMEOUT_EXIT="$?"
   if [ $TIMEOUT_EXIT -eq 124 ]; then
