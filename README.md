@@ -123,6 +123,7 @@ The goal is to reproduce `Figure 7`.
 Herbie is an external tool which we used for this evaluation.
 Therefore to avoid any issues that may come up due to Herbie,
   we have uploaded our pre-generated data and the plots that we have in the paper.
+Herbie is already installed in the VM.
 - Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
 - To view the provided plots, go to `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`
 and open the followin three PDFs
