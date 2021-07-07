@@ -128,6 +128,7 @@ Open the following three PDFs
   - Figure 7a: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
   - Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
   - Figure 7c: `by-config-all-tests-time-boxplot.pdf`
+
 to compare with the paper.
 
 #### Search Parameter Analysis
@@ -144,11 +145,15 @@ Open the following PDFs
       * `ablation/output/rr-bv4-run-rewrites.pdf`
       * `ablation/output/rr-bv32-run-rewrites.pdf`
       * `ablation/output/rr-rational-timeout.pdf`
+
 to compare with the paper.
 
 #### Validation Analysis
 `Table 2` will be printed as the last item to the terminal.
-You can compare with the one in the paper.
+Note that the first table is the one for `bv32`,
+  then second for `bv4`, and
+  third for `rational`.
+You can compare these with the one in the paper.
 Other than some variation in the timing numbers,
 the tables should be identical.
 
@@ -161,9 +166,9 @@ The goal is to reproduce `Table 1`.
 - Type `cd scripts/cvc4-eval/` to go to the correct directory.
 
 - To generate the table from the pre-run results,
-type `make` and it will print it to the terminal instantly.
+run `make` and it will print it to the terminal instantly.
 
-- To regenerate the data, type `make clean` to remove all
+- To regenerate the data, run `make clean` to remove all
  pre-generated results and run `make` again.
  This will take approximately 1.5 hours.
 
@@ -187,29 +192,28 @@ from Ruler and CVC4.
 #### Integrating with Herbie
 The goal is to reproduce `Figure 7`.
 Herbie is an external tool which we used for this evaluation.
-Therefore to avoid any issues that may come up due to Herbie,
-  we have uploaded our pre-generated data and the plots that we have in the paper.
-Herbie is already installed in the VM.
+Herbie is already installed in the VM together with
+the required racket 7.9 version.
 
 - Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
 
-- To view the provided plots, go to `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`
-and open the following three PDFs
-    * for `Figure 7a`: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
-    * for `Figure 7b`: `by-config-all-tests-output_parens-boxplot.pdf`
-    * for `Figure 7c`: `by-config-all-tests-time-boxplot.pdf`
+- To simply view pre-made plots you
+  can directly go to `herbie-rational/output/ruler-herbie-eval/results/submitted-plots`
+  and look at the PDFs.
 
-You can also go to `herbie-rational/output/ruler-herbie-eval/results/submitted-plots` and
- look at the pre-made plots.
+- To generate plots from existing data, run
+    ```
+    plots/plot-results.sh output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331
+    ```
+and open the following three PDFs under `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`:
+    * for Figure 7a: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
+    * for Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
+    * for Figure 7c: `by-config-all-tests-time-boxplot.pdf`
 
 - To reproduce all the data
 type: `./herbie-eval.sh 15`.
-This requires racket 7.9 which is already
-pre-installed in the directory.
-This runs the script with 1 seed by default.
-You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS`.
+You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS` (default is 1).
 We recommend trying with `15` seeds
-(type `./herbie-eval.sh 15`)
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
 `output/ruler-herbie-eval/results/`) -- they should be similar.
 In the VM this should take approximately [XXX] hours.
@@ -254,12 +258,12 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
    * `Figure 9b` plots are the pdfs under `orat-rr/bv4`, `orat-rr/bv32`, and `orat-rr/rat`
  (`orat` means "One Rule At A Time" which corresponds to `n = 1` in the caption in the paper).
 
-To make plots from the pre-generated data,
-type `./ablation.sh -r use-existing`.
+- To make plots from the pre-generated data,
+  type `./ablation.sh -r use-existing`.
 This will make plots using the data provided in the folder `submitted-data`
-and put them into the `output` folder.
+  and put them into the `output` folder.
 It will also print some of the data in the terminal, which we used
-for debugging.
+  for debugging.
 Feel free to ingore that.
 The `.tar` file in the `submitted-data` folder contains the log of each run.
 This is not used, and is provided for interest only.
