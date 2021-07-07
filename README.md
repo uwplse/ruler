@@ -205,12 +205,10 @@ It will also print some of the data in the terminal, which we used
 for debugging.
 Feel free to ingore that.
 The .tar file in the `submitted-data` folder contains the log of each run.
+This is not used, and is provided for interest only.
 
 - To run your own evaluation and make new plots from scratch,
 type  `./ablation.sh -r generate-new`.
-With the default settings provided
-(1 run instead of the 10 run aggregate reported in the paper),
-this will take approximately 12 hours.
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
 under `output/`,
@@ -219,10 +217,16 @@ These statistics are collected into json files
 and then plotted in matplotlib.
 Resultant pdf plots are available inside the 
 timestamped folder for that experiment.
+With the default settings provided
+(but only 1 run instead of the 10 run aggregate reported in the paper
+--- see below on how to evaluate over more runs),\
+this will take approximately 1.5 hours for all runs that terminate.
+However, it is almost certain that `orat` rationals
+in the `no-rr` setting will not terminate after 24 hours.
 
 In the published evaluation,
 we ran Ruler with 3 variables,
-5 iterations, over 10 runs but
+5 iterations, over 10 runs, but
 we recommend only running for 1 run on the VM.
 
 Note that timing results should only be compared between 
@@ -254,7 +258,7 @@ the entire pipeline will fail and no plots will be generated,
 so please keep an eye out for failures. 
 (You can temporarily generate the plots by removing
 the offending log file from the failed run and rerunning
-the parsing and plotting scripts.)
+the parsing and plotting scripts as they are invoked in `run.sh`.)
 
 ### Validation Analysis
 The goal is to reproduce `Table 2`.
