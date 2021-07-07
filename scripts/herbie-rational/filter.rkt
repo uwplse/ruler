@@ -1,5 +1,8 @@
 #lang racket
 
+;; script for filtering out the benchmarks in Herbie that
+;; only contain rational operators.
+
 (define (ops-in-expr expr)
   (define ops (mutable-set))
   (let loop ([expr expr])

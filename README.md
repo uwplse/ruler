@@ -134,8 +134,25 @@ We also provide various other plots that you are welcome to look at! These are
 however not presented in the paper and not relevant to this artifact.
 
 - To reproduce all the data
-(not recommended as it is slow, and Herbie can be hard to debug),
-type ``
+type `./herbie-eval.sh`. This requires racket 7.9 which is already
+pre-installed in the directory.
+This runs the script with 1 seed by default.
+You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS`.
+In the paper we ran with 30 seeds but that will take over 10 hours.
+We recommend trying with 5 seeds to check the results.
+Other arguments are set to default but the script has documentation for how to change them.
+
+#### Additional information about the scripts.
+`herbie-eval.sh` is the main script and it has comments to indidate what it does.
+Since we are still actively working on Ruler, there
+are some scripts that may not be relevant for this part of the evaluation.
+Plotting scripts are in `plots/` directory.
+Here are the scripts relevant for this eval and a brief description of what they do.
+`plots/plot-results.sh` calls these scripts to generate the plots.
+`plots/config-all-tests-box-plot.py` is the script that generates the plots in the paper.
+`filter.rkt` filters benchmarks from Herbie that contain only rational operators.
+`preprocess.py` preprocesses Ruler's rewrites to make them match with Herbie's syntax,
+and also removes expansive directions of rules.
 
 ### Search Parameter Analysis
 The goal is to reproduce `Figure 8` and `Figure 9`.
