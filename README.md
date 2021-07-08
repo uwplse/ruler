@@ -231,7 +231,7 @@ To map them to the figure, use the following guide:
   * `herbie-ruler` is `Both`
 
 ##### Additional information about the scripts.
-- `herbie-eval.sh` is the main script and it has comments to indidate what it does.
+- `herbie-eval.sh` is the main script and it has comments to indicate what it does.
 - `seed-variance.sh` is the script that runs Herbie with different seeds and generates the reports.
 - All results are saved in `output/ruler-herbie-eval/results/` under timestamped directories.
 The rules used are also saved in a txt file.
@@ -309,14 +309,14 @@ passed to `run-ruler.sh` and `run-ruler-rr.sh`
 from inside `run.sh`.
   * `-v` is the number of variables,
   * `-i` is the iterations,
-  * `-r` is number of runs (i.e. providing how many independent data points we average over),
+  * `-r` is number of runs (providing how many independent data points we average over),
   * `-d` is the domain
-  * `-o` is the output folder.
+  * `-o` is the output folder
   * `-t` is the amount of time each run will execute before timing out.
-  This only affects
+  `-t` only affects
    `run-ruler-rr.sh` since 
    there is a possibility of timeout in 
-  `orat` for rational and `no-rr`:
+  `orat` for rational and `no-rr`.
 
 Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
