@@ -197,5 +197,5 @@ input_folder = process.argv[2];
 output_path = process.argv[2] + "/parsed.json";
 // output_path = "output/parsed.json";
 let is_rr = process.argv[3]
-console.log(is_rr)
+// console.log(is_rr)
 load_files(input_folder, is_rr === "yes")
