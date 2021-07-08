@@ -25,4 +25,4 @@ TIMESTAMP="$(date "+%Y-%m-%d_%H%M")"
 node parse.js "$MYDIR/output/$TIMESTAMP/compare/"
 node parse.js "$MYDIR/output/$TIMESTAMP/no-rr/" yes
 
-python visualize.py "$MYDIR/output/$TIMESTAMP/compare/" "$MYDIR/output/$TIMESTAMP/no-rr/"
+python3 visualize.py "$MYDIR/output/$TIMESTAMP/compare/" "$MYDIR/output/$TIMESTAMP/no-rr/"
