@@ -60,6 +60,8 @@ mkdir -p "$OUTPUT_DIR/default";
 mkdir -p "$OUTPUT_DIR/phase-times";
 mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
+echo "run_ruler.sh: Running experiment for domain $DOMAIN."
+
 echo "Running orat..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
