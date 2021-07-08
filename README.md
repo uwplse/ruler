@@ -359,7 +359,7 @@ are already pre-installed in this directory.
 
 - To reproduce all the data,
 run `./eqsat-soundness.sh`.
-This will take [XXX] hours.
+This should take approximately 3 hours.
 The data will be generated and put in a timestamped directory under `output`.
 Each domain and configuration will have a directory and `all.json` will contain
 all of them.

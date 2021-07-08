@@ -36,7 +36,7 @@ done
 
 echo "]" >> all.json
 
-python3 tabulate.py all.json
+python3 $MYDIR/tabulate.py all.json
 popd
 
 echo "Done."
