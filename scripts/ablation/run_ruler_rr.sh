@@ -63,10 +63,10 @@ fi
 mkdir -p "$OUTPUT_DIR/orat-default";
 mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
-echo "Running phase-times..."
+echo "Running orat-default..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  echo "Running iter $i."
+  echo "Run $i."
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
@@ -78,7 +78,7 @@ done
 echo "Running no run-rewrites..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  echo "Running iter $i."
+  echo "Run $i."
   timeout $TIMEOUT \
   bash -c \
   "(time cargo "$DOMAIN" \

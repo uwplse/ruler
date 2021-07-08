@@ -282,9 +282,13 @@ a single run instead of the 10 run aggregate reported in the paper
 (see below on how to evaluate over more runs),
 this will take approximately 1.5 hours for all runs that terminate.
 However, it is almost certain that `orat` rationals
-in the `no-rr` setting will not terminate after 24 hours (see `Figure 9b`).
-If you do not wish to wait for the timeout of 24 hours (per run), 
-you can change the timeout setting (see the list of 
+in the `no-rr` setting will not terminate.
+We have set a timeout for this run of 1 hour (3600 seconds)
+so that the evaluation will finish in a timely manner,
+but in the paper, this run did not terminate after 24 hours (see `Figure 9b`).
+If you want to wait less than 1 hour,
+or you want to test the non-termination of this run 
+with a longer timeout, you can change the timeout setting (see the list of 
 arguments available below).
 
 In the published evaluation,
