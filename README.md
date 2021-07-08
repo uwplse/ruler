@@ -330,12 +330,11 @@ Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
 
 NOTE: If for some reason a run of Ruler fails to find rules,
-the entire pipeline will fail in the parsing stage 
-and no plots will be generated,
-so please keep an eye out for failures. 
-You can temporarily generate the plots by removing
-the log file of the aborted run and rerunning
-the parsing and plotting scripts as they are invoked in `run.sh`, i.e.,
+that log file will be ignored, 
+so please keep an eye out for failures.
+Each failure to parse a file should be logged with "Failed to parse". 
+If something went wrong and you want to re-run the parsing and ploting
+scripts, you can manually invoke them:
 
 ```
 node parse.js "output/$TIMESTAMP/compare/"

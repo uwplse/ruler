@@ -40,15 +40,15 @@ let load_dir = (path, type, k) => {
     
     // let's find and read all the logfiles in that directory
     fs.readdir(path, 'utf8', (err, filenames) => {
-        console.log(filenames);
+        // console.log(filenames);
         if (err != undefined || err != null) {
             console.log('Something went wrong');
         }
 
         // get a list of logfiles to process
+        // files_to_process = filenames.filter(str => str.substring(str.length - ".log".length, str.length) === ".log")
         files_to_process = filenames.filter(str => str.endsWith(".log"));
-        console.log(files_to_process)
-
+        
         // Use CPS so we know when all files are done 
         let process = (files, files_k) => {
             // todo list is empty
@@ -71,6 +71,8 @@ let load_dir = (path, type, k) => {
                     data.push(entry);
                 // push this data to the array for this type
                     dataByType[type].push(entry);
+                } else {
+                    console.log("Failed to parse " + path + '/' + file)
                 }
 
                 // keep working!
@@ -78,6 +80,7 @@ let load_dir = (path, type, k) => {
             })
         }
 
+        console.log(files_to_process)
         process(files_to_process, k);
     })
 }
@@ -87,6 +90,8 @@ let make_entry = (text) => {
         return;
     }
 
+    // sorry... this is the most efficient way to handle any errors
+    try {
     // look for each relevant log piece
     let total_time_pattern = /Learned (?<quantity>[\d]+)[a-z\s]*(?<time>[.\d]+)$/gm;
     let egraph_size_pattern = /egraph n=([\d]+), e=([\d]+)/gm;
@@ -144,6 +149,10 @@ let make_entry = (text) => {
         sys: sys
     }
 
+    } catch (e) {
+        console.log("Failed to parse: " + e);
+        return undefined;
+    }
 }
 
 let parse_name = (name, data) => {
