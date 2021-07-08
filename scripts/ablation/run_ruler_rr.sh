@@ -63,7 +63,7 @@ fi
 mkdir -p "$OUTPUT_DIR/orat-default";
 mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
-echo "run_ruler_rr.sh: Running experiment for domain $DOMAIN."
+echo "run_ruler_rr.sh [FIGURE 9b]: Running experiment for domain $DOMAIN."
 
 echo "Running orat-default..."
 for (( i=0; i<$NUM_RUNS; i++ ))
