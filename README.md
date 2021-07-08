@@ -339,7 +339,7 @@ scripts, you can manually invoke them:
 node parse.js "output/$TIMESTAMP/compare/"
 node parse.js "output/$TIMESTAMP/no-rr/" yes
 
-python visualize.py "output/$TIMESTAMP/compare/" "$MYDIR/output/$TIMESTAMP/no-rr/"
+python visualize.py "output/$TIMESTAMP/"
 ```
 
 #### Validation Analysis
