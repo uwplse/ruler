@@ -58,7 +58,7 @@ mkdir -p "$OUTPUT_DIR/mrat";
 mkdir -p "$OUTPUT_DIR/orat";
 mkdir -p "$OUTPUT_DIR/default";
 mkdir -p "$OUTPUT_DIR/phase-times";
-mkdir -p "$OUTPUT_DIR/no-run-rewrites";
+#mkdir -p "$OUTPUT_DIR/no-run-rewrites";
 
 echo "run_ruler.sh [FIGURE 8] [FIGURE 9a]: Running experiment for domain $DOMAIN."
 
