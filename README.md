@@ -330,7 +330,8 @@ Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
 
 NOTE: If for some reason a run of Ruler fails to find rules,
-the entire pipeline will fail and no plots will be generated,
+the entire pipeline will fail in the parsing stage 
+and no plots will be generated,
 so please keep an eye out for failures. 
 You can temporarily generate the plots by removing
 the log file of the aborted run and rerunning

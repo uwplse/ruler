@@ -64,12 +64,14 @@ let load_dir = (path, type, k) => {
             fs.readFile(path + '/' + file, 'utf8', (err, text) => {
                 // process all relevant data
                 let entry = make_entry(text);
-                entry.name = file;
-                entry.type = type;
-                parse_name(file, entry);
-                data.push(entry);
+                if (entry != undefined) {
+                    entry.name = file;
+                    entry.type = type;
+                    parse_name(file, entry);
+                    data.push(entry);
                 // push this data to the array for this type
-                dataByType[type].push(entry);
+                    dataByType[type].push(entry);
+                }
 
                 // keep working!
                 process(files.slice(1), files_k)
@@ -81,6 +83,10 @@ let load_dir = (path, type, k) => {
 }
 
 let make_entry = (text) => {
+    if (text === undefined) { 
+        return;
+    }
+
     // look for each relevant log piece
     let total_time_pattern = /Learned (?<quantity>[\d]+)[a-z\s]*(?<time>[.\d]+)$/gm;
     let egraph_size_pattern = /egraph n=([\d]+), e=([\d]+)/gm;
