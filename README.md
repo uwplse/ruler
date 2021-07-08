@@ -309,8 +309,7 @@ for a particular domain
 with the parameters provided, 
 for as many runs as required.
 In particular, `run-ruler.sh` handles generating
-the data for Figure 8 and Figure 9a
-(as well as some other data not discussed in the paper), 
+the data for Figure 8 and Figure 9a,
 and `run-ruler-rr.sh` handles generating the data for Figure 9b.
 - To change the parameters, simply modify the arguments 
 passed to `run-ruler.sh` and `run-ruler-rr.sh` 

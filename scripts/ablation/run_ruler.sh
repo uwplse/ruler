@@ -101,15 +101,3 @@ do
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp out.json "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
-
-echo "Running no run-rewrites..."
-for (( i=0; i<$NUM_RUNS; i++ ))
-do
-  echo "Run $i."
-  (time cargo "$DOMAIN" \
-  --variables "$NUM_VARIABLES" \
-  --iters "$NUM_ITERS" \
-  --do-final-run $@ \
-  --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
-  cp out.json "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
-done

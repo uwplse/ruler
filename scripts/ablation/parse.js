@@ -28,8 +28,8 @@ let load_files = (base_folder,  is_rr) => {
         () => load_dir(base_folder + default_conf, "default",
             () => load_dir(base_folder + orat, "orat",
                 () => load_dir(base_folder + mrat, "mrat",
-                    () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
-                        () => print_data(data))))));
+                    // () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
+                        () => print_data(data)))));
 }
 
 // I should really just make promises... 
