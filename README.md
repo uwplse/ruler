@@ -280,7 +280,7 @@ timestamped folder for that experiment.
 With the default settings and
 a single run instead of the 10 run aggregate reported in the paper
 (see below on how to evaluate over more runs),
-this will take approximately 1.5 hours for all runs that terminate.
+this will take approximately 2-3 hours for all runs that terminate.
 However, it is almost certain that `orat` rationals
 in the `no-rr` setting will not terminate.
 We have set a timeout for this run of 1 hour (3600 seconds)

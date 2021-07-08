@@ -97,7 +97,7 @@ def make_choose_eqs_plot(domain, data, compare, compare2, boxplot):
     # minimize.plot()
     fig.suptitle(domain)
     plt.tight_layout();
-    plt.savefig('output/' + domain + '-by-config-rules-learned.pdf')
+    plt.savefig(output_path + domain + '-by-config-rules-learned.pdf')
 
     # plt.show()
 
@@ -252,11 +252,11 @@ def compare_phase_times(data, dataset_names, legend_outside=False, sigdigs=False
         plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
         plt.subplots_adjust(right=0.7)
         fig.set_size_inches(9,5)
-        plt.savefig("output/by-domain-phase-times-legend-outside.pdf")
+        plt.savefig(output_path + "by-domain-phase-times-legend-outside.pdf")
     else:
         plt.legend()
         fig.set_size_inches(10,5)
-        plt.savefig("output/by-domain-phase-times.pdf")
+        plt.savefig(output_path + "by-domain-phase-times.pdf")
 
     
 
@@ -316,7 +316,7 @@ def compare_run_rewrites(data, domain):
     # minimize.plot()
     # plt.show()
     plt.tight_layout()
-    plt.savefig('output/' + domain + '-run-rewrites.pdf')
+    plt.savefig(output_path + domain + '-run-rewrites.pdf')
 
 def compare_phase_times_run_rewrites(domain, data, legend_outside=False):
     # TODO: sort in order of the dataset_names
@@ -418,10 +418,10 @@ def compare_phase_times_run_rewrites(domain, data, legend_outside=False):
         plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
         plt.subplots_adjust(right=0.7)
         fig.set_size_inches(9,5)
-        plt.savefig("output/" + domain + "-by-domain-phase-times-legend-outside.pdf")
+        plt.savefig(output_path + domain + "-by-domain-phase-times-legend-outside.pdf")
     else:
         plt.legend()
-        plt.savefig("output/" + domain + "-by-domain-phase-times.pdf")
+        plt.savefig(output_path + domain + "-by-domain-phase-times.pdf")
 
 def compare_run_rewrites_with_timeout(domain, data, max, set_max=False):
 
@@ -488,15 +488,21 @@ def compare_run_rewrites_with_timeout(domain, data, max, set_max=False):
     # minimize.plot()
     # plt.show()
     plt.tight_layout()
-    plt.savefig('output/rr-' + domain + '-timeout.pdf')
+    plt.savefig(output_path + 'rr-' + domain + '-timeout.pdf')
+
+output_path = ""
 
 def main():
-    if len(sys.argv) < 2:
+    global output_path
+
+    if len(sys.argv) == 1:
         path = "submitted-data/compare/parsed.json"
         path_rr = "submitted-data/no-rr/parsed.json"
+        output_path = "output/"
     else:
-        path = sys.argv[1] + "parsed.json"
-        path_rr = sys.argv[2] + "parsed.json"
+        path = sys.argv[1] + "compare/parsed.json"
+        path_rr = sys.argv[1] + "no-rr/parsed.json"
+        output_path = sys.argv[1]
         
     data = json.load(open(path))
     data_rr = json.load(open(path_rr))
