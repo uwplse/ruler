@@ -88,7 +88,7 @@ Importantly, we measure both running time,
 We also measured running time,
   number of rules learned,
   and number of e-classes in the egraph with and without
-  invoking `run_rewrites` (`Figure 4, Line 9`) to study it's effect.
+  invoking `run_rewrites` (`Figure 4, Line 9`) to study its effect.
 The results are shown in `Figure 9b` for `bv4`, `bv32`, and `rationals`.
 
 - Validation Analysis (`Section 6.2`): We compared different
@@ -172,7 +172,7 @@ run `make` and it will print it to the terminal instantly.
  pre-generated results and run `make` again.
  This will take approximately 1.5 hours.
 
-**Note that  in some cases the numbers
+**Note that in some cases the numbers
   will not match exactly with what
   we reported in the paper because
   the VM is less powerful than the machine
@@ -268,7 +268,7 @@ The `.tar` file in the `submitted-data` folder contains the log of each run.
 This is not used, and is provided for interest only.
 
 - To run your own evaluation and make new plots from scratch,
-run  `./ablation.sh -r generate-new`.
+run `./ablation.sh -r generate-new`.
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
 under `output/`,
