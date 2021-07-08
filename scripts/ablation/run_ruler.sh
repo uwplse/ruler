@@ -30,8 +30,8 @@ done
 shift "$((OPTIND-1))"
 
 if [ -z "${NUM_RUNS:-}" ] ; then
-    echo "Running with num_runs = 5 (-r 5)"
-    NUM_RUNS=5
+    echo "Running with num_runs = 10 (-r 10)"
+    NUM_RUNS=10
 fi
 
 if [ -z "${NUM_VARIABLES:-}" ] ; then
