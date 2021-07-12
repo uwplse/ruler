@@ -20,16 +20,18 @@ The next part is "Step-by-Step" which first lists the claims we
   perform further experiments.
 
 ## Getting started
-We recommend running the VM on a machine with at least 32GB RAM.
-Please download the `.ova` file [here]
+We recommend running the VM on a machine with at least 32GB RAM to reproduce all the results.
+
+* Download the `.ova` file [here]
   and open it with Virtual Box by
   going to `File -> import appliance` and giving the path to the `.ova` file
   and clicking on `continue`. In the next window that pops up, click on
   `Import`. It should take a few minutes to import.
-  Please change the RAM to 25 GB and allocate 4 processors by going to
+
+* Next, change the RAM to 25 GB and allocate 4 processors by going to
   `Settings` under `System -> Motherboard` and `System -> Processor` respectively.
 
-* Next, please open the virtual machine image in virtual box by clicking on the
+* Next, open the virtual machine image in virtual box by clicking on the
   green `Start` button.
 
 * Login is automatic, but in case needed, the password is: `ruler`.
@@ -118,8 +120,8 @@ Note that in some cases the numbers
   will not match exactly with what
   we reported in the paper because
   the VM is less powerful than the machine
-  we had for running the eval in the paper (see paper for details),
-  and sometimes the heuristics also may have slightly different effects.
+  we had for running the eval in the paper,
+  and sometimes the heuristics also may have slightly different effects (see paper for details).
 
 #### Integrating with Herbie
 The three plots in `Figure 7` will be
@@ -333,7 +335,8 @@ passed directly to the Ruler invocation.
 
 NOTE: If a run of Ruler fails (e.g., due to out-of-memory issues on the VM),
  `parse.js` will log a "Failed to parse" line when parsing the corresponding `.log` file.
- Data from the failed runs are ignored; only data from files that succeed parsing will be included in the resulting plots.
+ Data from the failed runs are ignored by the plotting scripts;
+   only data from files that succeed parsing will be included in the resulting plots.
 
 NOTE: You can also separately invoke the parsing and visualization scripts on the data like:
 
@@ -353,7 +356,7 @@ are already pre-installed in this directory.
 - Type `cd scripts/eqsat-sound` to go to the correct directory.
 
 - To view `Table 2` directly from pre-generated data,
-  go to `output/pre-gen-2021-07-06-2242` and type: `python3 ../../tabulate.py all.json`.
+  run: `python3 tabulate.py output/pre-gen-2021-07-06-2242/all.json`.
   Note that the first table is the one for `bv32`,
   then second for `bv4`, and
   third for `rational`.
