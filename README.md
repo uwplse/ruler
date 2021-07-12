@@ -331,12 +331,11 @@ from inside `run.sh`.
 Lastly, any succeeding parameters will be
 passed directly to the Ruler invocation.
 
-NOTE: If for some reason a run of Ruler fails to find rules,
-that log file will be ignored, 
-so please keep an eye out for failures.
-Each failure to parse a file should be logged with "Failed to parse". 
-If something went wrong and you want to re-run the parsing and ploting
-scripts, you can manually invoke them:
+NOTE: If a run of Ruler fails (e.g., due to out-of-memory issues on the VM),
+ `parse.js` will log a "Failed to parse" line when parsing the corresponding `.log` file.
+ Data from the failed runs are ignored; only data from files that succeed parsing will be included in the resulting plots.
+
+NOTE: You can also separately invoke the parsing and visualization scripts on the data like:
 
 ```
 node parse.js "output/$TIMESTAMP/compare/"
@@ -344,6 +343,7 @@ node parse.js "output/$TIMESTAMP/no-rr/" yes
 
 python visualize.py "output/$TIMESTAMP/"
 ```
+
 
 #### Validation Analysis
 The goal is to reproduce `Table 2`.

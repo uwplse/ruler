@@ -71,7 +71,7 @@ do
   --iters "$NUM_ITERS" \
   --do-final-run $@ \
   --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
-  cp out.json "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
+  # cp out.json "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
 
 echo "Running mrat..."
@@ -85,7 +85,7 @@ do
         --iters "$NUM_ITERS" \
         --do-final-run $@ \
         --rules-to-take "$r") &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log"
-        cp out.json "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i-out.json"
+       # cp out.json "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i-out.json"
     done
 done
 
@@ -99,5 +99,5 @@ do
   --do-final-run $@ ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
-  cp out.json "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
+  #cp out.json "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done

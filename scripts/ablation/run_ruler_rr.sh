@@ -74,7 +74,7 @@ do
   --iters "$NUM_ITERS" \
   --do-final-run \
   --rules-to-take 1 $@ ) &> "$OUTPUT_DIR/orat-default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
-  cp out.json "$OUTPUT_DIR/orat-default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
+  # cp out.json "$OUTPUT_DIR/orat-default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
 
 echo "Running no run-rewrites..."
@@ -99,5 +99,5 @@ do
     # uncomment this if you want to abort on timeout
     # exit $TIMEOUT_EXIT
   fi
-  cp out.json "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
+  # cp out.json "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
