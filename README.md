@@ -26,7 +26,7 @@ Please download the `.ova` file [here]
   going to `File -> import appliance` and giving the path to the `.ova` file
   and clicking on `continue`. In the next window that pops up, click on
   `Import`. It should take a few minutes to import.
-  Please change the RAM to 24 GB and allocate 4 processors by going to
+  Please change the RAM to 25 GB and allocate 4 processors by going to
   `Settings` under `System -> Motherboard` and `System -> Processor` respectively.
 
 * Next, please open the virtual machine image in virtual box by clicking on the
@@ -208,18 +208,21 @@ the required racket 7.9 version.
   * for Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
   * for Figure 7c: `by-config-all-tests-time-boxplot.pdf`
 
-- To reproduce all the data
-type: `./herbie-eval.sh 15`.
+- To generate the data
+run: `./herbie-eval.sh 15`.
 You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS` (default is 1).
 We recommend trying with `15` seeds
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
-`output/ruler-herbie-eval/results/`) -- they should be similar.
-In the VM this should take approximately [XXX] hours.
-You may notice some timeouts / errors on some benchmarks but those are due to Herbie, not Ruler.
+`output/ruler-herbie-eval/results/`) -- they should have a similar trend to the ones presented in the paper.
+In the VM this should take approximately 10 hours.
+You may notice some timeouts / errors (especially for the `herbie-no-simpl` case)
+on some benchmarks but those are due to Herbie, not Ruler.
 
 In the paper we ran the experiment with `30` seeds (on a large machine) but that takes much longer,
 and is better run on a real machine as opposed to a VM because it will
 generate more data and will be much slower on the VM.
+You are of course welcome to run it on the VM if you like.
+We expect it will take 24 hours.
 Other Herbie specific
 arguments to the `herbie-eval.sh` script are set to their defaults but
 the script has documentation for how to change them.
