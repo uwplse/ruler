@@ -20,7 +20,7 @@ The next part is "Step-by-Step" which first lists the claims we
   perform further experiments.
 
 ## Getting started
-We recommend running the VM on a machine with at least 32 GB RAM
+We recommend running the VM on a machine with more than 32 GB RAM
   to reproduce all the results from scratch.
 If you are only running `eval.sh` to produce results from previous runs (see below),
 you should be fine with a machine that has 16 GB RAM.
