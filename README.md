@@ -8,7 +8,7 @@ that uses equality saturation
  rulesets for a domain,
  given an interpreter.
 
-- **Available**: The artifact is available on Zenodo at: [link]
+- **Available**: The artifact is available on [Zenodo](https://zenodo.org/record/5094074#.YO0R4G5lBpQ).
 - **Functional**: Below we first provide instructions for "Getting Started"
   which should take less than 10 minutes.
 The next part is "Step-by-Step" which first lists the claims we
