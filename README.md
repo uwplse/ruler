@@ -445,7 +445,7 @@ To install and run the entire evaluation on a
   * python3-distutils
   * jq
   * matplotlib
-  * node
+  * node (version > 15)
 
 ### Installation of Ruler
 Ruler is implemented in [Rust](rust-lang.org/).
