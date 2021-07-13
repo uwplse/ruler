@@ -179,7 +179,6 @@ run `make` and it will print it to the terminal instantly.
 
 - To regenerate the data, run `make clean` to remove all
  pre-generated results and run `make` again.
-
  **This should work without allocating additional RAM to the VM.**
 
  This will take approximately 1.5 hours.
@@ -222,7 +221,6 @@ the required racket 7.9 version.
 
 - To generate the data,
 run: `./herbie-eval.sh 15`.
-
 **This part requires increasing the RAM of the VM to 25 GB or more.**
 
 You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS` (default is 1).
@@ -287,7 +285,6 @@ This is not used, and is provided for interest only.
 
 - To run your own evaluation and make new plots from scratch,
 run `./ablation.sh -r generate-new`.
-
 **This part requires 32 GB of RAM allocated to the VM.
 We have tried with 25 GB and even then two runs (`rational_3-2_100-0.log`, `rational_3-2_5-0.log`) ran out of memory.
 Ideally, these should be run on a real machine, which is what we did for the paper.**
@@ -384,7 +381,6 @@ are already pre-installed in this directory.
 
 - To reproduce all the data,
 run `./eqsat-soundness.sh`.
-
 **This part requires allocating at least 25 GB RAM to the VM.**
 
 This should take approximately 3 hours.
