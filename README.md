@@ -168,8 +168,8 @@ the tables should be identical.
 ### More Detailed Experiments
 This section describes how you can run each experiment separately.
 It also has instructions on generating all the data from scratch.
-Overall, generating all results from scratch will take about 20 hours (see below for details)
-on a VM (with 25 GB RAM allocated).
+Overall, generating all results from scratch will take about 20 hours (see below for details).
+Most of them also require allocating at least 25 GB to the VM.
 
 #### 1. Comparing with CVC4
 The goal is to reproduce `Table 1`.
