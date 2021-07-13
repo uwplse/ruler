@@ -305,7 +305,7 @@ If you want to wait less than 1 hour,
 or you want to test the non-termination of this run 
 with a longer timeout, you can change the timeout setting (see the list of 
 arguments available below).
-This part will take approximately **2 hours**.
+This part will take approximately **3 hours**.
 
 In the published evaluation,
 we ran Ruler with 3 variables,
