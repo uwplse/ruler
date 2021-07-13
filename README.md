@@ -179,7 +179,9 @@ run `make` and it will print it to the terminal instantly.
 
 - To regenerate the data, run `make clean` to remove all
  pre-generated results and run `make` again.
+
  **This should work without allocating additional RAM to the VM.**
+
  This will take approximately 1.5 hours.
 
 **Note that in some cases the numbers
@@ -220,7 +222,9 @@ the required racket 7.9 version.
 
 - To generate the data,
 run: `./herbie-eval.sh 15`.
+
 **This part requires increasing the RAM of the VM to 25 GB or more.**
+
 You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS` (default is 1).
 We recommend trying with `15` seeds
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
@@ -283,9 +287,11 @@ This is not used, and is provided for interest only.
 
 - To run your own evaluation and make new plots from scratch,
 run `./ablation.sh -r generate-new`.
+
 **This part requires 32 GB of RAM allocated to the VM.
 We have tried with 25 GB and even then two runs (`rational_3-2_100-0.log`, `rational_3-2_5-0.log`) ran out of memory.
 Ideally, these should be run on a real machine, which is what we did for the paper.**
+
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
 under `output/`,
@@ -294,12 +300,8 @@ These statistics are collected into json files
 and then plotted in matplotlib.
 Resultant pdf plots are available inside the 
 timestamped folder for that experiment.
-With the default settings and
-a single run instead of the 10 run aggregate reported in the paper
-(see below on how to evaluate over more runs),
-this will take approximately 2-3 hours for all runs that terminate.
-However, it is almost certain that `orat` rationals
-in the `no-rr` setting will not terminate.
+As we presented in the paper, `orat` rationals
+in the `no-rr` setting does not terminate.
 We have set a timeout for this run of 1 hour (3600 seconds)
 so that the evaluation will finish in a timely manner,
 but in the paper, this run did not terminate after 24 hours (see `Figure 9b`).
@@ -312,6 +314,8 @@ In the published evaluation,
 we ran Ruler with 3 variables,
 5 iterations, over 10 runs, but
 we recommend only running for 1 run on the VM.
+
+This part will take approximately 2 hours.
 
 Note that timing results should only be compared between 
 themselves and not as absolute values, since logging is enabled
@@ -380,7 +384,9 @@ are already pre-installed in this directory.
 
 - To reproduce all the data,
 run `./eqsat-soundness.sh`.
+
 **This part requires allocating at least 25 GB RAM to the VM.**
+
 This should take approximately 3 hours.
 The data will be generated and put in a timestamped directory under `output`.
 Each domain and configuration will have a directory and `all.json` will contain
