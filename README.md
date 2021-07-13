@@ -25,7 +25,7 @@ We recommend running the VM on a machine with at least 32GB RAM
 If you are only running `eval.sh` to produce results from pre-generated results (see below),
 you should be fine with a machine that has 16 GB RAM.
 
-* Download the `.ova` file [here]
+* Download the `.ova` file [here](https://drive.google.com/drive/folders/1t1zURWTiWNHpY2utezXaeE30ESjx6s1x?usp=sharing)
   and open it with Virtual Box by
   going to `File -> import appliance` and giving the path to the `.ova` file
   and clicking on `continue`. In the next window that pops up, click on
