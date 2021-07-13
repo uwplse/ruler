@@ -20,7 +20,10 @@ The next part is "Step-by-Step" which first lists the claims we
   perform further experiments.
 
 ## Getting started
-We recommend running the VM on a machine with at least 32GB RAM to reproduce all the results.
+We recommend running the VM on a machine with at least 32GB RAM
+  to reproduce all the results from scratch.
+If you are only running `eval.sh` to produce results from pre-generated results (see below),
+you should be fine with a machine that has 16 GB RAM.
 
 * Download the `.ova` file [here]
   and open it with Virtual Box by
@@ -28,8 +31,10 @@ We recommend running the VM on a machine with at least 32GB RAM to reproduce all
   and clicking on `continue`. In the next window that pops up, click on
   `Import`. It should take a few minutes to import.
 
-* Next, change the RAM to 25 GB and allocate 4 processors by going to
-  `Settings` under `System -> Motherboard` and `System -> Processor` respectively.
+*  If you plan on running the full eval from scratch (i.e., regenerate all the data),
+   change the RAM to 25 GB by going to
+  `Settings` under `System -> Motherboard`.
+  Otherwise, skip this step.
 
 * Next, open the virtual machine image in virtual box by clicking on the
   green `Start` button.
@@ -99,8 +104,9 @@ The results are shown in `Table 2`.
 
 ### Results from Pre-generated Data
 
-Most of our experiments will take several hours to run from scratch (see "More Detailed Experiments" below),
-and some are better run on bigger machines than on a VM as they generate a lot of data.
+Most of our experiments will take several hours to run
+  from scratch (see "More Detailed Experiments" below),
+  and some are better run on bigger machines than on a VM as they generate a lot of data.
 We instead recommend running the `scripts/eval.sh`:
 
 ```
@@ -165,6 +171,7 @@ It also has instructions on generating all the data from scratch.
 
 #### Comparing with CVC4
 The goal is to reproduce `Table 1`.
+
 - Type `cd scripts/cvc4-eval/` to go to the correct directory.
 
 - To generate the table from the pre-run results,
@@ -172,6 +179,7 @@ run `make` and it will print it to the terminal instantly.
 
 - To regenerate the data, run `make clean` to remove all
  pre-generated results and run `make` again.
+ **This should work without allocating additional RAM to the VM.**
  This will take approximately 1.5 hours.
 
 **Note that in some cases the numbers
@@ -212,6 +220,7 @@ the required racket 7.9 version.
 
 - To generate the data
 run: `./herbie-eval.sh 15`.
+**This part requires increasing the RAM of the VM to 25 GB or more.**
 You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS` (default is 1).
 We recommend trying with `15` seeds
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
@@ -274,6 +283,9 @@ This is not used, and is provided for interest only.
 
 - To run your own evaluation and make new plots from scratch,
 run `./ablation.sh -r generate-new`.
+**This part requires 32 GB of RAM allocated to the VM.
+We have tried with 25 GB and even then two runs (`rational_3-2_100-0.log`, `rational_3-2_5-0.log`) ran out of memory.
+Ideally, these should be run on a real machine, which is what we did for the paper.**
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
 under `output/`,
@@ -368,6 +380,7 @@ are already pre-installed in this directory.
 
 - To reproduce all the data,
 run `./eqsat-soundness.sh`.
+**This part requires allocating at least 25 GB RAM to the VM.**
 This should take approximately 3 hours.
 The data will be generated and put in a timestamped directory under `output`.
 Each domain and configuration will have a directory and `all.json` will contain
