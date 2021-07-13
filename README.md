@@ -173,7 +173,7 @@ Most of them also require allocating at least 32 GB to the VM.
 #### 1. Comparing with CVC4
 The goal is to reproduce `Table 1`.
 
-- Type `cd scripts/cvc4-eval/` to go to the correct directory.
+- Type `cd $HOME/ruler/scripts/cvc4-eval/` to go to the correct directory.
 
 - To generate the table from the previous runs,
 run `make` and it will print it to the terminal instantly.
@@ -206,7 +206,7 @@ Herbie is an external tool which we used for this evaluation.
 Herbie is already installed in the VM together with
 the required racket 7.9 version.
 
-- Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
+- Type `cd $HOME/ruler/scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
 
 - To simply view pre-made plots, you
   can directly go to `herbie-rational/output/ruler-herbie-eval/results/submitted-plots`
@@ -266,7 +266,7 @@ Plotting scripts are in `plots/` directory.
 #### 3. Search Parameter Analysis
 The goal is to reproduce `Figure 8` and `Figure 9`.
 
-- Type `cd scripts/ablation` to go to the correct directory.
+- Type `cd $HOME/ruler/scripts/ablation` to go to the correct directory.
 
 - To only view the plots, go to `submitted-plots/`.
    * `Figure 8` in the paper corresponds to the `10-run/by-domain-phase-times.pdf` plot.
@@ -364,7 +364,7 @@ The goal is to reproduce `Table 2`.
 This part of the eval requires rosette 4.0 and racket 8.0 which
 are already pre-installed in this directory.
 
-- Type `cd scripts/eqsat-sound` to go to the correct directory.
+- Type `cd $HOME/ruler/scripts/eqsat-sound` to go to the correct directory.
 
 - To view `Table 2` directly from previous runs,
   run: `python3 tabulate.py output/pre-gen-2021-07-06-2242/all.json`.
