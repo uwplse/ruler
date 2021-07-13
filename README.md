@@ -310,7 +310,7 @@ This part will take approximately **3 hours**.
 
 In the published evaluation,
 we ran Ruler with 3 variables,
-5 iterations, over 10 runs, but
+2 iterations, over 10 runs, but
 we recommend only running for 1 run on the VM.
 
 Note that timing results should only be compared between 
