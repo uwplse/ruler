@@ -22,7 +22,7 @@ The next part is "Step-by-Step" which first lists the claims we
 ## Getting started
 We recommend running the VM on a machine with at least 32 GB RAM
   to reproduce all the results from scratch.
-If you are only running `eval.sh` to produce results from pre-generated results (see below),
+If you are only running `eval.sh` to produce results from previous runs (see below),
 you should be fine with a machine that has 16 GB RAM.
 
 * Download the `.ova` file [here](https://drive.google.com/drive/folders/1t1zURWTiWNHpY2utezXaeE30ESjx6s1x?usp=sharing)
@@ -31,8 +31,8 @@ you should be fine with a machine that has 16 GB RAM.
   and clicking on `continue`. In the next window that pops up, click on
   `Import`. It should take a few minutes to import.
 
-*  If you plan on running the full eval from scratch (i.e., regenerate all the data),
-   change the RAM to 25 GB (or more) by going to
+*  If you plan on running the full eval from scratch,
+   change the RAM to 32 GB (or more) by going to
   `Settings` under `System -> Motherboard`.
   Otherwise, skip this step.
 
@@ -46,8 +46,7 @@ you should be fine with a machine that has 16 GB RAM.
   are already installed and Ruler is already compiled for you, ready to be run.
 
 * To allow a quick verification of our artifact,
-  we provided pre-generated data and
-  results in the VM.
+  we provided data from previous runs.
   You can therefore directly view the results (see below on how to do that).
 
 * You can also run the tool yourself entirely from scratch,
@@ -102,7 +101,7 @@ The results are shown in `Figure 9b` for `bv4`, `bv32`, and `rationals`.
   rule validation methods for `bv4`, `bv32`, and `rationals`.
 The results are shown in `Table 2`.
 
-### Results from Pre-generated Data
+### Results from Previous Runs
 
 Most of our experiments will take several hours to run
   from scratch (see "More Detailed Experiments" below),
@@ -115,7 +114,7 @@ cd scripts
 ```
 
 to generate the results
-from existing data that we have provided in the VM.
+from previous runs that we have included in the VM.
 We expect it to take less than 10 seconds.
 This script runs all four experiments and here is how you can view the results.
 
@@ -141,7 +140,7 @@ to compare with the paper.
 
 #### 3. Search Parameter Analysis
 The plots in `Figure 8, 9` will be generated
-using the data provided in the `submitted-data` directory
+using data from previous runs in the `submitted-data` directory
 and can be found under `output`.
 Open the following PDFs
   - Figure 8: `ablation/output/by-domain-phase-times.pdf`
@@ -169,18 +168,18 @@ the tables should be identical.
 This section describes how you can run each experiment separately.
 It also has instructions on generating all the data from scratch.
 Overall, generating all results from scratch will take about 20 hours (see below for details).
-Most of them also require allocating at least 25 GB to the VM.
+Most of them also require allocating at least 32 GB to the VM.
 
 #### 1. Comparing with CVC4
 The goal is to reproduce `Table 1`.
 
 - Type `cd scripts/cvc4-eval/` to go to the correct directory.
 
-- To generate the table from the pre-run results,
+- To generate the table from the previous runs,
 run `make` and it will print it to the terminal instantly.
 
 - To regenerate the data, run `make clean` to remove all
- pre-generated results and run `make` again.
+ results and run `make` again.
  **This should work without allocating additional RAM to the VM.**
  This will take approximately **1.5 hours**.
 
@@ -209,12 +208,14 @@ the required racket 7.9 version.
 
 - Type `cd scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
 
-- To simply view pre-made plots you
+- To simply view pre-made plots, you
   can directly go to `herbie-rational/output/ruler-herbie-eval/results/submitted-plots`
   and look at the PDFs.
 
-- To generate plots from existing data, run
-    `plots/plot-results.sh output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`
+- To generate plots from previous runs, run
+    ```
+    plots/plot-results.sh output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331
+    ```
    and open the following three PDFs under `output/ruler-herbie-eval/results/pre-gen-2021-04-13-1331`:
   * for Figure 7a: `by-config-all-tests-avg_bits_err_improve-boxplot.pdf`
   * for Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
@@ -222,7 +223,7 @@ the required racket 7.9 version.
 
 - To generate the data,
 run: `./herbie-eval.sh 15`.
-**This part requires increasing the RAM of the VM to 25 GB or more.**
+**This part requires increasing the RAM of the VM to 32 GB or more.**
 You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS` (default is 1).
 We recommend trying with `15` seeds
 to check the results (look for plots with same names as mentioned above in the timestamped directory under
@@ -273,7 +274,7 @@ The goal is to reproduce `Figure 8` and `Figure 9`.
    * `Figure 9b` plots are the pdfs under `orat-rr/bv4`, `orat-rr/bv32`, and `orat-rr/rat`
  (`orat` means "One Rule At a Time" which corresponds to `n = 1` in the caption in the paper).
 
-- To make plots from the pre-generated data,
+- To make plots from the previous runs,
   run `./ablation.sh -r use-existing`.
 This will make plots using the data provided in the folder `submitted-data`
   and put them into the `output` folder.
@@ -285,8 +286,7 @@ This is not used, and is provided for interest only.
 
 - To run your own evaluation and make new plots from scratch,
 run `./ablation.sh -r generate-new`.
-**This part requires 32 GB of RAM allocated to the VM.
-We have tried with 25 GB and even then two runs (`rational_3-2_100-0.log`, `rational_3-2_5-0.log`) ran out of memory.
+**This part requires 32 GB of RAM allocated to the VM and may still run out of memory on some runs.
 Ideally, these should be run on a real machine, which is what we did for the paper.**
 This runs Ruler with different configurations,
 saving each run to its own timestamped folder
@@ -366,7 +366,7 @@ are already pre-installed in this directory.
 
 - Type `cd scripts/eqsat-sound` to go to the correct directory.
 
-- To view `Table 2` directly from pre-generated data,
+- To view `Table 2` directly from previous runs,
   run: `python3 tabulate.py output/pre-gen-2021-07-06-2242/all.json`.
   Note that the first table is the one for `bv32`,
   then second for `bv4`, and
@@ -379,7 +379,7 @@ are already pre-installed in this directory.
 
 - To reproduce all the data,
 run `./eqsat-soundness.sh`.
-**This part requires allocating at least 25 GB RAM to the VM.**
+**This part requires allocating at least 32 GB RAM to the VM.**
 This should take approximately **3 hours**.
 The data will be generated and put in a timestamped directory under `output`.
 Each domain and configuration will have a directory and `all.json` will contain
