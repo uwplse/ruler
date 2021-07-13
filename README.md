@@ -218,7 +218,7 @@ the required racket 7.9 version.
   * for Figure 7b: `by-config-all-tests-output_parens-boxplot.pdf`
   * for Figure 7c: `by-config-all-tests-time-boxplot.pdf`
 
-- To generate the data
+- To generate the data,
 run: `./herbie-eval.sh 15`.
 **This part requires increasing the RAM of the VM to 25 GB or more.**
 You can run it for fewer or more seeds by typing `./herbie-eval.sh NSEEDS` (default is 1).
