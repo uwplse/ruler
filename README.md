@@ -53,7 +53,7 @@ you should be fine with a machine that has 16 GB RAM.
 as shown below for each section of the evaluation.
 
 Note that in the paper,
-  the evaluations were often done is larger scale
+  the evaluations were often done in larger scale
   which is not possible on the VM.
 We have provided recommendations below on how
 to run it on a smaller scale (e.g., fewer
@@ -106,7 +106,7 @@ The results are shown in `Table 2`.
 Most of our experiments will take several hours to run
   from scratch (see "More Detailed Experiments" below),
   and some are better run on bigger machines than on a VM as they generate a lot of data.
-We instead recommend running the `scripts/eval.sh`:
+We instead recommend running `scripts/eval.sh`:
 
 ```
 cd scripts
@@ -206,7 +206,7 @@ Herbie is an external tool which we used for this evaluation.
 Herbie is already installed in the VM together with
 the required racket 7.9 version.
 
-- Type `cd $HOME/ruler/scripts/herbie-rational` to go to the correct directory from the `ruler` directory.
+- Type `cd $HOME/ruler/scripts/herbie-rational` to go to the correct directory.
 
 - To simply view pre-made plots, you
   can directly go to `herbie-rational/output/ruler-herbie-eval/results/submitted-plots`
@@ -259,6 +259,7 @@ Below are the scripts relevant for this eval and a brief description of what the
   * `filter.rkt` filters benchmarks from Herbie that contain only rational operators.
   * `preprocess.py` preprocesses Ruler's rewrites to make them match with Herbie's syntax,
 and also removes expansive directions of rules.
+
 Plotting scripts are in `plots/` directory.
   * `plots/plot-results.sh` calls these scripts to generate the plots.
   * `plots/config-all-tests-box-plot.py` is the script that generates the plots in the paper.
@@ -309,7 +310,7 @@ This part will take approximately **3 hours**.
 
 In the published evaluation,
 we ran Ruler with 3 variables,
-5 iterations, over 10 runs, but
+2 iterations, over 10 runs, but
 we recommend only running for 1 run on the VM.
 
 Note that timing results should only be compared between 
