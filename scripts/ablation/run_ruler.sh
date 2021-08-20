@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 # determine physical directory of this script
-# h/t Zach
 src="${BASH_SOURCE[0]}"
 while [ -L "$src" ]; do
   dir="$(cd -P "$(dirname "$src")" && pwd)"
@@ -9,9 +8,6 @@ while [ -L "$src" ]; do
   [[ $src != /* ]] && src="$dir/$src"
 done
 MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
-
-# TODO replace bool etc with a parameter
-# TODO properly parameterize the number of iterations
 
 export RUST_LOG="ruler=info,egg=warn";
 
@@ -34,8 +30,8 @@ done
 shift "$((OPTIND-1))"
 
 if [ -z "${NUM_RUNS:-}" ] ; then
-    echo "Running with num_runs = 5 (-r 5)"
-    NUM_RUNS=5
+    echo "Running with num_runs = 10 (-r 10)"
+    NUM_RUNS=10
 fi
 
 if [ -z "${NUM_VARIABLES:-}" ] ; then
@@ -62,18 +58,20 @@ mkdir -p "$OUTPUT_DIR/mrat";
 mkdir -p "$OUTPUT_DIR/orat";
 mkdir -p "$OUTPUT_DIR/default";
 mkdir -p "$OUTPUT_DIR/phase-times";
-mkdir -p "$OUTPUT_DIR/no-run-rewrites";
+#mkdir -p "$OUTPUT_DIR/no-run-rewrites";
+
+echo "run_ruler.sh [FIGURE 8] [FIGURE 9a]: Running experiment for domain $DOMAIN."
 
 echo "Running orat..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  echo "Running iter $i."
+  echo "Run $i."
   (time cargo "$DOMAIN"  \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
   --do-final-run $@ \
   --rules-to-take 1) &> "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
-  cp out.json "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
+  # cp out.json "$OUTPUT_DIR/orat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done
 
 echo "Running mrat..."
@@ -81,37 +79,25 @@ for r in 5 10 15 25 50 100
 do
     for (( i=0; i<$NUM_RUNS; i++ ))
     do
-        echo "Running iter $i with mrat_m=$r."
+        echo "Run $i with mrat_m=$r."
         (time cargo "$DOMAIN" \
         --variables "$NUM_VARIABLES" \
         --iters "$NUM_ITERS" \
         --do-final-run $@ \
         --rules-to-take "$r") &> "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i.log"
-        cp out.json "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i-out.json"
+       # cp out.json "$OUTPUT_DIR/mrat/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$r-$i-out.json"
     done
 done
 
 echo "Running phase-times..."
 for (( i=0; i<$NUM_RUNS; i++ ))
 do
-  echo "Running iter $i."
+  echo "Run $i."
   (time cargo "$DOMAIN" \
   --variables "$NUM_VARIABLES" \
   --iters "$NUM_ITERS" \
   --do-final-run $@ ) &> "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
   cp "$OUTPUT_DIR/phase-times/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log" \
         "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
-  cp out.json "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
-done
-
-echo "Running no run-rewrites..."
-for (( i=0; i<$NUM_RUNS; i++ ))
-do
-  echo "Running iter $i."
-  (time cargo "$DOMAIN" \
-  --variables "$NUM_VARIABLES" \
-  --iters "$NUM_ITERS" \
-  --do-final-run $@ \
-  --no-run-rewrites) &> "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i.log"
-  cp out.json "$OUTPUT_DIR/no-run-rewrites/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
+  #cp out.json "$OUTPUT_DIR/default/${DOMAIN}_${NUM_VARIABLES}-${NUM_ITERS}_$i-out.json"
 done

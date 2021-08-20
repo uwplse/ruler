@@ -35,6 +35,8 @@ for out in $(find . -name 'out.json' | sort); do
 done
 
 echo "]" >> all.json
+
+python3 $MYDIR/tabulate.py all.json
 popd
 
 echo "Done."

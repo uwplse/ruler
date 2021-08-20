@@ -44,7 +44,7 @@ def format_cell(cell):
         sound = rules - (unsound + unknown)
         if unsound == 0: unsound = '-'
         if unknown == 0: unknown = '-'
-        return '{}/{}/{} & {:.1f}s'.format(sound, unsound, unknown, cell['time'])
+        return '{}/{} & {:.1f}s'.format(sound, unsound, cell['time'])
     else:
         assert false
 

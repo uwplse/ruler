@@ -1,3 +1,7 @@
+/*!
+Experimental domain of BigInts.
+!*/
+
 use egg::*;
 use ruler::*;
 
@@ -6,9 +10,11 @@ use rand_pcg::Pcg64;
 use z3::ast::Ast;
 use z3::*;
 
+/// Define Constant as BigInt.
 pub type Constant = BigInt;
 
 define_language! {
+    /// Define the operators for the domain.
     pub enum Math {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
@@ -203,6 +209,7 @@ impl SynthLanguage for Math {
     }
 }
 
+/// Sampler for BigInts used for cvec generation and validation.
 pub fn sampler(rng: &mut Pcg64, nbits: u64, num_samples: usize) -> Vec<BigInt> {
     let mut ret = vec![];
     for _ in 0..num_samples {
@@ -211,6 +218,7 @@ pub fn sampler(rng: &mut Pcg64, nbits: u64, num_samples: usize) -> Vec<BigInt> {
     ret
 }
 
+/// Convert expressions to Z3's syntax for using SMT based rule verification.
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],
@@ -252,6 +260,7 @@ fn egg_to_z3<'a>(
     (buf.pop().unwrap(), assumes)
 }
 
+/// Entry point.
 fn main() {
     Math::main()
 }

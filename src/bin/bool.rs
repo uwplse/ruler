@@ -1,9 +1,16 @@
+/*!
+Domain of Booleans.
+The rewrites for this small domain are correct by construction as
+they are model checked.
+!*/
+
 use egg::*;
 use ruler::*;
 
 use std::ops::*;
 
 define_language! {
+    /// Define the operators for the domain.
     pub enum Math {
         "~" = Not(Id),
         "&" = And([Id; 2]),
@@ -71,7 +78,7 @@ impl SynthLanguage for Math {
         let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
 
         let consts = self_product(&consts, synth.params.variables);
-        println!("cvec len: {}", consts[0].len());
+        // println!("cvec len: {}", consts[0].len());
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: consts[0].len(),
@@ -129,6 +136,7 @@ impl SynthLanguage for Math {
     }
 }
 
+/// Entry point.
 fn main() {
     Math::main()
 }

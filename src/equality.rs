@@ -2,6 +2,7 @@ use crate::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Definition of an equality.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(from = "SerializedEq")]
 #[serde(into = "SerializedEq")]
@@ -116,6 +117,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
 }
 
 impl<L: SynthLanguage> Equality<L> {
+    /// Create a new [Equality] from two [RecExprs](https://docs.rs/egg/0.6.0/egg/struct.RecExpr.html).
     pub fn new<'a>(mut e1: &'a RecExpr<L>, mut e2: &'a RecExpr<L>) -> Option<Self> {
         if e1 < e2 {
             std::mem::swap(&mut e1, &mut e2);
@@ -183,6 +185,8 @@ impl<L: SynthLanguage> Equality<L> {
         }
     }
 
+    /// Assign a score to this Equality using heursitics mentioned in the Ruler paper
+    /// (page 11, footnote 5).
     pub fn score(&self) -> impl Ord + Debug {
         L::score(&self.lhs, &self.rhs)
     }

@@ -14,7 +14,7 @@ with open(jsonp, 'r') as f:
 pairs = dict([(s['config'], s['data']) for s in ss])
 
 if field == "time":
-    print(pairs)
+    # print(pairs)
     for k in pairs:
         times = pairs.get(k)
         new_times = []

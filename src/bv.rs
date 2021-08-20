@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::*;
 
+
+/// General bitvector implementation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct BV<const N: u32>(pub Inner);
@@ -118,6 +120,7 @@ impl<const N: u32> From<Inner> for BV<N> {
     }
 }
 
+/// Macro for specializing `BV` to different sized bitvectors.
 #[macro_export]
 macro_rules! impl_bv {
     ($n:literal) => {
@@ -135,6 +138,7 @@ macro_rules! impl_bv {
         pub type BV = $crate::BV::<$n>;
 
         egg::define_language! {
+            /// Define the operators for the domain.
             pub enum Math {
                 "+" = Add([Id; 2]),
                 "--" = Sub([Id; 2]),
@@ -154,6 +158,7 @@ macro_rules! impl_bv {
         impl SynthLanguage for Math {
             type Constant = BV;
 
+            /// Converting CVC4's rewrites to Ruler's BV grammar syntax.
             fn convert_parse(s: &str) -> RecExpr<Self> {
                 let s = s
                     .replace("bvadd", "+")
@@ -243,7 +248,7 @@ macro_rules! impl_bv {
                     let vals = std::iter::repeat_with(|| synth.rng.gen::<BV>());
                     row.extend(vals.take(n_samples).map(Some));
                 }
-                println!("cvec len: {}", consts[0].len());
+                // println!("cvec len: {}", consts[0].len());
 
                 let mut egraph = EGraph::new(SynthAnalysis {
                     cvec_len: consts[0].len(),

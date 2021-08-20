@@ -1,11 +1,20 @@
+/*!
+Experimental Float domain.
+This is a good example of how Ruler allows custom samplers for different domains.
+Validation is done using random testing.
+!*/
+
 use egg::*;
 use ordered_float::OrderedFloat;
 use rand::Rng;
 use rand_pcg::Pcg64;
 use ruler::*;
 
+/// Ordered Floats as constants.
 pub type Constant = OrderedFloat<f64>;
 
+/// A set of stricky floats to seed the cvecs with, and also
+/// use for validation.
 pub static TRICKY_FLOATS: [f64; 5] = [
     f64::NEG_INFINITY,
     f64::INFINITY,
@@ -15,6 +24,7 @@ pub static TRICKY_FLOATS: [f64; 5] = [
 ];
 
 define_language! {
+    /// Define the operators for the domain.
     pub enum Math {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
@@ -32,6 +42,9 @@ define_language! {
     }
 }
 
+/// Returns an ordered float from an f64.
+/// It only returns 0.0 for both -0.0 and 0.0,
+/// and the input for other values. 
 pub fn mk_constant(val: f64) -> Option<Constant> {
     // is_normal eliminates 0, but we want 0.
     if val.is_normal() || val == 0.0 || val == -0.0 {
@@ -189,6 +202,7 @@ impl SynthLanguage for Math {
     }
 }
 
+/// Helper for chaining a cross product of `TRICKY_FLOATS` to cvecs.
 fn chain_consts(constants: Vec<Constant>, nvars: u32, i: u32) -> Vec<Option<Constant>> {
     let mut res = vec![];
     let mut consts = vec![];
@@ -211,11 +225,13 @@ fn chain_consts(constants: Vec<Constant>, nvars: u32, i: u32) -> Vec<Option<Cons
     res
 }
 
+/// Sample a float with some ULPS of the input `x`.
 fn sample_float_range(rng: &mut Pcg64, x: f64, ulps_range: u64) -> f64 {
     let u = rng.gen_range(0, ulps_range);
     f64::from_bits(x.to_bits() + u)
 }
 
+/// Sample a normal float.
 fn rand_float_repr(rng: &mut Pcg64) -> f64 {
     let mut x = f64::NAN;
     while !x.is_normal() {
@@ -224,6 +240,9 @@ fn rand_float_repr(rng: &mut Pcg64) -> f64 {
     x
 }
 
+/// A float specific sampler that accounts for the distribution of floats,
+/// and additionally generates
+/// both independent and dependent samples.
 fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>> {
     let ulp_rad_sm: u64 = 1000;
     let ulp_rad_lg: u64 = 50000000000000;
@@ -299,6 +318,7 @@ fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>
     return all_vecs;
 }
 
+/// Entry point.
 fn main() {
     Math::main()
 }

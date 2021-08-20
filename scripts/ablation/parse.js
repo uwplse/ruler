@@ -28,8 +28,8 @@ let load_files = (base_folder,  is_rr) => {
         () => load_dir(base_folder + default_conf, "default",
             () => load_dir(base_folder + orat, "orat",
                 () => load_dir(base_folder + mrat, "mrat",
-                    () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
-                        () => print_data(data))))));
+                    // () => load_dir(base_folder + no_run_rewrites, "no-run-rewrites",
+                        () => print_data(data)))));
 }
 
 // I should really just make promises... 
@@ -40,15 +40,15 @@ let load_dir = (path, type, k) => {
     
     // let's find and read all the logfiles in that directory
     fs.readdir(path, 'utf8', (err, filenames) => {
-        console.log(filenames);
+        // console.log(filenames);
         if (err != undefined || err != null) {
-            console.log('lol');
+            console.log('Something went wrong');
         }
 
         // get a list of logfiles to process
+        // files_to_process = filenames.filter(str => str.substring(str.length - ".log".length, str.length) === ".log")
         files_to_process = filenames.filter(str => str.endsWith(".log"));
-        console.log(files_to_process)
-
+        
         // Use CPS so we know when all files are done 
         let process = (files, files_k) => {
             // todo list is empty
@@ -64,23 +64,34 @@ let load_dir = (path, type, k) => {
             fs.readFile(path + '/' + file, 'utf8', (err, text) => {
                 // process all relevant data
                 let entry = make_entry(text);
-                entry.name = file;
-                entry.type = type;
-                parse_name(file, entry);
-                data.push(entry);
+                if (entry != undefined) {
+                    entry.name = file;
+                    entry.type = type;
+                    parse_name(file, entry);
+                    data.push(entry);
                 // push this data to the array for this type
-                dataByType[type].push(entry);
+                    dataByType[type].push(entry);
+                } else {
+                    console.log("Failed to parse " + path + '/' + file)
+                }
 
                 // keep working!
                 process(files.slice(1), files_k)
             })
         }
 
+        console.log(files_to_process)
         process(files_to_process, k);
     })
 }
 
 let make_entry = (text) => {
+    if (text === undefined) { 
+        return;
+    }
+
+    // sorry... this is the most efficient way to handle any errors
+    try {
     // look for each relevant log piece
     let total_time_pattern = /Learned (?<quantity>[\d]+)[a-z\s]*(?<time>[.\d]+)$/gm;
     let egraph_size_pattern = /egraph n=([\d]+), e=([\d]+)/gm;
@@ -138,6 +149,10 @@ let make_entry = (text) => {
         sys: sys
     }
 
+    } catch (e) {
+        console.log("Failed to parse: " + e);
+        return undefined;
+    }
 }
 
 let parse_name = (name, data) => {
@@ -182,5 +197,5 @@ input_folder = process.argv[2];
 output_path = process.argv[2] + "/parsed.json";
 // output_path = "output/parsed.json";
 let is_rr = process.argv[3]
-console.log(is_rr)
+// console.log(is_rr)
 load_files(input_folder, is_rr === "yes")

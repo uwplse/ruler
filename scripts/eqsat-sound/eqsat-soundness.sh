@@ -16,19 +16,10 @@ mkdir -p "$DIR"
 is=2
 vs=3
 
-# domain=("32" "less-const" "rational")
-# numfuzz=("100" "1000" "smt")
-# consts=("2" "5")
-# # actual lengths of the cvecs, used for the sampling configs
-# bv32_cvec=("343" "6859")
-# bv4_cvec=("343" "4096")
-# rat_cvec=("27" "729")
-
-domain=("4" "32")
+domain=("4" "32" "rational")
 numfuzz=("0" "10" "100" "1000" "smt")
 consts=("2" "3" "5")
 # actual lengths of the cvecs, used for the sampling configs
-# todo add a const row for 1 manually if you want.
 bv32_cvec=("343" "1331" "6859")
 bv4_cvec=("343" "1331" "4096")
 rat_cvec=("27" "125" "729")

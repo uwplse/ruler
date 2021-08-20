@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 type Pair<L> = (RecExpr<L>, RecExpr<L>);
 
+/// Perform derivability test between two rulesets.
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
     let parse = |filename| {
         let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
@@ -49,7 +50,7 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
     serde_json::to_writer_pretty(file, &json).unwrap();
 }
 
-// check the derivability of rules in test using the rules in src
+/// Check the derivability of rules in test using the rules in src
 fn one_way<L: SynthLanguage>(
     params: &DeriveParams,
     src: &[Pair<L>],

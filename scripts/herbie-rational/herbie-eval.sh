@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# determine physical directory of this script
 # h/t Zach
+# determine physical directory of this script
 src="${BASH_SOURCE[0]}"
 while [ -L "$src" ]; do
   dir="$(cd -P "$(dirname "$src")" && pwd)"
@@ -67,7 +67,7 @@ then
 else
     git clone git@github.com:uwplse/herbie.git
     cd herbie
-    # To use old Herbie before racket 8 was merged.
+    # To use old Herbie before racket 8 was merged because the newer commits were not stable.
      git checkout 1c32e484210bac6cd4423e9372082d6b547e9d48
     make install
     cd ..
@@ -83,7 +83,7 @@ then
     echo "Rational FPCore Exists. Not Filtering."
 else
     echo "Filtering all stable benches..."
-    racket $MYDIR/filter.rkt \
+    $MYDIR/racket/bin/racket $MYDIR/filter.rkt \
     --operators "let let* fabs + - * / neg" \
     --names "Octave 3.8, jcobi/3 ; Rosa's FloatVsDoubleBenchmark ; (- (/ x0 (- 1 x1)) x0) ; Expression 4, p15" \
     bench/hamming \
@@ -145,3 +145,14 @@ popd
 
 $MYDIR/seed-stats-per-test.sh "$DIR/results/$tstamp"
 $MYDIR/plots/plot-results.sh "$DIR/results/$tstamp"
+
+
+# remove the large files.
+pushd "$DIR/results/$tstamp"
+
+rm -rf "herbie-only"
+rm -rf "ruler-only"
+rm -rf "herbie-ruler"
+rm -rf "herbie-no-simpl"
+
+popd

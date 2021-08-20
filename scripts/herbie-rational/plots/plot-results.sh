@@ -80,8 +80,6 @@ function gen-test-field {
 
 fields="
   output_parens
-  avg_bits_err_input
-  avg_bits_err_output
   avg_bits_err_improve
   time"
 
@@ -89,9 +87,9 @@ for f in $fields; do
   gen-config-seed-field "$f"
 done
 
-for f in $fields; do
-  gen-config-test-field "$f"
-done
+# for f in $fields; do
+#   gen-config-test-field "$f"
+# done
 
 for f in $fields; do
   gen-seed-field "$f"

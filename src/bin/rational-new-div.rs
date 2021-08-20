@@ -1,3 +1,15 @@
+/*!
+   Here is an example of how to implement a domain for Ruler to infer rewrites.
+   This shows the domain of rationals with a different
+   semantics for division by zero (see `Section 6.3` in the paper).
+   To implement a new domain, you need to
+   - define the operators in the language with `define_language`,
+   - implement `eval` which is the interpreter for your domain,
+   - implement `init_synth` to add the variables and important constants to the initial egraph,
+   - implement `make_layer` to enumerate terms in the egraph,
+   - implement `is_valid` for checking the validity of the rules in your domain.
+!*/
+
 use egg::*;
 use ruler::*;
 
@@ -8,9 +20,11 @@ use rand_pcg::Pcg64;
 use z3::ast::Ast;
 use z3::*;
 
+/// define `Constant` for rationals
 pub type Constant = Ratio<BigInt>;
 
 define_language! {
+    /// Define the operators for the domain.
     pub enum Math {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
@@ -25,6 +39,7 @@ define_language! {
     }
 }
 
+/// Return a non-zero constant.
 fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
     if d.is_zero() {
         None
@@ -238,6 +253,9 @@ impl SynthLanguage for Math {
     }
 }
 
+	
+
+/// Return a randomply sampled BigInt that is not 0
 // randomly sample so that they are not 0
 // Ratio::new will panic if the denom is 0
 pub fn gen_pos(rng: &mut Pcg64, bits: u64) -> BigInt {
@@ -251,6 +269,7 @@ pub fn gen_pos(rng: &mut Pcg64, bits: u64) -> BigInt {
     res
 }
 
+/// A sampler that generates both big and small rationals.
 pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Ratio<BigInt>> {
     let mut ret = vec![];
     for _ in 0..num_samples {
@@ -266,6 +285,7 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
     ret
 }
 
+/// Convert expressions to Z3's syntax for using SMT based rule verification.
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],
@@ -322,6 +342,7 @@ fn egg_to_z3<'a>(
     (buf.pop().unwrap(), assumes)
 }
 
+/// Entry point.
 fn main() {
     Math::main()
 }

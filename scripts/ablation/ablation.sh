@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 # determine physical directory of this script
-# h/t Zach
 src="${BASH_SOURCE[0]}"
 while [ -L "$src" ]; do
   dir="$(cd -P "$(dirname "$src")" && pwd)"
@@ -31,7 +30,7 @@ fi
 
 if [[ "$RUN" == "use-existing" ]] ; then
     echo "Running with existing data."
-    python visualize.py "$MYDIR/submitted-data/compare/" "$MYDIR/submitted-data/no-rr/"
+    python3 visualize.py 
     exit 0
 fi
 

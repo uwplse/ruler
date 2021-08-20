@@ -1,6 +1,6 @@
 import sys
 
-# prelude is from Brett: https://github.com/bksaiki/herbie/commit/349f184c3636bdeacb69241a5f5cde7fa0288831
+# prelude h/t Amy and Brett: https://github.com/bksaiki/herbie/commit/349f184c3636bdeacb69241a5f5cde7fa0288831
 prelude = """
 #lang racket
 
