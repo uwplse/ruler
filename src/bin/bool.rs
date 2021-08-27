@@ -84,8 +84,8 @@ impl SynthLanguage for Math {
             cvec_len: consts[0].len(),
         });
 
-        // egraph.add(Math::Lit(false));
-        // egraph.add(Math::Lit(true));
+        egraph.add(Math::Lit(false));
+        egraph.add(Math::Lit(true));
 
         for i in 0..synth.params.variables {
             let var = Symbol::from(letter(i));

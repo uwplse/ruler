@@ -19,6 +19,7 @@ libm = "0.2.1"
 float-cmp = "0.8.0"
 lazy_static = "1.4.0"
 itertools = "0.9.0"
+# fixed = "1.9.0"
 clap = "3.0.0-beta.2"
 z3 = {version="0.10.0", features = ["static-link-z3"]}
 # z3 = {version="0.10.0"}

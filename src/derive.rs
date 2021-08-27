@@ -5,27 +5,27 @@ use std::sync::Mutex;
 
 type Pair<L> = (RecExpr<L>, RecExpr<L>);
 
+pub fn parse<L: SynthLanguage>(filename: &String) -> Vec<Pair<L>> {
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
+    let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
+
+    let pairs: Vec<Pair<L>> = report
+        .eqs
+        .iter()
+        .map(|eq| {
+            let l = L::instantiate(&eq.lhs);
+            let r = L::instantiate(&eq.rhs);
+            (l, r)
+        })
+        .collect();
+
+    pairs
+}
+
 /// Perform derivability test between two rulesets.
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
-    let parse = |filename| {
-        let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
-        let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
-
-        let pairs: Vec<Pair<L>> = report
-            .eqs
-            .iter()
-            .map(|eq| {
-                let l = L::instantiate(&eq.lhs);
-                let r = L::instantiate(&eq.rhs);
-                (l, r)
-            })
-            .collect();
-
-        pairs
-    };
-
-    let pairs1 = parse(&params.in1);
-    let pairs2 = parse(&params.in2);
+    let pairs1 = parse::<L>(&params.in1);
+    let pairs2 = parse::<L>(&params.in2);
 
     println!("Using {} to derive {}", params.in1, params.in2);
     let (derivable, not_derivable) = one_way(&params, &pairs1, &pairs2);
