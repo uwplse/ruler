@@ -9,10 +9,7 @@ use egg::*;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
-use std::{
-    borrow::{Borrow, Cow},
-    collections::VecDeque,
-};
+use std::{borrow::{Borrow, Cow}, collections::VecDeque};
 use std::{cmp::Ordering, hash::Hash};
 use std::{
     fmt::{Debug, Display},
@@ -126,6 +123,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
 
         RecExpr::from(nodes)
     }
+
 
     /// Heuristics for ranking rewrites based on number of variables,
     /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
@@ -251,21 +249,38 @@ pub struct Synthesizer<L: SynthLanguage> {
     pub rng: Pcg64,
     pub egraph: EGraph<L, SynthAnalysis>,
     initial_egraph: EGraph<L, SynthAnalysis>,
-    pub equalities: EqualityMap<L>,
+    pub all_eqs: EqualityMap<L>,
+    pub old_eqs: EqualityMap<L>,
+    pub new_eqs: EqualityMap<L>,
     pub smt_unknown: usize,
 }
+
+
 
 impl<L: SynthLanguage> Synthesizer<L> {
     /// Initialize all the arguments of the [Synthesizer].
     pub fn new(params: SynthParams) -> Self {
+        // add prior rules (if any) to old_eqs
+        let mut olds: EqualityMap<L> = Default::default();
+        if params.prior_rules.clone().is_some() {
+            for (l, r) in derive::parse::<L>(params.prior_rules.as_ref().unwrap()) {
+                if let Some(e) = Equality::new(&l, &r) {
+                    olds.insert(e.name.clone(), e);
+                }
+            }
+        }
+
         let mut synth = Self {
             rng: Pcg64::seed_from_u64(params.seed),
             egraph: Default::default(),
             initial_egraph: Default::default(),
-            equalities: Default::default(),
+            old_eqs: olds.clone(),
+            new_eqs: Default::default(),
+            all_eqs: olds, // also add prior rules to all_eqs
             smt_unknown: 0,
             params,
         };
+
         L::init_synth(&mut synth);
         synth.initial_egraph = synth.egraph.clone();
         synth
@@ -316,28 +331,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
     /// Apply current ruleset to the term egraph to minimize the term space.
     #[inline(never)]
     fn run_rewrites(&mut self) -> EGraph<L, SynthAnalysis> {
-        // run the rewrites
-        log::info!("running eqsat with {} rules", self.equalities.len());
+        // run the rewrites using all_eqs
+        log::info!("running eqsat with {} rules", self.all_eqs.len());
         let start = Instant::now();
-        let mut rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
-            .equalities
-            .values()
-            .flat_map(|eq| &eq.rewrites)
-            .collect();
-
-        // use prior rules if provided
-        let mut old_eqs = vec![];
-        if self.params.prior_rules.is_some() {
-            for (l, r) in derive::parse::<L>(self.params.prior_rules.as_ref().unwrap()) {
-                if let Some(e) = Equality::new(&l, &r) {
-                    let rws = e.rewrites;
-                    old_eqs.extend(rws);
-                }
-            }
-            for eq in &old_eqs {
-                rewrites.push(eq);
-            }
-        }
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
+            self.all_eqs.values().flat_map(|eq| &eq.rewrites).collect();
 
         let mut runner = self.mk_runner(self.egraph.clone());
         runner = runner.run(rewrites);
@@ -355,11 +353,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
         runner.egraph.rebuild();
-        log::info!(
-            "Ran {} rules in {:?}",
-            self.equalities.len(),
-            start.elapsed()
-        );
+        log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
         runner.egraph
     }
 
@@ -414,7 +408,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
 
-        new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
+        new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
         new_eqs
     }
 
@@ -467,7 +461,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
 
-        new_eqs.retain(|k, _v| !self.equalities.contains_key(k));
+        new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
         (new_eqs, by_cvec.into_iter().map(|pair| pair.1).collect())
     }
 
@@ -550,6 +544,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     );
 
                     let rule_minimize_before = Instant::now();
+
                     let (eqs, bads) = if self.params.minimize {
                         self.minimize(new_eqs)
                     } else {
@@ -571,14 +566,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     for eq in eqs.values() {
                         log::info!("  {}", eq);
                         if !self.params.no_run_rewrites {
-                            assert!(!self.equalities.contains_key(&eq.name));
+                            assert!(!self.all_eqs.contains_key(&eq.name));
                             if let Some((i, j)) = eq.ids {
                                 self.egraph.union(i, j);
                             }
                         }
                     }
 
-                    self.equalities.extend(eqs);
+                    // add new rewrites to both all_eqs aand new_eqs
+                    self.all_eqs.extend(eqs.clone());
+                    self.new_eqs.extend(eqs);
 
                     // TODO check formatting for Learned...
                     log::info!("Time taken in... run_rewrites: {}, rule discovery: {}, rule minimization: {}",
@@ -595,36 +592,38 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
 
         let time = t.elapsed().as_secs_f64();
-        let num_rules = self.equalities.len();
-        let mut eqs: Vec<_> = self
-            .equalities
-            .clone()
-            .into_iter()
-            .map(|(_, eq)| eq)
-            .collect();
+
+        let mut eqs: Vec<_> = self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
 
         // final run_rewrites
         if self.params.do_final_run {
             let old = std::mem::replace(&mut self.params.no_conditionals, false);
-            let rws = self.equalities.values().flat_map(|eq| &eq.rewrites);
+            let rws = self.all_eqs.values().flat_map(|eq| &eq.rewrites);
             let final_runner = self.mk_runner(self.egraph.clone());
             final_runner.run(rws);
             self.params.no_conditionals = old;
         }
 
-        println!("Learned {} rules in {:?}", num_rules, time);
-        for eq in &eqs {
-            // println!("  {:?}   {}", eq.score(), eq);
-            println!("{}", eq);
+        let num_rules = self.new_eqs.len();
+        let mut n_eqs: Vec<_> = self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        n_eqs.sort_by_key(|eq| eq.score());
+        n_eqs.reverse();
+        let num_olds = self.old_eqs.len();
+        let o_eqs: Vec<_> = self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        for eq in &n_eqs {
+            println!("  {:?}   {}", eq.score(), eq);
+            // println!("{}", eq);
         }
-        println!("Learned {} rules in {:?}", num_rules, time);
+        println!("Learned {} rules in {:?} using {} old rules.", num_rules, time, num_olds);
         Report {
             params: self.params,
             time,
             num_rules,
-            eqs,
+            all_eqs: eqs,
+            new_eqs: n_eqs,
+            old_eqs: o_eqs,
             smt_unknown: self.smt_unknown,
         }
     }
@@ -638,14 +637,19 @@ pub struct Report<L: SynthLanguage> {
     pub time: f64,
     pub num_rules: usize,
     pub smt_unknown: usize,
-    pub eqs: Vec<Equality<L>>,
+    pub all_eqs: Vec<Equality<L>>,
+    pub new_eqs: Vec<Equality<L>>,
+    pub old_eqs: Vec<Equality<L>>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "L: SynthLanguage")]
 struct SlimReport<L: SynthLanguage> {
     time: f64,
-    eqs: Vec<Equality<L>>,
+    all_eqs: Vec<Equality<L>>,
+    new_eqs: Vec<Equality<L>>,
+    old_eqs: Vec<Equality<L>>,
+    // eqs: Vec<Equality<L>>,
 }
 
 /// All parameters for rule synthesis.
@@ -698,7 +702,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "300000")]
     pub eqsat_node_limit: usize,
     /// iter limit for all the eqsats
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "5")]
     pub eqsat_iter_limit: usize,
     /// time limit (seconds) for all the eqsats
     #[clap(long, default_value = "60")]
@@ -753,6 +757,10 @@ pub struct DeriveParams {
     out: String,
     #[clap(long, default_value = "5")]
     iter_limit: usize,
+    #[clap(long, default_value = "300000")]
+    node_limit: usize,
+    #[clap(long, default_value = "60")]
+    time_limit: u64,
 }
 
 /// Report for rules generated by CVC4.
@@ -945,7 +953,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("Shrinking with {} keepers", keepers.len());
 
             let rewrites = self
-                .equalities
+                .all_eqs
                 .values()
                 .flat_map(|eq| &eq.rewrites)
                 .chain(keepers.values().flat_map(|eq| &eq.rewrites));
@@ -971,7 +979,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     let left = extract.find_best(ids[0]).1;
                     let right = extract.find_best(ids[1]).1;
                     if let Some(eq) = Equality::new(&left, &right) {
-                        if !self.equalities.contains_key(&eq.name) {
+                        if !self.all_eqs.contains_key(&eq.name) {
                             new_eqs.insert(eq.name.clone(), eq);
                         }
                     }
@@ -993,7 +1001,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     /// Apply rewrites rules as they are being inferred, to minimize the candidate space.
     #[inline(never)]
-    fn choose_eqs(&mut self, mut new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
+    fn choose_eqs(
+        &mut self,
+        mut new_eqs: EqualityMap<L>,
+    ) -> (EqualityMap<L>, EqualityMap<L>) {
         let mut bads = EqualityMap::default();
         let mut should_validate = true;
         for step in vec![100, 10, 1] {
@@ -1065,7 +1076,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 log::info!("chunk size {}, flat {}", size, flat.len());
 
                 let mut rewrites: Vec<_> = self
-                    .equalities
+                    .all_eqs
                     .values()
                     .flat_map(|eq| &eq.rewrites)
                     .chain(flat.iter().flat_map(|eq| &eq.rewrites))
