@@ -325,20 +325,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .flat_map(|eq| &eq.rewrites)
             .collect();
 
-        // use prior rules if provided
-        let mut old_eqs = vec![];
-        if self.params.prior_rules.is_some() {
-            for (l, r) in derive::parse::<L>(self.params.prior_rules.as_ref().unwrap()) {
-                if let Some(e) = Equality::new(&l, &r) {
-                    let rws = e.rewrites;
-                    old_eqs.extend(rws);
-                }
-            }
-            for eq in &old_eqs {
-                rewrites.push(eq);
-            }
-        }
-
         let mut runner = self.mk_runner(self.egraph.clone());
         runner = runner.run(rewrites);
 
@@ -737,11 +723,6 @@ pub struct SynthParams {
     #[clap(long)]
     pub do_final_run: bool,
 
-    ///////////////////
-    // persistence params //
-    ///////////////////
-    #[clap(long)]
-    pub prior_rules: Option<String>,
 }
 
 /// Derivability report.
