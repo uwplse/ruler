@@ -174,22 +174,57 @@ impl SynthLanguage for Math {
 
     /// Term enumeration.
     fn make_layer(synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
+        let mut bin_add: HashMap<Id, Vec<Id>> = HashMap::default();
         let mut to_add = vec![];
+        let mut ids = vec![];
+
+        for i in synth.ids() {
+            ids.push(i);
+        }
+
+        ids.sort();
+        for i in ids {
+            log::info!("{} [{}] : {:?}", i, synth.egraph[i].data.gen, synth.egraph[i].nodes);
+        }
+
         for i in synth.ids() {
             for j in synth.ids() {
-                if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                    continue;
+                // must have at least one non-constant term
+                // and at least one term from previous iteration
+                if (!synth.egraph[i].data.exact || !synth.egraph[j].data.exact) &&
+                   (synth.egraph[i].data.gen + 1 == _iter || synth.egraph[j].data.gen + 1 == _iter) {          
+                    if _iter > synth.params.modulo_alpha_renaming_above_iter {
+                        let val = bin_add.get_mut(&j); 
+                        if val == None || val.unwrap().iter().find(|&&x| x == i) == None {
+                            to_add.push(Math::Add([i, j]));
+                            to_add.push(Math::Mul([i, j]));
+                            
+                        }
+                        
+                        to_add.push(Math::Sub([i, j]));
+                        to_add.push(Math::Div([i, j])); 
+
+                        let val = bin_add.get_mut(&i);
+                        if val != None {
+                            val.unwrap().push(j);
+                        } else {
+                            bin_add.insert(i, vec![j]);
+                        }
+                    }
+                } else {
+                    to_add.push(Math::Add([i, j]));
+                    to_add.push(Math::Sub([i, j]));
+                    to_add.push(Math::Mul([i, j]));
+                    to_add.push(Math::Div([i, j]));      
                 }
-                to_add.push(Math::Add([i, j]));
-                to_add.push(Math::Sub([i, j]));
-                to_add.push(Math::Mul([i, j]));
-                to_add.push(Math::Div([i, j]));
             }
-            if synth.egraph[i].data.exact {
-                continue;
+
+            // must have at least one non-constant term
+            // and at least one term from previous iteration
+            if !synth.egraph[i].data.exact && synth.egraph[i].data.gen + 1 == _iter {
+                to_add.push(Math::Abs(i));
+                to_add.push(Math::Neg(i));
             }
-            to_add.push(Math::Abs(i));
-            to_add.push(Math::Neg(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());

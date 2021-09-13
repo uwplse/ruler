@@ -10,6 +10,7 @@ use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{borrow::{Borrow, Cow}, collections::VecDeque};
+use std::cmp;
 use std::{cmp::Ordering, hash::Hash};
 use std::{
     fmt::{Debug, Display},
@@ -665,6 +666,9 @@ pub struct SynthParams {
     /// Number of variables to add to the initial egraph
     #[clap(long, default_value = "3")]
     pub variables: usize,
+    /// Output file name
+    #[clap(long, default_value = "out.json")]
+    pub outfile: String,
 
     ///////////////////
     // search params //
@@ -691,9 +695,9 @@ pub struct SynthParams {
     pub no_run_rewrites: bool,
     #[clap(long)]
     pub linear_cvec_matching: bool,
-    /// Output file name
-    #[clap(long, default_value = "out.json")]
-    pub outfile: String,
+    /// modulo alpha renaming
+    #[clap(long, default_value = "1")]
+    pub modulo_alpha_renaming_above_iter: usize,
 
     ////////////////
     // eqsat args //
@@ -827,6 +831,7 @@ macro_rules! map {
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
     pub exact: bool,
+    pub gen: usize
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -872,6 +877,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
             ord_merge(&mut ord, to.exact.cmp(&from.exact));
             to.exact |= from.exact;
+            to.exact = cmp::max(to.exact, from.exact);
         }
 
         ord
@@ -879,9 +885,15 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
         let get_cvec = |i: &Id| &egraph[*i].data.cvec;
+        let get_gen = |i: Id| egraph[i].data.gen;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
+            gen: if enode.is_var() || enode.is_constant() {
+                0
+            } else {
+                1 + enode.fold(0 as usize, |x: usize, i: Id| cmp::max(x, get_gen(i)))
+            }
         }
     }
 
@@ -918,12 +930,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let mut took = 0;
             while let Some((name, eq)) = new_eqs.pop() {
                 if should_validate {
-                    let rule_validation = Instant::now();
+                    // let rule_validation = Instant::now();
                     let valid = L::is_valid(self, &eq.lhs, &eq.rhs);
-                    log::info!(
-                        "Time taken in validation: {}",
-                        rule_validation.elapsed().as_secs_f64()
-                    );
+                    // log::info!(
+                    //     "Time taken in validation: {}",
+                    //     rule_validation.elapsed().as_secs_f64()
+                    // );
 
                     if valid {
                         let old = keepers.insert(name, eq);
