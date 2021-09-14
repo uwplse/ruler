@@ -541,9 +541,36 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     self.egraph.total_size(),
                     self.egraph.number_of_classes(),
                 );
+
                 for node in chunk {
-                    self.egraph.add(node.clone());
+                    if iter > self.params.modulo_alpha_renaming_above_iter {
+                        // extract a generalized pattern from the eclass
+                        // corresponding to `node`
+                        let mut cp = self.egraph.clone();
+                        let id = cp.add(node.clone());
+                        let mut extract = Extractor::new(&cp, AstSize);
+                        let (_, rec) = extract.find_best(id);
+                        let map = &mut HashMap::default();
+                        let pat = L::generalize(&rec, map);
+
+                        // construct a singleton egraph and search it
+                        let mut single: EGraph<L, SynthAnalysis> = EGraph::default();
+                        let foo = single.add(node.clone());
+                        eprintln!("{}", foo);
+                        let matches = pat.search(&single);
+                        let matched: Vec<Id> = matches.iter().map(|m| m.eclass).collect();
+
+                        log::info!("EMA: {:?}, {}, {:?}", node, pat.pretty(30), matched);
+                    } else {
+                        self.egraph.add(node.clone());
+                    }
                 }
+
+                // for node in chunk {
+                //     self.egraph.add(node.clone());
+                // }
+
+
                 'inner: loop {
                     let run_rewrites_before = Instant::now();
                     if !self.params.no_run_rewrites {
