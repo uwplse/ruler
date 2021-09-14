@@ -176,16 +176,10 @@ impl SynthLanguage for Math {
     fn make_layer(synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
         let mut bin_add: HashMap<Id, Vec<Id>> = HashMap::default();
         let mut to_add = vec![];
-        let mut ids = vec![];
 
-        for i in synth.ids() {
-            ids.push(i);
-        }
-
-        ids.sort();
-        for i in ids {
-            log::info!("{} [{}] : {:?}", i, synth.egraph[i].data.gen, synth.egraph[i].nodes);
-        }
+        log::info!("Previous layer: {} enodes, {} eclasses ",
+                    synth.egraph.total_number_of_nodes(),
+                    synth.egraph.number_of_classes());
 
         for i in synth.ids() {
             for j in synth.ids() {
@@ -196,13 +190,20 @@ impl SynthLanguage for Math {
                     if _iter > synth.params.modulo_alpha_renaming_above_iter {
                         let val = bin_add.get_mut(&j); 
                         if val == None || val.unwrap().iter().find(|&&x| x == i) == None {
+                            // this is clearly wrong but produces much fewer nodes
+                            // to_add.push(Math::Add([i, j]));
+                            // to_add.push(Math::Sub([i, j]));
+                            // to_add.push(Math::Mul([i, j]));
+                            // to_add.push(Math::Div([i, j]));  
+
+                            // this is right
                             to_add.push(Math::Add([i, j]));
                             to_add.push(Math::Mul([i, j]));
-                            
                         }
-                        
+
+                        // this is right
                         to_add.push(Math::Sub([i, j]));
-                        to_add.push(Math::Div([i, j])); 
+                        to_add.push(Math::Div([i, j]));
 
                         let val = bin_add.get_mut(&i);
                         if val != None {
@@ -210,12 +211,12 @@ impl SynthLanguage for Math {
                         } else {
                             bin_add.insert(i, vec![j]);
                         }
+                    } else {
+                        to_add.push(Math::Add([i, j]));
+                        to_add.push(Math::Sub([i, j]));
+                        to_add.push(Math::Mul([i, j]));
+                        to_add.push(Math::Div([i, j])); 
                     }
-                } else {
-                    to_add.push(Math::Add([i, j]));
-                    to_add.push(Math::Sub([i, j]));
-                    to_add.push(Math::Mul([i, j]));
-                    to_add.push(Math::Div([i, j]));      
                 }
             }
 

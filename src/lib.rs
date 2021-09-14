@@ -466,6 +466,34 @@ impl<L: SynthLanguage> Synthesizer<L> {
         (new_eqs, by_cvec.into_iter().map(|pair| pair.1).collect())
     }
 
+    // Takes a pattern extracted from egg and merges it into the egraph,
+    fn merge_egg_pat(&mut self, pat: &Pattern<L>) -> egg::Id {
+        let mut ids: Vec<egg::Id> = vec![];
+        let rec = L::instantiate(pat);
+
+        for e in rec.as_ref() {
+            if e.is_var() || e.is_constant() {
+                if let Some(i) = self.egraph.lookup(e.clone()) {
+                    ids.push(i);
+                } else {
+                    ids.push(self.egraph.add(e.clone()));
+                }
+            } else {
+                let mut c = e.clone();
+                c.update_children(|n| ids[usize::from(n)]);
+                if let Some(i) = self.egraph.lookup(c) {
+                    ids.push(i);
+                } else {
+                    let mut c = e.clone();      // this is really dumb
+                    c.update_children(|n| ids[usize::from(n)]);
+                    ids.push(self.egraph.add(c));
+                }
+            }
+        }
+
+        ids.pop().unwrap()
+    }
+
     /// Top level function for rule synthesis.
     /// This corresponds to `Figure 4` in the Ruler paper, where
     /// all the key components of `Ruler` (e.g., `make_layer`, `run_rewrites`, `cvec_match`, `choose_eqs`) are invoked.
@@ -568,7 +596,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         log::info!("  {}", eq);
                         if !self.params.no_run_rewrites {
                             assert!(!self.all_eqs.contains_key(&eq.name));
-                            if let Some((i, j)) = eq.ids {
+                            if let Some((i, j)) = eq.ids {  // inserted 
+                                self.egraph.union(i, j);
+                            } else {                        // extracted
+                                let i = self.merge_egg_pat(&eq.lhs);
+                                let j = self.merge_egg_pat(&eq.rhs);              
                                 self.egraph.union(i, j);
                             }
                         }
