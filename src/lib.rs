@@ -125,6 +125,31 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         RecExpr::from(nodes)
     }
 
+    /// Like generalize, but returns a recexpr
+    fn emt_generalize(expr: &RecExpr<Self>) -> RecExpr<Self> {
+        let map = &mut HashMap::<Symbol, Var>::default();
+        let nodes: Vec<_> = expr
+            .as_ref()
+            .iter()
+            .map(|n| match n.to_var() {
+                Some(sym) => {
+                    let var = if let Some(var) = map.get(&sym) {
+                        *var
+                    } else {
+                        let var = format!("?{}", letter(map.len())).parse().unwrap();
+                        map.insert(sym, var);
+                        var
+                    };
+                    
+                    let s = var.to_string();
+                    Self::mk_var(s[1..].into())
+                }
+                None => n.clone()
+            })
+            .collect();
+
+        RecExpr::from(nodes)
+    }
 
     /// Heuristics for ranking rewrites based on number of variables,
     /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
@@ -466,34 +491,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         (new_eqs, by_cvec.into_iter().map(|pair| pair.1).collect())
     }
 
-    // Takes a pattern extracted from egg and merges it into the egraph,
-    fn merge_egg_pat(&mut self, pat: &Pattern<L>) -> egg::Id {
-        let mut ids: Vec<egg::Id> = vec![];
-        let rec = L::instantiate(pat);
-
-        for e in rec.as_ref() {
-            if e.is_var() || e.is_constant() {
-                if let Some(i) = self.egraph.lookup(e.clone()) {
-                    ids.push(i);
-                } else {
-                    ids.push(self.egraph.add(e.clone()));
-                }
-            } else {
-                let mut c = e.clone();
-                c.update_children(|n| ids[usize::from(n)]);
-                if let Some(i) = self.egraph.lookup(c) {
-                    ids.push(i);
-                } else {
-                    let mut c = e.clone();      // this is really dumb
-                    c.update_children(|n| ids[usize::from(n)]);
-                    ids.push(self.egraph.add(c));
-                }
-            }
-        }
-
-        ids.pop().unwrap()
-    }
-
     /// Top level function for rule synthesis.
     /// This corresponds to `Figure 4` in the Ruler paper, where
     /// all the key components of `Ruler` (e.g., `make_layer`, `run_rewrites`, `cvec_match`, `choose_eqs`) are invoked.
@@ -544,32 +541,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                 for node in chunk {
                     if iter > self.params.modulo_alpha_renaming_above_iter {
-                        // extract a generalized pattern from the eclass
-                        // corresponding to `node`
-                        let mut cp = self.egraph.clone();
-                        let id = cp.add(node.clone());
-                        let mut extract = Extractor::new(&cp, AstSize);
-                        let (_, rec) = extract.find_best(id);
-                        let map = &mut HashMap::default();
-                        let pat = L::generalize(&rec, map);
-
-                        // construct a singleton egraph and search it
-                        let mut single: EGraph<L, SynthAnalysis> = EGraph::default();
-                        let foo = single.add(node.clone());
-                        eprintln!("{}", foo);
-                        let matches = pat.search(&single);
-                        let matched: Vec<Id> = matches.iter().map(|m| m.eclass).collect();
-
-                        log::info!("EMA: {:?}, {}, {:?}", node, pat.pretty(30), matched);
+                        let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                        self.egraph.add_expr(&L::emt_generalize(&rec));
+                        // self.egraph.add(node.clone());
                     } else {
                         self.egraph.add(node.clone());
                     }
                 }
-
-                // for node in chunk {
-                //     self.egraph.add(node.clone());
-                // }
-
 
                 'inner: loop {
                     let run_rewrites_before = Instant::now();
@@ -626,8 +604,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
                             if let Some((i, j)) = eq.ids {  // inserted 
                                 self.egraph.union(i, j);
                             } else {                        // extracted
-                                let i = self.merge_egg_pat(&eq.lhs);
-                                let j = self.merge_egg_pat(&eq.rhs);              
+                                let i = self.egraph.add_expr(&L::instantiate(&eq.lhs));
+                                let j = self.egraph.add_expr(&L::instantiate(&eq.rhs));
                                 self.egraph.union(i, j);
                             }
                         }
@@ -890,7 +868,8 @@ macro_rules! map {
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
     pub exact: bool,
-    pub gen: usize
+    pub gen: usize,
+    pub simplest: RecExpr<L>
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -936,7 +915,11 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
             ord_merge(&mut ord, to.exact.cmp(&from.exact));
             to.exact |= from.exact;
-            to.exact = cmp::max(to.exact, from.exact);
+            to.gen = cmp::max(to.gen, from.gen);
+
+            if AstSize.cost_rec(&from.simplest) < AstSize.cost_rec(&to.simplest) {
+                to.simplest = from.simplest.clone();
+            }
         }
 
         ord
@@ -945,6 +928,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
         let get_cvec = |i: &Id| &egraph[*i].data.cvec;
         let get_gen = |i: Id| egraph[i].data.gen;
+        let get_simplest = |i: Id| &egraph[i].data.simplest;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
@@ -952,6 +936,32 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 0
             } else {
                 1 + enode.fold(0 as usize, |x: usize, i: Id| cmp::max(x, get_gen(i)))
+            },
+            simplest: if enode.is_var() || enode.is_constant() {
+                let mut rec = RecExpr::<L>::default();
+                rec.add(enode.clone());
+                rec
+            } else {
+                let mut nodes: Vec<L> = vec![];
+                let mut map: HashMap<Id, Id> = HashMap::default();
+                enode.for_each(|id| {
+                    if map.get(&id) == None {
+                        let s = get_simplest(id);
+                        let i = nodes.len();
+                        for n in s.as_ref() {
+                            nodes.push(n
+                                .clone()
+                                .map_children(|id| Id::from(usize::from(id) + i)));
+                        }
+
+                        map.insert(id, Id::from(nodes.len() - 1));
+                    }
+                });
+
+                nodes.push(enode
+                    .clone()
+                    .map_children(|id| *map.get(&id).unwrap()));
+                RecExpr::from(nodes)
             }
         }
     }
