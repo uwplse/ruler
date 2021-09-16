@@ -733,7 +733,7 @@ pub struct SynthParams {
     #[clap(long)]
     pub linear_cvec_matching: bool,
     /// modulo alpha renaming
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "2")]
     pub modulo_alpha_renaming_above_iter: usize,
 
     ////////////////
@@ -1088,7 +1088,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     ) -> (EqualityMap<L>, EqualityMap<L>) {
         let mut bads = EqualityMap::default();
         let mut should_validate = true;
-        for step in vec![100, 10, 1] {
+        for step in vec![10000, 1000, 100, 10, 1] {
             if self.params.rules_to_take < step {
                 continue;
             }
