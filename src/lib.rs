@@ -531,14 +531,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 layer.retain(|n| n.all(|id| !has_constants.contains(&id)));
             }
 
+            let chunk_count = div_up(layer.len(), self.params.chunk_size);
+            let mut chunk_num = 1;
+
             log::info!("Made layer of {} nodes", layer.len());
+            log::info!("Running loop with {} chunks", chunk_count);
             for chunk in layer.chunks(self.params.chunk_size) {
+                log::info!("Chunk {} / {}", chunk_num, chunk_count);
                 log::info!(
                     "egraph n={}, e={}",
                     self.egraph.total_size(),
                     self.egraph.number_of_classes(),
                 );
 
+                chunk_num += 1;
                 for node in chunk {
                     if iter > self.params.modulo_alpha_renaming_above_iter {
                         let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
@@ -587,8 +593,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                     let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
 
+		            log::info!("Added {} rules to the poison set!", bads.len());
                     for bad in bads {
-                        log::info!("adding {} to poison set", bad.0);
                         poison_rules.insert(bad.1);
                     }
                     if eqs.is_empty() {
@@ -733,7 +739,7 @@ pub struct SynthParams {
     #[clap(long)]
     pub linear_cvec_matching: bool,
     /// modulo alpha renaming
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "1")]
     pub modulo_alpha_renaming_above_iter: usize,
 
     ////////////////
@@ -1088,23 +1094,50 @@ impl<L: SynthLanguage> Synthesizer<L> {
     ) -> (EqualityMap<L>, EqualityMap<L>) {
         let mut bads = EqualityMap::default();
         let mut should_validate = true;
-        for step in vec![10000, 1000, 100, 10, 1] {
-            if self.params.rules_to_take < step {
+        let step_sizes: Vec<usize> = vec![1000, 100, 10, 1];
+        let mut step_idx = 0;
+
+        // Idea here is to remain at a high step level as long as possible
+        // Move down in step size if
+        //  (a) the number of eqs is smaller than the step size
+        //  (b) the number of bad eqs is smaller than the step size
+        // Never move up in step level
+        'inner: loop {
+            let step = step_sizes[step_idx];
+            let mut n_bad = 0;
+
+            let n_rules = usize::min(self.params.rules_to_take, new_eqs.len());
+            log::info!("Starting shrink iterations, step size: {}, rule count: {}", step, n_rules);
+            if self.params.rules_to_take < step || n_rules < step {
+                step_idx += 1;
                 continue;
             }
-            let n_rules = usize::min(self.params.rules_to_take, new_eqs.len());
+
             if step < 10 && n_rules > 200 {
-                break;
+                break 'inner;
             }
+
             let (n, b) = self.shrink(new_eqs, step, should_validate);
             new_eqs = n;
+            n_bad += b.len();
             bads.extend(b);
 
             // if we taking all the rules, we don't need to validate anymore
             if self.params.rules_to_take == usize::MAX {
                 should_validate = false;
             }
+
+            if n_bad < step {           // not enough progress:
+                if step_idx + 1 == step_sizes.len() {
+                    if n_bad == 0 {     // break if no progress at lowest step size
+                        break 'inner;
+                    }                   // else loop again
+                } else {                // default: decrease step size
+                    step_idx += 1;
+                }
+            }
         }
+
         (new_eqs, bads)
     }
 

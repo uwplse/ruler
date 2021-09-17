@@ -13,7 +13,7 @@ use egg::*;
 use ruler::*;
 
 use num::bigint::{BigInt, RandBigInt, ToBigInt};
-use num::{rational::Ratio, Signed, ToPrimitive, Zero};
+use num::{rational::Ratio, ToPrimitive, Zero};
 use rand::Rng;
 use rand_pcg::Pcg64;
 use z3::ast::Ast;
@@ -28,11 +28,11 @@ define_language! {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
-        "/" = Div([Id; 2]),
+        // "/" = Div([Id; 2]),
         "~" = Neg(Id),
-        "fabs" = Abs(Id),
-        "pow" = Pow([Id; 2]),
-        "recip" = Reciprocal(Id),
+        // "fabs" = Abs(Id),
+        // "pow" = Pow([Id; 2]),
+        // "recip" = Reciprocal(Id),
         Num(Constant),
         Var(egg::Symbol),
     }
@@ -62,34 +62,34 @@ impl SynthLanguage for Math {
             Math::Mul([a, b]) => map!(v, a, b => Some(a * b)),
             Math::Num(n) => vec![Some(n.clone()); cvec_len],
             Math::Var(_) => vec![],
-            Math::Div([a, b]) => map!(v, a, b => {
-                if b.is_zero() {
-                    None
-                } else{
-                    Some(a / b)
-                }
-            }),
-            Math::Abs(a) => map!(v, a => Some(a.abs())),
-            Math::Pow([a, b]) => map!(v, a, b => {
-                match b.to_i32() {
-                    Some(b_int) => {
-                        if a.is_zero() && b_int < 0 {
-                            None
-                        } else {
-                            Some(a.pow(b_int))
-                        }
-                    }
-                    None => None
-                }
+            // Math::Div([a, b]) => map!(v, a, b => {
+            //     if b.is_zero() {
+            //         None
+            //     } else{
+            //         Some(a / b)
+            //     }
+            // }),
+            // Math::Abs(a) => map!(v, a => Some(a.abs())),
+            // Math::Pow([a, b]) => map!(v, a, b => {
+            //     match b.to_i32() {
+            //         Some(b_int) => {
+            //             if a.is_zero() && b_int < 0 {
+            //                 None
+            //             } else {
+            //                 Some(a.pow(b_int))
+            //             }
+            //         }
+            //         None => None
+            //     }
 
-            }),
-            Math::Reciprocal(a) => map!(v, a => {
-                if a.is_zero() {
-                    None
-                } else {
-                    Some(a.recip())
-                }
-            }),
+            // }),
+            // Math::Reciprocal(a) => map!(v, a => {
+            //     if a.is_zero() {
+            //         None
+            //     } else {
+            //         Some(a.recip())
+            //     }
+            // }),
         }
     }
 
@@ -190,14 +190,14 @@ impl SynthLanguage for Math {
                             to_add.push(Math::Add([i, j]));
                             to_add.push(Math::Sub([i, j]));
                             to_add.push(Math::Mul([i, j]));
-                            to_add.push(Math::Div([i, j])); 
+                            // to_add.push(Math::Div([i, j]));
                         }
                     } else {
                         if !synth.egraph[i].data.exact || !synth.egraph[j].data.exact {
                             to_add.push(Math::Add([i, j]));
                             to_add.push(Math::Sub([i, j]));
                             to_add.push(Math::Mul([i, j]));
-                            to_add.push(Math::Div([i, j])); 
+                            // to_add.push(Math::Div([i, j]));
                         }
                     }
                 }
@@ -206,7 +206,7 @@ impl SynthLanguage for Math {
             // must have at least one non-constant term
             // and at least one term from previous iteration
             if !synth.egraph[i].data.exact && synth.egraph[i].data.gen + 1 == _iter  {
-                to_add.push(Math::Abs(i));
+                // to_add.push(Math::Abs(i));
                 to_add.push(Math::Neg(i));
             }
         }
@@ -313,8 +313,8 @@ fn egg_to_z3<'a>(
     expr: &[Math],
 ) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
     let mut buf: Vec<z3::ast::Real> = vec![];
-    let mut assumes: Vec<z3::ast::Bool> = vec![];
-    let zero = z3::ast::Real::from_real(&ctx, 0, 1);
+    // let mut assumes: Vec<z3::ast::Bool> = vec![];
+    // let zero = z3::ast::Real::from_real(&ctx, 0, 1);
     for node in expr.as_ref().iter() {
         match node {
             Math::Var(v) => buf.push(z3::ast::Real::new_const(&ctx, v.to_string())),
@@ -337,30 +337,30 @@ fn egg_to_z3<'a>(
                 &ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
-            Math::Div([a, b]) => {
-                let denom = &buf[usize::from(*b)];
-                let lez = z3::ast::Real::le(denom, &zero);
-                let gez = z3::ast::Real::ge(denom, &zero);
-                let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
-                assumes.push(assume);
-                buf.push(z3::ast::Real::div(
-                    &buf[usize::from(*a)],
-                    &buf[usize::from(*b)],
-                ))
-            }
+            // Math::Div([a, b]) => {
+            //     let denom = &buf[usize::from(*b)];
+            //     let lez = z3::ast::Real::le(denom, &zero);
+            //     let gez = z3::ast::Real::ge(denom, &zero);
+            //     let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
+            //     assumes.push(assume);
+            //     buf.push(z3::ast::Real::div(
+            //         &buf[usize::from(*a)],
+            //         &buf[usize::from(*b)],
+            //     ))
+            // }
             Math::Neg(a) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)])),
-            Math::Abs(a) => {
-                let inner = &buf[usize::from(*a)].clone();
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Real::le(inner, &zero),
-                    &z3::ast::Real::unary_minus(inner),
-                    &inner,
-                ));
-            }
-            _ => unimplemented!(),
+            // Math::Abs(a) => {
+            //     let inner = &buf[usize::from(*a)].clone();
+            //     buf.push(z3::ast::Bool::ite(
+            //         &z3::ast::Real::le(inner, &zero),
+            //         &z3::ast::Real::unary_minus(inner),
+            //         &inner,
+            //     ));
+            // }
+            // _ => unimplemented!(),
         }
     }
-    (buf.pop().unwrap(), assumes)
+    (buf.pop().unwrap(), vec![])
 }
 
 /// Entry point 
