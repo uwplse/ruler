@@ -185,20 +185,17 @@ impl SynthLanguage for Math {
                 // must have at least one non-constant term
                 // and at least one term from previous iteration
                 if synth.egraph[i].data.gen + 1 == _iter || synth.egraph[j].data.gen + 1 == _iter {
-                    if _iter > synth.params.no_constants_above_iter {
-                        if !synth.egraph[i].data.exact && !synth.egraph[j].data.exact {
-                            to_add.push(Math::Add([i, j]));
-                            to_add.push(Math::Sub([i, j]));
-                            to_add.push(Math::Mul([i, j]));
-                            to_add.push(Math::Div([i, j])); 
-                        }
+                    let cond = if _iter > synth.params.no_constants_above_iter {
+                        !synth.egraph[i].data.exact && !synth.egraph[j].data.exact
                     } else {
-                        if !synth.egraph[i].data.exact || !synth.egraph[j].data.exact {
-                            to_add.push(Math::Add([i, j]));
-                            to_add.push(Math::Sub([i, j]));
-                            to_add.push(Math::Mul([i, j]));
-                            to_add.push(Math::Div([i, j])); 
-                        }
+                        !synth.egraph[i].data.exact || !synth.egraph[j].data.exact
+                    };
+
+                    if cond {
+                        to_add.push(Math::Add([i, j]));
+                        to_add.push(Math::Sub([i, j]));
+                        to_add.push(Math::Mul([i, j]));
+                        // to_add.push(Math::Div([i, j])); 
                     }
                 }
             }
@@ -206,13 +203,107 @@ impl SynthLanguage for Math {
             // must have at least one non-constant term
             // and at least one term from previous iteration
             if !synth.egraph[i].data.exact && synth.egraph[i].data.gen + 1 == _iter  {
-                to_add.push(Math::Abs(i));
-                to_add.push(Math::Neg(i));
+                // to_add.push(Math::Abs(i));
+                // to_add.push(Math::Neg(i));
             }
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
         to_add
+    }
+
+    fn valid_constants(
+        egraph: &EGraph<Self, SynthAnalysis>,
+        id: &Id,
+        seen: &mut HashSet<Id>
+    ) -> bool {
+        egraph[*id].nodes
+            .iter()
+            .all(|x| {
+                match x {
+                    Math::Neg(a) => {
+                        seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }
+                    }
+                    Math::Add([a, b]) => {
+                        (seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }) &&
+                        (seen.contains(b) || {
+                            seen.insert(*b);
+                            Self::valid_constants(egraph, b, seen)
+                        })
+                    }
+                    Math::Sub([a, b]) => {
+                        (seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }) &&
+                        (seen.contains(b) || {
+                            seen.insert(*b);
+                            Self::valid_constants(egraph, b, seen)
+                        })
+                    }
+                    Math::Mul([a, b]) => { 
+                        (seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }) &&
+                        (seen.contains(b) || {
+                            seen.insert(*b);
+                            Self::valid_constants(egraph, b, seen)
+                        })
+                    }
+                    Math::Div([a, b]) => {
+                        (seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }) &&
+                        (seen.contains(b) || {
+                            seen.insert(*b);
+                            Self::valid_constants(egraph, b, seen)
+                        })
+                    }
+                    Math::Abs(a) => {
+                        seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }
+                    }
+                    Math::Reciprocal(a) => {
+                        seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }
+                    }
+                    Math::Pow([a, b]) => {
+                        (seen.contains(a) || {
+                            seen.insert(*a);
+                            Self::valid_constants(egraph, a, seen)
+                        }) &&
+                        (seen.contains(b) || {
+                            seen.insert(*b);
+                            Self::valid_constants(egraph, b, seen)
+                        })
+                    }
+                    Math::Var(_) => true,
+                    Math::Num(n) => {
+                        let one: BigInt = BigInt::from(1);
+                        if !n.denom().eq(&one) {
+                            return false;
+                        }
+
+                        let consts: Vec<BigInt> = vec![-2, -1, 0, 1, 2]
+                                                    .iter()
+                                                    .map(|x| BigInt::from(*x))
+                                                    .collect();
+                        consts.iter().any(|x| n.numer().eq(&x))
+                    }
+                }
+            })
     }
 
     /// Check the validity of a rewrite rule.

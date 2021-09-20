@@ -10,7 +10,6 @@ use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{borrow::{Borrow, Cow}, collections::VecDeque};
-use std::cmp;
 use std::{cmp::Ordering, hash::Hash};
 use std::{
     fmt::{Debug, Display},
@@ -205,6 +204,15 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
 
     /// Layer wise term enumeration in the egraph.
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self>;
+
+    /// Returns true if the eclass contains valid constants from the domain
+    fn valid_constants(
+        _egraph: &EGraph<Self, SynthAnalysis>,
+        _id: &Id,
+        _seen: &mut HashSet<Id>
+    ) -> bool {
+        true
+    }
 
     /// Given a , `ctx`, i.e., mapping from variables to cvecs, evaluate a pattern, `pat`,
     /// on each element of the cvec.
@@ -534,7 +542,34 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let chunk_count = div_up(layer.len(), self.params.chunk_size);
             let mut chunk_num = 1;
 
+            // deduplicate and filter bad constants
             log::info!("Made layer of {} nodes", layer.len());
+            let mut cp = self.egraph.clone();
+            let mut max_id = cp.number_of_classes();
+            layer.retain(|node| {
+                let seen = &mut HashSet::<Id>::default();
+                if iter > self.params.ema_above_iter {
+                    let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                    let rec2 = L::emt_generalize(&rec);
+                    let id = cp.add_expr(&rec2);
+                    if usize::from(id) < max_id {
+                        return false;
+                    }
+
+                    max_id = usize::from(id);
+                    L::valid_constants(&cp, &id, seen) 
+                } else {
+                    let id = cp.add(node.clone());
+                    if usize::from(id) < max_id {
+                        return false;
+                    }
+
+                    max_id = usize::from(id);
+                    L::valid_constants(&cp, &id, seen)
+                }
+            });
+
+            log::info!("Filtered layer, {} nodes remaining", layer.len());
             log::info!("Running loop with {} chunks", chunk_count);
             for chunk in layer.chunks(self.params.chunk_size) {
                 log::info!("Chunk {} / {}", chunk_num, chunk_count);
@@ -546,10 +581,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                 chunk_num += 1;
                 for node in chunk {
-                    if iter > self.params.modulo_alpha_renaming_above_iter {
+                    if iter > self.params.ema_above_iter {
                         let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                         self.egraph.add_expr(&L::emt_generalize(&rec));
-                        // self.egraph.add(node.clone());
                     } else {
                         self.egraph.add(node.clone());
                     }
@@ -601,6 +635,27 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         log::info!("Stopping early, no eqs");
                         break 'inner;
                     }
+
+                    // filter bad constants
+                    let eqs: EqualityMap<L> = eqs
+                        .into_iter()
+                        .filter(|(_, eq)| {
+                            let lrec = L::instantiate(&eq.lhs);
+                            let rrec = L::instantiate(&eq.rhs);
+
+                            let mut cp = self.egraph.clone();
+                            let i = cp.add_expr(&lrec);
+                            let seen = &mut HashSet::<Id>::default();
+                            if !L::valid_constants(&cp, &i, seen) {
+                                return false;
+                            }
+
+                            let mut cp = self.egraph.clone();
+                            let j = cp.add_expr(&rrec);
+                            let seen = &mut HashSet::<Id>::default();
+                            L::valid_constants(&cp, &j, seen)
+                        })
+                        .collect();
 
                     log::info!("Chose {} good rules", eqs.len());
                     for eq in eqs.values() {
@@ -740,7 +795,7 @@ pub struct SynthParams {
     pub linear_cvec_matching: bool,
     /// modulo alpha renaming
     #[clap(long, default_value = "1")]
-    pub modulo_alpha_renaming_above_iter: usize,
+    pub ema_above_iter: usize,
 
     ////////////////
     // eqsat args //
@@ -921,7 +976,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
             ord_merge(&mut ord, to.exact.cmp(&from.exact));
             to.exact |= from.exact;
-            to.gen = cmp::max(to.gen, from.gen);
+            to.gen = usize::max(to.gen, from.gen);
 
             if AstSize.cost_rec(&from.simplest) < AstSize.cost_rec(&to.simplest) {
                 to.simplest = from.simplest.clone();
@@ -941,7 +996,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             gen: if enode.is_var() || enode.is_constant() {
                 0
             } else {
-                1 + enode.fold(0 as usize, |x: usize, i: Id| cmp::max(x, get_gen(i)))
+                1 + enode.fold(0, |x: usize, i: Id| usize::max(x, get_gen(i)))
             },
             simplest: if enode.is_var() || enode.is_constant() {
                 let mut rec = RecExpr::<L>::default();
@@ -1092,9 +1147,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         &mut self,
         mut new_eqs: EqualityMap<L>,
     ) -> (EqualityMap<L>, EqualityMap<L>) {
+        let step_sizes: Vec<usize> = vec![10, 1];
         let mut bads = EqualityMap::default();
         let mut should_validate = true;
-        let step_sizes: Vec<usize> = vec![1000, 100, 10, 1];
         let mut step_idx = 0;
 
         // Idea here is to remain at a high step level as long as possible
@@ -1104,13 +1159,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // Never move up in step level
         'inner: loop {
             let step = step_sizes[step_idx];
-            let mut n_bad = 0;
-
             let n_rules = usize::min(self.params.rules_to_take, new_eqs.len());
-            log::info!("Starting shrink iterations, step size: {}, rule count: {}", step, n_rules);
+
+            log::info!("Shrinking w/ step size: {}, rule count: {}", step, n_rules);
             if self.params.rules_to_take < step || n_rules < step {
-                step_idx += 1;
-                continue;
+                if step_idx + 1 == step_sizes.len() {
+                    break 'inner;
+                } else {
+                    step_idx += 1;
+                    continue;
+                }
             }
 
             if step < 10 && n_rules > 200 {
@@ -1118,8 +1176,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
 
             let (n, b) = self.shrink(new_eqs, step, should_validate);
+            let n_bad = b.len();
             new_eqs = n;
-            n_bad += b.len();
             bads.extend(b);
 
             // if we taking all the rules, we don't need to validate anymore
