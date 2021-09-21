@@ -196,17 +196,17 @@ impl SynthLanguage for Math {
                     };
 
                     to_add.push(Math::Add([i, j]));
-                    to_add.push(Math::Sub([i, j]));
+                    // to_add.push(Math::Sub([i, j]));
                     to_add.push(Math::Mul([i, j]));
-                    // to_add.push(Math::Div([i, j])); 
+                    // to_add.push(Math::Div([i, j]));
                 }
             }
 
             // must have at least one non-constant term
             // and at least one term from previous iteration
             if !synth.egraph[i].data.exact && synth.egraph[i].data.gen + 1 == _iter  {
-                // to_add.push(Math::Abs(i));
-                // to_add.push(Math::Neg(i));
+                to_add.push(Math::Abs(i));
+                to_add.push(Math::Neg(i));
             }
         }
 

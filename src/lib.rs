@@ -9,7 +9,7 @@ use egg::*;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
-use std::{borrow::{Borrow, Cow}, collections::VecDeque};
+use std::{borrow::{Borrow, Cow}};
 use std::{cmp::Ordering, hash::Hash};
 use std::{
     fmt::{Debug, Display},
@@ -216,6 +216,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
 
     /// Given an eclass `id`, returns true if any id in `ids` is
     /// encountered when recursing down `depth` times.
+    /// Used for aggressive constant filtering
     fn contains_ids_with_depth(
         egraph: &EGraph<Self, SynthAnalysis>,
         id: Id,
@@ -560,9 +561,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     })
                     .collect();
 
-                layer.retain(|n| {
-                    n.all(|id| !L::contains_ids_with_depth(&self.egraph, id, &constants, iter - 1))
-                });
+                // layer.retain(|n| {
+                //     n.all(|id| !L::contains_ids_with_depth(&self.egraph, id, &constants, iter - 1))
+                // });
+                layer.retain(|n| n.all(|id| !constants.contains(&id)));
             }
             
             // deduplicate and filter bad constants
@@ -643,13 +645,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     );
 
                     let rule_minimize_before = Instant::now();
-
-                    let (eqs, bads) = if self.params.minimize {
-                        self.minimize(new_eqs)
-                    } else {
-                        self.choose_eqs(new_eqs)
-                    };
-
+                    let (eqs, bads) = self.choose_eqs(new_eqs);
                     let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
 
 		            log::info!("Added {} rules to the poison set!", bads.len());
@@ -707,7 +703,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     // For the no-conditional case which returns
                     // a non-empty list of ids that have the same cvec,
                     // won't this cause eclasses to merge even if the rule is actually not valid?
-                    if self.params.minimize || self.params.rules_to_take == usize::MAX {
+                    if self.params.rules_to_take == usize::MAX {
                         log::info!("Stopping early, took all eqs");
                         break 'inner;
                     }
@@ -805,8 +801,6 @@ pub struct SynthParams {
     /// 0 is unlimited
     #[clap(long, default_value = "100000")]
     pub chunk_size: usize,
-    #[clap(long, conflicts_with = "rules-to-take")]
-    pub minimize: bool,
     /// disallows enumerating terms with constants past this iteration
     #[clap(long, default_value = "999999")]
     pub no_constants_above_iter: usize,
@@ -882,7 +876,7 @@ pub struct DeriveParams {
     in1: String,
     in2: String,
     out: String,
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "5")]
     iter_limit: usize,
     #[clap(long, default_value = "300000")]
     node_limit: usize,
@@ -1172,9 +1166,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
         &mut self,
         mut new_eqs: EqualityMap<L>,
     ) -> (EqualityMap<L>, EqualityMap<L>) {
+        let step_sizes: Vec<usize> = vec![100, 10, 1];
         let mut bads = EqualityMap::default();
         let mut should_validate = true;
-        let mut step = 100;
+        let mut step_idx = 0;
 
         // Idea here is to remain at a high step level as long as possible
         // Move down in step size if
@@ -1182,16 +1177,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         //  (b) the number of bad eqs is smaller than the step size
         // Never move up in step level
         'inner: loop {
-            log::info!("Shrinking w/ step size: {}, rule count: {}", step, new_eqs.len());
-            if self.params.rules_to_take < step {
-                continue;
-            }
-
-            if new_eqs.len() < step {
-                if step == 1 {
+            let step = step_sizes[step_idx];
+            if self.params.rules_to_take < step || new_eqs.len() < step {
+                if step_idx + 1 == step_sizes.len() {
                     break 'inner;
                 } else {
-                    step = div_up(step, 10);
+                    step_idx += 1;
+                    continue;
                 }
             }
 
@@ -1205,122 +1197,18 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 should_validate = false;
             }
 
-            if n_bad < step {                   // not enough progress:
-                if step == 1 && n_bad == 0 {    // break if no progress at lowest step size
-                    break 'inner;        
-                } else {                        // default: decrease step size
-                    step = usize::min(div_up(step, 10), div_up(new_eqs.len(), 10));
+            if n_bad < step {           // not enough progress:
+                if step_idx + 1 == step_sizes.len() {
+                    if n_bad == 0 {     // break if no progress at lowest step size
+                        break 'inner;
+                    }                   // else loop again
+                } else {                // default: decrease step size
+                    step_idx += 1;
                 }
             }
         }
 
         (new_eqs, bads)
-    }
-
-    /// Alternate minimization algorithm which is currently not used.
-    #[inline(never)]
-    fn minimize(&mut self, new_eqs: EqualityMap<L>) -> (EqualityMap<L>, EqualityMap<L>) {
-        assert!(self.params.minimize);
-
-        let t = Instant::now();
-
-        let rule_validation = Instant::now();
-        let (new_eqs, bads): (EqualityMap<L>, EqualityMap<L>) = new_eqs
-            .into_iter()
-            .partition(|(_name, eq)| L::is_valid(self, &eq.lhs, &eq.rhs));
-
-        log::info!(
-            "Time taken in validation: {}",
-            rule_validation.elapsed().as_secs_f64()
-        );
-
-        let n_new_eqs = new_eqs.len();
-        log::info!("Minimizing {} rules...", n_new_eqs);
-        let mut flat: VecDeque<Equality<L>> = new_eqs.into_iter().map(|(_, eq)| eq).collect();
-        let mut test = vec![];
-
-        for mut n_chunks in (2..).map(|i| 1 << i) {
-            if n_chunks > flat.len() {
-                if n_chunks >= flat.len() * 2 {
-                    break;
-                }
-                n_chunks = flat.len();
-            }
-
-            log::info!("n chunks {}", n_chunks);
-
-            let mut chunk_sizes = vec![flat.len() / n_chunks; n_chunks];
-            for i in 0..(flat.len() % n_chunks) {
-                chunk_sizes[i] += 1;
-            }
-            assert_eq!(flat.len(), chunk_sizes.iter().sum::<usize>());
-
-            for size in chunk_sizes {
-                let n_new_eqs_this_loop = flat.len();
-                test.clear();
-                for _ in 0..size {
-                    test.push(flat.pop_front().unwrap());
-                }
-                assert_eq!(test.len(), size);
-
-                log::info!("chunk size {}, flat {}", size, flat.len());
-
-                let mut rewrites: Vec<_> = self
-                    .all_eqs
-                    .values()
-                    .flat_map(|eq| &eq.rewrites)
-                    .chain(flat.iter().flat_map(|eq| &eq.rewrites))
-                    .collect();
-
-                rewrites.sort_by_key(|rw| rw.name());
-                rewrites.dedup_by_key(|rw| rw.name());
-
-                let mut runner = self.mk_runner(self.initial_egraph.clone());
-
-                for candidate_eq in &test {
-                    runner = runner.with_expr(&L::instantiate(&candidate_eq.lhs));
-                    runner = runner.with_expr(&L::instantiate(&candidate_eq.rhs));
-                }
-
-                runner = runner.run(rewrites);
-
-                let mut extract = Extractor::new(&runner.egraph, AstSize);
-                flat.extend(runner.roots.chunks(2).zip(&test).filter_map(|(ids, eq)| {
-                    if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
-                        None
-                    } else {
-                        let lhs = extract.find_best(ids[0]).1;
-                        let rhs = extract.find_best(ids[1]).1;
-                        // TODO get ids so they can be unioned by `run`
-                        if let Some(mut eq2) = Equality::new(&lhs, &rhs) {
-                            eq2.ids = eq.ids;
-                            Some(eq2)
-                        } else {
-                            None
-                        }
-                    }
-                }));
-
-                log::info!(
-                    "Minimizing... threw away {} rules, {} / {} remain",
-                    n_new_eqs_this_loop - flat.len(),
-                    flat.len(),
-                    n_new_eqs
-                );
-            }
-        }
-
-        log::info!(
-            "Minimized {}->{} rules in {:?}",
-            n_new_eqs,
-            flat.len(),
-            t.elapsed()
-        );
-
-        (
-            flat.into_iter().map(|eq| (eq.name.clone(), eq)).collect(),
-            bads,
-        )
     }
 }
 
