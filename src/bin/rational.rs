@@ -185,18 +185,20 @@ impl SynthLanguage for Math {
                 // must have at least one non-constant term
                 // and at least one term from previous iteration
                 if synth.egraph[i].data.gen + 1 == _iter || synth.egraph[j].data.gen + 1 == _iter {
-                    let cond = if _iter > synth.params.no_constants_above_iter {
-                        !synth.egraph[i].data.exact && !synth.egraph[j].data.exact
+                    if _iter > synth.params.no_constants_above_iter {
+                        if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
+                            continue;
+                        }
                     } else {
-                        !synth.egraph[i].data.exact || !synth.egraph[j].data.exact
+                        if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                            continue;
+                        }
                     };
 
-                    if cond {
-                        to_add.push(Math::Add([i, j]));
-                        to_add.push(Math::Sub([i, j]));
-                        to_add.push(Math::Mul([i, j]));
-                        // to_add.push(Math::Div([i, j])); 
-                    }
+                    to_add.push(Math::Add([i, j]));
+                    to_add.push(Math::Sub([i, j]));
+                    to_add.push(Math::Mul([i, j]));
+                    // to_add.push(Math::Div([i, j])); 
                 }
             }
 
