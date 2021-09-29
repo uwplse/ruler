@@ -507,8 +507,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         if self.params.rules_to_take == 0 {
             self.params.rules_to_take = usize::MAX;
         }
-        if self.params.chunk_size == 0 {
-            self.params.chunk_size = usize::MAX;
+        if self.params.node_chunk_size == 0 {
+            self.params.node_chunk_size = usize::MAX;
+        }
+        if self.params.eq_chunk_size == 0 {
+            self.params.eq_chunk_size = usize::MAX;
         }
 
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
@@ -564,12 +567,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             });
 
-            let chunk_count = div_up(layer.len(), self.params.chunk_size);
+            let chunk_count = div_up(layer.len(), self.params.node_chunk_size);
             let mut chunk_num = 1;
 
             log::info!("Filtered layer, {} nodes remaining", layer.len());
             log::info!("Running loop with {} chunks", chunk_count);
-            for chunk in layer.chunks(self.params.chunk_size) {
+            for chunk in layer.chunks(self.params.node_chunk_size) {
                 log::info!("Chunk {} / {}", chunk_num, chunk_count);
                 log::info!(
                     "egraph n={}, e={}",
@@ -604,73 +607,91 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     let rule_discovery = rule_discovery_before.elapsed().as_secs_f64();
                     log::info!("{} candidate eqs", new_eqs.len());
 
-                    let new_eqs: EqualityMap<L> = new_eqs
+                    let mut filtered_eqs: EqualityMap<L> = new_eqs
                         .into_iter()
                         .filter(|eq| !poison_rules.contains(&eq.1))
                         .collect();
 
-                    log::info!(
-                        "egraph n={}, e={}",
-                        self.egraph.total_size(),
-                        self.egraph.number_of_classes(),
-                    );
+                    log::info!("Time taken in... run_rewrites: {}, rule discovery: {}",
+                                run_rewrites, rule_discovery);
 
-                    let rule_minimize_before = Instant::now();
-                    let (eqs, bads) = self.choose_eqs(new_eqs);
-                    let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
+                    let eq_chunk_count = div_up(filtered_eqs.len(), self.params.eq_chunk_size);
+                    let mut eq_chunk_num = 1;
 
-		            log::info!("Added {} rules to the poison set!", bads.len());
-                    for bad in bads {
-                        poison_rules.insert(bad.1);
-                    }
-                    if eqs.is_empty() {
-                        log::info!("Stopping early, no eqs");
-                        break 'inner;
-                    }
+                    log::info!("Running minimization loop with {} chunks", eq_chunk_count);
+                    while !filtered_eqs.is_empty() {
+                        log::info!("Chunk {} / {}", eq_chunk_num, eq_chunk_count);
+                        log::info!(
+                            "egraph n={}, e={}",
+                            self.egraph.total_size(),
+                            self.egraph.number_of_classes(),
+                        );
+                        eq_chunk_num += 1;
 
-                    // filter bad constants
-                    log::info!("{} possible rules", eqs.len());
-                    let mut valid_eqs = vec![];
-                    for (s, eq) in eqs {
-                        if !self.params.no_run_rewrites {
-                            assert!(!self.all_eqs.contains_key(&eq.name));
-                            if let Some((i, j)) = eq.ids {  // inserted 
-                                self.egraph.union(i, j);
-                            } else {                        // extracted
-                                let mut cp = self.egraph.clone();
-                                let lrec = L::instantiate(&eq.lhs);
-                                let rrec = L::instantiate(&eq.rhs);
-
-                                let i = cp.add_expr(&lrec);
-                                let seen = &mut HashSet::<Id>::default();
-                                if !L::valid_constants(&cp, &i, seen) {
-                                        continue;
-                                }
-
-                                let j = cp.add_expr(&rrec);
-                                let seen = &mut HashSet::<Id>::default();
-                                if !L::valid_constants(&cp, &j, seen) {
-                                    continue;
-                                }
-
-                                let i = self.egraph.add_expr(&lrec);
-                                let j = self.egraph.add_expr(&rrec);
-                                self.egraph.union(i, j);
+                        let mut eqs_chunk: EqualityMap<L> = EqualityMap::default();
+                        while !filtered_eqs.is_empty() && eqs_chunk.len() < self.params.eq_chunk_size {
+                            if let Some((k, v)) = filtered_eqs.pop() {
+                                eqs_chunk.insert(k, v);
                             }
                         }
 
-                        log::info!("  {}", eq);
-                        valid_eqs.push((s, eq));
+                        let rule_minimize_before = Instant::now();
+                        let (eqs, bads) = self.choose_eqs(eqs_chunk);
+                        let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
+
+                        log::info!("Added {} rules to the poison set!", bads.len());
+                        for bad in bads {
+                            poison_rules.insert(bad.1);
+                        }
+                        if eqs.is_empty() {
+                            log::info!("Stopping early, no eqs");
+                            break 'inner;
+                        }
+
+                        // filter bad constants
+                        log::info!("{} possible rules", eqs.len());
+                        let mut valid_eqs = vec![];
+                        for (s, eq) in eqs {
+                            if !self.params.no_run_rewrites {
+                                assert!(!self.all_eqs.contains_key(&eq.name));
+                                if let Some((i, j)) = eq.ids {  // inserted 
+                                    self.egraph.union(i, j);
+                                } else {                        // extracted
+                                    let mut cp = self.egraph.clone();
+                                    let lrec = L::instantiate(&eq.lhs);
+                                    let rrec = L::instantiate(&eq.rhs);
+
+                                    let i = cp.add_expr(&lrec);
+                                    let seen = &mut HashSet::<Id>::default();
+                                    if !L::valid_constants(&cp, &i, seen) {
+                                            continue;
+                                    }
+
+                                    let j = cp.add_expr(&rrec);
+                                    let seen = &mut HashSet::<Id>::default();
+                                    if !L::valid_constants(&cp, &j, seen) {
+                                        continue;
+                                    }
+
+                                    let i = self.egraph.add_expr(&lrec);
+                                    let j = self.egraph.add_expr(&rrec);
+                                    self.egraph.union(i, j);
+                                }
+                            }
+
+                            log::info!("  {}", eq);
+                            valid_eqs.push((s, eq));
+                        }
+
+                        // add new rewrites to both all_eqs and new_eqs
+                        log::info!("Chose {} good rules", valid_eqs.len());
+                        self.all_eqs.extend(valid_eqs.clone());
+                        self.new_eqs.extend(valid_eqs);
+
+                        // TODO check formatting for Learned...
+                        log::info!("Time taken in... rule minimization: {}", rule_minimize);
                     }
 
-                    // add new rewrites to both all_eqs and new_eqs
-                    log::info!("Chose {} good rules", valid_eqs.len());
-                    self.all_eqs.extend(valid_eqs.clone());
-                    self.new_eqs.extend(valid_eqs);
-
-                    // TODO check formatting for Learned...
-                    log::info!("Time taken in... run_rewrites: {}, rule discovery: {}, rule minimization: {}",
-                    run_rewrites,  rule_discovery, rule_minimize);
                     // For the no-conditional case which returns
                     // a non-empty list of ids that have the same cvec,
                     // won't this cause eclasses to merge even if the rule is actually not valid?
@@ -771,7 +792,10 @@ pub struct SynthParams {
     pub rules_to_take: usize,
     /// 0 is unlimited
     #[clap(long, default_value = "100000")]
-    pub chunk_size: usize,
+    pub node_chunk_size: usize,
+    /// 0 is unlimited
+    #[clap(long, default_value = "100000")]
+    pub eq_chunk_size: usize,
     /// disallows enumerating terms with constants past this iteration
     #[clap(long, default_value = "999999")]
     pub no_constants_above_iter: usize,
