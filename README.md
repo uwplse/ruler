@@ -1,4 +1,4 @@
-# <img src="ruler.png" alt="ruler logo" height="40" align="left"> Rewrite Rule Inference Using Equality Saturation
+# <img src="ruler.svg" alt="ruler logo" height="40" align="left"> Rewrite Rule Inference Using Equality Saturation
 
 This is the artifact for our paper
 "Rewrite Rule Inference Using Equality Saturation".
