@@ -207,6 +207,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
 
     /// Returns true if the eclass contains valid constants from the domain
     fn valid_constants(
+        _synth: &Synthesizer<Self>,
         _egraph: &EGraph<Self, SynthAnalysis>,
         _id: &Id,
         _seen: &mut HashSet<Id>
@@ -555,7 +556,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
 
                     max_id = usize::from(id);
-                    L::valid_constants(&cp, &id, seen) 
+                    L::valid_constants(&self, &cp, &id, seen) 
                 } else {
                     let id = cp.add(node.clone());
                     if usize::from(id) < max_id {
@@ -563,7 +564,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
 
                     max_id = usize::from(id);
-                    L::valid_constants(&cp, &id, seen)
+                    L::valid_constants(&self, &cp, &id, seen)
                 }
             });
 
@@ -663,13 +664,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                                     let i = cp.add_expr(&lrec);
                                     let seen = &mut HashSet::<Id>::default();
-                                    if !L::valid_constants(&cp, &i, seen) {
+                                    if !L::valid_constants(&self, &cp, &i, seen) {
                                             continue;
                                     }
 
                                     let j = cp.add_expr(&rrec);
                                     let seen = &mut HashSet::<Id>::default();
-                                    if !L::valid_constants(&cp, &j, seen) {
+                                    if !L::valid_constants(&self, &cp, &j, seen) {
                                         continue;
                                     }
 
@@ -794,7 +795,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "100000")]
     pub node_chunk_size: usize,
     /// 0 is unlimited
-    #[clap(long, default_value = "100000")]
+    #[clap(long, default_value = "0")]
     pub eq_chunk_size: usize,
     /// disallows enumerating terms with constants past this iteration
     #[clap(long, default_value = "999999")]
@@ -808,8 +809,17 @@ pub struct SynthParams {
     #[clap(long)]
     pub linear_cvec_matching: bool,
     /// modulo alpha renaming
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "999999")]
     pub ema_above_iter: usize,
+    // disabled operators during enumeration
+    #[clap(long)]
+    pub disabled_ops: Option<String>,
+    // disabled constants during enumeration
+    #[clap(long)]
+    pub disabled_consts: Option<String>,
+    // consts allowed in final rules, empty implies no filter
+    #[clap(long)]
+    pub filtered_consts: Option<String>,
 
     ////////////////
     // eqsat args //
