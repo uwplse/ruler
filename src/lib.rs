@@ -954,7 +954,6 @@ macro_rules! map {
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
     pub exact: bool,
-    pub gen: usize,
     pub simplest: RecExpr<L>
 }
 
@@ -1001,7 +1000,6 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
             ord_merge(&mut ord, to.exact.cmp(&from.exact));
             to.exact |= from.exact;
-            to.gen = usize::min(to.gen, from.gen);
 
             if AstSize.cost_rec(&from.simplest) < AstSize.cost_rec(&to.simplest) {
                 to.simplest = from.simplest.clone();
@@ -1013,16 +1011,10 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
         let get_cvec = |i: &Id| &egraph[*i].data.cvec;
-        let get_gen = |i: Id| egraph[i].data.gen;
         let get_simplest = |i: Id| &egraph[i].data.simplest;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
-            gen: if enode.is_var() || enode.is_constant() {
-                0
-            } else {
-                1 + enode.fold(0, |x: usize, i: Id| usize::max(x, get_gen(i)))
-            },
             simplest: if enode.is_var() || enode.is_constant() {
                 let mut rec = RecExpr::<L>::default();
                 rec.add(enode.clone());
