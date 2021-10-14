@@ -252,6 +252,7 @@ macro_rules! impl_bv {
 
                 let mut egraph = EGraph::new(SynthAnalysis {
                     cvec_len: consts[0].len(),
+                    foldable: !synth.params.no_constant_fold
                 });
 
                 // egraph.add(Math::Num(BV::ZERO));

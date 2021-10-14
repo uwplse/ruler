@@ -50,11 +50,12 @@ pub struct SynthAnalysis {
     /// Length of cvec or characteristic vector.
     /// All cvecs have the same length.    
     pub cvec_len: usize,
+    pub foldable: bool
 }
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { cvec_len: 10 }
+        Self { cvec_len: 10, foldable: true }
     }
 }
 
@@ -677,6 +678,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                     let i = self.egraph.add_expr(&lrec);
                                     let j = self.egraph.add_expr(&rrec);
                                     self.egraph.union(i, j);
+                                    
                                 }
                             }
 
@@ -781,6 +783,9 @@ pub struct SynthParams {
     /// Output file name
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
+    /// Constant folding
+    #[clap(long)]
+    pub no_constant_fold: bool,
 
     ///////////////////
     // search params //
@@ -1011,7 +1016,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
         let get_cvec = |i: &Id| &egraph[*i].data.cvec;
-        let get_simplest = |i: Id| &egraph[i].data.simplest;
+        let get_simplest = |i: &Id| &egraph[*i].data.simplest;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
@@ -1024,7 +1029,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 let mut map: HashMap<Id, Id> = HashMap::default();
                 enode.for_each(|id| {
                     if map.get(&id) == None {
-                        let s = get_simplest(id);
+                        let s = get_simplest(&id);
                         let i = nodes.len();
                         for n in s.as_ref() {
                             nodes.push(n
@@ -1045,13 +1050,15 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     }
 
     fn modify(egraph: &mut EGraph<L, Self>, id: Id) {
-        let sig = &egraph[id].data;
-        if sig.exact {
-            let first = sig.cvec.iter().find_map(|x| x.as_ref());
-            if let Some(first) = first {
-                let enode = L::mk_constant(first.clone());
-                let added = egraph.add(enode);
-                egraph.union(id, added);
+        if egraph.analysis.foldable {
+            let sig = &egraph[id].data;
+            if sig.exact {
+                let first = sig.cvec.iter().find_map(|x| x.as_ref());
+                if let Some(first) = first {
+                    let enode = L::mk_constant(first.clone());
+                    let added = egraph.add(enode);
+                    egraph.union(id, added);
+                }
             }
         }
     }

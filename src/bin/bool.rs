@@ -82,6 +82,7 @@ impl SynthLanguage for Math {
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: consts[0].len(),
+            foldable: !synth.params.no_constant_fold
         });
 
         egraph.add(Math::Lit(false));
