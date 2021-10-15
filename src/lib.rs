@@ -214,32 +214,6 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         true
     }
 
-    /// Given an eclass `id`, returns true if any id in `ids` is
-    /// encountered when recursing down `depth` times.
-    /// Used for aggressive constant filtering
-    fn contains_ids_with_depth(
-        egraph: &EGraph<Self, SynthAnalysis>,
-        id: Id,
-        ids: &HashSet<Id>,
-        depth: usize
-    ) -> bool {
-        if depth == 0 {
-            return false;
-        }
-
-        if ids.contains(&id) {
-            return true;
-        }
-
-        egraph[id].nodes
-            .iter()
-            .any(|x| {
-                x.any(|i| {
-                    Self::contains_ids_with_depth(egraph, i, ids, depth - 1)
-                })
-            })
-    }
-
     /// Given a , `ctx`, i.e., mapping from variables to cvecs, evaluate a pattern, `pat`,
     /// on each element of the cvec.
     fn eval_pattern(
@@ -561,9 +535,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     })
                     .collect();
 
-                // layer.retain(|n| {
-                //     n.all(|id| !L::contains_ids_with_depth(&self.egraph, id, &constants, iter - 1))
-                // });
                 layer.retain(|n| n.all(|id| !constants.contains(&id)));
             }
             
