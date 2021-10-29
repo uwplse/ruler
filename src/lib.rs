@@ -833,6 +833,12 @@ pub struct SynthParams {
     #[clap(long)]
     pub do_final_run: bool,
 
+    ///////////////////
+    // persistence params //
+    ///////////////////
+    #[clap(long)]
+    pub prior_rules: Option<String>,
+
 }
 
 /// Derivability report.
