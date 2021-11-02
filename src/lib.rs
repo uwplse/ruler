@@ -659,26 +659,23 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                 if let Some((i, j)) = eq.ids {  // inserted 
                                     self.egraph.union(i, j);
                                 } else {                        // extracted
-                                    let mut cp = self.egraph.clone();
+                                    // let mut cp = self.egraph.clone();
+                                    let mut valid_const = true;
                                     let lrec = L::instantiate(&eq.lhs);
                                     let rrec = L::instantiate(&eq.rhs);
 
-                                    let i = cp.add_expr(&lrec);
+                                    let i = self.egraph.add_expr(&lrec);
                                     let seen = &mut HashSet::<Id>::default();
-                                    if !L::valid_constants(&self, &cp, &i, seen) {
-                                            continue;
-                                    }
+                                    valid_const &= L::valid_constants(&self, &self.egraph, &i, seen);
 
-                                    let j = cp.add_expr(&rrec);
-                                    let seen = &mut HashSet::<Id>::default();
-                                    if !L::valid_constants(&self, &cp, &j, seen) {
+                                    let j = self.egraph.add_expr(&rrec);
+                                    seen.clear();
+                                    valid_const &= L::valid_constants(&self, &self.egraph, &j, seen);
+
+                                    self.egraph.union(i, j);
+                                    if !valid_const {   // encountered a constant we don't want to see
                                         continue;
                                     }
-
-                                    let i = self.egraph.add_expr(&lrec);
-                                    let j = self.egraph.add_expr(&rrec);
-                                    self.egraph.union(i, j);
-                                    
                                 }
                             }
 
