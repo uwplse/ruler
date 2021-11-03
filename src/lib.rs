@@ -406,6 +406,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
             self.all_eqs.values().flat_map(|eq| &eq.rewrites).collect();
 
+        log::info!("Rewrites: {}", rewrites.len());
+
         let mut runner = self.mk_runner(self.egraph.clone());
         runner = runner.run(rewrites);
 
@@ -542,6 +544,58 @@ impl<L: SynthLanguage> Synthesizer<L> {
         (new_eqs, by_cvec.into_iter().map(|pair| pair.1).collect())
     }
 
+    /// Enumerates a layer and filters (EMA, constant filtering)
+    fn enumerate_layer(&self, iter: usize) -> Vec<L> {
+        let mut layer = L::make_layer(&self, iter);
+        layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
+
+        // no constants (if set)
+        log::info!("Made layer of {} nodes", layer.len());
+        if iter > self.params.no_constants_above_iter {
+            let constants: HashSet<Id> = self
+                .ids()
+                .filter_map(|id| {
+                    let expr = &self.egraph[id].data.simplest;
+                    if expr.as_ref().iter().any(|n| n.is_constant()) {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            layer.retain(|n| n.all(|id| !constants.contains(&id)));
+        }
+        
+        // deduplicate and filter bad constants
+        let mut cp = self.egraph.clone();
+        let mut max_id = cp.number_of_classes();
+        layer.retain(|node| {
+            let seen = &mut HashSet::<Id>::default();
+            if iter > self.params.ema_above_iter {
+                let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                let rec2 = L::emt_generalize(&rec);
+                let id = cp.add_expr(&rec2);
+                if usize::from(id) < max_id {
+                    return false;
+                }
+
+                max_id = usize::from(id);
+                L::valid_constants(&self, &cp, &id, seen)
+            } else {
+                let id = cp.add(node.clone());
+                if usize::from(id) < max_id {
+                    return false;
+                }
+
+                max_id = usize::from(id);
+                L::valid_constants(&self, &cp, &id, seen)
+            }
+        });
+
+        layer
+    }
+
     /// Rule synthesis for one domain
     fn run_one_domain(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
@@ -549,54 +603,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         assert!(self.params.iters > 0);
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
-            let mut layer = L::make_layer(&self, iter);
-
-            layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
-
-            // no constants (if set)
-            log::info!("Made layer of {} nodes", layer.len());
-            if iter > self.params.no_constants_above_iter {
-                let constants: HashSet<Id> = self
-                    .ids()
-                    .filter_map(|id| {
-                        let expr = &self.egraph[id].data.simplest;
-                        if expr.as_ref().iter().any(|n| n.is_constant()) {
-                            Some(id)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                layer.retain(|n| n.all(|id| !constants.contains(&id)));
-            }
-            
-            // deduplicate and filter bad constants
-            let mut cp = self.egraph.clone();
-            let mut max_id = cp.number_of_classes();
-            layer.retain(|node| {
-                let seen = &mut HashSet::<Id>::default();
-                if iter > self.params.ema_above_iter {
-                    let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
-                    let rec2 = L::emt_generalize(&rec);
-                    let id = cp.add_expr(&rec2);
-                    if usize::from(id) < max_id {
-                        return false;
-                    }
-
-                    max_id = usize::from(id);
-                    L::valid_constants(&self, &cp, &id, seen)
-                } else {
-                    let id = cp.add(node.clone());
-                    if usize::from(id) < max_id {
-                        return false;
-                    }
-
-                    max_id = usize::from(id);
-                    L::valid_constants(&self, &cp, &id, seen)
-                }
-            });
-
+            let layer = self.enumerate_layer(iter);
             let chunk_count = div_up(layer.len(), self.params.node_chunk_size);
             let mut chunk_num = 1;
 
@@ -773,54 +780,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         assert!(self.params.iters > 0);
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
-            let mut layer = L::make_layer(&self, iter);
-
-            layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
-
-            // no constants (if set)
-            log::info!("Made layer of {} nodes", layer.len());
-            if iter > self.params.no_constants_above_iter {
-                let constants: HashSet<Id> = self
-                    .ids()
-                    .filter_map(|id| {
-                        let expr = &self.egraph[id].data.simplest;
-                        if expr.as_ref().iter().any(|n| n.is_constant()) {
-                            Some(id)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                layer.retain(|n| n.all(|id| !constants.contains(&id)));
-            }
-            
-            // deduplicate and filter bad constants
-            let mut cp = self.egraph.clone();
-            let mut max_id = cp.number_of_classes();
-            layer.retain(|node| {
-                let seen = &mut HashSet::<Id>::default();
-                if iter > self.params.ema_above_iter {
-                    let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
-                    let rec2 = L::emt_generalize(&rec);
-                    let id = cp.add_expr(&rec2);
-                    if usize::from(id) < max_id {
-                        return false;
-                    }
-
-                    max_id = usize::from(id);
-                    L::valid_constants(&self, &cp, &id, seen)
-                } else {
-                    let id = cp.add(node.clone());
-                    if usize::from(id) < max_id {
-                        return false;
-                    }
-
-                    max_id = usize::from(id);
-                    L::valid_constants(&self, &cp, &id, seen)
-                }
-            });
-
+            let layer = self.enumerate_layer(iter);
             let chunk_count = div_up(layer.len(), self.params.node_chunk_size);
             let mut chunk_num = 1;
 
@@ -844,9 +804,51 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                 }
 
-                'inner: loop {
-                    break;
+                // run rewrites
+                let run_rewrites_before = Instant::now();
+                log::info!("running eqsat with {} rules", self.all_eqs.len());
+                let start = Instant::now();
+                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
+                    self.all_eqs.values().flat_map(|eq| &eq.rewrites).collect();
+
+                log::info!("Rewrites: {}", rewrites.len());
+                let mut runner = self.mk_runner(self.egraph.clone());
+                runner = runner.run(rewrites);
+                log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
+
+                // update the clean egraph based on any unions that happened
+                let mut found_unions = HashMap::default();
+                for id in self.ids() {
+                    let id2 = runner.egraph.find(id);
+                    found_unions.entry(id2).or_insert(vec![]).push(id);
                 }
+
+                // these unions are rewrite rules
+                let mut new_eqs: EqualityMap<L> = EqualityMap::default();
+                for ids in found_unions.values() {
+                    for win in ids.windows(2) {
+                        let mut extract = Extractor::new(&self.egraph, NumberOfDomainOps);
+                        let (_, e1) = extract.find_best(win[0]);
+                        let (_, e2) = extract.find_best(win[1]);
+                        if let Some(mut eq) = Equality::new(&e1, &e2) {
+                            log::debug!("  Candidate {}", eq);
+                            eq.ids = Some((win[0], win[1]));
+                            new_eqs.insert(eq.name.clone(), eq);
+                        }
+
+                        self.egraph.union(win[0], win[1]);
+                    }
+                }
+
+                runner.egraph.rebuild();
+                log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
+                let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
+                log::info!("Time taken in... run_rewrites: {}", run_rewrites);
+                
+                log::info!("Chose {} good rules", new_eqs.len());
+                self.all_eqs.extend(new_eqs.clone());
+                self.new_eqs.extend(new_eqs);
+                
             }
         }
 
@@ -865,7 +867,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             println!("  {:?}   {}", eq.score(), eq);
         }
         println!("Learned {} rules in {:?} using {} old rules.", num_rules, time, num_olds);
-
         Report {
             params: self.params,
             time,
@@ -1162,6 +1163,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
             ord_merge(&mut ord, to.exact.cmp(&from.exact));
             to.exact |= from.exact;
+            to.in_domain |= from.in_domain;
 
             if AstSize.cost_rec(&from.simplest) < AstSize.cost_rec(&to.simplest) {
                 to.simplest = from.simplest.clone();
@@ -1388,6 +1390,35 @@ impl<L: Language> egg::CostFunction<L> for NumberOfOps {
             0
         } else {
             enode.fold(1, |sum, id| sum + costs(id))
+        }
+    }
+}
+
+
+fn add_or_max(a: usize, b: usize) -> usize {
+    let m = usize::max_value();
+    if a == m || b == m {
+        m
+    } else {
+        a + b
+    }
+}
+
+// Cost function only counting ops in the domain
+// Penalizes ops not in the domain
+pub struct NumberOfDomainOps;
+impl<L: SynthLanguage> egg::CostFunction<L> for NumberOfDomainOps {
+    type Cost = usize;
+    fn cost<C>(&mut self, enode: &L, mut costs: C) -> Self::Cost
+    where
+        C: FnMut(Id) -> Self::Cost,
+    {
+        if enode.is_var() || enode.is_constant() {
+            0
+        } else if enode.is_in_domain() {
+            enode.fold(1, |sum, id| add_or_max(sum, costs(id)))
+        } else {
+            usize::max_value()
         }
     }
 }

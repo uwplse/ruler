@@ -153,7 +153,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let mut extract = Extractor::new(&synth.egraph, NumberOfOps);
+        let mut extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
         let mut to_add = vec![];
 
         // maps ids to n_ops
@@ -163,11 +163,15 @@ impl SynthLanguage for Math {
             .collect();
 
         for i in synth.ids() {
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact {
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
                 continue;
             }
             
             to_add.push(Math::Bnot(i));
+        }
+
+        for id in synth.ids() {
+            log::info!("{}: {:?}", id, synth.egraph[id]);
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
