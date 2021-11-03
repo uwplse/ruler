@@ -221,6 +221,32 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         return false;
     }
 
+    /// Returns true if the node is in the current domain.
+    /// Useful for rule lifting.
+    fn is_in_domain(&self) -> bool {
+        return true;
+    }
+
+    /// Like calling `egraph.add_expr` except enodes for
+    /// lower domain equivalencies are added.
+    fn add_domain_expr(synth: &mut Synthesizer<Self>, _expr: &RecExpr<Self>) -> Id {
+        if !synth.lifting {
+            panic!("`add_domain_expr` not implemented for rule lifting");
+        }
+        
+        Id::from(0 as usize)
+    }
+
+    /// Like calling `egraph.add` except enodes for
+    /// lower domain equivalencies are added.
+    fn add_domain_node(synth: &mut Synthesizer<Self>, _node: Self) -> Id {
+        if !synth.lifting {
+            panic!("`add_domain_node` not implemented for rule lifting");
+        }
+        
+        Id::from(0 as usize)
+    }
+
     /// Given a , `ctx`, i.e., mapping from variables to cvecs, evaluate a pattern, `pat`,
     /// on each element of the cvec.
     fn eval_pattern(
@@ -294,6 +320,7 @@ pub struct Synthesizer<L: SynthLanguage> {
     pub old_eqs: EqualityMap<L>,
     pub new_eqs: EqualityMap<L>,
     pub smt_unknown: usize,
+    pub lifting: bool
 }
 
 
@@ -320,6 +347,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             all_eqs: olds, // also add prior rules to all_eqs
             smt_unknown: 0,
             params,
+            lifting: false
         };
 
         L::init_synth(&mut synth);
@@ -514,21 +542,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         (new_eqs, by_cvec.into_iter().map(|pair| pair.1).collect())
     }
 
-    /// Top level function for rule synthesis.
-    /// This corresponds to `Figure 4` in the Ruler paper, where
-    /// all the key components of `Ruler` (e.g., `make_layer`, `run_rewrites`, `cvec_match`, `choose_eqs`) are invoked.
-    pub fn run(mut self) -> Report<L> {
-        // normalize some params
-        if self.params.rules_to_take == 0 {
-            self.params.rules_to_take = usize::MAX;
-        }
-        if self.params.node_chunk_size == 0 {
-            self.params.node_chunk_size = usize::MAX;
-        }
-        if self.params.eq_chunk_size == 0 {
-            self.params.eq_chunk_size = usize::MAX;
-        }
-
+    /// Rule synthesis for one domain
+    fn run_one_domain(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
         assert!(self.params.iters > 0);
@@ -739,7 +754,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let o_eqs: Vec<_> = self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
         for eq in &n_eqs {
             println!("  {:?}   {}", eq.score(), eq);
-            // println!("{}", eq);
         }
         println!("Learned {} rules in {:?} using {} old rules.", num_rules, time, num_olds);
         Report {
@@ -750,6 +764,138 @@ impl<L: SynthLanguage> Synthesizer<L> {
             new_eqs: n_eqs,
             old_eqs: o_eqs,
             smt_unknown: self.smt_unknown,
+        }
+    }
+    
+    /// Rule synthesis for rule lifting
+    fn run_rule_lifting(mut self) -> Report<L> {
+        let t = Instant::now();
+        assert!(self.params.iters > 0);
+        for iter in 1..=self.params.iters {
+            log::info!("[[[ Iteration {} ]]]", iter);
+            let mut layer = L::make_layer(&self, iter);
+
+            layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
+
+            // no constants (if set)
+            log::info!("Made layer of {} nodes", layer.len());
+            if iter > self.params.no_constants_above_iter {
+                let constants: HashSet<Id> = self
+                    .ids()
+                    .filter_map(|id| {
+                        let expr = &self.egraph[id].data.simplest;
+                        if expr.as_ref().iter().any(|n| n.is_constant()) {
+                            Some(id)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                layer.retain(|n| n.all(|id| !constants.contains(&id)));
+            }
+            
+            // deduplicate and filter bad constants
+            let mut cp = self.egraph.clone();
+            let mut max_id = cp.number_of_classes();
+            layer.retain(|node| {
+                let seen = &mut HashSet::<Id>::default();
+                if iter > self.params.ema_above_iter {
+                    let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                    let rec2 = L::emt_generalize(&rec);
+                    let id = cp.add_expr(&rec2);
+                    if usize::from(id) < max_id {
+                        return false;
+                    }
+
+                    max_id = usize::from(id);
+                    L::valid_constants(&self, &cp, &id, seen)
+                } else {
+                    let id = cp.add(node.clone());
+                    if usize::from(id) < max_id {
+                        return false;
+                    }
+
+                    max_id = usize::from(id);
+                    L::valid_constants(&self, &cp, &id, seen)
+                }
+            });
+
+            let chunk_count = div_up(layer.len(), self.params.node_chunk_size);
+            let mut chunk_num = 1;
+
+            log::info!("Filtered layer, {} nodes remaining", layer.len());
+            log::info!("Running loop with {} chunks", chunk_count);
+            for chunk in layer.chunks(self.params.node_chunk_size) {
+                log::info!("Chunk {} / {}", chunk_num, chunk_count);
+                log::info!(
+                    "egraph n={}, e={}",
+                    self.egraph.total_size(),
+                    self.egraph.number_of_classes(),
+                );
+
+                chunk_num += 1;
+                for node in chunk {
+                    if iter > self.params.ema_above_iter {
+                        let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                        L::add_domain_expr(&mut self, &rec);
+                    } else {
+                        L::add_domain_node(&mut self, node.clone());
+                    }
+                }
+
+                'inner: loop {
+                    break;
+                }
+            }
+        }
+
+        let mut eqs: Vec<_> = self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        eqs.sort_by_key(|eq| eq.score());
+        eqs.reverse();
+
+        let time = t.elapsed().as_secs_f64();
+        let num_rules = self.new_eqs.len();
+        let mut n_eqs: Vec<_> = self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        n_eqs.sort_by_key(|eq| eq.score());
+        n_eqs.reverse();
+        let num_olds = self.old_eqs.len();
+        let o_eqs: Vec<_> = self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        for eq in &n_eqs {
+            println!("  {:?}   {}", eq.score(), eq);
+        }
+        println!("Learned {} rules in {:?} using {} old rules.", num_rules, time, num_olds);
+
+        Report {
+            params: self.params,
+            time,
+            num_rules,
+            all_eqs: eqs,
+            new_eqs: n_eqs,
+            old_eqs: o_eqs,
+            smt_unknown: self.smt_unknown
+        }
+    }
+
+    /// Top level function for rule synthesis.
+    /// This corresponds to `Figure 4` in the Ruler paper, where
+    /// all the key components of `Ruler` (e.g., `make_layer`, `run_rewrites`, `cvec_match`, `choose_eqs`) are invoked.
+    pub fn run(mut self) -> Report<L> {
+        // normalize some params
+        if self.params.rules_to_take == 0 {
+            self.params.rules_to_take = usize::MAX;
+        }
+        if self.params.node_chunk_size == 0 {
+            self.params.node_chunk_size = usize::MAX;
+        }
+        if self.params.eq_chunk_size == 0 {
+            self.params.eq_chunk_size = usize::MAX;
+        }
+
+        if self.lifting {
+            self.run_rule_lifting()
+        } else {
+            self.run_one_domain()
         }
     }
 }
@@ -968,8 +1114,9 @@ macro_rules! map {
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
+    pub simplest: RecExpr<L>,
     pub exact: bool,
-    pub simplest: RecExpr<L>
+    pub in_domain: bool
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -1029,7 +1176,6 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         let get_simplest = |i: &Id| &egraph[*i].data.simplest;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
-            exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
             simplest: if enode.is_var() || enode.is_constant() {
                 let mut rec = RecExpr::<L>::default();
                 rec.add(enode.clone());
@@ -1055,7 +1201,9 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                     .clone()
                     .map_children(|id| *map.get(&id).unwrap()));
                 RecExpr::from(nodes)
-            }
+            },
+            exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
+            in_domain: enode.is_in_domain()
         }
     }
 
@@ -1086,6 +1234,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut keepers = EqualityMap::default();
         let mut bads = EqualityMap::default();
         let initial_len = new_eqs.len();
+
         while !new_eqs.is_empty() {
             // best are last
             new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
