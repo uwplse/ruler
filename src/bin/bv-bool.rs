@@ -11,22 +11,22 @@ define_language! {
     /// Define the operators for the domain.
     pub enum Math {
         // boolean domain
-        "not" = Not(Id),
-        "and" = And([Id; 2]),
-        "or" = Or([Id; 2]),
-        "xor" = Xor([Id; 2]),
+        "~" = Not(Id),
+        "&" = And([Id; 2]),
+        "|" = Or([Id; 2]),
+        "^" = Xor([Id; 2]),
         Lit(bool),
 
         // bitvector domain
-        "bv" = Make([Id; 2]), 
-        "&" = Band([Id; 2]),
-        "|" = Bor([Id; 2]),
-        "^" = Bxor([Id; 2]),
-        "~" = Bnot(Id),
+        "and" = Band([Id; 2]),
+        "or" = Bor([Id; 2]),
+        "xor" = Bxor([Id; 2]),
+        "not" = Bnot(Id),
         Var(egg::Symbol),
         Num(BV<2>),
 
         // conversions
+        "bv" = Make([Id; 2]), 
         "first" = First(Id),
         "second" = Second(Id),
     }
@@ -72,6 +72,8 @@ fn second_bool_id(
         .unwrap()
 }
 
+
+// BV-bool language
 impl SynthLanguage for Math {
     type Constant = BV::<2>;
 
@@ -146,10 +148,6 @@ impl SynthLanguage for Math {
 
         synth.egraph = egraph;
         synth.lifting = true;
-
-        for id in synth.ids() {
-            log::info!("{}: {:?}", id, synth.egraph[id]);
-        }
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
@@ -163,15 +161,32 @@ impl SynthLanguage for Math {
             .collect();
 
         for i in synth.ids() {
+            for j in synth.ids() {
+                if (ids[&i] + ids[&j] + 1 != iter) ||
+                    !synth.egraph[i].data.in_domain ||
+                    !synth.egraph[j].data.in_domain {
+                    continue;
+                }
+
+                if iter > synth.params.no_constants_above_iter {
+                    if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
+                        continue;
+                    }
+                } else {
+                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                        continue;
+                    }
+                };
+
+                to_add.push(Math::Band([i, j]));
+                to_add.push(Math::Bor([i, j]));
+            }
+
             if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
                 continue;
             }
             
             to_add.push(Math::Bnot(i));
-        }
-
-        for id in synth.ids() {
-            log::info!("{}: {:?}", id, synth.egraph[id]);
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -202,10 +217,86 @@ impl SynthLanguage for Math {
                 let (uid, _) = synth.egraph.union(op_id, mk_id);
                 uid
             },
+            Math::Band([i, j]) => {
+                let op_id = synth.egraph.add(node);
+                let fsti_id = first_bool_id(&synth.egraph, i);
+                let seci_id = second_bool_id(&synth.egraph, i);
+                let fstj_id = first_bool_id(&synth.egraph, j);
+                let secj_id = second_bool_id(&synth.egraph, j);
+                let nfst_id = synth.egraph.add(Math::And([fsti_id, fstj_id]));
+                let nsec_id = synth.egraph.add(Math::And([seci_id, secj_id]));
+                let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
+                let (uid, _) = synth.egraph.union(op_id, mk_id);
+                uid
+            },
+            Math::Bor([i, j]) => {
+                let op_id = synth.egraph.add(node);
+                let fsti_id = first_bool_id(&synth.egraph, i);
+                let seci_id = second_bool_id(&synth.egraph, i);
+                let fstj_id = first_bool_id(&synth.egraph, j);
+                let secj_id = second_bool_id(&synth.egraph, j);
+                let nfst_id = synth.egraph.add(Math::Or([fsti_id, fstj_id]));
+                let nsec_id = synth.egraph.add(Math::Or([seci_id, secj_id]));
+                let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
+                let (uid, _) = synth.egraph.union(op_id, mk_id);
+                uid
+            },
             _ => {
-                panic!("Not implemented {:?}", node);
+                panic!("Not a bitvector node {:?}", node);
             }
         }
+    }
+
+    /// @Override
+    /// Heuristics for ranking rewrites based on number of variables,
+    /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
+    /// and number of ops.
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
+        let lhs_recpat = Self::recpat_instantiate(&lhs.ast);
+        let rhs_recpat = Self::recpat_instantiate(&rhs.ast);
+        let sz_lhs = DomainAstSize.cost_rec(&lhs_recpat) as i32;
+        let sz_rhs = DomainAstSize.cost_rec(&rhs_recpat) as i32;
+        // let sz_max_pattern = sz_lhs.max(sz_rhs);
+
+        // lhs.vars() and rhs.vars() is deduping
+        // examples
+        //   (- x x) => 0 --- 1 b/c x only var
+        //   (- x 0) => x --- 1 b/c x only var
+        //   (+ x y) => (+ y x) --- 2 b/c x, y only vars
+        let mut var_set: HashSet<Var> = Default::default();
+        var_set.extend(lhs.vars());
+        var_set.extend(rhs.vars());
+        let n_vars_rule = var_set.len() as i32;
+
+        let mut op_set: HashSet<String> = Default::default();
+        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+            if !node.is_leaf() {
+                op_set.insert(node.display_op().to_string());
+            }
+        }
+        let n_ops = op_set.len() as i32;
+
+        let n_consts = lhs
+            .ast
+            .as_ref()
+            .iter()
+            .chain(rhs.ast.as_ref())
+            .filter(|n| match n {
+                ENodeOrVar::ENode(n) => n.is_constant(),
+                ENodeOrVar::Var(_) => false,
+            })
+            .count() as i32;
+
+        // (-sz_max_pattern, n_vars_rule)
+        [
+            n_vars_rule,
+            -n_consts,
+            -i32::max(sz_lhs, sz_rhs),
+            // -i32::min(sz_lhs, sz_rhs),
+            -(sz_lhs + sz_rhs),
+            -n_ops,
+            // 0
+        ]
     }
 }
 

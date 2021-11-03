@@ -23,6 +23,15 @@ pub fn div_up(a : usize, b: usize) -> usize {
     (0..a).step_by(b).size_hint().0
 }
 
+pub fn add_or_max(a: usize, b: usize) -> usize {
+    let m = usize::max_value();
+    if a == m || b == m {
+        m
+    } else {
+        a + b
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

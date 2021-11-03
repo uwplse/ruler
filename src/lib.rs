@@ -125,6 +125,24 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         RecExpr::from(nodes)
     }
 
+    // Like instantiate, but takes a recexpr of pattern nodes
+    fn recpat_instantiate(expr: &RecExpr<ENodeOrVar<Self>>) -> RecExpr<Self> {
+        let nodes: Vec<_> = expr
+            .as_ref()
+            .iter()
+            .map(|n| match n {
+                ENodeOrVar::ENode(n) => n.clone(),
+                ENodeOrVar::Var(v) => {
+                    let s = v.to_string();
+                    assert!(s.starts_with('?'));
+                    Self::mk_var(s[1..].into())
+                }
+            })
+            .collect();
+
+        RecExpr::from(nodes)
+    }
+
     /// Like generalize, but returns a recexpr
     fn emt_generalize(expr: &RecExpr<Self>) -> RecExpr<Self> {
         let map = &mut HashMap::<Symbol, Var>::default();
@@ -225,6 +243,11 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
     /// Useful for rule lifting.
     fn is_in_domain(&self) -> bool {
         return true;
+    }
+
+    /// Returns true if every node in the recexpr is in the domain
+    fn recexpr_in_domain(expr: &RecExpr<Self>) -> bool {
+        expr.as_ref().iter().all(|x| x.is_in_domain())
     }
 
     /// Like calling `egraph.add_expr` except enodes for
@@ -673,7 +696,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         }
 
                         let rule_minimize_before = Instant::now();
-                        let (eqs, bads) = self.choose_eqs(eqs_chunk);
+                        let (eqs, bads) = self.choose_eqs(eqs_chunk, true);
                         let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
 
                         log::info!("Added {} rules to the poison set!", bads.len());
@@ -823,17 +846,21 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     found_unions.entry(id2).or_insert(vec![]).push(id);
                 }
 
-                // these unions are rewrite rules
+                // these unions are candidate rewrite rules
                 let mut new_eqs: EqualityMap<L> = EqualityMap::default();
                 for ids in found_unions.values() {
                     for win in ids.windows(2) {
-                        let mut extract = Extractor::new(&self.egraph, NumberOfDomainOps);
+                        let mut extract = Extractor::new(&self.egraph, DomainAstSize);
                         let (_, e1) = extract.find_best(win[0]);
                         let (_, e2) = extract.find_best(win[1]);
-                        if let Some(mut eq) = Equality::new(&e1, &e2) {
-                            log::debug!("  Candidate {}", eq);
-                            eq.ids = Some((win[0], win[1]));
-                            new_eqs.insert(eq.name.clone(), eq);
+                        if L::recexpr_in_domain(&e1) && L::recexpr_in_domain(&e1) {
+                            if let Some(mut eq) = Equality::new(&e1, &e2) {
+                                log::debug!("  Candidate {}", eq);
+                                eq.ids = Some((win[0], win[1]));
+                                if !self.new_eqs.contains_key(&eq.name) {
+                                    new_eqs.insert(eq.name.clone(), eq);
+                                }
+                            }
                         }
 
                         self.egraph.union(win[0], win[1]);
@@ -844,11 +871,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
                 let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
                 log::info!("Time taken in... run_rewrites: {}", run_rewrites);
+
+                for (_, eq) in &new_eqs {
+                    log::info!("{}", eq);
+                }
+
+                let rule_minimize_before = Instant::now();
+                let (eqs, _) = self.choose_eqs(new_eqs, false);
+                let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
+                log::info!("Time taken in... rule minimization: {}", rule_minimize);
                 
-                log::info!("Chose {} good rules", new_eqs.len());
-                self.all_eqs.extend(new_eqs.clone());
-                self.new_eqs.extend(new_eqs);
-                
+                log::info!("Chose {} good rules", eqs.len());
+                self.all_eqs.extend(eqs.clone());
+                self.new_eqs.extend(eqs);
             }
         }
 
@@ -1231,7 +1266,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         &mut self,
         mut new_eqs: EqualityMap<L>,
         step: usize,
-        should_validate: bool,
+        should_validate: bool
     ) -> (EqualityMap<L>, EqualityMap<L>) {
         let mut keepers = EqualityMap::default();
         let mut bads = EqualityMap::default();
@@ -1245,13 +1280,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let mut took = 0;
             while let Some((name, eq)) = new_eqs.pop() {
                 if should_validate {
-                    // let rule_validation = Instant::now();
                     let valid = L::is_valid(self, &eq.lhs, &eq.rhs);
-                    // log::info!(
-                    //     "Time taken in validation: {}",
-                    //     rule_validation.elapsed().as_secs_f64()
-                    // );
-
                     if valid {
                         let old = keepers.insert(name, eq);
                         took += old.is_none() as usize;
@@ -1305,9 +1334,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
                     let left = extract.find_best(ids[0]).1;
                     let right = extract.find_best(ids[1]).1;
-                    if let Some(eq) = Equality::new(&left, &right) {
-                        if !self.all_eqs.contains_key(&eq.name) {
-                            new_eqs.insert(eq.name.clone(), eq);
+                    if L::recexpr_in_domain(&left) && L::recexpr_in_domain(&right) {
+                        if let Some(eq) = Equality::new(&left, &right) {
+                            if !self.all_eqs.contains_key(&eq.name) {
+                                new_eqs.insert(eq.name.clone(), eq);
+                            }
                         }
                     }
                 }
@@ -1331,10 +1362,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn choose_eqs(
         &mut self,
         mut new_eqs: EqualityMap<L>,
+        mut should_validate: bool
     ) -> (EqualityMap<L>, EqualityMap<L>) {
         let step_sizes: Vec<usize> = vec![100, 10, 1];
         let mut bads = EqualityMap::default();
-        let mut should_validate = true;
         let mut step_idx = 0;
 
         // Idea here is to remain at a high step level as long as possible
@@ -1394,16 +1425,6 @@ impl<L: Language> egg::CostFunction<L> for NumberOfOps {
     }
 }
 
-
-fn add_or_max(a: usize, b: usize) -> usize {
-    let m = usize::max_value();
-    if a == m || b == m {
-        m
-    } else {
-        a + b
-    }
-}
-
 // Cost function only counting ops in the domain
 // Penalizes ops not in the domain
 pub struct NumberOfDomainOps;
@@ -1416,6 +1437,23 @@ impl<L: SynthLanguage> egg::CostFunction<L> for NumberOfDomainOps {
         if enode.is_var() || enode.is_constant() {
             0
         } else if enode.is_in_domain() {
+            enode.fold(1, |sum, id| add_or_max(sum, costs(id)))
+        } else {
+            usize::max_value()
+        }
+    }
+}
+
+// Cost function for ast size in the domain
+// Penalizes ops not in the domain
+pub struct DomainAstSize;
+impl<L: SynthLanguage> egg::CostFunction<L> for DomainAstSize {
+    type Cost = usize;
+    fn cost<C>(&mut self, enode: &L, mut costs: C) -> Self::Cost
+    where
+        C: FnMut(Id) -> Self::Cost,
+    {
+        if enode.is_in_domain() {
             enode.fold(1, |sum, id| add_or_max(sum, costs(id)))
         } else {
             usize::max_value()
