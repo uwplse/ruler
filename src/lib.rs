@@ -216,6 +216,11 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         true
     }
 
+    /// Returns true if this node does not equal another by injectivity.
+    fn not_equal_injective(&self, _o: &Self) -> bool {
+        return false;
+    }
+
     /// Given a , `ctx`, i.e., mapping from variables to cvecs, evaluate a pattern, `pat`,
     /// on each element of the cvec.
     fn eval_pattern(
@@ -427,23 +432,31 @@ impl<L: SynthLanguage> Synthesizer<L> {
             true
         };
 
+        let mut rejected_injectivity = 0;
         for ids in by_cvec.values() {
             let mut ids = ids.iter().copied();
             while let Some(id1) = ids.next() {
                 for id2 in ids.clone() {
                     if compare(&self.egraph[id1].data.cvec, &self.egraph[id2].data.cvec) {
-                        let (_, e1) = extract.find_best(id1);
-                        let (_, e2) = extract.find_best(id2);
-                        if let Some(mut eq) = Equality::new(&e1, &e2) {
-                            log::debug!("  Candidate {}", eq);
-                            eq.ids = Some((id1, id2));
-                            new_eqs.insert(eq.name.clone(), eq);
+                        if (self.egraph[id1].nodes.len() == 1) &&
+                           (self.egraph[id2].nodes.len() == 1) &&
+                           (self.egraph[id1].nodes[0].not_equal_injective(&self.egraph[id2].nodes[0])) {
+                            rejected_injectivity += 1;
+                        } else {
+                            let (_, e1) = extract.find_best(id1);
+                            let (_, e2) = extract.find_best(id2);
+                            if let Some(mut eq) = Equality::new(&e1, &e2) {
+                                log::debug!("  Candidate {}", eq);
+                                eq.ids = Some((id1, id2));
+                                new_eqs.insert(eq.name.clone(), eq);
+                            }
                         }
                     }
                 }
             }
         }
 
+        log::info!("{} eqs rejected by injectivity", rejected_injectivity);
         new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
         new_eqs
     }
@@ -557,7 +570,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
 
                     max_id = usize::from(id);
-                    L::valid_constants(&self, &cp, &id, seen) 
+                    L::valid_constants(&self, &cp, &id, seen)
                 } else {
                     let id = cp.add(node.clone());
                     if usize::from(id) < max_id {

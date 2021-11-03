@@ -169,6 +169,7 @@ impl SynthLanguage for Math {
             cvec_len: consts[0].len(),
             foldable: !synth.params.no_constant_fold
         });
+
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
@@ -351,6 +352,25 @@ impl SynthLanguage for Math {
                     }
                 }
             })
+    }
+
+    fn not_equal_injective(&self, o: &Self) -> bool {
+        match (self, o) {
+            (Math::Add([a, b]), Math::Add([x, y])) => {
+                (a == x && b != y) || (a != x && b == y)
+            },
+            (Math::Sub([a, b]), Math::Sub([x, y])) => {
+                (a == x && b != y) || (a != x && b == y)
+            },
+            (Math::Mul([a, b]), Math::Mul([x, y])) => {
+                (a == x && b != y) || (a != x && b == y)
+            },
+            (Math::Div([a, b]), Math::Div([x, y])) => {
+                (a == x && b != y) || (a != x && b == y)
+            },
+            (Math::Neg(a), Math::Neg(b)) => (a != b),
+            (_, _) => false
+        }
     }
 
     /// Check the validity of a rewrite rule.
