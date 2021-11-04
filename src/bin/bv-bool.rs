@@ -180,6 +180,7 @@ impl SynthLanguage for Math {
 
                 to_add.push(Math::Band([i, j]));
                 to_add.push(Math::Bor([i, j]));
+                to_add.push(Math::Bxor([i, j]));
             }
 
             if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
@@ -237,6 +238,18 @@ impl SynthLanguage for Math {
                 let secj_id = second_bool_id(&synth.egraph, j);
                 let nfst_id = synth.egraph.add(Math::Or([fsti_id, fstj_id]));
                 let nsec_id = synth.egraph.add(Math::Or([seci_id, secj_id]));
+                let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
+                let (uid, _) = synth.egraph.union(op_id, mk_id);
+                uid
+            },
+            Math::Bxor([i, j]) => {
+                let op_id = synth.egraph.add(node);
+                let fsti_id = first_bool_id(&synth.egraph, i);
+                let seci_id = second_bool_id(&synth.egraph, i);
+                let fstj_id = first_bool_id(&synth.egraph, j);
+                let secj_id = second_bool_id(&synth.egraph, j);
+                let nfst_id = synth.egraph.add(Math::Xor([fsti_id, fstj_id]));
+                let nsec_id = synth.egraph.add(Math::Xor([seci_id, secj_id]));
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
                 let (uid, _) = synth.egraph.union(op_id, mk_id);
                 uid
