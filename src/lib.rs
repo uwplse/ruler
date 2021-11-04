@@ -43,6 +43,14 @@ pub fn letter(i: usize) -> &'static str {
     &alpha[i..i + 1]
 }
 
+/// Constant folding method
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ConstantFoldMethod {
+    NoFold,             // disables constant folding
+    CvecMatching,       // constant folding done by cvec matching
+    Lang,               // constant folding implemented by language
+}
+
 /// Properties of cvecs in `Ruler`; currently onyl their length.
 /// cvecs are stored as [eclass analysis data](https://docs.rs/egg/0.6.0/egg/trait.Analysis.html).
 #[derive(Debug, Clone)]
@@ -50,12 +58,15 @@ pub struct SynthAnalysis {
     /// Length of cvec or characteristic vector.
     /// All cvecs have the same length.    
     pub cvec_len: usize,
-    pub foldable: bool
+    pub constant_fold: ConstantFoldMethod,
 }
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { cvec_len: 10, foldable: true }
+        Self { 
+            cvec_len: 10,
+            constant_fold: ConstantFoldMethod::CvecMatching
+        }
     }
 }
 
@@ -268,6 +279,11 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         }
         
         Id::from(0 as usize)
+    }
+
+    /// Constant folding done explicitly by the language
+    fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {
+        // do nothing by default
     }
 
     /// Given a , `ctx`, i.e., mapping from variables to cvecs, evaluate a pattern, `pat`,
@@ -1152,7 +1168,7 @@ pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
     pub simplest: RecExpr<L>,
     pub exact: bool,
-    pub in_domain: bool
+    pub in_domain: bool,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -1245,16 +1261,22 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     }
 
     fn modify(egraph: &mut EGraph<L, Self>, id: Id) {
-        if egraph.analysis.foldable {
-            let sig = &egraph[id].data;
-            if sig.exact {
-                let first = sig.cvec.iter().find_map(|x| x.as_ref());
-                if let Some(first) = first {
-                    let enode = L::mk_constant(first.clone());
-                    let added = egraph.add(enode);
-                    egraph.union(id, added);
+        match egraph.analysis.constant_fold {
+            ConstantFoldMethod::CvecMatching => {
+                let sig = &egraph[id].data;
+                if sig.exact {
+                    let first = sig.cvec.iter().find_map(|x| x.as_ref());
+                    if let Some(first) = first {
+                        let enode = L::mk_constant(first.clone());
+                        let added = egraph.add(enode);
+                        egraph.union(id, added);
+                    }
                 }
-            }
+            },
+            ConstantFoldMethod::NoFold => {
+                L::constant_fold(egraph, id);
+            },
+            _ => (),
         }
     }
 }

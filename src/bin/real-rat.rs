@@ -130,10 +130,14 @@ impl SynthLanguage for Math {
             .collect();
 
 
-        let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: 0,
-            foldable: !synth.params.no_constant_fold
-        });
+            let mut egraph = EGraph::new(SynthAnalysis {
+                cvec_len: 0,
+                constant_fold: if synth.params.no_constant_fold {
+                    ConstantFoldMethod::NoFold
+                } else {
+                    ConstantFoldMethod::Lang
+                },
+            });
 
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));

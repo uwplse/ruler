@@ -130,7 +130,11 @@ impl SynthLanguage for Math {
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
-            foldable: !synth.params.no_constant_fold
+            constant_fold: if synth.params.no_constant_fold {
+                ConstantFoldMethod::NoFold
+            } else {
+                ConstantFoldMethod::Lang
+            },
         });
 
         for i in 0..synth.params.variables {
@@ -316,6 +320,11 @@ impl SynthLanguage for Math {
                 panic!("Not a complex node {:?}", node);
             }
         }
+    }
+
+    // Constant folding for complex numbers
+    fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {
+
     }
 }
 

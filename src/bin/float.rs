@@ -124,7 +124,11 @@ impl SynthLanguage for Math {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: params.n_samples
                 + (constants.len() + TRICKY_FLOATS.len()).pow(params.variables as u32),
-            foldable: !synth.params.no_constant_fold
+            constant_fold: if synth.params.no_constant_fold {
+                ConstantFoldMethod::NoFold
+            } else {
+                ConstantFoldMethod::CvecMatching
+            },
         });
 
         let rng = &mut synth.rng;

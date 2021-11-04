@@ -157,8 +157,13 @@ impl SynthLanguage for Math {
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: consts[0].len(),
-            foldable: !synth.params.no_constant_fold
+            constant_fold: if synth.params.no_constant_fold {
+                ConstantFoldMethod::NoFold
+            } else {
+                ConstantFoldMethod::CvecMatching
+            },
         });
+        
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
@@ -287,6 +292,7 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
 }
 
 /// Convert expressions to Z3's syntax for using SMT based rule verification.
+#[allow(unused_mut, mutable_borrow_reservation_conflict)]   // please remove if changing this
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],

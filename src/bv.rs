@@ -252,7 +252,11 @@ macro_rules! impl_bv {
 
                 let mut egraph = EGraph::new(SynthAnalysis {
                     cvec_len: consts[0].len(),
-                    foldable: !synth.params.no_constant_fold
+                    constant_fold: if synth.params.no_constant_fold {
+                        ConstantFoldMethod::NoFold
+                    } else {
+                        ConstantFoldMethod::CvecMatching
+                    },
                 });
 
                 // egraph.add(Math::Num(BV::ZERO));
