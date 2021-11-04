@@ -28,10 +28,11 @@ define_language! {
         "*C" = CMul([Id; 2]),
         "/C" = CDiv([Id; 2]),
         "conj" = Conj(Id),
+        Complex(egg::Symbol),
         Var(egg::Symbol),
 
         // conversions
-        "complex" = Complex([Id; 2]),
+        "complex" = Make([Id; 2]),
         "re" = Re(Id),
         "im" = Im(Id),
     }
@@ -56,7 +57,7 @@ fn re_id(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Id {
         .iter()
         .find_map(|x| {
             match x {
-                Math::Complex([i, _]) => Some(*i),
+                Math::Make([i, _]) => Some(*i),
                 _ => None
             }
         }).unwrap()
@@ -68,7 +69,7 @@ fn im_id(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Id {
         .iter()
         .find_map(|x| {
             match x {
-                Math::Complex([_, j]) => Some(*j),
+                Math::Make([_, j]) => Some(*j),
                 _ => None
             }
         }).unwrap()
@@ -121,26 +122,12 @@ impl SynthLanguage for Math {
             Math::CDiv([_, _]) => true,
             Math::Conj(_) => true,
             Math::Var(_) => true,
+            Math::Complex(_) => true,
             _ => false
         }
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        // disabled constants (TODO: validate input)
-        // let disabled_consts: Vec<&str> =
-        //     if let Some(s) = &synth.params.disabled_consts {
-        //         s.split(" ").collect()
-        //     } else {
-        //         vec![]
-        //     };
-
-        // // this is for adding to the egraph, not used for cvec.
-        // let constants: Vec<Rational> = ["1", "0", "-1"]
-        //     .iter()
-        //     .filter(|s| disabled_consts.iter().find(|x| x.eq(s)).is_none())
-        //     .map(|s| s.parse().unwrap())
-        //     .collect();
-
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
             foldable: !synth.params.no_constant_fold
@@ -151,18 +138,42 @@ impl SynthLanguage for Math {
             let var_id = egraph.add(Math::Var(var));
             let re_id = egraph.add(Math::Re(var_id));
             let im_id = egraph.add(Math::Im(var_id));
-            let cx_id = egraph.add(Math::Complex([re_id, im_id]));
+            let cx_id = egraph.add(Math::Make([re_id, im_id]));
             egraph.union(var_id, cx_id);
         }
 
-        // for c in constants {
-        //     let c_id = egraph.add(Math::Rat(c.clone()));
-        //     let lim_id = egraph.add(Math::Lim(c_id));
-        //     let seq_id = egraph.add(Math::Seq(lim_id));
-        //     let re_id = egraph.add(Math::Real(c.clone()));
-        //     egraph.union(seq_id, c_id);
-        //     egraph.union(lim_id, re_id);
-        // }
+        // rational constants
+        let zero: Rational = "0".parse().unwrap();
+        let one: Rational = "1".parse().unwrap();
+        let re_zero = egraph.add(Math::Real(zero));
+        let re_one = egraph.add(Math::Real(one));
+
+        // zero constant
+        let cx_zero = egraph.add(Math::Complex(Symbol::from("0")));
+        let zero_mk = egraph.add(Math::Make([re_zero, re_zero]));
+        let zero_mk_re = egraph.add(Math::Re(cx_zero));
+        let zero_mk_im = egraph.add(Math::Im(cx_zero));
+        egraph.union(cx_zero, zero_mk);
+        egraph.union(zero_mk_re, re_zero);
+        egraph.union(zero_mk_im, re_zero);
+
+        // one constant
+        let cx_one = egraph.add(Math::Complex(Symbol::from("1")));
+        let one_mk = egraph.add(Math::Make([re_one, re_zero]));
+        let one_mk_re = egraph.add(Math::Re(cx_one));
+        let one_mk_im = egraph.add(Math::Im(cx_one));
+        egraph.union(cx_one, one_mk);
+        egraph.union(one_mk_re, re_one);
+        egraph.union(one_mk_im, re_zero);
+
+        // i constant
+        let cx_i = egraph.add(Math::Complex(Symbol::from("i")));
+        let i_mk = egraph.add(Math::Make([re_zero, re_one]));
+        let i_mk_re = egraph.add(Math::Re(cx_i));
+        let i_mk_im = egraph.add(Math::Im(cx_i));
+        egraph.union(cx_i, i_mk);
+        egraph.union(i_mk_re, re_zero);
+        egraph.union(i_mk_im, re_one);
 
         synth.egraph = egraph;
         synth.lifting = true;
@@ -234,7 +245,7 @@ impl SynthLanguage for Math {
                 let imi_id = im_id(&synth.egraph, &i);
                 let nre_id = synth.egraph.add(Math::RNeg(rei_id));
                 let nim_id = synth.egraph.add(Math::RNeg(imi_id));
-                let cx_id = synth.egraph.add(Math::Complex([nre_id, nim_id]));
+                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
                 let (uid, _) = synth.egraph.union(op_id, cx_id);
                 uid
             },
@@ -243,7 +254,7 @@ impl SynthLanguage for Math {
                 let rei_id = re_id(&synth.egraph, &i);
                 let imi_id = im_id(&synth.egraph, &i);
                 let nim_id = synth.egraph.add(Math::RNeg(imi_id));
-                let cx_id = synth.egraph.add(Math::Complex([rei_id, nim_id]));
+                let cx_id = synth.egraph.add(Math::Make([rei_id, nim_id]));
                 let (uid, _) = synth.egraph.union(op_id, cx_id);
                 uid
             },
@@ -255,7 +266,7 @@ impl SynthLanguage for Math {
                 let imj_id = im_id(&synth.egraph, &j);
                 let nre_id = synth.egraph.add(Math::RAdd([rei_id, rej_id]));
                 let nim_id = synth.egraph.add(Math::RAdd([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Complex([nre_id, nim_id]));
+                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
                 let (uid, _) = synth.egraph.union(op_id, cx_id);
                 uid
             },
@@ -267,7 +278,7 @@ impl SynthLanguage for Math {
                 let imj_id = im_id(&synth.egraph, &j);
                 let nre_id = synth.egraph.add(Math::RSub([rei_id, rej_id]));
                 let nim_id = synth.egraph.add(Math::RSub([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Complex([nre_id, nim_id]));
+                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
                 let (uid, _) = synth.egraph.union(op_id, cx_id);
                 uid
             },
@@ -279,7 +290,7 @@ impl SynthLanguage for Math {
                 let imj_id = im_id(&synth.egraph, &j);
                 let nre_id = synth.egraph.add(Math::RMul([rei_id, rej_id]));
                 let nim_id = synth.egraph.add(Math::RMul([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Complex([nre_id, nim_id]));
+                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
                 let (uid, _) = synth.egraph.union(op_id, cx_id);
                 uid
             },
@@ -291,11 +302,14 @@ impl SynthLanguage for Math {
                 let imj_id = im_id(&synth.egraph, &j);
                 let nre_id = synth.egraph.add(Math::RDiv([rei_id, rej_id]));
                 let nim_id = synth.egraph.add(Math::RDiv([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Complex([nre_id, nim_id]));
+                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
                 let (uid, _) = synth.egraph.union(op_id, cx_id);
                 uid
             },
             Math::Var(_) => {
+                synth.egraph.add(node)
+            }
+            Math::Complex(_) => {
                 synth.egraph.add(node)
             }
             _ => {
