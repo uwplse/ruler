@@ -888,10 +888,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
                 log::info!("Time taken in... run_rewrites: {}", run_rewrites);
 
-                for (_, eq) in &new_eqs {
-                    log::info!("{}", eq);
-                }
-
                 let rule_minimize_before = Instant::now();
                 let (eqs, _) = self.choose_eqs(new_eqs, false);
                 let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
@@ -1273,7 +1269,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                     }
                 }
             },
-            ConstantFoldMethod::NoFold => {
+            ConstantFoldMethod::Lang => {
                 L::constant_fold(egraph, id);
             },
             _ => (),

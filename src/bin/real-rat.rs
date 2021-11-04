@@ -51,15 +51,16 @@ fn add_domain_expr_rec(
 }
 
 // returns the sequence associated with the eclass
-fn sequence_id(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Id {
+fn sequence_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<Id> {
     egraph[*id].nodes
         .iter()
-        .find_map(|x| {
+        .filter_map(|x| {
             match x {
                 Math::Lim(i) => Some(*i),
-                _ => None
+                _ => None,
             }
-        }).unwrap()
+        })
+        .collect()
 }
 
 impl SynthLanguage for Math {
@@ -85,7 +86,6 @@ impl SynthLanguage for Math {
         Math::Var(sym)
     }
 
-    // TODO: implement constants
     fn to_constant(&self) -> Option<&Self::Constant> {
         if let Math::Rat(n) = self {
             Some(n)
@@ -94,9 +94,16 @@ impl SynthLanguage for Math {
         }
     }
 
-    // TODO: implement constants
     fn mk_constant(c: Self::Constant) -> Self {
         Math::Rat(c)
+    }
+
+    // override default behavior
+    fn is_constant(&self) -> bool {
+        match self {
+            Math::Real(_) => true,
+            _ => false,
+        }
     }
 
     // override default behavior
@@ -220,48 +227,62 @@ impl SynthLanguage for Math {
     fn add_domain_node(synth: &mut Synthesizer<Self>, node: Self) -> Id {
         match node {
             Math::RNeg(i) => {
-                let op_id = synth.egraph.add(node);
-                let seqi_id = sequence_id(&synth.egraph, &i);
-                let neg_id = synth.egraph.add(Math::Neg(seqi_id));
-                let lim_id = synth.egraph.add(Math::Lim(neg_id));
-                let (uid, _) = synth.egraph.union(op_id, lim_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                for seq_id in sequence_ids(&synth.egraph, &i) {
+                    let neg_id = synth.egraph.add(Math::Neg(seq_id));
+                    let lim_id = synth.egraph.add(Math::Lim(neg_id));
+                    let (uid, _) = synth.egraph.union(op_id, lim_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::RAdd([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let seqi_id = sequence_id(&synth.egraph, &i);
-                let seqj_id = sequence_id(&synth.egraph, &j);
-                let neg_id = synth.egraph.add(Math::Add([seqi_id, seqj_id]));
-                let lim_id = synth.egraph.add(Math::Lim(neg_id));
-                let (uid, _) = synth.egraph.union(op_id, lim_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                let seqi_ids = sequence_ids(&synth.egraph, &i);
+                let seqj_ids = sequence_ids(&synth.egraph, &j);
+                for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
+                    let add_id = synth.egraph.add(Math::Add([seqi_id, seqj_id]));
+                    let lim_id = synth.egraph.add(Math::Lim(add_id));
+                    let (uid, _) = synth.egraph.union(op_id, lim_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::RSub([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let seqi_id = sequence_id(&synth.egraph, &i);
-                let seqj_id = sequence_id(&synth.egraph, &j);
-                let neg_id = synth.egraph.add(Math::Sub([seqi_id, seqj_id]));
-                let lim_id = synth.egraph.add(Math::Lim(neg_id));
-                let (uid, _) = synth.egraph.union(op_id, lim_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                let seqi_ids = sequence_ids(&synth.egraph, &i);
+                let seqj_ids = sequence_ids(&synth.egraph, &j);
+                for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
+                    let sub_id = synth.egraph.add(Math::Sub([seqi_id, seqj_id]));
+                    let lim_id = synth.egraph.add(Math::Lim(sub_id));
+                    let (uid, _) = synth.egraph.union(op_id, lim_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::RMul([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let seqi_id = sequence_id(&synth.egraph, &i);
-                let seqj_id = sequence_id(&synth.egraph, &j);
-                let neg_id = synth.egraph.add(Math::Mul([seqi_id, seqj_id]));
-                let lim_id = synth.egraph.add(Math::Lim(neg_id));
-                let (uid, _) = synth.egraph.union(op_id, lim_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                let seqi_ids = sequence_ids(&synth.egraph, &i);
+                let seqj_ids = sequence_ids(&synth.egraph, &j);
+                for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
+                    let mul_id = synth.egraph.add(Math::Mul([seqi_id, seqj_id]));
+                    let lim_id = synth.egraph.add(Math::Lim(mul_id));
+                    let (uid, _) = synth.egraph.union(op_id, lim_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::RDiv([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let seqi_id = sequence_id(&synth.egraph, &i);
-                let seqj_id = sequence_id(&synth.egraph, &j);
-                let neg_id = synth.egraph.add(Math::Div([seqi_id, seqj_id]));
-                let lim_id = synth.egraph.add(Math::Lim(neg_id));
-                let (uid, _) = synth.egraph.union(op_id, lim_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                let seqi_ids = sequence_ids(&synth.egraph, &i);
+                let seqj_ids = sequence_ids(&synth.egraph, &j);
+                for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
+                    let div_id = synth.egraph.add(Math::Div([seqi_id, seqj_id]));
+                    let lim_id = synth.egraph.add(Math::Lim(div_id));
+                    let (uid, _) = synth.egraph.union(op_id, lim_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::Var(_) => {
                 synth.egraph.add(node)

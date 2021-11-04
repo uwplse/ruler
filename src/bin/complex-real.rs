@@ -76,7 +76,7 @@ fn im_id(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Id {
 }
 
 impl SynthLanguage for Math {
-    type Constant = Rational;  // not used
+    type Constant = egg::Symbol;  // not used
 
     // no evaluation needed
     fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
@@ -98,18 +98,24 @@ impl SynthLanguage for Math {
         Math::Var(sym)
     }
 
-    // TODO: implement constants
     fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::Real(n) = self {
+        if let Math::Complex(n) = self {
             Some(n)
         } else {
             None
         }
     }
 
-    // TODO: implement constants
     fn mk_constant(c: Self::Constant) -> Self {
-        Math::Real(c)
+        Math::Complex(c)
+    }
+
+    // override default behavior
+    fn is_constant(&self) -> bool {
+        match self {
+            Math::Complex(_) => true,
+            _ => false,
+        }
     }
 
     // override default behavior
@@ -214,15 +220,15 @@ impl SynthLanguage for Math {
                 to_add.push(Math::CAdd([i, j]));
                 to_add.push(Math::CSub([i, j]));
                 to_add.push(Math::CMul([i, j]));
-                to_add.push(Math::CDiv([i, j]));
+                // to_add.push(Math::CDiv([i, j]));
             }
 
             if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
                 continue;
             }
             
-            to_add.push(Math::CNeg(i));
             to_add.push(Math::Conj(i));
+            to_add.push(Math::CNeg(i));
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -288,32 +294,37 @@ impl SynthLanguage for Math {
             },
             Math::CMul([i, j]) => {
                 let op_id = synth.egraph.add(node);
-                let rei_id = re_id(&synth.egraph, &i);
-                let imi_id = im_id(&synth.egraph, &i);
-                let rej_id = re_id(&synth.egraph, &j);
-                let imj_id = im_id(&synth.egraph, &j);
-                let nre_id = synth.egraph.add(Math::RMul([rei_id, rej_id]));
-                let nim_id = synth.egraph.add(Math::RMul([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
+                let rei_id = re_id(&synth.egraph, &i);  // (Re i)
+                let imi_id = im_id(&synth.egraph, &i);  // (Im i)
+                let rej_id = re_id(&synth.egraph, &j);  // (Re j)
+                let imj_id = im_id(&synth.egraph, &j);  // (Im j)
+                let mrirj_id = synth.egraph.add(Math::RMul([rei_id, rej_id]));      // (* (Re i) (Re j))
+                let miiij_id = synth.egraph.add(Math::RMul([imi_id, imj_id]));      // (* (Im i) (Im j))
+                let mriij_id = synth.egraph.add(Math::RMul([rei_id, imj_id]));      // (* (Re i) (Im j))
+                let miirj_id = synth.egraph.add(Math::RMul([imi_id, rej_id]));      // (* (Im i) (Re j))
+                let sre_id = synth.egraph.add(Math::RSub([mrirj_id, miiij_id]));
+                let aim_id = synth.egraph.add(Math::RAdd([mriij_id, miirj_id]));
+                let cx_id = synth.egraph.add(Math::Make([sre_id, aim_id]));
                 let (uid, _) = synth.egraph.union(op_id, cx_id);
                 uid
             },
-            Math::CDiv([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let rei_id = re_id(&synth.egraph, &i);
-                let imi_id = im_id(&synth.egraph, &i);
-                let rej_id = re_id(&synth.egraph, &j);
-                let imj_id = im_id(&synth.egraph, &j);
-                let nre_id = synth.egraph.add(Math::RDiv([rei_id, rej_id]));
-                let nim_id = synth.egraph.add(Math::RDiv([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
-                let (uid, _) = synth.egraph.union(op_id, cx_id);
-                uid
-            },
+            // Math::CDiv([i, j]) => {
+            //     let op_id = synth.egraph.add(node);
+            //     let rei_id = re_id(&synth.egraph, &i);
+            //     let imi_id = im_id(&synth.egraph, &i);
+            //     let rej_id = re_id(&synth.egraph, &j);
+            //     let imj_id = im_id(&synth.egraph, &j);
+            //     let nre_id = synth.egraph.add(Math::RDiv([rei_id, rej_id]));
+            //     let nim_id = synth.egraph.add(Math::RDiv([imi_id, imj_id]));
+            //     let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
+            //     let (uid, _) = synth.egraph.union(op_id, cx_id);
+            //     uid
+            // },
             Math::Var(_) => {
                 synth.egraph.add(node)
             }
             Math::Complex(_) => {
+                log::info!("complex constant");
                 synth.egraph.add(node)
             }
             _ => {
