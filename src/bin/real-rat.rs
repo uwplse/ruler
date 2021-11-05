@@ -3,7 +3,8 @@
 !*/
 
 use num::bigint::{BigInt};
-use num::{rational::Ratio};
+use num::{rational::Ratio, Zero};
+use std::ops::*;
 
 use egg::*;
 use ruler::*;
@@ -29,7 +30,7 @@ define_language! {
         "*R" = RMul([Id; 2]),
         "/R" = RDiv([Id; 2]),
         Var(egg::Symbol),
-        Real(Rational),     // TODO: this is dumb
+        Real(Symbol),           // TODO: this is dumb
 
         // conversions
         "lim" = Lim(Id),
@@ -101,7 +102,7 @@ impl SynthLanguage for Math {
     // override default behavior
     fn is_constant(&self) -> bool {
         match self {
-            Math::Real(_) => true,
+            Math::Rat(_) => true,
             _ => false,
         }
     }
@@ -130,10 +131,10 @@ impl SynthLanguage for Math {
             };
 
         // this is for adding to the egraph, not used for cvec.
-        let constants: Vec<Rational> = ["1", "0", "-1"]
+        let constants: Vec<(Rational, &str)> = ["1", "0", "-1"]
             .iter()
             .filter(|s| disabled_consts.iter().find(|x| x.eq(s)).is_none())
-            .map(|s| s.parse().unwrap())
+            .map(|s| (s.parse().unwrap(), *s))
             .collect();
 
 
@@ -154,11 +155,11 @@ impl SynthLanguage for Math {
             egraph.union(var_id, lim_id);
         }
 
-        for c in constants {
+        for (c, s) in constants {
             let c_id = egraph.add(Math::Rat(c.clone()));
             let lim_id = egraph.add(Math::Lim(c_id));
             let seq_id = egraph.add(Math::Seq(lim_id));
-            let re_id = egraph.add(Math::Real(c.clone()));
+            let re_id = egraph.add(Math::Real(Symbol::from(s)));
             egraph.union(seq_id, c_id);
             egraph.union(lim_id, re_id);
         }
@@ -290,6 +291,124 @@ impl SynthLanguage for Math {
             _ => {
                 panic!("Not a real node {:?}", node);
             }
+        }
+    }
+
+    // custom constant folder
+    fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        let mut to_add = vec![];
+        if !egraph[id].data.in_domain { // lower domain
+            if !egraph[id].nodes.iter().any(|x| x.is_constant()) {  // cannot already have a constant
+                for x in &egraph[id].nodes {
+                    match x {
+                        Math::Neg(i) => {
+                            for n in &egraph[*i].nodes {
+                                match n {
+                                    Math::Rat(v) => {
+                                        let r = v.neg();
+                                        let s = r.to_string();
+                                        to_add.push((Math::Rat(r), s));
+                                        break;
+                                    },
+                                    _ => (),
+                                }
+                            }
+                        },
+                        Math::Add([i, j]) => {
+                            for n in &egraph[*i].nodes {
+                                match n {
+                                    Math::Rat(v) => {
+                                        for n in &egraph[*j].nodes {
+                                            match n {
+                                                Math::Rat(w) => {
+                                                    let r = v + w;
+                                                    let s = r.to_string();
+                                                    to_add.push((Math::Rat(r), s));
+                                                    break;
+                                                },
+                                                _ => (),
+                                            }
+                                        }
+                                    },
+                                    _ => (),
+                                }
+                            }
+                        },
+                        Math::Sub([i, j]) => {
+                            for n in &egraph[*i].nodes {
+                                match n {
+                                    Math::Rat(v) => {
+                                        for n in &egraph[*j].nodes {
+                                            match n {
+                                                Math::Rat(w) => {
+                                                    let r = v - w;
+                                                    let s = r.to_string();
+                                                    to_add.push((Math::Rat(r), s));
+                                                    break;
+                                                },
+                                                _ => (),
+                                            }
+                                        }
+                                    },
+                                    _ => (),
+                                }
+                            }
+                        }
+                        Math::Mul([i, j]) => {
+                            for n in &egraph[*i].nodes {
+                                match n {
+                                    Math::Rat(v) => {
+                                        for n in &egraph[*j].nodes {
+                                            match n {
+                                                Math::Rat(w) => {
+                                                    let r = v * w;
+                                                    let s = r.to_string();
+                                                    to_add.push((Math::Rat(r), s));
+                                                },
+                                                _ => (),
+                                            }
+                                        }
+                                    },
+                                    _ => (),
+                                }
+                            }
+                        },
+                        Math::Div([i, j]) => {
+                            for n in &egraph[*i].nodes {
+                                match n {
+                                    Math::Rat(v) => {
+                                        for n in &egraph[*j].nodes {
+                                            match n {
+                                                Math::Rat(w) => {
+                                                    if !w.is_zero() {
+                                                        let r = v / w;
+                                                        let s = r.to_string();
+                                                        to_add.push((Math::Rat(r), s));
+                                                        break;
+                                                    }
+                                                },
+                                                _ => (),
+                                            }
+                                        }
+                                    },
+                                    _ => (),
+                                }
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+
+        for (n, s) in to_add {
+            let c_id = egraph.add(n);
+            let lim_id = egraph.add(Math::Lim(c_id));
+            let seq_id = egraph.add(Math::Seq(id));
+            let s_id = egraph.add(Math::Real(Symbol::from(s)));
+            egraph.union(c_id, seq_id);
+            egraph.union(id, lim_id);
+            egraph.union(id, s_id);
         }
     }
 }

@@ -51,28 +51,18 @@ fn add_domain_expr_rec(
     Math::add_domain_node(synth, e)
 }
 
-// returns the id of the real component associated with the eclass
-fn re_id(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Id {
+// returns a vector of (id, id) corresponding to the real and
+// imaginary components of numbers associated with the eclass
+fn component_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<(Id, Id)> {
     egraph[*id].nodes
         .iter()
-        .find_map(|x| {
+        .filter_map(|x| {
             match x {
-                Math::Make([i, _]) => Some(*i),
-                _ => None
+                Math::Make([i, j]) => Some((*i, *j)),
+                _ => None,
             }
-        }).unwrap()
-}
-
-// returns the id of the imaginary component associated with the eclass
-fn im_id(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Id {
-    egraph[*id].nodes
-        .iter()
-        .find_map(|x| {
-            match x {
-                Math::Make([_, j]) => Some(*j),
-                _ => None
-            }
-        }).unwrap()
+        })
+        .collect()
 }
 
 impl SynthLanguage for Math {
@@ -219,7 +209,7 @@ impl SynthLanguage for Math {
 
                 to_add.push(Math::CAdd([i, j]));
                 to_add.push(Math::CSub([i, j]));
-                to_add.push(Math::CMul([i, j]));
+                // to_add.push(Math::CMul([i, j]));
                 // to_add.push(Math::CDiv([i, j]));
             }
 
@@ -250,64 +240,85 @@ impl SynthLanguage for Math {
     fn add_domain_node(synth: &mut Synthesizer<Self>, node: Self) -> Id {
         match node {
             Math::CNeg(i) => {
-                let op_id = synth.egraph.add(node);
-                let rei_id = re_id(&synth.egraph, &i);
-                let imi_id = im_id(&synth.egraph, &i);
-                let nre_id = synth.egraph.add(Math::RNeg(rei_id));
-                let nim_id = synth.egraph.add(Math::RNeg(imi_id));
-                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
-                let (uid, _) = synth.egraph.union(op_id, cx_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                for (rei_id, imi_id) in component_ids(&synth.egraph, &i) {
+                    let re_id = synth.egraph.add(Math::RNeg(rei_id));
+                    let im_id = synth.egraph.add(Math::RNeg(imi_id));
+                    let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+                    let (uid, _) = synth.egraph.union(op_id, cx_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::Conj(i) => {
-                let op_id = synth.egraph.add(node);
-                let rei_id = re_id(&synth.egraph, &i);
-                let imi_id = im_id(&synth.egraph, &i);
-                let nim_id = synth.egraph.add(Math::RNeg(imi_id));
-                let cx_id = synth.egraph.add(Math::Make([rei_id, nim_id]));
-                let (uid, _) = synth.egraph.union(op_id, cx_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                for (rei_id, imi_id) in component_ids(&synth.egraph, &i) {
+                    let im_id = synth.egraph.add(Math::RNeg(imi_id));
+                    let cx_id = synth.egraph.add(Math::Make([rei_id, im_id]));
+                    let (uid, _) = synth.egraph.union(op_id, cx_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::CAdd([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let rei_id = re_id(&synth.egraph, &i);
-                let imi_id = im_id(&synth.egraph, &i);
-                let rej_id = re_id(&synth.egraph, &j);
-                let imj_id = im_id(&synth.egraph, &j);
-                let nre_id = synth.egraph.add(Math::RAdd([rei_id, rej_id]));
-                let nim_id = synth.egraph.add(Math::RAdd([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
-                let (uid, _) = synth.egraph.union(op_id, cx_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                let compi_ids = component_ids(&synth.egraph, &i);
+                let compj_ids = component_ids(&synth.egraph, &j);
+                for (&(rei_id, imi_id), &(rej_id, imj_id)) in compi_ids.iter().zip(compj_ids.iter()) {
+                    let re_id = synth.egraph.add(Math::RAdd([rei_id, rej_id]));
+                    let im_id = synth.egraph.add(Math::RAdd([imi_id, imj_id]));
+                    let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+                    let (uid, _) = synth.egraph.union(op_id, cx_id);
+                    op_id = uid;
+                }
+                op_id
             },
             Math::CSub([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let rei_id = re_id(&synth.egraph, &i);
-                let imi_id = im_id(&synth.egraph, &i);
-                let rej_id = re_id(&synth.egraph, &j);
-                let imj_id = im_id(&synth.egraph, &j);
-                let nre_id = synth.egraph.add(Math::RSub([rei_id, rej_id]));
-                let nim_id = synth.egraph.add(Math::RSub([imi_id, imj_id]));
-                let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
-                let (uid, _) = synth.egraph.union(op_id, cx_id);
-                uid
+                let mut op_id = synth.egraph.add(node);
+                let compi_ids = component_ids(&synth.egraph, &i);
+                let compj_ids = component_ids(&synth.egraph, &j);
+                for (&(rei_id, imi_id), &(rej_id, imj_id)) in compi_ids.iter().zip(compj_ids.iter()) {
+                    let re_id = synth.egraph.add(Math::RSub([rei_id, rej_id]));
+                    let im_id = synth.egraph.add(Math::RSub([imi_id, imj_id]));
+                    let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+                    let (uid, _) = synth.egraph.union(op_id, cx_id);
+                    op_id = uid;
+                }
+                op_id
             },
-            Math::CMul([i, j]) => {
-                let op_id = synth.egraph.add(node);
-                let rei_id = re_id(&synth.egraph, &i);  // (Re i)
-                let imi_id = im_id(&synth.egraph, &i);  // (Im i)
-                let rej_id = re_id(&synth.egraph, &j);  // (Re j)
-                let imj_id = im_id(&synth.egraph, &j);  // (Im j)
-                let mrirj_id = synth.egraph.add(Math::RMul([rei_id, rej_id]));      // (* (Re i) (Re j))
-                let miiij_id = synth.egraph.add(Math::RMul([imi_id, imj_id]));      // (* (Im i) (Im j))
-                let mriij_id = synth.egraph.add(Math::RMul([rei_id, imj_id]));      // (* (Re i) (Im j))
-                let miirj_id = synth.egraph.add(Math::RMul([imi_id, rej_id]));      // (* (Im i) (Re j))
-                let sre_id = synth.egraph.add(Math::RSub([mrirj_id, miiij_id]));
-                let aim_id = synth.egraph.add(Math::RAdd([mriij_id, miirj_id]));
-                let cx_id = synth.egraph.add(Math::Make([sre_id, aim_id]));
-                let (uid, _) = synth.egraph.union(op_id, cx_id);
-                uid
-            },
+            // Math::CMul([i, j]) => {
+            //     let mut op_id = synth.egraph.add(node);
+            //     let compi_ids = component_ids(&synth.egraph, &i);
+            //     let compj_ids = component_ids(&synth.egraph, &j);
+            //     for (&(rei_id, imi_id), &(rej_id, imj_id)) in compi_ids.iter().zip(compj_ids.iter()) {
+            //         let mult_rei_rej_id = synth.egraph.add(Math::RMul([rei_id, rej_id]));
+            //         let mult_rei_imj_id = synth.egraph.add(Math::RMul([rei_id, imj_id]));
+            //         let mult_imi_rej_id = synth.egraph.add(Math::RMul([imi_id, rej_id]));
+            //         let mult_imi_imj_id = synth.egraph.add(Math::RMul([imi_id, imj_id]));
+            //         let re_id = synth.egraph.add(Math::RSub([mult_rei_rej_id, mult_imi_imj_id]));
+            //         let im_id = synth.egraph.add(Math::RAdd([mult_rei_imj_id, mult_imi_rej_id]));
+            //         let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+            //         let (uid, _) = synth.egraph.union(op_id, cx_id);
+            //         op_id = uid;
+            //     }
+            //     op_id
+            // },
+            // Math::CMul([i, j]) => {
+            //     // let op_id = synth.egraph.add(node);
+            //     // let rei_id = re_id(&synth.egraph, &i);  // (Re i)
+            //     // let imi_id = im_id(&synth.egraph, &i);  // (Im i)
+            //     // let rej_id = re_id(&synth.egraph, &j);  // (Re j)
+            //     // let imj_id = im_id(&synth.egraph, &j);  // (Im j)
+            //     // let mrirj_id = synth.egraph.add(Math::RMul([rei_id, rej_id]));      // (* (Re i) (Re j))
+            //     // let miiij_id = synth.egraph.add(Math::RMul([imi_id, imj_id]));      // (* (Im i) (Im j))
+            //     // let mriij_id = synth.egraph.add(Math::RMul([rei_id, imj_id]));      // (* (Re i) (Im j))
+            //     // let miirj_id = synth.egraph.add(Math::RMul([imi_id, rej_id]));      // (* (Im i) (Re j))
+            //     // let sre_id = synth.egraph.add(Math::RSub([mrirj_id, miiij_id]));
+            //     // let aim_id = synth.egraph.add(Math::RAdd([mriij_id, miirj_id]));
+            //     // let cx_id = synth.egraph.add(Math::Make([sre_id, aim_id]));
+            //     // let (uid, _) = synth.egraph.union(op_id, cx_id);
+            //     // uid
+            // },
             // Math::CDiv([i, j]) => {
             //     let op_id = synth.egraph.add(node);
             //     let rei_id = re_id(&synth.egraph, &i);
