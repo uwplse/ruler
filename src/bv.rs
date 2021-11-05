@@ -257,6 +257,7 @@ macro_rules! impl_bv {
                     } else {
                         ConstantFoldMethod::CvecMatching
                     },
+                    rule_lifting: false,
                 });
 
                 // egraph.add(Math::Num(BV::ZERO));

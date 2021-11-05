@@ -139,6 +139,7 @@ impl SynthLanguage for Math {
             } else {
                 ConstantFoldMethod::Lang
             },
+            rule_lifting: true,
         });
 
         for i in 0..synth.params.variables {
@@ -151,7 +152,6 @@ impl SynthLanguage for Math {
         }
 
         synth.egraph = egraph;
-        synth.lifting = true;
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {

@@ -129,6 +129,7 @@ impl SynthLanguage for Math {
             } else {
                 ConstantFoldMethod::CvecMatching
             },
+            rule_lifting: false,
         });
 
         let rng = &mut synth.rng;

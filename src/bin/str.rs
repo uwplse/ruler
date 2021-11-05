@@ -241,6 +241,7 @@ impl SynthLanguage for Lang {
             } else {
                 ConstantFoldMethod::CvecMatching
             },
+            rule_lifting: false,
         });
 
         egraph.add(Lang::Lit(Constant::Num(-1)));

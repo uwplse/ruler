@@ -30,7 +30,7 @@ define_language! {
         "*R" = RMul([Id; 2]),
         "/R" = RDiv([Id; 2]),
         Var(egg::Symbol),
-        Real(Symbol),           // TODO: this is dumb
+        Real(egg::Symbol),           // TODO: this is dumb
 
         // conversions
         "lim" = Lim(Id),
@@ -38,6 +38,41 @@ define_language! {
     }
 }
 
+macro_rules! constant_fold {
+    ($i:ident, $egraph:ident, $to_add:ident, $op:tt) => {     // unary
+        for n in &$egraph[*$i].nodes {
+            match n {
+                Math::Rat(v) => {
+                    let r = $op v;
+                    let s = r.to_string();
+                    $to_add.push((Math::Rat(r), s));
+                    break;
+                },
+                _ => (),
+            }
+        }
+    };
+    ($i:ident, $j:ident, $egraph:ident, $to_add:ident, $op:tt) => {     // binary
+        for n in &$egraph[*$i].nodes {
+            match n {
+                Math::Rat(v) => {
+                    for n in &$egraph[*$j].nodes {
+                        match n {
+                            Math::Rat(w) => {
+                                let r = v $op w;
+                                let s = r.to_string();
+                                $to_add.push((Math::Rat(r), s));
+                                break;
+                            },
+                            _ => (),
+                        }
+                    }
+                },
+                _ => (),
+            }
+        }
+    };
+}
 
 // transcription of `egraph::add_expr_rec`
 fn add_domain_expr_rec(
@@ -145,6 +180,7 @@ impl SynthLanguage for Math {
                 } else {
                     ConstantFoldMethod::Lang
                 },
+                rule_lifting: true,
             });
 
         for i in 0..synth.params.variables {
@@ -165,7 +201,6 @@ impl SynthLanguage for Math {
         }
 
         synth.egraph = egraph;
-        synth.lifting = true;
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
@@ -288,6 +323,9 @@ impl SynthLanguage for Math {
             Math::Var(_) => {
                 synth.egraph.add(node)
             }
+            Math::Real(_) => {
+                synth.egraph.add(node)
+            }
             _ => {
                 panic!("Not a real node {:?}", node);
             }
@@ -301,79 +339,11 @@ impl SynthLanguage for Math {
             if !egraph[id].nodes.iter().any(|x| x.is_constant()) {  // cannot already have a constant
                 for x in &egraph[id].nodes {
                     match x {
-                        Math::Neg(i) => {
-                            for n in &egraph[*i].nodes {
-                                match n {
-                                    Math::Rat(v) => {
-                                        let r = v.neg();
-                                        let s = r.to_string();
-                                        to_add.push((Math::Rat(r), s));
-                                        break;
-                                    },
-                                    _ => (),
-                                }
-                            }
-                        },
-                        Math::Add([i, j]) => {
-                            for n in &egraph[*i].nodes {
-                                match n {
-                                    Math::Rat(v) => {
-                                        for n in &egraph[*j].nodes {
-                                            match n {
-                                                Math::Rat(w) => {
-                                                    let r = v + w;
-                                                    let s = r.to_string();
-                                                    to_add.push((Math::Rat(r), s));
-                                                    break;
-                                                },
-                                                _ => (),
-                                            }
-                                        }
-                                    },
-                                    _ => (),
-                                }
-                            }
-                        },
-                        Math::Sub([i, j]) => {
-                            for n in &egraph[*i].nodes {
-                                match n {
-                                    Math::Rat(v) => {
-                                        for n in &egraph[*j].nodes {
-                                            match n {
-                                                Math::Rat(w) => {
-                                                    let r = v - w;
-                                                    let s = r.to_string();
-                                                    to_add.push((Math::Rat(r), s));
-                                                    break;
-                                                },
-                                                _ => (),
-                                            }
-                                        }
-                                    },
-                                    _ => (),
-                                }
-                            }
-                        }
-                        Math::Mul([i, j]) => {
-                            for n in &egraph[*i].nodes {
-                                match n {
-                                    Math::Rat(v) => {
-                                        for n in &egraph[*j].nodes {
-                                            match n {
-                                                Math::Rat(w) => {
-                                                    let r = v * w;
-                                                    let s = r.to_string();
-                                                    to_add.push((Math::Rat(r), s));
-                                                },
-                                                _ => (),
-                                            }
-                                        }
-                                    },
-                                    _ => (),
-                                }
-                            }
-                        },
-                        Math::Div([i, j]) => {
+                        Math::Neg(i) => constant_fold!(i, egraph, to_add, -),
+                        Math::Add([i, j]) => constant_fold!(i, j, egraph, to_add, +),
+                        Math::Sub([i, j]) => constant_fold!(i, j, egraph, to_add, -),
+                        Math::Mul([i, j]) => constant_fold!(i, j, egraph, to_add, *),
+                        Math::Div([i, j]) => {  // explicit because of zero check
                             for n in &egraph[*i].nodes {
                                 match n {
                                     Math::Rat(v) => {
@@ -402,13 +372,36 @@ impl SynthLanguage for Math {
         }
 
         for (n, s) in to_add {
+            let mut to_update = vec![];
+            for id in egraph.classes().map(|c| c.id) {
+                for n in &egraph[id].nodes {
+                    match n {
+                        Math::Lim(i) => {
+                            if *i == id {
+                                to_update.push(*i);
+                            }
+                        },
+                        _ => (),
+                    }
+                }
+            }
+
+            // C = lim c
+            // c = id = seq C
             let c_id = egraph.add(n);
+            let r_id = egraph.add(Math::Real(Symbol::from(s)));
+            let seq_id = egraph.add(Math::Seq(r_id));
             let lim_id = egraph.add(Math::Lim(c_id));
-            let seq_id = egraph.add(Math::Seq(id));
-            let s_id = egraph.add(Math::Real(Symbol::from(s)));
+
+            egraph.union(r_id, lim_id);
+            egraph.union(c_id, id);
             egraph.union(c_id, seq_id);
-            egraph.union(id, lim_id);
-            egraph.union(id, s_id);
+            for i in to_update {
+                egraph.union(lim_id, i);
+            }
+
+            let r_id = egraph.find(r_id);
+            egraph[r_id].data.exact = true;  
         }
     }
 }

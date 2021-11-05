@@ -87,6 +87,7 @@ impl SynthLanguage for Math {
             } else {
                 ConstantFoldMethod::CvecMatching
             },
+            rule_lifting: false,
         });
 
         egraph.add(Math::Lit(false));

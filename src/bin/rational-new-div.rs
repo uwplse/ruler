@@ -162,6 +162,7 @@ impl SynthLanguage for Math {
             } else {
                 ConstantFoldMethod::CvecMatching
             },
+            rule_lifting: false,
         });
         
         for i in 0..synth.params.variables {
