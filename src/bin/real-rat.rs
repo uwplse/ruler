@@ -334,8 +334,8 @@ impl SynthLanguage for Math {
 
     // custom constant folder
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        let mut to_add = vec![];
         if !egraph[id].data.in_domain { // lower domain
+            let mut to_add = vec![];
             if !egraph[id].nodes.iter().any(|x| x.is_constant()) {  // cannot already have a constant
                 for x in &egraph[id].nodes {
                     match x {
@@ -369,39 +369,50 @@ impl SynthLanguage for Math {
                     }
                 }
             }
-        }
 
-        for (n, s) in to_add {
-            let mut to_update = vec![];
-            for id in egraph.classes().map(|c| c.id) {
-                for n in &egraph[id].nodes {
-                    match n {
-                        Math::Lim(i) => {
-                            if *i == id {
-                                to_update.push(*i);
-                            }
-                        },
-                        _ => (),
+            for (n, s) in to_add {
+                let mut to_update = vec![];
+                for id in egraph.classes().map(|c| c.id) {
+                    for n in &egraph[id].nodes {
+                        match n {
+                            Math::Lim(i) => {
+                                if *i == id {
+                                    to_update.push(*i);
+                                }
+                            },
+                            _ => (),
+                        }
                     }
                 }
+    
+                // C = lim c
+                // c = id = seq C
+                let c_id = egraph.add(n);
+                let r_id = egraph.add(Math::Real(Symbol::from(s)));
+                let seq_id = egraph.add(Math::Seq(r_id));
+                let lim_id = egraph.add(Math::Lim(c_id));
+    
+                egraph.union(r_id, lim_id);
+                egraph.union(c_id, id);
+                egraph.union(c_id, seq_id);
+                for i in to_update {
+                    egraph.union(lim_id, i);
+                }
+    
+                let r_id = egraph.find(r_id);
+                egraph[r_id].data.exact = true;  
             }
+        } else {
+            let lim_ids: Vec<Id> = egraph[id].nodes.iter()
+                .filter_map(|n| match n {
+                    Math::Lim(v) => Some(*v),
+                    _ => None,
+                })
+                .collect();
 
-            // C = lim c
-            // c = id = seq C
-            let c_id = egraph.add(n);
-            let r_id = egraph.add(Math::Real(Symbol::from(s)));
-            let seq_id = egraph.add(Math::Seq(r_id));
-            let lim_id = egraph.add(Math::Lim(c_id));
-
-            egraph.union(r_id, lim_id);
-            egraph.union(c_id, id);
-            egraph.union(c_id, seq_id);
-            for i in to_update {
-                egraph.union(lim_id, i);
+            for i in lim_ids {
+                Self::constant_fold(egraph, i);
             }
-
-            let r_id = egraph.find(r_id);
-            egraph[r_id].data.exact = true;  
         }
     }
 }
