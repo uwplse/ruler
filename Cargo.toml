@@ -5,6 +5,7 @@ authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washin
 edition = "2018"
 
 [dependencies]
+clap = "3.0.0-beta.5"
 log = "0.4"
 env_logger = { version = "0.7", default-features = false }
 rand_pcg = "0.2"
@@ -20,7 +21,6 @@ float-cmp = "0.8.0"
 lazy_static = "1.4.0"
 itertools = "0.9.0"
 # fixed = "1.9.0"
-clap = "3.0.0-beta.2"
 z3 = {version="0.10.0", features = ["static-link-z3"]}
 # z3 = {version="0.10.0"}
 rustc-hash = "1"
