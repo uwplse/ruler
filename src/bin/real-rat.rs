@@ -12,16 +12,6 @@ use ruler::*;
 /// define `Constant` as rationals
 pub type Rational = Ratio<BigInt>;
 
-/// macro for simpler match statements
-macro_rules! true_if_match {
-    ($x:ident, $m:pat) => {
-        match $x {
-            $m => true,
-            _ => false,
-        }
-    };
-}
-
 /// macro for constant folding
 macro_rules! constant_fold {
     ($i:ident, $egraph:ident, $to_add:ident, $op:tt) => {     // unary
@@ -153,7 +143,10 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_constant(&self) -> bool {
-        true_if_match!(self, Math::Real(_))
+        match self {
+            Math::Real(_) => true,
+            _ => false,
+        }
     }
 
     // override default behavior
@@ -357,11 +350,14 @@ impl SynthLanguage for Math {
     // custom constant folder
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
         if !egraph[id].data.in_domain { // lower domain
-            if egraph[id].nodes.iter().any(|x| true_if_match!(x, Math::Rat(_))) {        // early exit if constant exists
+            if egraph[id].nodes.iter().any(|x| {
+                match x {
+                    Math::Rat(_) => true,
+                    _ => false,
+                }
+            }) {        // early exit if constant exists
                 return;
             }
-
-            log::info!("constant fold lower");
 
             let mut to_add: Option<(Self, String)> = None;
             for x in &egraph[id].nodes {

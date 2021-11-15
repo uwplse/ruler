@@ -2,14 +2,8 @@
     Complex from Reals
 !*/
 
-use num::bigint::{BigInt};
-use num::{rational::Ratio};
-
 use egg::*;
 use ruler::*;
-
-/// define `Constant` as rationals
-pub type Rational = Ratio<BigInt>;
 
 define_language! {
     pub enum Math {
@@ -19,7 +13,7 @@ define_language! {
         "-R" = RSub([Id; 2]),
         "*R" = RMul([Id; 2]),
         "/R" = RDiv([Id; 2]),
-        Real(Rational),     // TODO: this is dumb
+        Real(egg::Symbol),     // TODO: this is dumb
 
         // real domain
         "~C" = CNeg(Id),
@@ -32,9 +26,12 @@ define_language! {
         Var(egg::Symbol),
 
         // conversions
-        "complex" = Make([Id; 2]),
-        "re" = Re(Id),
-        "im" = Im(Id),
+        "Cart" = Cart([Id; 2]),
+        "Polar" = Polar([Id; 2]),
+        "Re" = Re(Id),
+        "Im" = Im(Id),
+        "abs" = Abs(Id),
+        "Arg" = Arg(Id),
     }
 }
 
@@ -53,12 +50,26 @@ fn add_domain_expr_rec(
 
 // returns a vector of (id, id) corresponding to the real and
 // imaginary components of numbers associated with the eclass
-fn component_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<(Id, Id)> {
+fn cartesian_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<(Id, Id)> {
     egraph[*id].nodes
         .iter()
         .filter_map(|x| {
             match x {
-                Math::Make([i, j]) => Some((*i, *j)),
+                Math::Cart([i, j]) => Some((*i, *j)),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
+// returns a vector of (id, id) corresponding to the modulus
+// and argument of numbers associated with the eclass
+fn polar_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<(Id, Id)> {
+    egraph[*id].nodes
+        .iter()
+        .filter_map(|x| {
+            match x {
+                Math::Polar([i, j]) => Some((*i, *j)),
                 _ => None,
             }
         })
@@ -111,6 +122,10 @@ impl SynthLanguage for Math {
     // override default behavior
     fn is_in_domain(&self) -> bool {
         match self {
+            Math::RNeg(_) => true,
+            Math::RAdd([_, _]) => true,
+            // Math::RMul([_, _]) => true,
+
             Math::CNeg(_) => true,
             Math::CAdd([_, _]) => true,
             Math::CSub([_, _]) => true,
@@ -119,6 +134,12 @@ impl SynthLanguage for Math {
             Math::Conj(_) => true,
             Math::Var(_) => true,
             Math::Complex(_) => true,
+
+            Math::Re(_) => true,
+            Math::Im(_) => true,
+            Math::Abs(_) => true,
+            Math::Arg(_) => true,
+
             _ => false
         }
     }
@@ -137,44 +158,74 @@ impl SynthLanguage for Math {
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let var_id = egraph.add(Math::Var(var));
+            // real
             let re_id = egraph.add(Math::Re(var_id));
             let im_id = egraph.add(Math::Im(var_id));
-            let cx_id = egraph.add(Math::Make([re_id, im_id]));
-            egraph.union(var_id, cx_id);
+
+            // complex
+            let abs_id = egraph.add(Math::Abs(var_id));
+            let arg_id = egraph.add(Math::Arg(var_id));
+            let cx_id = egraph.add(Math::Cart([re_id, im_id]));
+            let px_id = egraph.add(Math::Polar([abs_id, arg_id]));
+
+            let (var_id, _) = egraph.union(var_id, cx_id);
+            egraph.union(var_id, px_id);
         }
 
-        // rational constants
-        let zero: Rational = "0".parse().unwrap();
-        let one: Rational = "1".parse().unwrap();
+        // symbolic constants
+        let zero = Symbol::from("0");
+        let one = Symbol::from("1");
+        let pi_2 = Symbol::from("pi/2");
+        let pi = Symbol::from("pi");
+        let complex_i = Symbol::from("i");
+
+        // // rational constants
         let re_zero = egraph.add(Math::Real(zero));
         let re_one = egraph.add(Math::Real(one));
+        let re_pi_2 = egraph.add(Math::Real(pi_2));
+        let re_pi = egraph.add(Math::Real(pi));
 
-        // zero constant
-        let cx_zero = egraph.add(Math::Complex(Symbol::from("0")));
-        let zero_mk = egraph.add(Math::Make([re_zero, re_zero]));
+        let pi_2_pi_2 = egraph.add(Math::RAdd([re_pi_2, re_pi_2]));
+        egraph.union(re_pi, pi_2_pi_2);
+
+        // // zero constant
+        let cx_zero = egraph.add(Math::Complex(zero));
+        let zero_mk = egraph.add(Math::Cart([re_zero, re_zero]));
         let zero_mk_re = egraph.add(Math::Re(cx_zero));
         let zero_mk_im = egraph.add(Math::Im(cx_zero));
+        let zero_mk_abs = egraph.add(Math::Abs(cx_zero));
+        let zero_mk_arg = egraph.add(Math::Arg(cx_zero));
         egraph.union(cx_zero, zero_mk);
         egraph.union(zero_mk_re, re_zero);
         egraph.union(zero_mk_im, re_zero);
+        egraph.union(zero_mk_abs, re_zero);
+        egraph.union(zero_mk_arg, re_zero);
 
-        // one constant
-        let cx_one = egraph.add(Math::Complex(Symbol::from("1")));
-        let one_mk = egraph.add(Math::Make([re_one, re_zero]));
+        // // one constant
+        let cx_one = egraph.add(Math::Complex(one));
+        let one_mk = egraph.add(Math::Cart([re_one, re_zero]));
         let one_mk_re = egraph.add(Math::Re(cx_one));
         let one_mk_im = egraph.add(Math::Im(cx_one));
+        let one_mk_abs = egraph.add(Math::Abs(cx_one));
+        let one_mk_arg = egraph.add(Math::Arg(cx_one));
         egraph.union(cx_one, one_mk);
         egraph.union(one_mk_re, re_one);
         egraph.union(one_mk_im, re_zero);
+        egraph.union(one_mk_abs, re_one);
+        egraph.union(one_mk_arg, re_zero);
 
-        // i constant
-        let cx_i = egraph.add(Math::Complex(Symbol::from("i")));
-        let i_mk = egraph.add(Math::Make([re_zero, re_one]));
+        // // i constant
+        let cx_i = egraph.add(Math::Complex(complex_i));
+        let i_mk = egraph.add(Math::Cart([re_zero, re_one]));
         let i_mk_re = egraph.add(Math::Re(cx_i));
         let i_mk_im = egraph.add(Math::Im(cx_i));
+        let i_mk_abs = egraph.add(Math::Abs(cx_i));
+        let i_mk_arg = egraph.add(Math::Arg(cx_i));
         egraph.union(cx_i, i_mk);
         egraph.union(i_mk_re, re_zero);
         egraph.union(i_mk_im, re_one);
+        egraph.union(i_mk_abs, re_one);
+        egraph.union(i_mk_arg, re_pi_2);
 
         synth.egraph = egraph;
     }
@@ -239,72 +290,186 @@ impl SynthLanguage for Math {
 
     fn add_domain_node(synth: &mut Synthesizer<Self>, node: Self) -> Id {
         match node {
+            // (~C x) ~ (Cart (~R (Re x)) (~R (Im x))
+            //        ~ (Polar (Abs x) (+ (Arg x) pi))
             Math::CNeg(i) => {
                 let mut op_id = synth.egraph.add(node);
-                for (rei_id, imi_id) in component_ids(&synth.egraph, &i) {
+                let recx_id = synth.egraph.add(Math::Re(op_id));
+                let imcx_id = synth.egraph.add(Math::Im(op_id));
+                let abscx_id = synth.egraph.add(Math::Abs(op_id));
+                let argcx_id = synth.egraph.add(Math::Arg(op_id));
+
+                // cartesian
+                for (rei_id, imi_id) in cartesian_ids(&synth.egraph, &i) {
+                    // real operators
                     let re_id = synth.egraph.add(Math::RNeg(rei_id));
                     let im_id = synth.egraph.add(Math::RNeg(imi_id));
-                    let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+                    let (re_id, _) = synth.egraph.union(re_id, recx_id);
+                    let (im_id, _) = synth.egraph.union(im_id, imcx_id);
+                    
+                    // complex opertors
+                    let cx_id = synth.egraph.add(Math::Cart([re_id, im_id]));
+                    let (uid, _) = synth.egraph.union(op_id, cx_id);
+                    op_id = uid;
+                }
+                
+                // polar
+                for (absi_id, argi_id) in polar_ids(&synth.egraph, &i) {
+                    // real operators
+                    let re_pi = synth.egraph.add(Math::Real(Symbol::from("pi")));
+                    let arg_id = synth.egraph.add(Math::RAdd([argi_id, re_pi]));
+                    let (abs_id, _) = synth.egraph.union(absi_id, abscx_id);
+                    let (arg_id, _) = synth.egraph.union(arg_id, argcx_id);
+                    
+                    // complex opertors
+                    let cx_id = synth.egraph.add(Math::Polar([abs_id, arg_id]));
                     let (uid, _) = synth.egraph.union(op_id, cx_id);
                     op_id = uid;
                 }
                 op_id
             },
+            // (conj x) ~ (Cart (Re x)) (~R (Im x))
+            //          ~ (Polar (Abs x) (~R (Arg x)))
             Math::Conj(i) => {
                 let mut op_id = synth.egraph.add(node);
-                for (rei_id, imi_id) in component_ids(&synth.egraph, &i) {
+                let recx_id = synth.egraph.add(Math::Re(op_id));
+                let imcx_id = synth.egraph.add(Math::Im(op_id));
+                let abscx_id = synth.egraph.add(Math::Abs(op_id));
+                let argcx_id = synth.egraph.add(Math::Arg(op_id));
+
+                // cartesian
+                for (rei_id, imi_id) in cartesian_ids(&synth.egraph, &i) {
                     let im_id = synth.egraph.add(Math::RNeg(imi_id));
-                    let cx_id = synth.egraph.add(Math::Make([rei_id, im_id]));
+                    let (re_id, _) = synth.egraph.union(rei_id, recx_id);
+                    let (im_id, _) = synth.egraph.union(im_id, imcx_id);
+                    let cx_id = synth.egraph.add(Math::Cart([re_id, im_id]));
                     let (uid, _) = synth.egraph.union(op_id, cx_id);
                     op_id = uid;
                 }
+
+                // polar
+                for (absi_id, argi_id) in polar_ids(&synth.egraph, &i) {
+                    // real operators
+                    let arg_id = synth.egraph.add(Math::RNeg(argi_id));
+                    let (abs_id, _) = synth.egraph.union(absi_id, abscx_id);
+                    let (arg_id, _) = synth.egraph.union(arg_id, argcx_id);
+                    
+                    // complex opertors
+                    let cx_id = synth.egraph.add(Math::Polar([abs_id, arg_id]));
+                    let (uid, _) = synth.egraph.union(op_id, cx_id);
+                    op_id = uid;
+                }
+
                 op_id
             },
+            // (+C x y) ~ (Cart (+R (Re x) (Re y)) (+R (Im x) (Im y)))
+            //          ~ (Polar (Abs (+C x y)) (Arg (+C x y)))
             Math::CAdd([i, j]) => {
                 let mut op_id = synth.egraph.add(node);
-                let compi_ids = component_ids(&synth.egraph, &i);
-                let compj_ids = component_ids(&synth.egraph, &j);
+                let recx_id = synth.egraph.add(Math::Re(op_id));
+                let imcx_id = synth.egraph.add(Math::Im(op_id));
+                let compi_ids = cartesian_ids(&synth.egraph, &i);
+                let compj_ids = cartesian_ids(&synth.egraph, &j);
+
+                // cartesian
                 for (&(rei_id, imi_id), &(rej_id, imj_id)) in compi_ids.iter().zip(compj_ids.iter()) {
+                    // real operators
                     let re_id = synth.egraph.add(Math::RAdd([rei_id, rej_id]));
                     let im_id = synth.egraph.add(Math::RAdd([imi_id, imj_id]));
-                    let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+                    let (re_id, _) = synth.egraph.union(re_id, recx_id);
+                    let (im_id, _) = synth.egraph.union(im_id, imcx_id);
+                    
+                    // complex operators
+                    let cx_id = synth.egraph.add(Math::Cart([re_id, im_id]));
                     let (uid, _) = synth.egraph.union(op_id, cx_id);
                     op_id = uid;
                 }
+                
+                // polar
+                let abs_id = synth.egraph.add(Math::Abs(op_id));
+                let arg_id = synth.egraph.add(Math::Arg(op_id));
+                let pr_id = synth.egraph.add(Math::Polar([abs_id, arg_id]));
+                let (op_id, _) = synth.egraph.union(op_id, pr_id);
+
                 op_id
             },
+            // (-C x y) ~ (Cart (-R (Re x) (Re y)) (-R (Im x) (Im y))
+            //          ~ (Polar (Abs (-C x y)) (Arg (-C x y)))
             Math::CSub([i, j]) => {
                 let mut op_id = synth.egraph.add(node);
-                let compi_ids = component_ids(&synth.egraph, &i);
-                let compj_ids = component_ids(&synth.egraph, &j);
+                let recx_id = synth.egraph.add(Math::Re(op_id));
+                let imcx_id = synth.egraph.add(Math::Im(op_id));
+                let compi_ids = cartesian_ids(&synth.egraph, &i);
+                let compj_ids = cartesian_ids(&synth.egraph, &j);
+
+                // cartesian
                 for (&(rei_id, imi_id), &(rej_id, imj_id)) in compi_ids.iter().zip(compj_ids.iter()) {
+                    // real operators
                     let re_id = synth.egraph.add(Math::RSub([rei_id, rej_id]));
                     let im_id = synth.egraph.add(Math::RSub([imi_id, imj_id]));
-                    let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+                    let (re_id, _) = synth.egraph.union(re_id, recx_id);
+                    let (im_id, _) = synth.egraph.union(im_id, imcx_id);
+                    
+                    // complex operators
+                    let cx_id = synth.egraph.add(Math::Cart([re_id, im_id]));
                     let (uid, _) = synth.egraph.union(op_id, cx_id);
                     op_id = uid;
                 }
+
+                // polar
+                let abs_id = synth.egraph.add(Math::Abs(op_id));
+                let arg_id = synth.egraph.add(Math::Arg(op_id));
+                let pr_id = synth.egraph.add(Math::Polar([abs_id, arg_id]));
+                let (op_id, _) = synth.egraph.union(op_id, pr_id);
+
                 op_id
             },
+            // (*C x y) ~ (Cart (-R (*R (Re x) (Re y)) (*R (Im x) (Im y)))
+            //                  (+R (*R (Re x) (Im y)) (*R (Im x) (Re y))))
+            //          ~ (Polar (*R (Abs x) (Abs y)) (+R (Arg x) (Arg y)))
             Math::CMul([i, j]) => {
                 let mut op_id = synth.egraph.add(node);
-                let compi_ids = component_ids(&synth.egraph, &i);
-                let compj_ids = component_ids(&synth.egraph, &j);
+                let recx_id = synth.egraph.add(Math::Re(op_id));
+                let imcx_id = synth.egraph.add(Math::Im(op_id));
+                let abscx_id = synth.egraph.add(Math::Abs(op_id));
+                let argcx_id = synth.egraph.add(Math::Arg(op_id));
+
+                // cartesian
+                let compi_ids = cartesian_ids(&synth.egraph, &i);
+                let compj_ids = cartesian_ids(&synth.egraph, &j);
                 for (&(rei_id, imi_id), &(rej_id, imj_id)) in compi_ids.iter().zip(compj_ids.iter()) {
+                    // complex operators
                     let mult_rei_rej_id = synth.egraph.add(Math::RMul([rei_id, rej_id]));
                     let mult_rei_imj_id = synth.egraph.add(Math::RMul([rei_id, imj_id]));
                     let mult_imi_rej_id = synth.egraph.add(Math::RMul([imi_id, rej_id]));
                     let mult_imi_imj_id = synth.egraph.add(Math::RMul([imi_id, imj_id]));
                     let re_id = synth.egraph.add(Math::RSub([mult_rei_rej_id, mult_imi_imj_id]));
                     let im_id = synth.egraph.add(Math::RAdd([mult_rei_imj_id, mult_imi_rej_id]));
-                    let cx_id = synth.egraph.add(Math::Make([re_id, im_id]));
+                    let (re_id, _) = synth.egraph.union(re_id, recx_id);
+                    let (im_id, _) = synth.egraph.union(im_id, imcx_id);
+
+                    // complex operators
+                    let cx_id = synth.egraph.add(Math::Cart([re_id, im_id]));
                     let (uid, _) = synth.egraph.union(op_id, cx_id);
-                    let rec_id = synth.egraph.add(Math::Re(uid));
-                    let imc_id = synth.egraph.add(Math::Im(uid));
-                    synth.egraph.union(re_id, rec_id);
-                    synth.egraph.union(im_id, imc_id);
                     op_id = uid;
                 }
+
+                // polar
+                let compi_ids = polar_ids(&synth.egraph, &i);
+                let compj_ids = polar_ids(&synth.egraph, &j);
+                for (&(absi_id, argi_id), &(absj_id, argj_id)) in compi_ids.iter().zip(compj_ids.iter()) {
+                    // real
+                    let abs_id = synth.egraph.add(Math::RMul([absi_id, absj_id]));
+                    let arg_id = synth.egraph.add(Math::RAdd([argi_id, argj_id]));
+                    let (abs_id, _) = synth.egraph.union(abs_id, abscx_id);
+                    let (arg_id, _) = synth.egraph.union(arg_id, argcx_id);
+                    
+                    // complex opertors
+                    let cx_id = synth.egraph.add(Math::Polar([abs_id, arg_id]));
+                    let (uid, _) = synth.egraph.union(op_id, cx_id);
+                    op_id = uid;
+                }
+
                 op_id
             },
             // Math::CDiv([i, j]) => {
@@ -315,7 +480,7 @@ impl SynthLanguage for Math {
             //     let imj_id = im_id(&synth.egraph, &j);
             //     let nre_id = synth.egraph.add(Math::RDiv([rei_id, rej_id]));
             //     let nim_id = synth.egraph.add(Math::RDiv([imi_id, imj_id]));
-            //     let cx_id = synth.egraph.add(Math::Make([nre_id, nim_id]));
+            //     let cx_id = synth.egraph.add(Math::Cart([nre_id, nim_id]));
             //     let (uid, _) = synth.egraph.union(op_id, cx_id);
             //     uid
             // },
@@ -332,8 +497,19 @@ impl SynthLanguage for Math {
     }
 
     // Constant folding for complex numbers
-    fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {
+    fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if !egraph[id].data.in_domain { // lower domain
+            if egraph[id].nodes.iter().any(|x| {
+                match x {
+                    Math::Real(_) => true,
+                    _ => false,
+                }
+            }) {        // early exit if constant exists
+                return;
+            }
 
+            // log::info!("fold: {:?}", egraph[id].nodes);
+        }
     }
 }
 
