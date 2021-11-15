@@ -12,6 +12,55 @@ use ruler::*;
 /// define `Constant` as rationals
 pub type Rational = Ratio<BigInt>;
 
+/// macro for simpler match statements
+macro_rules! true_if_match {
+    ($x:ident, $m:pat) => {
+        match $x {
+            $m => true,
+            _ => false,
+        }
+    };
+}
+
+/// macro for constant folding
+macro_rules! constant_fold {
+    ($i:ident, $egraph:ident, $to_add:ident, $op:tt) => {     // unary
+        for n in &$egraph[*$i].nodes {
+            match n {
+                Math::Rat(v) => {
+                    let r = $op v;
+                    let s = r.to_string();
+                    $to_add = Some((Math::Rat(r), s));
+                    break;
+                },
+                _ => (),
+            }
+        }
+    };
+    ($i:ident, $j:ident, $egraph:ident, $to_add:ident, $op:tt) => {     // binary
+        for n in &$egraph[*$i].nodes {
+            match n {
+                Math::Rat(v) => {
+                    for n in &$egraph[*$j].nodes {
+                        match n {
+                            Math::Rat(w) => {
+                                let r = v $op w;
+                                let s = r.to_string();
+                                $to_add = Some((Math::Rat(r), s));
+                                break;
+                            },
+                            _ => (),
+                        }
+                    }
+                },
+                _ => (),
+            }
+        }
+    };
+}
+
+
+
 define_language! {
     pub enum Math {
         // rational domain
@@ -38,42 +87,6 @@ define_language! {
     }
 }
 
-macro_rules! constant_fold {
-    ($i:ident, $egraph:ident, $to_add:ident, $op:tt) => {     // unary
-        for n in &$egraph[*$i].nodes {
-            match n {
-                Math::Rat(v) => {
-                    let r = $op v;
-                    let s = r.to_string();
-                    $to_add.push((Math::Rat(r), s));
-                    break;
-                },
-                _ => (),
-            }
-        }
-    };
-    ($i:ident, $j:ident, $egraph:ident, $to_add:ident, $op:tt) => {     // binary
-        for n in &$egraph[*$i].nodes {
-            match n {
-                Math::Rat(v) => {
-                    for n in &$egraph[*$j].nodes {
-                        match n {
-                            Math::Rat(w) => {
-                                let r = v $op w;
-                                let s = r.to_string();
-                                $to_add.push((Math::Rat(r), s));
-                                break;
-                            },
-                            _ => (),
-                        }
-                    }
-                },
-                _ => (),
-            }
-        }
-    };
-}
-
 // transcription of `egraph::add_expr_rec`
 fn add_domain_expr_rec(
     synth: &mut Synthesizer<Math>,
@@ -97,6 +110,10 @@ fn sequence_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<Id> {
             }
         })
         .collect()
+}
+
+fn real_const_symbol(s: &str) -> egg::Symbol {
+    egg::Symbol::from(s.to_owned() + "R")
 }
 
 impl SynthLanguage for Math {
@@ -136,10 +153,7 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_constant(&self) -> bool {
-        match self {
-            Math::Rat(_) => true,
-            _ => false,
-        }
+        true_if_match!(self, Math::Real(_))
     }
 
     // override default behavior
@@ -195,7 +209,7 @@ impl SynthLanguage for Math {
             let c_id = egraph.add(Math::Rat(c.clone()));
             let lim_id = egraph.add(Math::Lim(c_id));
             let seq_id = egraph.add(Math::Seq(lim_id));
-            let re_id = egraph.add(Math::Real(Symbol::from(s)));
+            let re_id = egraph.add(Math::Real(real_const_symbol(s)));
             egraph.union(seq_id, c_id);
             egraph.union(lim_id, re_id);
         }
@@ -234,13 +248,21 @@ impl SynthLanguage for Math {
                 to_add.push(Math::RAdd([i, j]));
                 to_add.push(Math::RSub([i, j]));
                 to_add.push(Math::RMul([i, j]));
-                to_add.push(Math::RDiv([i, j]));
+
+                if !synth.egraph[j].nodes.iter().any(|x| {
+                    match x {
+                        Math::Real(v) => *v == real_const_symbol("0"),
+                        _ => false
+                    }
+                }) {
+                    to_add.push(Math::RDiv([i, j]));
+                }
             }
 
             if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
                 continue;
             }
-            
+
             to_add.push(Math::RNeg(i));
         }
 
@@ -335,42 +357,46 @@ impl SynthLanguage for Math {
     // custom constant folder
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
         if !egraph[id].data.in_domain { // lower domain
-            let mut to_add = vec![];
-            if !egraph[id].nodes.iter().any(|x| x.is_constant()) {  // cannot already have a constant
-                for x in &egraph[id].nodes {
-                    match x {
-                        Math::Neg(i) => constant_fold!(i, egraph, to_add, -),
-                        Math::Add([i, j]) => constant_fold!(i, j, egraph, to_add, +),
-                        Math::Sub([i, j]) => constant_fold!(i, j, egraph, to_add, -),
-                        Math::Mul([i, j]) => constant_fold!(i, j, egraph, to_add, *),
-                        Math::Div([i, j]) => {  // explicit because of zero check
-                            for n in &egraph[*i].nodes {
-                                match n {
-                                    Math::Rat(v) => {
-                                        for n in &egraph[*j].nodes {
-                                            match n {
-                                                Math::Rat(w) => {
-                                                    if !w.is_zero() {
-                                                        let r = v / w;
-                                                        let s = r.to_string();
-                                                        to_add.push((Math::Rat(r), s));
-                                                        break;
-                                                    }
-                                                },
-                                                _ => (),
-                                            }
+            if egraph[id].nodes.iter().any(|x| true_if_match!(x, Math::Rat(_))) {        // early exit if constant exists
+                return;
+            }
+
+            log::info!("constant fold lower");
+
+            let mut to_add: Option<(Self, String)> = None;
+            for x in &egraph[id].nodes {
+                match x {
+                    Math::Neg(i) => constant_fold!(i, egraph, to_add, -),
+                    Math::Add([i, j]) => constant_fold!(i, j, egraph, to_add, +),
+                    Math::Sub([i, j]) => constant_fold!(i, j, egraph, to_add, -),
+                    Math::Mul([i, j]) => constant_fold!(i, j, egraph, to_add, *),
+                    Math::Div([i, j]) => {  // explicit because of zero check
+                        for n in &egraph[*i].nodes {
+                            match n {
+                                Math::Rat(v) => {
+                                    for n in &egraph[*j].nodes {
+                                        match n {
+                                            Math::Rat(w) => {
+                                                if !w.is_zero() {
+                                                    let r = v / w;
+                                                    let s = r.to_string();
+                                                    to_add = Some((Math::Rat(r), s));
+                                                    break;
+                                                }
+                                            },
+                                            _ => (),
                                         }
-                                    },
-                                    _ => (),
-                                }
+                                    }
+                                },
+                                _ => (),
                             }
                         }
-                        _ => (),
                     }
+                    _ => (),
                 }
             }
 
-            for (n, s) in to_add {
+            if let Some((n, s)) = to_add {
                 let mut to_update = vec![];
                 for id in egraph.classes().map(|c| c.id) {
                     for n in &egraph[id].nodes {
@@ -410,10 +436,62 @@ impl SynthLanguage for Math {
                 })
                 .collect();
 
-            for i in lim_ids {
-                Self::constant_fold(egraph, i);
+            for id in lim_ids {
+                Self::constant_fold(egraph, id);
             }
         }
+    }
+    
+    /// @Override
+    /// Heuristics for ranking rewrites based on number of variables,
+    /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
+    /// and number of ops.
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
+        let lhs_recpat = Self::recpat_instantiate(&lhs.ast);
+        let rhs_recpat = Self::recpat_instantiate(&rhs.ast);
+        let sz_lhs = DomainAstSize.cost_rec(&lhs_recpat) as i32;
+        let sz_rhs = DomainAstSize.cost_rec(&rhs_recpat) as i32;
+        // let sz_max_pattern = sz_lhs.max(sz_rhs);
+
+        // lhs.vars() and rhs.vars() is deduping
+        // examples
+        //   (- x x) => 0 --- 1 b/c x only var
+        //   (- x 0) => x --- 1 b/c x only var
+        //   (+ x y) => (+ y x) --- 2 b/c x, y only vars
+        let mut var_set: HashSet<Var> = Default::default();
+        var_set.extend(lhs.vars());
+        var_set.extend(rhs.vars());
+        let n_vars_rule = var_set.len() as i32;
+
+        let mut op_set: HashSet<String> = Default::default();
+        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+            if !node.is_leaf() {
+                op_set.insert(node.display_op().to_string());
+            }
+        }
+        let n_ops = op_set.len() as i32;
+
+        let n_consts = lhs
+            .ast
+            .as_ref()
+            .iter()
+            .chain(rhs.ast.as_ref())
+            .filter(|n| match n {
+                ENodeOrVar::ENode(n) => n.is_constant(),
+                ENodeOrVar::Var(_) => false,
+            })
+            .count() as i32;
+
+        // (-sz_max_pattern, n_vars_rule)
+        [
+            n_vars_rule,
+            -n_consts,
+            -i32::max(sz_lhs, sz_rhs),
+            // -i32::min(sz_lhs, sz_rhs),
+            -(sz_lhs + sz_rhs),
+            -n_ops,
+            // 0
+        ]
     }
 }
 

@@ -81,6 +81,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
         }
+
         let ids = self.rhs.apply_one(egraph, matched_id, subst);
         assert_eq!(ids.len(), 1);
         let id = ids[0];

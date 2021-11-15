@@ -462,6 +462,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 self.egraph.union(win[0], win[1]);
             }
         }
+
         runner.egraph.rebuild();
         log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
         runner.egraph
@@ -865,11 +866,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 // these unions are candidate rewrite rules
                 let mut new_eqs: EqualityMap<L> = EqualityMap::default();
                 for ids in found_unions.values() {
-                    for win in ids.windows(2) {
-                        let mut extract = Extractor::new(&self.egraph, DomainAstSize);
-                        let (_, e1) = extract.find_best(win[0]);
-                        let (_, e2) = extract.find_best(win[1]);
-                        if L::recexpr_in_domain(&e1) && L::recexpr_in_domain(&e1) {
+                    for win in ids.windows(2) {              
+                        // log::info!("equality: {:?} {:?}", e1.pretty(100), e2.pretty(100));    
+                        if self.egraph[win[0]].data.in_domain &&
+                           self.egraph[win[1]].data.in_domain {
+                            let mut extract = Extractor::new(&self.egraph, DomainAstSize);
+                            let (_, e1) = extract.find_best(win[0]);
+                            let (_, e2) = extract.find_best(win[1]);
                             if let Some(mut eq) = Equality::new(&e1, &e2) {
                                 log::debug!("  Candidate {}", eq);
                                 eq.ids = Some((win[0], win[1]));
@@ -877,8 +880,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                     new_eqs.insert(eq.name.clone(), eq);
                                 }
                             }
-                        } else {
-                            log::info!("not in domain: {} ~ {}", e1.pretty(100), e2.pretty(100));
                         }
 
                         self.egraph.union(win[0], win[1]);
@@ -886,6 +887,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
 
                 self.egraph.rebuild();
+                new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
 
                 log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
                 let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
@@ -895,16 +897,41 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 let (eqs, _) = self.choose_eqs(new_eqs);
                 let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
                 log::info!("Time taken in... rule minimization: {}", rule_minimize);
+
+                // let mut valid_eqs = vec![];
+                // for (s, eq) in eqs {
+                //     if !self.params.no_run_rewrites {
+                //         assert!(!self.all_eqs.contains_key(&eq.name));
+                //         if let Some((i, j)) = eq.ids {  // inserted 
+                //             self.egraph.union(i, j);
+                //         } else {                        // extracted
+                //             // let mut cp = self.egraph.clone();
+                //             let mut valid_const = true;
+                //             let lrec = L::instantiate(&eq.lhs);
+                //             let rrec = L::instantiate(&eq.rhs);
+
+                //             let i = self.egraph.add_expr(&lrec);
+                //             let seen = &mut HashSet::<Id>::default();
+                //             valid_const &= L::valid_constants(&self, &self.egraph, &i, seen);
+
+                //             let j = self.egraph.add_expr(&rrec);
+                //             seen.clear();
+                //             valid_const &= L::valid_constants(&self, &self.egraph, &j, seen);
+
+                //             self.egraph.union(i, j);
+                //             if !valid_const {   // encountered a constant we don't want to see
+                //                 continue;
+                //             }
+                //         }
+                //     }
+
+                //     log::info!("  {}", eq);
+                //     valid_eqs.push((s, eq));
+                // }
                 
                 log::info!("Chose {} good rules", eqs.len());
                 self.all_eqs.extend(eqs.clone());
                 self.new_eqs.extend(eqs);
-            }
-        }
-
-        for id in self.ids() {
-            if self.egraph[id].data.exact {
-                log::info!("const: {} {:?}", id, self.egraph[id]);
             }
         }
 
@@ -1199,6 +1226,13 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> Option<Ordering> {
         let mut ord = Some(Ordering::Equal);
+        let cost_fn = |x: &RecExpr<L>| {
+            if self.rule_lifting && L::recexpr_in_domain(x) {
+                DomainAstSize.cost_rec(x)
+            } else {
+                AstSize.cost_rec(x)
+            }
+        };
 
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
@@ -1217,18 +1251,13 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 }
             }
 
-            let cost_fn = if self.rule_lifting {
-                |x| DomainAstSize.cost_rec(x)
-            } else {
-                |x| AstSize.cost_rec(x)
-            };
-
             ord_merge(&mut ord, to.exact.cmp(&from.exact));
-            to.exact |= from.exact;
-            to.in_domain |= from.in_domain;
-            if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
-                to.simplest = from.simplest.clone();
-            }
+        }
+
+        to.exact |= from.exact;
+        to.in_domain |= from.in_domain;
+        if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
+            to.simplest = from.simplest.clone();
         }
 
         ord
@@ -1284,7 +1313,9 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 }
             },
             ConstantFoldMethod::Lang => {
-                L::constant_fold(egraph, id);
+                if egraph[id].data.exact {
+                    L::constant_fold(egraph, id);
+                }
             },
             _ => (),
         }
@@ -1486,12 +1517,12 @@ impl<L: SynthLanguage> egg::CostFunction<L> for NumberOfDomainOps {
     where
         C: FnMut(Id) -> Self::Cost,
     {
-        if enode.is_var() || enode.is_constant() {
-            0
-        } else if enode.is_in_domain() {
-            enode.fold(1, |sum, id| add_or_max(sum, costs(id)))
-        } else {
+        if !enode.is_in_domain() {
             usize::max_value()
+        } else if enode.is_var() || enode.is_constant() {
+            0
+        } else {
+            enode.fold(1, |sum, id| add_or_max(sum, costs(id)))
         }
     }
 }
