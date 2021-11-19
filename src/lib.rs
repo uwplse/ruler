@@ -929,6 +929,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 //     valid_eqs.push((s, eq));
                 // }
                 
+                // log::info!("Chose {} good rules", valid_eqs.len());
+                // self.all_eqs.extend(valid_eqs.clone());
+                // self.new_eqs.extend(valid_eqs);
+
                 log::info!("Chose {} good rules", eqs.len());
                 self.all_eqs.extend(eqs.clone());
                 self.new_eqs.extend(eqs);
@@ -1234,6 +1238,11 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             }
         };
 
+        // do not merge high-level enode with low-level enode
+        assert_eq!(to.in_domain, from.in_domain,
+                   "trying to merge HL and LL eclass: {} != {}",
+                   to.simplest.pretty(100), from.simplest.pretty(100));
+
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
@@ -1255,7 +1264,6 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         }
 
         to.exact |= from.exact;
-        to.in_domain |= from.in_domain;
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
             to.simplest = from.simplest.clone();
         }

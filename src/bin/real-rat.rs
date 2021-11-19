@@ -393,6 +393,7 @@ impl SynthLanguage for Math {
             }
 
             if let Some((n, s)) = to_add {
+                // log::info!("constant fold lower: {}", s);
                 let mut to_update = vec![];
                 for id in egraph.classes().map(|c| c.id) {
                     for n in &egraph[id].nodes {
@@ -410,7 +411,7 @@ impl SynthLanguage for Math {
                 // C = lim c
                 // c = id = seq C
                 let c_id = egraph.add(n);
-                let r_id = egraph.add(Math::Real(Symbol::from(s)));
+                let r_id = egraph.add(Math::Real(real_const_symbol(&s)));
                 let seq_id = egraph.add(Math::Seq(r_id));
                 let lim_id = egraph.add(Math::Lim(c_id));
     
@@ -431,6 +432,10 @@ impl SynthLanguage for Math {
                     _ => None,
                 })
                 .collect();
+
+            // if !lim_ids.is_empty() {
+            //     log::info!("constant fold higher");
+            // }
 
             for id in lim_ids {
                 Self::constant_fold(egraph, id);
