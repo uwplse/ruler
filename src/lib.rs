@@ -263,24 +263,26 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         expr.as_ref().iter().all(|x| x.is_in_domain())
     }
 
+    /// Helper function for `add_domain_expr`
+    fn add_domain_expr_rec(synth: &mut Synthesizer<Self>, nodes: &[Self]) -> Id {
+        let n = nodes.last().unwrap().clone()
+            .map_children(|i| {
+                let child = &nodes[..usize::from(i) + 1];
+                Self::add_domain_expr_rec(synth, child)
+            });
+        Self::add_domain_node(synth, n)
+    }
+
     /// Like calling `egraph.add_expr` except enodes for
     /// lower domain equivalencies are added.
-    fn add_domain_expr(synth: &mut Synthesizer<Self>, _expr: &RecExpr<Self>) -> Id {
-        if !synth.egraph.analysis.rule_lifting {
-            panic!("`add_domain_expr` should not be called without rule lifting enabled");
-        }
-        
-        Id::from(0 as usize)
+    fn add_domain_expr(synth: &mut Synthesizer<Self>, expr: &RecExpr<Self>) -> Id {
+        Self::add_domain_expr_rec(synth, expr.as_ref())
     }
 
     /// Like calling `egraph.add` except enodes for
     /// lower domain equivalencies are added.
-    fn add_domain_node(synth: &mut Synthesizer<Self>, _node: Self) -> Id {
-        if !synth.egraph.analysis.rule_lifting {
-            panic!("`add_domain_node` should not be called without rule lifting enabled");
-        }
-        
-        Id::from(0 as usize)
+    fn add_domain_node(synth: &mut Synthesizer<Self>, node: Self) -> Id {
+        synth.egraph.add(node)
     }
 
     /// Constant folding done explicitly by the language
@@ -360,6 +362,7 @@ pub struct Synthesizer<L: SynthLanguage> {
     pub all_eqs: EqualityMap<L>,
     pub old_eqs: EqualityMap<L>,
     pub new_eqs: EqualityMap<L>,
+    pub lifting_rewrites: Vec<Rewrite<L, SynthAnalysis>>,
     pub smt_unknown: usize,
 }
 
@@ -385,6 +388,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             old_eqs: olds.clone(),
             new_eqs: Default::default(),
             all_eqs: olds, // also add prior rules to all_eqs
+            lifting_rewrites: vec![],
             smt_unknown: 0,
             params,
         };
@@ -434,6 +438,26 @@ impl<L: SynthLanguage> Synthesizer<L> {
             runner.with_egraph(egraph)
         };
         runner
+    }
+
+    fn mk_cvec_less_runner(&self, egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
+        let node_limit = self.params.eqsat_node_limit;
+
+        let runner = Runner::default()
+            .with_node_limit(usize::MAX)
+            .with_hook(move |r| {
+                let size = r.egraph.total_number_of_nodes();
+                if size > node_limit {
+                    Err(format!("Node limit: {}", size))
+                } else {
+                    Ok(())
+                }
+            })
+            .with_node_limit(self.params.eqsat_node_limit * 2)
+            .with_iter_limit(self.params.eqsat_iter_limit)
+            .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
+            .with_scheduler(SimpleScheduler);
+        runner.with_egraph(egraph)
     }
 
     /// Apply current ruleset to the term egraph to minimize the term space.
@@ -844,19 +868,28 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                 }
 
+                // run HL-LL rewrites
+                log::info!("running HL-LL rewrites");
+                let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
+                runner = runner.run(&self.lifting_rewrites);
+                self.egraph = runner.egraph;
+                self.egraph.rebuild();
+
                 // run rewrites
                 let run_rewrites_before = Instant::now();
                 log::info!("running eqsat with {} rules", self.all_eqs.len());
                 let start = Instant::now();
-                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-                    self.all_eqs.values().flat_map(|eq| &eq.rewrites).collect();
+                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.all_eqs
+                    .values()
+                    .flat_map(|eq| &eq.rewrites)
+                    .collect();
 
                 log::info!("Rewrites: {}", rewrites.len());
-                let mut runner = self.mk_runner(self.egraph.clone());
+                let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
                 runner = runner.run(rewrites);
                 log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
 
-                // update the clean egraph based on any unions that happened
+                // collect any interesting unions
                 let mut found_unions = HashMap::default();
                 for id in self.ids() {
                     let id2 = runner.egraph.find(id);
@@ -867,7 +900,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 let mut new_eqs: EqualityMap<L> = EqualityMap::default();
                 for ids in found_unions.values() {
                     for win in ids.windows(2) {              
-                        // log::info!("equality: {:?} {:?}", e1.pretty(100), e2.pretty(100));    
                         if self.egraph[win[0]].data.in_domain &&
                            self.egraph[win[1]].data.in_domain {
                             let mut extract = Extractor::new(&self.egraph, DomainAstSize);
@@ -888,6 +920,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                 self.egraph.rebuild();
                 new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
+
+                for id in self.ids() {
+                    log::info!("{}: {:?}", id, self.egraph[id].nodes);
+                }
 
                 log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
                 let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
@@ -1454,7 +1490,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         &mut self,
         mut new_eqs: EqualityMap<L>,
     ) -> (EqualityMap<L>, EqualityMap<L>) {
-        let step_sizes: Vec<usize> = vec![100, 10, 1];
+        let step_sizes: Vec<usize> = vec![1];
         let mut bads = EqualityMap::default();
         let mut should_validate = true;
         let mut step_idx = 0;
