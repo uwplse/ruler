@@ -75,9 +75,32 @@ define_language! {
     }
 }
 
+fn real_const_symbol(s: &str) -> egg::Symbol {
+    egg::Symbol::from(s.to_owned() + "R")
+}
+
 fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
     move |egraph, _, subst| egraph[subst[var]].data.in_domain
+}
+
+fn is_zero(n: &Math) -> bool {
+    match n {
+        Math::Real(v) => (*v == real_const_symbol("0")),
+        _ => false,
+    }
+}
+
+fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
+    rec.as_ref().iter().any(|n| match n {
+        ENodeOrVar::ENode(Math::RDiv([_, i])) => {
+            match &rec.as_ref()[usize::from(*i)] {
+                ENodeOrVar::ENode(n) => is_zero(&n),
+                _ => false,
+            }
+        },
+        _ => false,
+    })
 }
 
 // returns the sequence associated with the eclass
@@ -92,10 +115,6 @@ fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id,
 //         })
 //         .collect()
 // }
-
-fn real_const_symbol(s: &str) -> egg::Symbol {
-    egg::Symbol::from(s.to_owned() + "R")
-}
 
 
 impl SynthLanguage for Math {
@@ -203,6 +222,7 @@ impl SynthLanguage for Math {
 
         synth.lifting_rewrites = vec![
             rewrite!("def-real"; "?a" => "(Lim (Seq ?a))" if is_real_str("?a")),
+
             rewrite!("def-neg"; "(Seq (~R ?a))" => "(~ (Seq ?a))"),
             rewrite!("def-add"; "(Seq (+R ?a ?b))" => "(+ (Seq ?a) (Seq ?b))"),
             rewrite!("def-sub"; "(Seq (-R ?a ?b))" => "(- (Seq ?a) (Seq ?b))"),
@@ -216,6 +236,17 @@ impl SynthLanguage for Math {
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
         let mut extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
         let mut to_add = vec![];
+
+        // disabled operators (TODO: validate input)
+        let disabled_ops: Vec<&str> =
+            if let Some(s) = &synth.params.disabled_ops {
+                s.split(" ").collect()
+            } else {
+                vec![]
+            };
+
+        // predicate if disabled
+        let allowedp = |s| disabled_ops.iter().find(|&x| x.eq(&s)).is_none();
 
         // maps ids to n_ops
         let ids: HashMap<Id, usize> = synth
@@ -241,16 +272,10 @@ impl SynthLanguage for Math {
                     }
                 };
 
-                to_add.push(Math::RAdd([i, j]));
-                to_add.push(Math::RSub([i, j]));
-                to_add.push(Math::RMul([i, j]));
-
-                if !synth.egraph[j].nodes.iter().any(|x| {
-                    match x {
-                        Math::Real(v) => *v == real_const_symbol("0"),
-                        _ => false
-                    }
-                }) {
+                if allowedp("+") { to_add.push(Math::RAdd([i, j])); }
+                if allowedp("-") { to_add.push(Math::RSub([i, j])); }
+                if allowedp("/") { to_add.push(Math::RMul([i, j])); }
+                if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
                     to_add.push(Math::RDiv([i, j]));
                 }
             }
@@ -259,7 +284,7 @@ impl SynthLanguage for Math {
                 continue;
             }
 
-            to_add.push(Math::RNeg(i));
+            if allowedp("~") { to_add.push(Math::RNeg(i)); }
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -268,84 +293,14 @@ impl SynthLanguage for Math {
 
     fn is_valid(
         _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
     ) -> bool {
-        true
+        !contains_div_by_zero(&lhs.ast) &&
+            !contains_div_by_zero(&lhs.ast) &&
+            !contains_div_by_zero(&rhs.ast) &&
+            !contains_div_by_zero(&rhs.ast)
     }
-
-    // fn add_domain_node(synth: &mut Synthesizer<Self>, node: Self) -> Id {
-    //     match node {
-    //         Math::RNeg(i) => {
-    //             let mut op_id = synth.egraph.add(node);
-    //             for seq_id in sequence_ids(&synth.egraph, &i) {
-    //                 let neg_id = synth.egraph.add(Math::Neg(seq_id));
-    //                 let lim_id = synth.egraph.add(Math::Lim(neg_id));
-    //                 let (uid, _) = synth.egraph.union(op_id, lim_id);
-    //                 op_id = uid;
-    //             }
-    //             op_id
-    //         },
-    //         Math::RAdd([i, j]) => {
-    //             let mut op_id = synth.egraph.add(node);
-    //             let seqi_ids = sequence_ids(&synth.egraph, &i);
-    //             let seqj_ids = sequence_ids(&synth.egraph, &j);
-    //             log::info!("add: {:?} {:?}", seqi_ids, seqj_ids);
-    //             for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
-    //                 let add_id = synth.egraph.add(Math::Add([seqi_id, seqj_id]));
-    //                 let lim_id = synth.egraph.add(Math::Lim(add_id));
-    //                 let (uid, _) = synth.egraph.union(op_id, lim_id);
-    //                 op_id = uid;
-    //             }
-    //             op_id
-    //         },
-    //         Math::RSub([i, j]) => {
-    //             let mut op_id = synth.egraph.add(node);
-    //             let seqi_ids = sequence_ids(&synth.egraph, &i);
-    //             let seqj_ids = sequence_ids(&synth.egraph, &j);
-    //             for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
-    //                 let sub_id = synth.egraph.add(Math::Sub([seqi_id, seqj_id]));
-    //                 let lim_id = synth.egraph.add(Math::Lim(sub_id));
-    //                 let (uid, _) = synth.egraph.union(op_id, lim_id);
-    //                 op_id = uid;
-    //             }
-    //             op_id
-    //         },
-    //         Math::RMul([i, j]) => {
-    //             let mut op_id = synth.egraph.add(node);
-    //             let seqi_ids = sequence_ids(&synth.egraph, &i);
-    //             let seqj_ids = sequence_ids(&synth.egraph, &j);
-    //             for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
-    //                 let mul_id = synth.egraph.add(Math::Mul([seqi_id, seqj_id]));
-    //                 let lim_id = synth.egraph.add(Math::Lim(mul_id));
-    //                 let (uid, _) = synth.egraph.union(op_id, lim_id);
-    //                 op_id = uid;
-    //             }
-    //             op_id
-    //         },
-    //         Math::RDiv([i, j]) => {
-    //             let mut op_id = synth.egraph.add(node);
-    //             let seqi_ids = sequence_ids(&synth.egraph, &i);
-    //             let seqj_ids = sequence_ids(&synth.egraph, &j);
-    //             for (&seqi_id, &seqj_id) in seqi_ids.iter().zip(seqj_ids.iter()) {
-    //                 let div_id = synth.egraph.add(Math::Div([seqi_id, seqj_id]));
-    //                 let lim_id = synth.egraph.add(Math::Lim(div_id));
-    //                 let (uid, _) = synth.egraph.union(op_id, lim_id);
-    //                 op_id = uid;
-    //             }
-    //             op_id
-    //         },
-    //         Math::Var(_) => {
-    //             synth.egraph.add(node)
-    //         }
-    //         Math::Real(_) => {
-    //             synth.egraph.add(node)
-    //         }
-    //         _ => {
-    //             panic!("Not a real node {:?}", node);
-    //         }
-    //     }
-    // }
 
     // custom constant folder
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {

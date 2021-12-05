@@ -906,10 +906,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
                             let (_, e1) = extract.find_best(win[0]);
                             let (_, e2) = extract.find_best(win[1]);
                             if let Some(mut eq) = Equality::new(&e1, &e2) {
-                                log::debug!("  Candidate {}", eq);
-                                eq.ids = Some((win[0], win[1]));
-                                if !self.new_eqs.contains_key(&eq.name) {
-                                    new_eqs.insert(eq.name.clone(), eq);
+                                if L::is_valid(&mut self, &eq.lhs, &eq.rhs) {
+                                    log::debug!("  Candidate {}", eq);
+                                    eq.ids = Some((win[0], win[1]));
+                                    if !self.new_eqs.contains_key(&eq.name) {
+                                        new_eqs.insert(eq.name.clone(), eq);
+                                    }
                                 }
                             }
                         }
@@ -920,10 +922,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                 self.egraph.rebuild();
                 new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
-
-                for id in self.ids() {
-                    log::info!("{}: {:?}", id, self.egraph[id].nodes);
-                }
 
                 log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
                 let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
@@ -1490,7 +1488,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         &mut self,
         mut new_eqs: EqualityMap<L>,
     ) -> (EqualityMap<L>, EqualityMap<L>) {
-        let step_sizes: Vec<usize> = vec![1];
+        let step_sizes: Vec<usize> = vec![100, 10, 1];
         let mut bads = EqualityMap::default();
         let mut should_validate = true;
         let mut step_idx = 0;
