@@ -14,6 +14,7 @@ bv32 =     ["run", "--quiet", "--release", "--bin", "bv32", "--", "synth", "--no
 bv-bool = ["run", "--quiet", "--release", "--bin", "bv-bool", "--", "synth"]
 real-rat = ["run", "--quiet", "--release", "--bin", "real-rat", "--", "synth"]
 complex-real = ["run", "--quiet", "--release", "--bin", "complex-real", "--", "synth"]
+trig = ["run", "--quiet", "--release", "--bin", "trig", "--", "synth"]
 
 derive-bv4   =  ["run", "--quiet", "--release", "--bin", "bv4",  "--", "derive"]
 derive-bv4ns =  ["run", "--quiet", "--release", "--bin", "bv4",  "--", "derive"]

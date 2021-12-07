@@ -98,6 +98,10 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             }
         }
 
+        if !L::is_valid_rewrite(egraph, &self.rhs, subst) {
+            return vec![];
+        }
+
         let ids = self.rhs.apply_one(egraph, matched_id, subst);
         assert_eq!(ids.len(), 1);
         let id = ids[0];

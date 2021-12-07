@@ -296,10 +296,7 @@ impl SynthLanguage for Math {
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> bool {
-        !contains_div_by_zero(&lhs.ast) &&
-            !contains_div_by_zero(&lhs.ast) &&
-            !contains_div_by_zero(&rhs.ast) &&
-            !contains_div_by_zero(&rhs.ast)
+        !contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast)
     }
 
     // custom constant folder

@@ -247,6 +247,15 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         true
     }
 
+    /// Returns true if the rewrite is valid
+    fn is_valid_rewrite(
+        _egraph: &EGraph<Self, SynthAnalysis>,
+        _rhs: &Pattern<Self>,
+        _subst: &Subst
+    ) -> bool {
+        true
+    }
+
     /// Returns true if this node does not equal another by injectivity.
     fn not_equal_injective(&self, _o: &Self) -> bool {
         return false;
@@ -977,6 +986,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
 
+        // let mut ids: Vec<Id> = self.ids().collect();
+        // let mut extract = Extractor::new(&self.egraph, DomainAstSize);
+        // ids.sort();
+        // for id in ids {
+        //     let (_, e) = extract.find_best(id);
+        //     log::info!("{}: {:?}", id, e.pretty(100));
+        // }
+
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.new_eqs.len();
         let mut n_eqs: Vec<_> = self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
@@ -1564,7 +1581,7 @@ impl<L: SynthLanguage> egg::CostFunction<L> for NumberOfDomainOps {
         } else if enode.is_var() || enode.is_constant() {
             0
         } else {
-            enode.fold(1, |sum, id| add_or_max(sum, costs(id)))
+            enode.fold(1, |sum, id| sum.saturating_add(costs(id)))
         }
     }
 }
@@ -1579,7 +1596,7 @@ impl<L: SynthLanguage> egg::CostFunction<L> for DomainAstSize {
         C: FnMut(Id) -> Self::Cost,
     {
         if enode.is_in_domain() {
-            enode.fold(1, |sum, id| add_or_max(sum, costs(id)))
+            enode.fold(1, |sum, id| sum.saturating_add(costs(id)))
         } else {
             usize::max_value()
         }
