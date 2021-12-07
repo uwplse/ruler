@@ -850,6 +850,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
     /// Rule synthesis for rule lifting
     fn run_rule_lifting(mut self) -> Report<L> {
         let t = Instant::now();
+        // run HL-LL rewrites (iter 0)
+        log::info!("running HL-LL rewrites");
+        let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
+        runner = runner.run(&self.lifting_rewrites);
+        self.egraph = runner.egraph;
+        self.egraph.rebuild();
+
         assert!(self.params.iters > 0);
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
@@ -986,13 +993,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
 
-        // let mut ids: Vec<Id> = self.ids().collect();
-        // let mut extract = Extractor::new(&self.egraph, DomainAstSize);
-        // ids.sort();
-        // for id in ids {
-        //     let (_, e) = extract.find_best(id);
-        //     log::info!("{}: {:?}", id, e.pretty(100));
-        // }
+        let mut ids: Vec<Id> = self.ids().collect();
+        let mut extract = Extractor::new(&self.egraph, DomainAstSize);
+        ids.sort();
+        for id in ids {
+            let (_, e) = extract.find_best(id);
+            log::info!("{}: {:?} {:?}", id, e.pretty(100), self.egraph[id].nodes);
+        }
 
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.new_eqs.len();
