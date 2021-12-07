@@ -27,6 +27,7 @@ define_language! {
         "/" = Div([Id; 2]),
         "Re" = Re(Id),
         "Im" = Im(Id),
+        "sqr" = Sqr(Id),
 
         // constants
         Complex(egg::Symbol),
@@ -126,6 +127,7 @@ impl SynthLanguage for Math {
             Math::Mul([_, _])   |
             Math::Re(_)         |
             Math::Im(_)         |
+            Math::Sqr(_)         |
             Math::Real(_)       |
             Math::Var(_) => true,
             _ => false,
@@ -181,16 +183,32 @@ impl SynthLanguage for Math {
             rewrite!("def-cis-re"; "(cos ?a)" <=> "(Re (cis ?a))"),
             rewrite!("def-cis-im"; "(sin ?a)" <=> "(Im (cis ?a))"),
             rewrite!("def-cis-add"; "(cis (+ ?a ?b))" <=> "(*C (cis ?a) (cis ?b))"),
+            rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
+            rewrite!("def-add"; "(+ (Re ?a) (Re ?b))" <=> "(Re (+C ?a ?b))"),
+            rewrite!("def-mul"; "(* (Re ?a) (Re ?b))" <=> "(Re (*C ?a ?b))"),
             vec![
-                rewrite!("cancel-cis-mul"; "(*C (cis ?a) (~C (cis ?a)))" => "1C"),
+                rewrite!("cancel-cis-mul"; "(*C (cis ?a) (cis (~C ?a)))" => "1C"),
                 rewrite!("pure-real"; "?a" => { ComplexToRealApplier("?a") })
             ]
         ]
         .concat();
 
         // duplicate rules for HL
-        if let Some(s) = synth.params.prior_rules {
-            
+        let mut duped: Vec<Equality<Self>> = vec![];
+        for (_, eq) in &synth.old_eqs {
+            let l = eq.lhs.to_string();
+            let r = eq.rhs.to_string();
+            let ls: String = l.chars().filter(|c| *c != 'C').collect();
+            let rs: String = r.chars().filter(|c| *c != 'C').collect();
+            let lhs: RecExpr<Self> = ls.parse().unwrap();
+            let rhs: RecExpr<Self> = rs.parse().unwrap();
+            if let Some(e) = Equality::new(&lhs, &rhs) {
+                duped.push(e);
+            }
+        }
+
+        for e in duped {
+            synth.old_eqs.insert(e.name.clone(), e);
         }
 
         synth.egraph = egraph;
@@ -250,6 +268,7 @@ impl SynthLanguage for Math {
             // if allowedp("~") { to_add.push(Math::RNeg(i)); }
             if allowedp("sin") { to_add.push(Math::Sin(i)); }
             if allowedp("cos") { to_add.push(Math::Cos(i)); }
+            if allowedp("sqr") { to_add.push(Math::Sqr(i)); }
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
