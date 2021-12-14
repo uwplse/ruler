@@ -2,6 +2,10 @@
     Complex from Reals
 !*/
 
+use std::str::FromStr;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
+
 use num::bigint::{BigInt};
 use num::rational::{Ratio, ParseRatioError};
 use num::Zero;
@@ -11,6 +15,102 @@ use ruler::*;
 
 pub type Rational = Ratio<BigInt>;
 
+// custom implementation of a complex value
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Complex {
+    val: Symbol
+}
+
+impl Complex {
+    pub fn as_str(self) -> &'static str {
+        self.val.as_str()
+    }
+}
+
+impl<S: AsRef<str>> From<S> for Complex {
+    fn from(s: S) -> Self {
+        let val = Symbol::from(s);
+        Complex { val }
+    }
+}
+
+impl From<Complex> for &'static str {
+    fn from(s: Complex) -> Self {
+        s.as_str()
+    }
+}
+
+impl FromStr for Complex {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() > 1 && s.chars().next().unwrap() != '?' && s.chars().last().unwrap() == 'C' {
+            Ok(s.into())
+        } else {
+            Err("not complex")
+        }
+    }
+}
+
+impl Display for Complex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self.as_str(), f)
+    }
+}
+
+impl Debug for Complex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self.as_str(), f)
+    }
+}
+
+// custom implementation of real value
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Real {
+    val: Symbol
+}
+
+impl Real {
+    pub fn as_str(self) -> &'static str {
+        self.val.as_str()
+    }
+}
+
+impl<S: AsRef<str>> From<S> for Real {
+    fn from(s: S) -> Self {
+        let val = Symbol::from(s);
+        Real { val }
+    }
+}
+
+impl From<Real> for &'static str {
+    fn from(s: Real) -> Self {
+        s.as_str()
+    }
+}
+
+impl FromStr for Real {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() > 1 && s.chars().next().unwrap() != '?' && s.chars().last().unwrap() == 'R' {
+            Ok(s.into())
+        } else {
+            Err("not real")
+        }
+    }
+}
+
+impl Display for Real {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self.as_str(), f)
+    }
+}
+
+impl Debug for Real {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self.as_str(), f)
+    }
+}
+
 define_language! {
     pub enum Math {
         // real domain
@@ -19,7 +119,7 @@ define_language! {
         "-R" = RSub([Id; 2]),
         "*R" = RMul([Id; 2]),
         "/R" = RDiv([Id; 2]),
-        Real(egg::Symbol),     // TODO: this is dumb
+        RealConst(Real),
 
         // real domain
         "~C" = CNeg(Id),
@@ -28,8 +128,7 @@ define_language! {
         "*C" = CMul([Id; 2]),
         "/C" = CDiv([Id; 2]),
         "conj" = Conj(Id),
-        Complex(egg::Symbol),
-        Var(egg::Symbol),
+        ComplexConst(Complex),
 
         // conversions
         "Cart" = Cart([Id; 2]),
@@ -38,6 +137,9 @@ define_language! {
         "Im" = Im(Id),
         "abs" = Abs(Id),
         "Arg" = Arg(Id),
+
+        // variables
+        Var(egg::Symbol),
     }
 }
 
@@ -46,13 +148,13 @@ macro_rules! fold_real {
     ($i:ident, $egraph:ident, $to_add:ident, $op:tt) => {{   // unary
         let n = $egraph[*$i].iter()
             .find_map(|x| match x {
-                Math::Real(v) => Some(v),
+                Math::RealConst(v) => Some(v),
                 _ => None,
             });
         if let Some(v) = n {
             let r = $op(v);
             if let Some(v) = r {
-                $to_add = Some(Math::Real(v));
+                $to_add = Some(Math::RealConst(v));
             } else {
                 $to_add = None;
             }
@@ -63,13 +165,13 @@ macro_rules! fold_real {
         let ns = $egraph[*$i].iter()
             .zip($egraph[*$j].iter())
             .find_map(|x| match x {
-                (Math::Real(v), Math::Real(w)) => Some((v, w)),
+                (Math::RealConst(v), Math::RealConst(w)) => Some((v, w)),
                 _ => None,
             });
         if let Some((v, w)) = ns {
             let r = $op(v, w);
             if let Some(v) = r {
-                $to_add = Some(Math::Real(v));
+                $to_add = Some(Math::RealConst(v));
             } else {
                 $to_add = None;
             }
@@ -87,18 +189,18 @@ fn is_complex_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, 
     move |egraph, _, subst| egraph[subst[var]].data.in_domain
 }
 
-fn real_const_symbol(s: &str) -> egg::Symbol {
-    egg::Symbol::from(s.to_owned() + "R")
+fn real_const_symbol(s: &str) -> Real {
+    Real::from(s.to_owned() + "R")
 }
 
-fn complex_const_symbol(s: &str) -> egg::Symbol {
-    egg::Symbol::from(s.to_owned() + "C")
+fn complex_const_symbol(s: &str) -> Complex {
+    Complex::from(s.to_owned() + "C")
 }
 
 fn is_zero(n: &Math) -> bool {
     match n {
-        Math::Complex(v) => *v == complex_const_symbol("0"),
-        Math::Real(v) => *v == real_const_symbol("0"),
+        Math::ComplexConst(v) => *v == complex_const_symbol("0"),
+        Math::RealConst(v) => *v == real_const_symbol("0"),
         _ => false,
     }
 }
@@ -161,12 +263,12 @@ fn is_valid_rewrite_rec(
 //  Constant folding
 //
 
-fn symbol_to_rational(sym: &egg::Symbol) -> Result<Rational, ParseRatioError> {
-    let s = sym.as_str();
+fn symbol_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
+    let s = r.as_str();
     (&s[..(s.len() - 1)]).parse()
 }
 
-fn fold_real_neg(v: &egg::Symbol) -> Option<egg::Symbol> {
+fn fold_real_neg(v: &Real) -> Option<Real> {
     let n = symbol_to_rational(v);
     match n {
         Ok(x) => Some(real_const_symbol(&(-x).to_string())),
@@ -174,7 +276,7 @@ fn fold_real_neg(v: &egg::Symbol) -> Option<egg::Symbol> {
     }
 }
 
-fn fold_real_add(v1: &egg::Symbol, v2: &egg::Symbol) -> Option<egg::Symbol> {
+fn fold_real_add(v1: &Real, v2: &Real) -> Option<Real> {
     let n1 = symbol_to_rational(v1);
     let n2 = symbol_to_rational(v2);
     match (n1, n2) {
@@ -183,7 +285,7 @@ fn fold_real_add(v1: &egg::Symbol, v2: &egg::Symbol) -> Option<egg::Symbol> {
     }
 }
 
-fn fold_real_sub(v1: &egg::Symbol, v2: &egg::Symbol) -> Option<egg::Symbol> {
+fn fold_real_sub(v1: &Real, v2: &Real) -> Option<Real> {
     let n1 = symbol_to_rational(v1);
     let n2 = symbol_to_rational(v2);
     match (n1, n2) {
@@ -192,17 +294,16 @@ fn fold_real_sub(v1: &egg::Symbol, v2: &egg::Symbol) -> Option<egg::Symbol> {
     }
 }
 
-fn fold_real_mul(v1: &egg::Symbol, v2: &egg::Symbol) -> Option<egg::Symbol> {
+fn fold_real_mul(v1: &Real, v2: &Real) -> Option<Real> {
     let n1 = symbol_to_rational(v1);
     let n2 = symbol_to_rational(v2);
-    log::info!("* {:?} {:?} ({:?} ({:?})", v1, v2, n1, n2);
     match (n1, n2) {
         (Ok(x), Ok(y)) => Some(real_const_symbol(&(x * y).to_string())),
         _ => None,
     }
 }
 
-fn fold_real_div(v1: &egg::Symbol, v2: &egg::Symbol) -> Option<egg::Symbol> {
+fn fold_real_div(v1: &Real, v2: &Real) -> Option<Real> {
     let n1 = symbol_to_rational(v1);
     let n2 = symbol_to_rational(v2);
     match (n1, n2) {
@@ -220,7 +321,7 @@ fn fold_real_div(v1: &egg::Symbol, v2: &egg::Symbol) -> Option<egg::Symbol> {
 //
 
 impl SynthLanguage for Math {
-    type Constant = egg::Symbol;  // not used
+    type Constant = Complex;  // not used
 
     // no evaluation needed
     fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
@@ -243,7 +344,7 @@ impl SynthLanguage for Math {
     }
 
     fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::Complex(n) = self {
+        if let Math::ComplexConst(n) = self {
             Some(n)
         } else {
             None
@@ -251,13 +352,13 @@ impl SynthLanguage for Math {
     }
 
     fn mk_constant(c: Self::Constant) -> Self {
-        Math::Complex(c)
+        Math::ComplexConst(c)
     }
 
     // override default behavior
     fn is_constant(&self) -> bool {
         match self {
-            Math::Complex(_) => true,
+            Math::ComplexConst(_) => true,
             _ => false,
         }
     }
@@ -276,7 +377,7 @@ impl SynthLanguage for Math {
             Math::CDiv([_, _]) => true,
             Math::Conj(_) => true,
             Math::Var(_) => true,
-            Math::Complex(_) => true,
+            Math::ComplexConst(_) => true,
 
             // Math::Re(_) => true,
             // Math::Im(_) => true,
@@ -329,16 +430,16 @@ impl SynthLanguage for Math {
         let complex_i = complex_const_symbol("i");
 
         // // rational constants
-        let re_zero = egraph.add(Math::Real(zero));
-        let re_one = egraph.add(Math::Real(one));
-        let re_pi_2 = egraph.add(Math::Real(pi_2));
-        let re_pi = egraph.add(Math::Real(pi));
+        let re_zero = egraph.add(Math::RealConst(zero));
+        let re_one = egraph.add(Math::RealConst(one));
+        let re_pi_2 = egraph.add(Math::RealConst(pi_2));
+        let re_pi = egraph.add(Math::RealConst(pi));
 
         let pi_2_pi_2 = egraph.add(Math::RAdd([re_pi_2, re_pi_2]));
         egraph.union(re_pi, pi_2_pi_2);
 
         // // zero constant
-        let cx_zero = egraph.add(Math::Complex(complex_zero));
+        let cx_zero = egraph.add(Math::ComplexConst(complex_zero));
         let zero_mk = egraph.add(Math::Cart([re_zero, re_zero]));
         let zero_mk_re = egraph.add(Math::Re(cx_zero));
         let zero_mk_im = egraph.add(Math::Im(cx_zero));
@@ -351,7 +452,7 @@ impl SynthLanguage for Math {
         egraph.union(zero_mk_arg, re_zero);
 
         // // one constant
-        let cx_one = egraph.add(Math::Complex(complex_one));
+        let cx_one = egraph.add(Math::ComplexConst(complex_one));
         let one_mk = egraph.add(Math::Cart([re_one, re_zero]));
         let one_mk_re = egraph.add(Math::Re(cx_one));
         let one_mk_im = egraph.add(Math::Im(cx_one));
@@ -364,7 +465,7 @@ impl SynthLanguage for Math {
         egraph.union(one_mk_arg, re_zero);
 
         // // i constant
-        let cx_i = egraph.add(Math::Complex(complex_i));
+        let cx_i = egraph.add(Math::ComplexConst(complex_i));
         let i_mk = egraph.add(Math::Cart([re_zero, re_one]));
         let i_mk_re = egraph.add(Math::Re(cx_i));
         let i_mk_im = egraph.add(Math::Im(cx_i));
@@ -484,7 +585,7 @@ impl SynthLanguage for Math {
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
         if !egraph[id].data.in_domain { // lower domain
             if egraph[id].iter().any(|x| match x {
-                    Math::Real(_) => true,
+                    Math::RealConst(_) => true,
                     _ => false,
                 }) {        // early exit if constant exists
                 return;

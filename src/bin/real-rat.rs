@@ -2,15 +2,67 @@
     Real from rationals
 !*/
 
+use std::ops::*;
+use std::str::FromStr;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
+
 use num::bigint::{BigInt};
 use num::{rational::Ratio, Zero};
-use std::ops::*;
 
 use egg::*;
 use ruler::*;
 
 /// define `Constant` as rationals
 pub type Rational = Ratio<BigInt>;
+
+// custom implementation of real value
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Real {
+    val: Symbol
+}
+
+impl Real {
+    pub fn as_str(self) -> &'static str {
+        self.val.as_str()
+    }
+}
+
+impl<S: AsRef<str>> From<S> for Real {
+    fn from(s: S) -> Self {
+        let val = Symbol::from(s);
+        Real { val }
+    }
+}
+
+impl From<Real> for &'static str {
+    fn from(s: Real) -> Self {
+        s.as_str()
+    }
+}
+
+impl FromStr for Real {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() > 0 && s.chars().next().unwrap() != '?' {
+            Ok(s.into())
+        } else {
+            Err("not real")
+        }
+    }
+}
+
+impl Display for Real {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self.as_str(), f)
+    }
+}
+
+impl Debug for Real {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self.as_str(), f)
+    }
+}
 
 /// macro for constant folding
 macro_rules! constant_fold {
@@ -67,7 +119,7 @@ define_language! {
         "*R" = RMul([Id; 2]),
         "/R" = RDiv([Id; 2]),
         Var(egg::Symbol),
-        Real(egg::Symbol),           // TODO: this is dumb
+        Real(Real),
 
         // conversions
         "Lim" = Lim(Id),
@@ -75,8 +127,8 @@ define_language! {
     }
 }
 
-fn real_const_symbol(s: &str) -> egg::Symbol {
-    egg::Symbol::from(s.to_owned() + "R")
+fn real_const_symbol(s: &str) -> Real {
+    Real::from(s.to_owned() + "R")
 }
 
 fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
@@ -86,7 +138,7 @@ fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id,
 
 fn is_zero(n: &Math) -> bool {
     match n {
-        Math::Real(v) => (*v == real_const_symbol("0")),
+        Math::Real(v) => *v == real_const_symbol("0"),
         _ => false,
     }
 }
