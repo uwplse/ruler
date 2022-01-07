@@ -1,7 +1,11 @@
 # <img src="ruler.svg" alt="ruler logo" height="40" align="left"> Rewrite Rule Inference Using Equality Saturation
 
 This is the artifact for our paper
-"Rewrite Rule Inference Using Equality Saturation".
+"Rewrite Rule Inference Using Equality Saturation",
+which is available on the 
+[ACM DL](https://dl.acm.org/doi/10.1145/3485496)
+or 
+[arXiv](https://arxiv.org/abs/2108.10436).
 In our paper, we presented a framework, Ruler, 
 that uses equality saturation
  to automatically infer small, expressive
@@ -18,6 +22,38 @@ The next part is "Step-by-Step" which first lists the claims we
   on a different machine,
   modify the code, and
   perform further experiments.
+
+If you use this work, please cite it using the following BibTeX.
+<details>
+<summary>BibTeX</summary>
+<code><pre>
+@article{ruler,
+  author = {Nandi, Chandrakana 
+        and Willsey, Max 
+        and Zhu, Amy 
+        and Wang, Yisu Remy 
+        and Saiki, Brett 
+        and Anderson, Adam 
+        and Schulz, Adriana 
+        and Grossman, Dan 
+        and Tatlock, Zachary},
+  title = {Rewrite Rule Inference Using Equality Saturation},
+  year = {2021},
+  issue_date = {October 2021},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  volume = {5},
+  number = {OOPSLA},
+  url = {https://doi.org/10.1145/3485496},
+  doi = {10.1145/3485496},
+  journal = {Proc. ACM Program. Lang.},
+  month = {oct},
+  articleno = {119},
+  numpages = {28},
+  keywords = {Program Synthesis, Rewrite Rules, Equality Saturation}
+}
+</pre></code>
+</details>
 
 ## Getting started
 We recommend running the VM on a machine with more than 32 GB RAM
