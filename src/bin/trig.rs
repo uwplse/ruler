@@ -466,8 +466,8 @@ impl SynthLanguage for Math {
     fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
         let lhs_recpat = Self::recpat_instantiate(&lhs.ast);
         let rhs_recpat = Self::recpat_instantiate(&rhs.ast);
-        let sz_lhs = DomainAstSize.cost_rec(&lhs_recpat) as i32;
-        let sz_rhs = DomainAstSize.cost_rec(&rhs_recpat) as i32;
+        let sz_lhs = ExtractableAstSize.cost_rec(&lhs_recpat) as i32;
+        let sz_rhs = ExtractableAstSize.cost_rec(&rhs_recpat) as i32;
         // let sz_max_pattern = sz_lhs.max(sz_rhs);
 
         // lhs.vars() and rhs.vars() is deduping

@@ -111,6 +111,54 @@ impl Debug for Real {
     }
 }
 
+// custom implementation of a complex value
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Variable(Symbol);
+
+impl Variable {
+    fn as_str(self) -> &'static str {
+        self.0.as_str()
+    }
+}
+
+impl<S: AsRef<str>> From<S> for Variable {
+    fn from(s: S) -> Self {
+        Variable(Symbol::from(s))
+    }
+}
+
+impl From<Variable> for &'static str {
+    fn from(s: Variable) -> Self {
+        s.as_str()
+    }
+}
+
+impl FromStr for Variable {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() == 1 && s.chars().nth(0).unwrap().is_alphabetic() {
+            Ok(s.into())
+        } else if s.len() == 2 && s.chars().nth(0).unwrap() == '?' &&
+            s.chars().nth(1).unwrap().is_alphabetic() {
+            Ok((&s[1..2]).into())
+        } else {
+            Err("not variable")
+        }
+    }
+}
+
+impl Display for Variable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self.as_str(), f)
+    }
+}
+
+impl Debug for Variable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self.as_str(), f)
+    }
+}
+
 define_language! {
     pub enum Math {
         // real domain
@@ -139,7 +187,7 @@ define_language! {
         "Arg" = Arg(Id),
 
         // variables
-        Var(egg::Symbol),
+        Var(Variable),
     }
 }
 
@@ -332,7 +380,7 @@ impl SynthLanguage for Math {
     }
 
     fn to_var(&self) -> Option<Symbol> {
-        if let Math::Var(sym) = self {
+        if let Math::Var(Variable(sym)) = self {
             Some(*sym)
         } else {
             None
@@ -340,7 +388,7 @@ impl SynthLanguage for Math {
     }
 
     fn mk_var(sym: Symbol) -> Self {
-        Math::Var(sym)
+        Math::Var(Variable(sym))
     }
 
     fn to_constant(&self) -> Option<&Self::Constant> {
@@ -366,10 +414,6 @@ impl SynthLanguage for Math {
     // override default behavior
     fn is_in_domain(&self) -> bool {
         match self {
-            // Math::RNeg(_) => true,
-            // Math::RAdd([_, _]) => true,
-            // Math::RMul([_, _]) => true,
-
             Math::CNeg(_) => true,
             Math::CAdd([_, _]) => true,
             Math::CSub([_, _]) => true,
@@ -391,6 +435,18 @@ impl SynthLanguage for Math {
         }
     }
 
+    fn is_extractable(&self) -> bool {
+        match self {
+            Math::RNeg(_) |
+            Math::RAdd(_) |
+            Math::RSub(_) |
+            Math::RMul(_) |
+            Math::RDiv(_) |
+            Math::RealConst(_) => false,
+            _ => true,
+        }
+    }
+
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
@@ -404,7 +460,7 @@ impl SynthLanguage for Math {
 
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
-            let var_id = egraph.add(Math::Var(var));
+            let var_id = egraph.add(Math::Var(Variable(var)));
             // real
             let re_id = egraph.add(Math::Re(var_id));
             let im_id = egraph.add(Math::Im(var_id));
