@@ -77,11 +77,13 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         egraph: &mut EGraph<L, SynthAnalysis>,
         matched_id: Id,
         subst: &Subst,
+        searcher_ast: Option<&PatternAst<L>>,
+        rule_name: Symbol
     ) -> Vec<Id> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
         }
-        let ids = self.rhs.apply_one(egraph, matched_id, subst);
+        let ids = self.rhs.apply_one(egraph, matched_id, subst, searcher_ast, rule_name);
         assert_eq!(ids.len(), 1);
         let id = ids[0];
         if !egraph[id].data.is_defined() {
@@ -176,7 +178,7 @@ impl<L: SynthLanguage> Equality<L> {
                 lhs,
                 rhs,
                 ids: None,
-                rewrites: if rw1.name() == rw2.name() {
+                rewrites: if rw1.name == rw2.name {
                     vec![rw1]
                 } else {
                     vec![rw1, rw2]

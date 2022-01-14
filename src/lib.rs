@@ -63,7 +63,7 @@ impl Default for SynthAnalysis {
 /// Every domain defines it own `Constant` type.
 /// `eval` implements an interpreter for the domain. It returns a `Cvec` of length `cvec_len`
 /// where each cvec element is computed using `eval`.
-pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
+pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
     type Constant: Clone + Hash + Eq + Debug + Display;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
@@ -171,7 +171,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         let mut op_set: HashSet<String> = Default::default();
         for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
             if !node.is_leaf() {
-                op_set.insert(node.display_op().to_string());
+                op_set.insert(node.to_string());
             }
         }
         let n_ops = op_set.len() as i32;
@@ -544,7 +544,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             layer.retain(|node| {
                 let seen = &mut HashSet::<Id>::default();
                 if iter > self.params.ema_above_iter {
-                    let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                    let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
                     let rec2 = L::emt_generalize(&rec);
                     let id = cp.add_expr(&rec2);
                     if usize::from(id) < max_id {
@@ -580,7 +580,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 chunk_num += 1;
                 for node in chunk {
                     if iter > self.params.ema_above_iter {
-                        let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                        let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
                         self.egraph.add_expr(&L::emt_generalize(&rec));
                     } else {
                         self.egraph.add(node.clone());
@@ -945,36 +945,40 @@ fn ord_merge(to: &mut Option<Ordering>, from: Ordering) {
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
-    fn merge(&self, to: &mut Self::Data, from: Self::Data) -> Option<Ordering> {
-        let mut ord = Some(Ordering::Equal);
+    fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+        let mut merge_a = false;
 
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
                     (None, Some(_)) => {
                         to.cvec[i] = from.cvec[i].clone();
-                        ord_merge(&mut ord, Ordering::Less);
+                        merge_a = true;
                     }
                     (Some(x), Some(y)) => {
                         assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
-                    }
-                    (Some(_), None) => {
-                        ord_merge(&mut ord, Ordering::Greater);
                     }
                     _ => (),
                 }
             }
 
-            ord_merge(&mut ord, to.exact.cmp(&from.exact));
-            to.exact |= from.exact;
-            to.gen = usize::min(to.gen, from.gen);
+            if from.exact && !to.exact {
+                to.exact = true;
+                merge_a = true;
+            }
+            if from.gen < to.gen {
+                to.gen = from.gen;
+                merge_a = true;
+            }
 
             if AstSize.cost_rec(&from.simplest) < AstSize.cost_rec(&to.simplest) {
+                merge_a = true;
                 to.simplest = from.simplest.clone();
             }
         }
 
-        ord
+        // conservatively just say that b changed
+        DidMerge(merge_a, true)
     }
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
