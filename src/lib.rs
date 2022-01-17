@@ -256,11 +256,6 @@ pub trait SynthLanguage: egg::Language + Send + Sync + 'static {
         true
     }
 
-    /// Returns true if this node does not equal another by injectivity.
-    fn not_equal_injective(&self, _o: &Self) -> bool {
-        return false;
-    }
-
     /// Returns true if the node is in the current domain.
     /// Useful for rule lifting.
     fn is_in_domain(&self) -> bool {
@@ -541,31 +536,23 @@ impl<L: SynthLanguage> Synthesizer<L> {
             true
         };
 
-        let mut rejected_injectivity = 0;
         for ids in by_cvec.values() {
             let mut ids = ids.iter().copied();
             while let Some(id1) = ids.next() {
                 for id2 in ids.clone() {
                     if compare(&self.egraph[id1].data.cvec, &self.egraph[id2].data.cvec) {
-                        if (self.egraph[id1].nodes.len() == 1) &&
-                           (self.egraph[id2].nodes.len() == 1) &&
-                           (self.egraph[id1].nodes[0].not_equal_injective(&self.egraph[id2].nodes[0])) {
-                            rejected_injectivity += 1;
-                        } else {
-                            let (_, e1) = extract.find_best(id1);
-                            let (_, e2) = extract.find_best(id2);
-                            if let Some(mut eq) = Equality::new(&e1, &e2) {
-                                log::debug!("  Candidate {}", eq);
-                                eq.ids = Some((id1, id2));
-                                new_eqs.insert(eq.name.clone(), eq);
-                            }
+                        let (_, e1) = extract.find_best(id1);
+                        let (_, e2) = extract.find_best(id2);
+                        if let Some(mut eq) = Equality::new(&e1, &e2) {
+                            log::debug!("  Candidate {}", eq);
+                            eq.ids = Some((id1, id2));
+                            new_eqs.insert(eq.name.clone(), eq);
                         }
                     }
                 }
             }
         }
 
-        log::info!("{} eqs rejected by injectivity", rejected_injectivity);
         new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
         new_eqs
     }
@@ -675,7 +662,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         layer
     }
 
-    /// Rule synthesis for one domain
+    /// Rule synthesis for one domain, i.e., Ruler as presented in OOPSLA'21
     fn run_one_domain(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
@@ -859,6 +846,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // run HL-LL rewrites (iter 0)
         log::info!("running HL-LL rewrites");
         let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
+        println!("after making cvec less runner: {}", runner.egraph.analysis.cvec_len);
         runner = runner.run(&self.lifting_rewrites);
         self.egraph = runner.egraph;
         self.egraph.rebuild();
