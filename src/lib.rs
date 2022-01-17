@@ -51,7 +51,7 @@ pub enum ConstantFoldMethod {
     Lang,               // constant folding implemented by language
 }
 
-/// Properties of cvecs in `Ruler`; currently onyl their length.
+/// Properties of cvecs in `Ruler`; currently only their length.
 /// cvecs are stored as [eclass analysis data](https://docs.rs/egg/0.6.0/egg/trait.Analysis.html).
 #[derive(Debug, Clone)]
 pub struct SynthAnalysis {
