@@ -169,7 +169,7 @@ UNSOUND=0
 TIMEOUT="3s"
 
 if [ $DOMAIN == "rational" ]; then
-    jq  --arg FIELD "$squote" -r '[.eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
+    jq  --arg FIELD "$squote" -r '[.all_eqs] | flatten | map("( => " + $FIELD + .lhs + " " + $FIELD +.rhs + " )") | .[]' \
         $RULES > to-check.txt
     while read p; do
       echo "$rational" > verify-rat.rkt
@@ -190,7 +190,7 @@ if [ $DOMAIN == "rational" ]; then
 elif [ $DOMAIN = "4" ] || [ $DOMAIN = "8" ] || [ $DOMAIN = "16" ] || [ $DOMAIN = "32" ]; then
     # | => ||, racket doesn't like |
     sed 's/|/||/g' $RULES > tmpf.json
-    jq -r '[.eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmpf.json > to-check.txt
+    jq -r '[.all_eqs] | flatten | map("( => " + .lhs + " " + .rhs + " )") | .[]' tmpf.json > to-check.txt
     while read p; do
       echo "$bv" > verify-bv.rkt
       echo "$p" >> verify-bv.rkt
