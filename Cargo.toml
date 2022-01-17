@@ -5,7 +5,7 @@ authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washin
 edition = "2018"
 
 [dependencies]
-clap = "3.0.0-beta.5"
+clap = { version = "3.0.7", features = ["derive"] }
 log = "0.4"
 env_logger = { version = "0.7", default-features = false }
 rand_pcg = "0.2"
