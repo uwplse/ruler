@@ -105,7 +105,10 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         }
 
         let ids = self.rhs.apply_one(egraph, matched_id, subst, searcher_ast, rule_name);
-        assert_eq!(ids.len(), 1);
+        // assert_eq!(ids.len(), 1);
+        if ids.len() == 0 {
+            return vec![];
+        }
         let id = ids[0];
         if !egraph[id].data.is_defined() {
             return vec![];
