@@ -83,6 +83,27 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
         }
+
+        // check that the domain matches
+        let rhs_top = self.rhs.ast.as_ref().last();
+        if let Some(n) = rhs_top {
+            let node = match n {
+                ENodeOrVar::ENode(n) => n.clone(),
+                ENodeOrVar::Var(v) => {
+                    let s = v.to_string();
+                    L::mk_var(s[1..].into())
+                },
+            };
+            
+            if egraph[matched_id].data.in_domain != node.is_in_domain() {
+                return vec![];
+            }
+        }
+
+        if !L::is_valid_rewrite(egraph, &self.rhs, subst) {
+            return vec![];
+        }
+
         let ids = self.rhs.apply_one(egraph, matched_id, subst, searcher_ast, rule_name);
         assert_eq!(ids.len(), 1);
         let id = ids[0];

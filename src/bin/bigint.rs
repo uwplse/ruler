@@ -118,7 +118,14 @@ impl SynthLanguage for Math {
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: consts[0].len(),
+            constant_fold: if synth.params.no_constant_fold {
+                ConstantFoldMethod::NoFold
+            } else {
+                ConstantFoldMethod::CvecMatching
+            },
+            rule_lifting: false,
         });
+
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
