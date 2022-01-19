@@ -64,7 +64,7 @@ impl Debug for Real {
     }
 }
 
-// custom implementation of a variable value
+// custom implementation of a variable
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Variable(Symbol);
 
@@ -166,8 +166,8 @@ define_language! {
         "-R" = RSub([Id; 2]),
         "*R" = RMul([Id; 2]),
         "/R" = RDiv([Id; 2]),
-        Var(Variable),
         Real(Real),
+        Var(Variable),
 
         // conversions
         "Lim" = Lim(Id),
@@ -184,7 +184,7 @@ fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id,
     move |egraph, _, subst| egraph[subst[var]].data.in_domain
 }
 
-fn is_zero(n: &Math) -> bool {
+fn is_real_zero(n: &Math) -> bool {
     match n {
         Math::Real(v) => *v == real_const_symbol("0"),
         _ => false,
@@ -195,27 +195,13 @@ fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
     rec.as_ref().iter().any(|n| match n {
         ENodeOrVar::ENode(Math::RDiv([_, i])) => {
             match &rec.as_ref()[usize::from(*i)] {
-                ENodeOrVar::ENode(n) => is_zero(&n),
+                ENodeOrVar::ENode(n) => is_real_zero(&n),
                 _ => false,
             }
         },
         _ => false,
     })
 }
-
-// returns the sequence associated with the eclass
-// fn sequence_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<Id> {
-//     egraph[*id].nodes
-//         .iter()
-//         .filter_map(|x| {
-//             match x {
-//                 Math::Lim(i) => Some(*i),
-//                 _ => None,
-//             }
-//         })
-//         .collect()
-// }
-
 
 impl SynthLanguage for Math {
     type Constant = Rational;  // not used
@@ -276,6 +262,19 @@ impl SynthLanguage for Math {
         }
     }
 
+    fn is_extractable(&self) -> bool {
+        match self {
+            Math::RNeg(_) => true,
+            Math::RAdd([_, _]) => true,
+            Math::RSub([_, _]) => true,
+            Math::RMul([_, _]) => true,
+            Math::RDiv([_, _]) => true,
+            Math::Var(_) => true,
+            Math::Real(_) => true,
+            _ => false,
+        }
+    }
+
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // disabled constants (TODO: validate input)
         let disabled_consts: Vec<&str> =
@@ -292,23 +291,19 @@ impl SynthLanguage for Math {
             .map(|s| (s.parse().unwrap(), *s))
             .collect();
 
-
-            let mut egraph = EGraph::new(SynthAnalysis {
-                cvec_len: 0,
-                constant_fold: if synth.params.no_constant_fold {
-                    ConstantFoldMethod::NoFold
-                } else {
-                    ConstantFoldMethod::Lang
-                },
-                rule_lifting: true,
-            });
+        let mut egraph = EGraph::new(SynthAnalysis {
+            cvec_len: 0,
+            constant_fold: if synth.params.no_constant_fold {
+                ConstantFoldMethod::NoFold
+            } else {
+                ConstantFoldMethod::Lang
+            },
+            rule_lifting: true,
+        });
 
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
-            let var_id = egraph.add(Math::Var(Variable(var)));
-            let seq_id = egraph.add(Math::Seq(var_id));
-            let lim_id = egraph.add(Math::Lim(seq_id));
-            egraph.union(var_id, lim_id);
+            egraph.add(Math::Var(Variable(var)));
         }
 
         for (c, s) in constants {
@@ -337,7 +332,8 @@ impl SynthLanguage for Math {
         let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
         let mut to_add = vec![];
 
-        // disabled operators (TODO: validate input)
+        // disabled operators from command line
+        // (TODO: validate input)
         let disabled_ops: Vec<&str> =
             if let Some(s) = &synth.params.disabled_ops {
                 s.split(" ").collect()
@@ -375,7 +371,7 @@ impl SynthLanguage for Math {
                 if allowedp("+") { to_add.push(Math::RAdd([i, j])); }
                 if allowedp("-") { to_add.push(Math::RSub([i, j])); }
                 if allowedp("/") { to_add.push(Math::RMul([i, j])); }
-                if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
+                if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_real_zero(x)) {
                     to_add.push(Math::RDiv([i, j]));
                 }
             }
@@ -484,10 +480,6 @@ impl SynthLanguage for Math {
                     _ => None,
                 })
                 .collect();
-
-            // if !lim_ids.is_empty() {
-            //     log::info!("constant fold higher");
-            // }
 
             for id in lim_ids {
                 Self::constant_fold(egraph, id);
