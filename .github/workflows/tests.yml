@@ -1,0 +1,28 @@
+name: Unit tests
+
+on: [push]
+
+env:
+  RUST_BACKTRACE: full
+
+jobs:
+  unit:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Rust compiler
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            default: true
+            override: true
+            components: rustfmt, clippy
+      - name: "Build"
+        run: cargo build --release
+      - name: "Synthesize rational rules"
+        run: cargo rational --iters 2 --variables 3 --num-fuzz 10 --do-final-run
+      - name: "Synthesize bv4 rules"
+        run: cargo bv4 --iters 2 --variables 3
+      - name: "Synthesize bv32 rules"
+        run: cargo bv4 --iters 2 --variables 3
