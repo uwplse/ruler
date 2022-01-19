@@ -186,7 +186,7 @@ define_language! {
 #[derive(Debug)]
 struct ComplexToRealApplier(&'static str);
 impl Applier<Math, SynthAnalysis> for ComplexToRealApplier {
-    fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst) -> Vec<Id> {
+    fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst, _searcher_pat: Option<&PatternAst<Math>>, _rule: Symbol) -> Vec<Id> {
         let id = subst[self.0.parse().unwrap()];
         if egraph[id].data.in_domain {
             return vec![];
@@ -386,7 +386,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let mut extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
         let mut to_add = vec![];
 
         // disabled operators (TODO: validate input)
@@ -483,7 +483,7 @@ impl SynthLanguage for Math {
         let mut op_set: HashSet<String> = Default::default();
         for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
             if !node.is_leaf() {
-                op_set.insert(node.display_op().to_string());
+                op_set.insert(node.to_string());
             }
         }
         let n_ops = op_set.len() as i32;

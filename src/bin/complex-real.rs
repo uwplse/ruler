@@ -471,7 +471,7 @@ impl SynthLanguage for Math {
             let cx_id = egraph.add(Math::Cart([re_id, im_id]));
             let px_id = egraph.add(Math::Polar([abs_id, arg_id]));
 
-            let (var_id, _) = egraph.union(var_id, cx_id);
+            egraph.union(var_id, cx_id);
             egraph.union(var_id, px_id);
         }
 
@@ -572,7 +572,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let mut extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
         let mut to_add = vec![];
 
         // maps ids to n_ops

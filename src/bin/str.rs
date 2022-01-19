@@ -271,7 +271,7 @@ impl SynthLanguage for Lang {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let mut extract = Extractor::new(&synth.egraph, NumberOfOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfOps);
 
         // maps ids to n_ops
         let ids: HashMap<Id, usize> = synth

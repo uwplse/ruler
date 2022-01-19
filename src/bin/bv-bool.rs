@@ -155,7 +155,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let mut extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
         let mut to_add = vec![];
 
         // maps ids to n_ops
@@ -219,8 +219,8 @@ impl SynthLanguage for Math {
                 let nfst_id = synth.egraph.add(Math::Not(fst_id));
                 let nsec_id = synth.egraph.add(Math::Not(sec_id));
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
-                let (uid, _) = synth.egraph.union(op_id, mk_id);
-                uid
+                synth.egraph.union(op_id, mk_id);
+                op_id
             },
             Math::Band([i, j]) => {
                 let op_id = synth.egraph.add(node);
@@ -231,8 +231,8 @@ impl SynthLanguage for Math {
                 let nfst_id = synth.egraph.add(Math::And([fsti_id, fstj_id]));
                 let nsec_id = synth.egraph.add(Math::And([seci_id, secj_id]));
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
-                let (uid, _) = synth.egraph.union(op_id, mk_id);
-                uid
+                synth.egraph.union(op_id, mk_id);
+                op_id
             },
             Math::Bor([i, j]) => {
                 let op_id = synth.egraph.add(node);
@@ -243,8 +243,8 @@ impl SynthLanguage for Math {
                 let nfst_id = synth.egraph.add(Math::Or([fsti_id, fstj_id]));
                 let nsec_id = synth.egraph.add(Math::Or([seci_id, secj_id]));
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
-                let (uid, _) = synth.egraph.union(op_id, mk_id);
-                uid
+                synth.egraph.union(op_id, mk_id);
+                op_id
             },
             Math::Bxor([i, j]) => {
                 let op_id = synth.egraph.add(node);
@@ -255,8 +255,8 @@ impl SynthLanguage for Math {
                 let nfst_id = synth.egraph.add(Math::Xor([fsti_id, fstj_id]));
                 let nsec_id = synth.egraph.add(Math::Xor([seci_id, secj_id]));
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
-                let (uid, _) = synth.egraph.union(op_id, mk_id);
-                uid
+                synth.egraph.union(op_id, mk_id);
+                op_id
             },
             _ => {
                 panic!("Not a bitvector node {:?}", node);
@@ -288,7 +288,7 @@ impl SynthLanguage for Math {
         let mut op_set: HashSet<String> = Default::default();
         for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
             if !node.is_leaf() {
-                op_set.insert(node.display_op().to_string());
+                op_set.insert(node.to_string());
             }
         }
         let n_ops = op_set.len() as i32;
