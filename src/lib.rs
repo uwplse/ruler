@@ -846,7 +846,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // run HL-LL rewrites (iter 0)
         log::info!("running HL-LL rewrites");
         let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
-        println!("after making cvec less runner: {}", runner.egraph.analysis.cvec_len);
+        log::info!("after making cvec less runner: {}", runner.egraph.analysis.cvec_len);
         runner = runner.run(&self.lifting_rewrites);
         self.egraph = runner.egraph;
         self.egraph.rebuild();
