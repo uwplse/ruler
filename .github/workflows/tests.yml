@@ -11,6 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
+      - name: Cache Rust build
+        uses: actions/cache@v2
+        env:
+          cache-name: rust-build
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-build-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
       - name: Install Rust compiler
         uses: actions-rs/toolchain@v1
         with:
@@ -18,15 +30,22 @@ jobs:
             default: true
             override: true
             components: rustfmt, clippy
+
       - name: "Build"
         run: cargo build --release
+
       - name: "Synthesize rational rules"
-        run: cargo rational --iters 2 --variables 3 --num-fuzz 50 --do-final-run
+        run: cargo rational --iters 2 --variables 3 --num-fuzz 50 --do-final-run --outfile rat.json
+
       - name: "Synthesize rational rules (EMA)"
-        run: cargo rational --iters 3 --variables 3 --do-ema-after-iter 1 --num-fuzz 50 --do-final-run
+        run: cargo rational --iters 2 --variables 3 --ema-above-iter 1 --num-fuzz 50 --do-final-run --outfile rat.json
+
       - name: "Synthesize rational rules (EMA, no consts)"
-        run: cargo rational --iters 3 --variables 3 --do-ema-after-iter 1 --no-constants-after-iter 1 --num-fuzz 50 --do-final-run
+        run: cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --num-fuzz 50 --do-final-run --outfile rat.json
+
       - name: "Synthesize bv4 rules"
-        run: cargo bv4 --iters 2 --variables 3
+        run: cargo bv4 --iters 2 --variables 3 --outfile bv4.json
+
       - name: "Synthesize bv32 rules"
-        run: cargo bv4 --iters 2 --variables 3
+        run: cargo bv4 --iters 2 --variables 3 --outfile bv32.json
+
