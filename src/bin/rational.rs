@@ -201,7 +201,7 @@ impl SynthLanguage for Math {
         // predicate if disabled
         let allowedp = |s| disabled_ops.iter().find(|&x| x.eq(&s)).is_none();
         
-        let mut extract = Extractor::new(&synth.egraph, NumberOfOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let mut to_add = vec![];
 
         // maps ids to n_ops

@@ -10,7 +10,7 @@ use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{borrow::{Borrow, Cow}};
-use std::{cmp::Ordering, hash::Hash};
+use std::{hash::Hash};
 use std::{
     fmt::{Debug, Display},
     time::Duration,
@@ -522,7 +522,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         log::info!("# unique cvecs: {}", by_cvec.len());
 
         let mut new_eqs = EqualityMap::default();
-        let mut extract = Extractor::new(&self.egraph, AstSize);
+        let extract = Extractor::new(&self.egraph, AstSize);
 
         let compare = |cvec1: &CVec<L>, cvec2: &CVec<L>| -> bool {
             let mut _count = 0;
@@ -576,7 +576,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         log::info!("# unique cvecs: {}", by_cvec.len());
 
         let mut new_eqs = EqualityMap::default();
-        let mut extract = Extractor::new(&self.egraph, AstSize);
+        let extract = Extractor::new(&self.egraph, AstSize);
         for ids in by_cvec.values() {
             if self.params.linear_cvec_matching || ids.len() > 0 {
                 let mut terms_ids: Vec<_> =
@@ -912,7 +912,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         if win[0] != win[1] &&
                             self.egraph[win[0]].data.is_extractable &&
                             self.egraph[win[1]].data.is_extractable { 
-                            let mut extract = Extractor::new(&self.egraph, ExtractableAstSize);
+                            let extract = Extractor::new(&self.egraph, ExtractableAstSize);
                             let (_, e1) = extract.find_best(win[0]);
                             let (_, e2) = extract.find_best(win[1]);
                             if let Some(mut eq) = Equality::new(&e1, &e2) {
@@ -956,7 +956,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         if win[0] != win[1] &&
                            self.egraph[win[0]].data.is_extractable &&
                            self.egraph[win[1]].data.is_extractable { 
-                            let mut extract = Extractor::new(&self.egraph, ExtractableAstSize);
+                            let extract = Extractor::new(&self.egraph, ExtractableAstSize);
                             let (_, e1) = extract.find_best(win[0]);
                             let (_, e2) = extract.find_best(win[1]);
                             if let Some(mut eq) = Equality::new(&e1, &e2) {
@@ -999,7 +999,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         eqs.reverse();
 
         let mut ids: Vec<Id> = self.ids().collect();
-        let mut extract = Extractor::new(&self.egraph, ExtractableAstSize);
+        let extract = Extractor::new(&self.egraph, ExtractableAstSize);
         ids.sort();
         for id in ids {
             if self.egraph[id].data.in_domain {
@@ -1281,17 +1281,6 @@ impl<L: SynthLanguage> Signature<L> {
     }
 }
 
-fn ord_merge(to: &mut Option<Ordering>, from: Ordering) {
-    if let Some(ord) = to.as_mut() {
-        match (*ord, from) {
-            (Ordering::Equal, _) => *ord = from,
-            (_, Ordering::Equal) => (),
-            (_, _) if *ord == from => (),
-            _ => *to = None,
-        }
-    }
-}
-
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
@@ -1474,7 +1463,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
             let old_len = new_eqs.len();
             if self.egraph.analysis.rule_lifting {
-                let mut extract = Extractor::new(&runner.egraph, ExtractableAstSize);
+                let extract = Extractor::new(&runner.egraph, ExtractableAstSize);
                 new_eqs.clear();
 
                 for ids in runner.roots.chunks(2) {
@@ -1491,7 +1480,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                 }
             } else {
-                let mut extract = Extractor::new(&runner.egraph, AstSize);
+                let extract = Extractor::new(&runner.egraph, AstSize);
                 new_eqs.clear();
 
                 for ids in runner.roots.chunks(2) {

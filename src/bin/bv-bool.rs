@@ -155,7 +155,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let mut extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
         let mut to_add = vec![];
 
         // maps ids to n_ops
