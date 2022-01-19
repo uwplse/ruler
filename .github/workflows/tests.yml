@@ -49,3 +49,9 @@ jobs:
       - name: "Synthesize bv32 rules"
         run: cargo bv4 --iters 2 --variables 3 --outfile bv32.json
 
+      - name: "Synthesize real rules from rational rules (rule lifting)"
+        run: cargo real-rat --iters 2 --variables 3 --no-constants-above-iter 1 --prior-rules rat.json --outfile real.json
+
+      # Need to filter out rational rules from real.json
+      # - name: "Synthesize complex rules from real rules (rule lifting, no constants)"
+      #   run: cargo complex-real --iters 2 --variables 3 --no-constants-above-iter 0 --prior-rules real.json --outfile complex.json
