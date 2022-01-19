@@ -61,6 +61,6 @@ jobs:
           cargo real-rat --iters 2 --variables 3 --no-constants-above-iter 1 --prior-rules out/rat.json --outfile out/real.json
           cargo run --release --bin real-rat derive --ci --new-eqs out/real.json tests/real.json out/real-derive.json
 
-      # Need to filter out rational rules from real rules
+      # Need to filter out rational rules from real.json
       # - name: "Synthesize complex rules from real rules (rule lifting, no constants)"
       #   run: cargo complex-real --iters 2 --variables 3 --no-constants-above-iter 0 --prior-rules real.json --outfile complex.json
