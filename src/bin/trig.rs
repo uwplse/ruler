@@ -459,57 +459,6 @@ impl SynthLanguage for Math {
     // custom constant folder
     fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {
     }
-
-    /// Heuristics for ranking rewrites based on number of variables,
-    /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
-    /// and number of ops.
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
-        let lhs_recpat = Self::recpat_instantiate(&lhs.ast);
-        let rhs_recpat = Self::recpat_instantiate(&rhs.ast);
-        let sz_lhs = ExtractableAstSize.cost_rec(&lhs_recpat) as i32;
-        let sz_rhs = ExtractableAstSize.cost_rec(&rhs_recpat) as i32;
-        // let sz_max_pattern = sz_lhs.max(sz_rhs);
-
-        // lhs.vars() and rhs.vars() is deduping
-        // examples
-        //   (- x x) => 0 --- 1 b/c x only var
-        //   (- x 0) => x --- 1 b/c x only var
-        //   (+ x y) => (+ y x) --- 2 b/c x, y only vars
-        let mut var_set: HashSet<Var> = Default::default();
-        var_set.extend(lhs.vars());
-        var_set.extend(rhs.vars());
-        let n_vars_rule = var_set.len() as i32;
-
-        let mut op_set: HashSet<String> = Default::default();
-        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-            if !node.is_leaf() {
-                op_set.insert(node.to_string());
-            }
-        }
-        let n_ops = op_set.len() as i32;
-
-        let n_consts = lhs
-            .ast
-            .as_ref()
-            .iter()
-            .chain(rhs.ast.as_ref())
-            .filter(|n| match n {
-                ENodeOrVar::ENode(n) => n.is_constant(),
-                ENodeOrVar::Var(_) => false,
-            })
-            .count() as i32;
-
-        // (-sz_max_pattern, n_vars_rule)
-        [
-            n_vars_rule,
-            -n_consts,
-            -i32::max(sz_lhs, sz_rhs),
-            // -i32::min(sz_lhs, sz_rhs),
-            -(sz_lhs + sz_rhs),
-            -n_ops,
-            // 0
-        ]
-    }
 }
 
 /// Entry point.

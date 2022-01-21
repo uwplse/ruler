@@ -138,26 +138,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         RecExpr::from(nodes)
     }
 
-    // Like instantiate, but takes a recexpr of pattern nodes
-    fn recpat_instantiate(expr: &RecExpr<ENodeOrVar<Self>>) -> RecExpr<Self> {
-        let nodes: Vec<_> = expr
-            .as_ref()
-            .iter()
-            .map(|n| match n {
-                ENodeOrVar::ENode(n) => n.clone(),
-                ENodeOrVar::Var(v) => {
-                    let s = v.to_string();
-                    assert!(s.starts_with('?'));
-                    Self::mk_var(s[1..].into())
-                }
-            })
-            .collect();
-
-        RecExpr::from(nodes)
-    }
-
-    /// Like generalize, but returns a recexpr
-    fn emt_generalize(expr: &RecExpr<Self>) -> RecExpr<Self> {
+    /// Applies alpha renaming to a recexpr
+    fn alpha_renaming(expr: &RecExpr<Self>) -> RecExpr<Self> {
         let map = &mut HashMap::<Symbol, Var>::default();
         let nodes: Vec<_> = expr
             .as_ref()
@@ -271,28 +253,6 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     /// Returns true if every node in the recexpr is in the domain
     fn recexpr_in_domain(expr: &RecExpr<Self>) -> bool {
         expr.as_ref().iter().all(|x| x.is_in_domain())
-    }
-
-    /// Helper function for `add_domain_expr`
-    fn add_domain_expr_rec(synth: &mut Synthesizer<Self>, nodes: &[Self]) -> Id {
-        let n = nodes.last().unwrap().clone()
-            .map_children(|i| {
-                let child = &nodes[..usize::from(i) + 1];
-                Self::add_domain_expr_rec(synth, child)
-            });
-        Self::add_domain_node(synth, n)
-    }
-
-    /// Like calling `egraph.add_expr` except enodes for
-    /// lower domain equivalencies are added.
-    fn add_domain_expr(synth: &mut Synthesizer<Self>, expr: &RecExpr<Self>) -> Id {
-        Self::add_domain_expr_rec(synth, expr.as_ref())
-    }
-
-    /// Like calling `egraph.add` except enodes for
-    /// lower domain equivalencies are added.
-    fn add_domain_node(synth: &mut Synthesizer<Self>, node: Self) -> Id {
-        synth.egraph.add(node)
     }
 
     /// Constant folding done explicitly by the language
@@ -640,7 +600,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let seen = &mut HashSet::<Id>::default();
             if iter > self.params.ema_above_iter {
                 let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
-                let rec2 = L::emt_generalize(&rec);
+                let rec2 = L::alpha_renaming(&rec);
                 let id = cp.add_expr(&rec2);
                 if usize::from(id) < max_id {
                     return false;
@@ -687,7 +647,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 for node in chunk {
                     if iter > self.params.ema_above_iter {
                         let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
-                        self.egraph.add_expr(&L::emt_generalize(&rec));
+                        self.egraph.add_expr(&L::alpha_renaming(&rec));
                     } else {
                         self.egraph.add(node.clone());
                     }
@@ -872,9 +832,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 for node in chunk {
                     if iter > self.params.ema_above_iter {
                         let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
-                        L::add_domain_expr(&mut self, &rec);
+                        self.egraph.add_expr(&L::alpha_renaming(&rec));
                     } else {
-                        L::add_domain_node(&mut self, node.clone());
+                        self.egraph.add(node.clone());
                     }
                 }
                 
@@ -988,9 +948,41 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
                 log::info!("Time taken in... rule minimization: {}", rule_minimize);
 
-                log::info!("Chose {} good rules", eqs.len());
-                self.all_eqs.extend(eqs.clone());
-                self.new_eqs.extend(eqs);
+                log::info!("{} possible rules", eqs.len());
+                let mut valid_eqs = vec![];
+                for (s, eq) in eqs {
+                    if !self.params.no_run_rewrites {
+                        assert!(!self.all_eqs.contains_key(&eq.name));
+                        if let Some((i, j)) = eq.ids {  // inserted
+                            self.egraph.union(i, j);
+                        } else {                        // extracted
+                            // let mut cp = self.egraph.clone();
+                            let mut valid_const = true;
+                            let lrec = L::instantiate(&eq.lhs);
+                            let rrec = L::instantiate(&eq.rhs);
+
+                            let i = self.egraph.add_expr(&lrec);
+                            let seen = &mut HashSet::<Id>::default();
+                            valid_const &= L::valid_constants(&self, &self.egraph, &i, seen);
+
+                            let j = self.egraph.add_expr(&rrec);
+                            seen.clear();
+                            valid_const &= L::valid_constants(&self, &self.egraph, &j, seen);
+
+                            self.egraph.union(i, j);
+                            if !valid_const {   // encountered a constant we don't want to see
+                                continue;
+                            }
+                        }
+                    }
+
+                    log::info!("  {}", eq);
+                    valid_eqs.push((s, eq));
+                }
+
+                log::info!("Chose {} good rules", valid_eqs.len());
+                self.all_eqs.extend(valid_eqs.clone());
+                self.new_eqs.extend(valid_eqs);
             }
         }
 
