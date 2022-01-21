@@ -806,7 +806,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // run HL-LL rewrites (iter 0)
         log::info!("running HL-LL rewrites");
         let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
-        log::info!("after making cvec less runner: {}", runner.egraph.analysis.cvec_len);
         runner = runner.run(&self.lifting_rewrites);
         self.egraph = runner.egraph;
         self.egraph.rebuild();
@@ -871,7 +870,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     for win in ids.windows(2) {             
                         if win[0] != win[1] &&
                             self.egraph[win[0]].data.is_extractable &&
-                            self.egraph[win[1]].data.is_extractable { 
+                            self.egraph[win[1]].data.is_extractable {
                             let extract = Extractor::new(&self.egraph, ExtractableAstSize);
                             let (_, e1) = extract.find_best(win[0]);
                             let (_, e2) = extract.find_best(win[1]);
@@ -900,7 +899,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     .values()
                     .flat_map(|eq| &eq.rewrites)
                     .collect();
-                runner = runner.run(rewrites); 
+                runner = runner.run(rewrites);
 
                 // collect any interesting unions
                 log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
@@ -986,22 +985,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
 
+        let time = t.elapsed().as_secs_f64();
         let mut eqs: Vec<_> = self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
 
-        let mut ids: Vec<Id> = self.ids().collect();
-        let extract = Extractor::new(&self.egraph, ExtractableAstSize);
-        ids.sort();
-        for id in ids {
-            if self.egraph[id].data.in_domain {
-                let (_, e) = extract.find_best(id);
-                log::info!("{} [{}]: {:?} {:?}", id, self.egraph[id].data.is_extractable,
-                            e.pretty(100), self.egraph[id].nodes);
-            }
+        // final run_rewrites
+        if self.params.do_final_run {
+            let old = std::mem::replace(&mut self.params.no_conditionals, false);
+            let rws = self.all_eqs.values().flat_map(|eq| &eq.rewrites);
+            let final_runner = self.mk_runner(self.egraph.clone());
+            final_runner.run(rws);
+            self.params.no_conditionals = old;
         }
 
-        let time = t.elapsed().as_secs_f64();
         let num_rules = self.new_eqs.len();
         let mut n_eqs: Vec<_> = self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
         n_eqs.sort_by_key(|eq| eq.score());

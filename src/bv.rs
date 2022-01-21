@@ -291,27 +291,27 @@ macro_rules! impl_bv {
                             continue;
                         }
 
-                        // to_add.push(Math::Add([i, j]));
-                        // to_add.push(Math::Sub([i, j]));
-                        // to_add.push(Math::Mul([i, j]));
+                        to_add.push(Math::Add([i, j]));
+                        to_add.push(Math::Sub([i, j]));
+                        to_add.push(Math::Mul([i, j]));
 
                         if !synth.params.no_shift {
-                            // to_add.push(Math::Shl([i, j]));
-                            // to_add.push(Math::Shr([i, j]));
+                            to_add.push(Math::Shl([i, j]));
+                            to_add.push(Math::Shr([i, j]));
                         }
 
                         to_add.push(Math::And([i, j]));
                         to_add.push(Math::Or([i, j]));
-                        if !synth.params.no_xor {
-                            to_add.push(Math::Xor([i, j]));
-                        }
+                        // if !synth.params.no_xor {
+                        //     to_add.push(Math::Xor([i, j]));
+                        // }
                     }
                     if ids[&i] + 1 != iter {
                         continue;
                     }
 
                     to_add.push(Math::Not(i));
-                    // to_add.push(Math::Neg(i));
+                    to_add.push(Math::Neg(i));
                 }
 
                 log::info!("Made a layer of {} enodes", to_add.len());

@@ -283,6 +283,20 @@ impl SynthLanguage for Math {
         }
     }
 
+    fn is_extractable(&self) -> bool {
+        match self {
+            Math::Sin(_)        |
+            Math::Cos(_)        |
+            Math::Add(_)        |
+            Math::Sub(_)        |
+            Math::Mul(_)        |
+            Math::Div(_)        |
+            Math::RealConst(_)  |
+            Math::Var(_) => true,
+            _ => false,
+        }
+    }
+
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // disabled constants (TODO: validate input)
         let disabled_consts: Vec<&str> =
@@ -343,9 +357,6 @@ impl SynthLanguage for Math {
                      "(Re (/C (*C (+C (cis ?a) (cis (~ ?a))) (+C (cis ?a) (cis (~ ?a)))) 2C))"),
             rewrite!("def-sin-sqr"; "(sqr (sin ?a))" <=>
                      "(Re (/C (*C (-C (cis ?a) (cis (~ ?a))) (-C (cis ?a) (cis (~ ?a)))) 2iC))"),
-
-            // rewrite!("complex-foil"; "(*C (+C ?a ?b) (+C ?c ?d))" <=>
-            //         "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))"),
 
             vec![
                 rewrite!("def-add"; "(+ (Re ?a) (Re ?b))" => "(Re (+C ?a ?b))"),
