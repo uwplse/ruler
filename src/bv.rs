@@ -318,12 +318,11 @@ macro_rules! impl_bv {
                 to_add
             }
 
-
-            fn is_valid(
-                synth: &mut Synthesizer<Self>,
+            fn validate(
+                synth: &Synthesizer<Self>,
                 lhs: &Pattern<Self>,
-                rhs: &Pattern<Self>,
-            ) -> bool {
+                rhs: &Pattern<Self>
+            ) -> ValidationResult {
                 use z3::{*, ast::Ast};
 
                 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
@@ -356,16 +355,15 @@ macro_rules! impl_bv {
                     let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
                     solver.assert(&lexpr._eq(&rexpr).not());
                     match solver.check() {
-                        SatResult::Unsat => true,
-                        SatResult::Sat => {
+                        SatResult::Sat => ValidationResult::Invalid,
+                        SatResult::Unsat => {
                             // println!("z3 validation: failed for {} => {}", lhs, rhs);
-                            false
-                        }
+                            ValidationResult::Valid
+                        },
                         SatResult::Unknown => {
-                            synth.smt_unknown += 1;
                             // println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                            false
-                        }
+                            ValidationResult::Unknown
+                        },
                     }
                 } else {
                     let n = synth.params.num_fuzz;
@@ -379,18 +377,18 @@ macro_rules! impl_bv {
                         env.insert(var, vec![]);
                     }
 
+                    let rng = &mut rand_pcg::Lcg128Xsl64::new(0, 0);
                     for cvec in env.values_mut() {
                         cvec.reserve(n);
                         for _ in 0..n {
-                            let v = synth.rng.gen::<BV>();
+                            let v = rng.gen::<BV>();
                             cvec.push(Some(v));
                         }
                     }
 
                     let lvec = Self::eval_pattern(lhs, &env, n);
                     let rvec = Self::eval_pattern(rhs, &env, n);
-
-                    lvec == rvec
+                    ValidationResult::from(lvec == rvec)
                 }
             }
         }

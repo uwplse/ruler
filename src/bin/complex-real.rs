@@ -613,12 +613,12 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
-        _synth: &mut Synthesizer<Self>,
+    fn validate(
+        _synth: &Synthesizer<Self>,
         lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-    ) -> bool {
-        !contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast)
+        rhs: &Pattern<Self>
+    ) -> ValidationResult {
+        ValidationResult::from(!contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast))
     }
 
     fn is_valid_rewrite(

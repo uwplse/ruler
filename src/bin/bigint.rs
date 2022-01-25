@@ -161,11 +161,11 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
-        synth: &mut Synthesizer<Self>,
+    fn validate(
+        synth: &Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
-        rhs: &egg::Pattern<Self>,
-    ) -> bool {
+        rhs: &egg::Pattern<Self>
+    ) -> ValidationResult {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);
@@ -178,15 +178,14 @@ impl SynthLanguage for Math {
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check_assumptions(all) {
                 // match solver.check() {
-                SatResult::Unsat => true,
+                SatResult::Unsat => ValidationResult::Invalid,
                 SatResult::Sat => {
                     println!("z3 validation: failed for {} => {}", lhs, rhs);
-                    false
+                    ValidationResult::Valid
                 }
                 SatResult::Unknown => {
-                    synth.smt_unknown += 1;
                     println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                    false
+                    ValidationResult::Unknown
                 }
             }
         } else {
@@ -201,17 +200,17 @@ impl SynthLanguage for Math {
                 env.insert(var, vec![]);
             }
 
+            let rng = &mut rand_pcg::Lcg128Xsl64::new(0, 0);
             for cvec in env.values_mut() {
                 cvec.reserve(n);
-                for s in sampler(&mut synth.rng, 32, n) {
+                for s in sampler(rng, 32, n) {
                     cvec.push(Some(s));
                 }
             }
 
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
-
-            lvec == rvec
+            ValidationResult::from(lvec == rvec)
         }
     }
 }

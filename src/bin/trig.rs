@@ -459,12 +459,12 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
-        _synth: &mut Synthesizer<Self>,
+    fn validate(
+        _synth: &Synthesizer<Self>,
         _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> bool {
-        true
+        _rhs: &Pattern<Self>
+    ) -> ValidationResult {
+        ValidationResult::Valid
     }
 
     // custom constant folder
