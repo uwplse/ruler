@@ -9,23 +9,33 @@ pub fn parse<L: SynthLanguage>(filename: &String) -> Vec<Pair<L>> {
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
 
-    let pairs: Vec<Pair<L>> = report
-        .all_eqs
-        .iter()
-        .map(|eq| {
+    report.all_eqs.iter().map(|eq| {
             let l = L::instantiate(&eq.lhs);
             let r = L::instantiate(&eq.rhs);
             (l, r)
         })
-        .collect();
+        .collect()
+}
 
-    pairs
+pub fn parse_new_eqs<L: SynthLanguage>(filename: &String) -> Vec<Pair<L>> {
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
+    let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
+
+    report.new_eqs.iter().map(|eq| {
+            let l = L::instantiate(&eq.lhs);
+            let r = L::instantiate(&eq.rhs);
+            (l, r)
+        })
+        .collect()
 }
 
 /// Perform derivability test between two rulesets.
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
-    let pairs1 = parse::<L>(&params.in1);
-    let pairs2 = parse::<L>(&params.in2);
+    let (pairs1, pairs2) = if params.new_eqs {
+        (parse_new_eqs::<L>(&params.in1), parse_new_eqs::<L>(&params.in2))
+    } else {
+        (parse::<L>(&params.in1), parse::<L>(&params.in2))
+    };
 
     if params.ci {
         println!("Using {} to derive {}", params.in1, params.in2);

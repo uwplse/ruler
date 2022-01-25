@@ -111,7 +111,7 @@ impl Debug for Real {
     }
 }
 
-// custom implementation of a complex value
+// custom implementation of a variable value
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Variable(Symbol);
 

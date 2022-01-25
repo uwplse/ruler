@@ -1,12 +1,46 @@
 # <img src="ruler.svg" alt="ruler logo" height="40" align="left"> Ruler
 
-### Installation of Ruler
+Ruler is a framework that uses equality saturation
+ to automatically infer small, expressive
+ rulesets for a domain.
+
+If you use this work, please cite it using the following BibTeX.
+<details>
+<summary>BibTeX</summary>
+<code><pre>
+@article{ruler,
+  author = {Nandi, Chandrakana
+        and Willsey, Max
+        and Zhu, Amy
+        and Wang, Yisu Remy
+        and Saiki, Brett
+        and Anderson, Adam
+        and Schulz, Adriana
+        and Grossman, Dan
+        and Tatlock, Zachary},
+  title = {Rewrite Rule Inference Using Equality Saturation},
+  year = {2021},
+  issue_date = {October 2021},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  volume = {5},
+  number = {OOPSLA},
+  url = {https://doi.org/10.1145/3485496},
+  doi = {10.1145/3485496},
+  journal = {Proc. ACM Program. Lang.},
+  month = {oct},
+  articleno = {119},
+  numpages = {28},
+  keywords = {Program Synthesis, Rewrite Rules, Equality Saturation}
+}
+</pre></code>
+</details>
+
+### Installation
 Ruler is implemented in [Rust](rust-lang.org/).
 You can install Rust [here](https://www.rust-lang.org/tools/install).
-You can then get the code from Zenodo and
-run the tool as described below.
 To build Ruler, type `cargo build --release`.
-This should take ~40 min.
+This should take a few minutes.
 
 ### Dependencies
 To install Ruler, the following dependencies must be installed:
@@ -48,11 +82,11 @@ Type `cargo domain --help` to see all available flags and parameters.
 
 ### Publications
 
-* C. Nandi, M. Willsey, A. Zhu, Y. Wang, B. Saiki, A. Anderson, A. Schulz, D. Grossman, Z. Tatlock
-[Rewrite Rule Inference Using Equality Saturation](https://dl.acm.org/doi/abs/10.1145/3485496).
-(OOPSLA 2021)
+* C. Nandi, M. Willsey, A. Zhu, Y. Wang, B. Saiki, A. Anderson, A. Schulz, D. Grossman, Z. Tatlock,
+[*Rewrite Rule Inference Using Equality Saturation*](https://dl.acm.org/doi/abs/10.1145/3485496).
+(OOPSLA 2021, Distinguished Paper Award)
 
-See [here](./OOPSLA.md) for documentation on OOPSLA artifacts.
+See [here](OOPSLA21.md) for documentation on OOPSLA artifacts.
 
 ### Extending Ruler to Support New Domains
 Ruler's goal is to support rewrite inference for new domains,
