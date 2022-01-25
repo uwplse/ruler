@@ -1,4 +1,4 @@
-# <img src="ruler.svg" alt="ruler logo" height="40" align="left"> Rewrite Rule Inference Using Equality Saturation
+# <img src="ruler.svg" alt="ruler logo" height="40" align="left"> Ruler
 
 ### Installation of Ruler
 Ruler is implemented in [Rust](rust-lang.org/).
@@ -9,22 +9,14 @@ To build Ruler, type `cargo build --release`.
 This should take ~40 min.
 
 ### Dependencies
-We tested our artifact setup on a Ubuntu 20.04 VM.
-To install and run the entire evaluation on a
-  fresh machine with the same OS,
-  the following dependencies must be installed:
+To install Ruler, the following dependencies must be installed:
 
-  * git
-  * python3
-  * moreutils
-  * cmake
-  * curl
-  * rust
+  * Rust
   * libz3
 
 If `libz3` is not offered on your system, you can edit `Cargo.toml` in this directory
   by changing the dependency `z3 = xxx` to `z3 = {version=xxx, features = ["static-link-z3"]}`.
-This will statically link to a built copy of z3 instead but the build
+This will statically link to a built copy of z3 instead of dynamically linking, but the build
   process will take considerably longer.
 It is recommended that you install `libz3` if possible.
 
@@ -53,6 +45,14 @@ Type `cargo domain --help` to see all available flags and parameters.
      See below for more information on supporting other domains.
 - `scripts` has all the scripts used for evaluating Ruler --- each is in a
     designated subdirectory.
+
+### Publications
+
+* C. Nandi, M. Willsey, A. Zhu, Y. Wang, B. Saiki, A. Anderson, A. Schulz, D. Grossman, Z. Tatlock
+[Rewrite Rule Inference Using Equality Saturation](https://dl.acm.org/doi/abs/10.1145/3485496).
+(OOPSLA 2021)
+
+See [here](./OOPSLA.md) for documentation on OOPSLA artifacts.
 
 ### Extending Ruler to Support New Domains
 Ruler's goal is to support rewrite inference for new domains,
