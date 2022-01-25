@@ -484,6 +484,31 @@ impl<L: SynthLanguage> Synthesizer<L> {
         runner.egraph
     }
 
+    /// Like run rewrites but unions are simply extracted and returned
+    /// along with the runner egraph.
+    fn run_rewrites_with_unions(
+        &self,
+        rewrites: Vec<&Rewrite<L, SynthAnalysis>>,
+        mut runner: Runner<L, SynthAnalysis>
+    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>) {
+        // run the rewrites
+        let start = Instant::now();
+        log::info!("running eqsat with {} rules", rewrites.len());
+        runner = runner.run(rewrites);
+
+        log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
+        // update the clean egraph based on any unions that happened
+        let mut found_unions = HashMap::default();
+        for id in self.ids() {
+            let id2 = runner.egraph.find(id);
+            found_unions.entry(id2).or_insert(vec![]).push(id);
+        }
+
+        runner.egraph.rebuild();
+        log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
+        (runner.egraph, found_unions)
+    }
+
     /// Generate potential rewrite rule candidates by cvec_matching.
     ///
     /// Note that this is a pair-wise matcher which is invoked when conditional
@@ -784,7 +809,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         (accepted_new_eqs, new_poison_rules, num_unknowns)
     }
 
-    /// Rule synthesis for one domain, i.e., Ruler as presented in OOPSLA'21
+    /// Rule synthesis for one domain, i.e., Ruler as presented at OOPSLA'21
     fn run_one_domain(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
@@ -877,38 +902,25 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         self.egraph.add(node.clone());
                     }
                 }
-                
-                // run new eqs
-                log::info!("running eqsat with {} new rules", self.new_eqs.len());
-                let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
-                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.new_eqs
-                    .values()
-                    .flat_map(|eq| &eq.rewrites)
-                    .collect();
-                runner = runner.run(rewrites);
-                self.egraph = runner.egraph;
-                self.egraph.rebuild();
-                
-                // run lifting rewrites
-                log::info!("running eqsat with {} rules", self.old_eqs.len() + self.lifting_rewrites.len());
-                let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
-                runner = runner.with_iter_limit(self.params.eqsat_iter_limit * 2);
+
+                let mut new_eqs: EqualityMap<L> = EqualityMap::default();
                 let run_rewrites_before = Instant::now();
                 let start = Instant::now();
-                runner = runner.run(&self.lifting_rewrites);
 
-                // collect any interesting unions
-                log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
-                let mut found_unions = HashMap::default();
-                for id in self.ids() {
-                    let id2 = runner.egraph.find(id);
-                    found_unions.entry(id2).or_insert(vec![]).push(id);
-                }
+                // run lifting rewrites
+                log::info!("running eqsat with {} rules", self.old_eqs.len() + self.lifting_rewrites.len());
+                let runner = self.mk_cvec_less_runner(self.egraph.clone())
+                    .with_iter_limit(self.params.eqsat_iter_limit + 1);     // increase iter limit by 1 to ensure saturation
+                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.lifting_rewrites.iter()
+                    .map(|x| x)
+                    .collect();
+                let (new_egraph, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
                 // these unions are candidate rewrite rules
-                let mut new_eqs: EqualityMap<L> = EqualityMap::default();
+                // do not apply unions on `self.egraph` since we are
+                // using `new_egraph` after this point
                 for ids in found_unions.values() {
-                    for win in ids.windows(2) {             
+                    for win in ids.windows(2) {
                         if win[0] != win[1] &&
                             self.egraph[win[0]].data.is_extractable &&
                             self.egraph[win[1]].data.is_extractable {
@@ -932,24 +944,32 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                 }
 
-                self.egraph = runner.egraph.clone();
+                self.egraph = new_egraph;
+                self.egraph.rebuild();
+                
+                // run new eqs
+                log::info!("running eqsat with {} new rules", self.new_eqs.len());
+                let runner = self.mk_cvec_less_runner(self.egraph.clone());
+                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.new_eqs
+                    .values()
+                    .flat_map(|eq| &eq.rewrites)
+                    .collect();
+                let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
+                for ids in found_unions.values() {
+                    for win in ids.windows(2) {
+                        self.egraph.union(win[0], win[1]);
+                    }
+                }
+
                 self.egraph.rebuild();
                 
                 // run old rewrites
-                let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
+                let runner = self.mk_cvec_less_runner(self.egraph.clone());
                 let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.old_eqs
                     .values()
                     .flat_map(|eq| &eq.rewrites)
                     .collect();
-                runner = runner.run(rewrites);
-
-                // collect any interesting unions
-                log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
-                let mut found_unions = HashMap::default();
-                for id in self.ids() {
-                    let id2 = runner.egraph.find(id);
-                    found_unions.entry(id2).or_insert(vec![]).push(id);
-                }
+                let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
                 // these unions are candidate rewrite rules
                 for ids in found_unions.values() {
