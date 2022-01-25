@@ -493,19 +493,22 @@ impl<L: SynthLanguage> Synthesizer<L> {
     ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>) {
         // run the rewrites
         let start = Instant::now();
-        log::info!("running eqsat with {} rules", rewrites.len());
+        let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
+        let num_rewrites = rewrites.len();
+        log::info!("running eqsat with {} rules", num_rewrites);
         runner = runner.run(rewrites);
 
         log::info!("{:?} collecting unions...", runner.stop_reason.unwrap());
         // update the clean egraph based on any unions that happened
         let mut found_unions = HashMap::default();
-        for id in self.ids() {
+        for id in ids {
             let id2 = runner.egraph.find(id);
             found_unions.entry(id2).or_insert(vec![]).push(id);
         }
 
         runner.egraph.rebuild();
-        log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
+        log::info!("Ran {} rules in {:?}", num_rewrites, start.elapsed());
+        log::info!("Round {} unions", found_unions.len());
         (runner.egraph, found_unions)
     }
 
@@ -517,8 +520,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn cvec_match_pair_wise(&self, egraph: &EGraph<L, SynthAnalysis>) -> EqualityMap<L> {
         let mut by_cvec: IndexMap<CVec<L>, Vec<Id>> = IndexMap::default();
 
-        let not_all_nones = self
-            .ids()
+        let not_all_nones = egraph.classes().map(|c| c.id)
             .filter(|id| !&egraph[*id].data.cvec.iter().all(|v| v == &None));
         for id in not_all_nones {
             let class = &egraph[id];
@@ -682,7 +684,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     // Run single chunk
-    fn run_one_chunk(
+    fn run_chunk(
         &self,
         egraph: &mut EGraph<L, SynthAnalysis>,
         chunk: &[L],
@@ -813,6 +815,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn run_one_domain(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
+
         assert!(self.params.iters > 0);
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
@@ -822,12 +825,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let mut tmp = EGraph::<L, SynthAnalysis>::new(SynthAnalysis::default());
             std::mem::swap(&mut tmp, &mut self.egraph);
             for chunk in all_chunks {
-                let (new_rules, new_poison, num_unknowns) = self.run_one_chunk(&mut tmp, &chunk, iter, &poison_rules);
-                poison_rules.extend(new_poison);
+                let (new_rules, new_poison, num_unknowns) = self.run_chunk(&mut tmp, &chunk, iter, &poison_rules);
+                poison_rules = new_poison;
+
+                log::info!("Chose {} good rules", new_rules.len());
                 self.new_eqs.extend(new_rules.clone());
                 self.all_eqs.extend(new_rules);
                 self.smt_unknown += num_unknowns;
             }
+
+            std::mem::swap(&mut tmp, &mut self.egraph);
         }
 
         let time = t.elapsed().as_secs_f64();
@@ -865,6 +872,155 @@ impl<L: SynthLanguage> Synthesizer<L> {
             smt_unknown: self.smt_unknown,
         }
     }
+
+    // Run single chunk
+    fn run_chunk_rule_lifting(
+        &self,
+        egraph: &mut EGraph<L, SynthAnalysis>,
+        chunk: &[L],
+        iter: usize,
+    ) -> (EqualityMap<L>, usize) {
+        Synthesizer::add_chunk(egraph, chunk, iter > self.params.ema_above_iter);
+
+        let mut new_candidate_eqs: EqualityMap<L> = EqualityMap::default();
+        let run_rewrites_before = Instant::now();
+
+        // run lifting rewrites
+        log::info!("running eqsat with {} rules", self.old_eqs.len() + self.lifting_rewrites.len());
+        let runner = self.mk_cvec_less_runner(egraph.clone())
+            .with_iter_limit(self.params.eqsat_iter_limit + 1);     // increase iter limit by 1 to ensure saturation
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.lifting_rewrites.iter()
+            .map(|x| x)
+            .collect();
+        let (new_egraph, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
+
+        // these unions are candidate rewrite rules
+        // do not apply unions on `egraph` since we are
+        // using `new_egraph` after this point
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                if win[0] != win[1] &&
+                    egraph[win[0]].data.is_extractable &&
+                    egraph[win[1]].data.is_extractable {
+                    let extract = Extractor::new(&egraph, ExtractableAstSize);
+                    let (_, e1) = extract.find_best(win[0]);
+                    let (_, e2) = extract.find_best(win[1]);
+                    if let Some(mut eq) = Equality::new(&e1, &e2) {
+                        if e1 != e2 &&
+                            e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
+                            e2.as_ref().iter().all(|x| x.is_extractable()) {
+                            if let ValidationResult::Valid = L::validate(&self, &eq.lhs, &eq.rhs) {
+                                eq.ids = Some((win[0], win[1]));
+                                if !new_candidate_eqs.contains_key(&eq.name) {
+                                    log::debug!("  Candidate {}", eq);
+                                    new_candidate_eqs.insert(eq.name.clone(), eq);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        *egraph = new_egraph;
+        egraph.rebuild();
+
+        // run new eqs
+        log::info!("running eqsat with {} new rules", self.new_eqs.len());
+        let runner = self.mk_cvec_less_runner(egraph.clone());
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.new_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .collect();
+        let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                egraph.union(win[0], win[1]);
+            }
+        }
+
+        egraph.rebuild();
+
+        // run old rewrites
+        let runner = self.mk_cvec_less_runner(egraph.clone());
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.old_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .collect();
+        let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
+
+        // these unions are candidate rewrite rules
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                if win[0] != win[1] &&
+                    egraph[win[0]].data.is_extractable &&
+                    egraph[win[1]].data.is_extractable {
+                    let extract = Extractor::new(&egraph, ExtractableAstSize);
+                    let (_, e1) = extract.find_best(win[0]);
+                    let (_, e2) = extract.find_best(win[1]);
+                    if let Some(mut eq) = Equality::new(&e1, &e2) {
+                        log::info!("candidate; {:?} {:?}", e1.pretty(1000), e2.pretty(1000));
+                        if e1 != e2 &&
+                            e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
+                            e2.as_ref().iter().all(|x| x.is_extractable()) {
+                            if let ValidationResult::Valid = L::validate(&self, &eq.lhs, &eq.rhs) {
+                                eq.ids = Some((win[0], win[1]));
+                                if !new_candidate_eqs.contains_key(&eq.name) {
+                                    new_candidate_eqs.insert(eq.name.clone(), eq);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                egraph.union(win[0], win[1]);
+            }
+        }
+
+        egraph.rebuild();
+        new_candidate_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
+        let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
+        log::info!("Time taken in... run_rewrites: {}", run_rewrites);
+
+        let rule_minimize_before = Instant::now();
+        log::info!("Rewrites before minimization: {}", new_candidate_eqs.len());
+        let (eqs, _, num_unknowns) = self.choose_eqs(new_candidate_eqs);
+        let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
+        log::info!("Time taken in... rule minimization: {}", rule_minimize);
+
+        log::info!("{} possible rules", eqs.len());
+        let mut valid_eqs: EqualityMap<L> = EqualityMap::default();
+        for (s, eq) in eqs {
+            if !self.params.no_run_rewrites {
+                assert!(!self.all_eqs.contains_key(&eq.name));
+                if let Some((i, j)) = eq.ids {  // inserted
+                    egraph.union(i, j);
+                } else {                        // extracted
+                    let mut valid_const = true;
+                    let lrec = L::instantiate(&eq.lhs);
+                    let rrec = L::instantiate(&eq.rhs);
+
+                    let i = egraph.add_expr(&lrec);
+                    let seen = &mut HashSet::<Id>::default();
+                    valid_const &= L::valid_constants(&self, &egraph, &i, seen);
+
+                    let j = egraph.add_expr(&rrec);
+                    seen.clear();
+                    valid_const &= L::valid_constants(&self, &egraph, &j, seen);
+
+                    egraph.union(i, j);
+                    if !valid_const {   // encountered a constant we don't want to see
+                        continue;
+                    }
+                }
+            }
+
+            log::info!("  {}", eq);
+            valid_eqs.insert(s, eq);
+        }
+
+        (valid_eqs, num_unknowns)
+    }
     
     /// Rule synthesis for rule lifting
     fn run_rule_lifting(mut self) -> Report<L> {
@@ -880,173 +1036,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
             let layer = self.enumerate_layer(iter);
-            let chunk_count = div_up(layer.len(), self.params.node_chunk_size);
-            let mut chunk_num = 1;
+            let all_chunks: Vec<&[L]> = layer.chunks(self.params.node_chunk_size).collect();
 
-            log::info!("Filtered layer, {} nodes remaining", layer.len());
-            log::info!("Running loop with {} chunks", chunk_count);
-            for chunk in layer.chunks(self.params.node_chunk_size) {
-                log::info!("Chunk {} / {}", chunk_num, chunk_count);
-                log::info!(
-                    "egraph n={}, e={}",
-                    self.egraph.total_size(),
-                    self.egraph.number_of_classes(),
-                );
+            let mut tmp = EGraph::<L, SynthAnalysis>::new(SynthAnalysis::default());
+            std::mem::swap(&mut tmp, &mut self.egraph);
+            for chunk in all_chunks {
+                let (new_rules, num_unknowns) = self.run_chunk_rule_lifting(&mut tmp, &chunk, iter);
 
-                chunk_num += 1;
-                for node in chunk {
-                    if iter > self.params.ema_above_iter {
-                        let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
-                        self.egraph.add_expr(&L::alpha_renaming(&rec));
-                    } else {
-                        self.egraph.add(node.clone());
-                    }
-                }
-
-                let mut new_eqs: EqualityMap<L> = EqualityMap::default();
-                let run_rewrites_before = Instant::now();
-                let start = Instant::now();
-
-                // run lifting rewrites
-                log::info!("running eqsat with {} rules", self.old_eqs.len() + self.lifting_rewrites.len());
-                let runner = self.mk_cvec_less_runner(self.egraph.clone())
-                    .with_iter_limit(self.params.eqsat_iter_limit + 1);     // increase iter limit by 1 to ensure saturation
-                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.lifting_rewrites.iter()
-                    .map(|x| x)
-                    .collect();
-                let (new_egraph, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
-
-                // these unions are candidate rewrite rules
-                // do not apply unions on `self.egraph` since we are
-                // using `new_egraph` after this point
-                for ids in found_unions.values() {
-                    for win in ids.windows(2) {
-                        if win[0] != win[1] &&
-                            self.egraph[win[0]].data.is_extractable &&
-                            self.egraph[win[1]].data.is_extractable {
-                            let extract = Extractor::new(&self.egraph, ExtractableAstSize);
-                            let (_, e1) = extract.find_best(win[0]);
-                            let (_, e2) = extract.find_best(win[1]);
-                            if let Some(mut eq) = Equality::new(&e1, &e2) {
-                                if e1 != e2 &&
-                                    e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
-                                    e2.as_ref().iter().all(|x| x.is_extractable()) {
-                                    if let ValidationResult::Valid = L::validate(&self, &eq.lhs, &eq.rhs) {
-                                        eq.ids = Some((win[0], win[1]));
-                                        if !self.new_eqs.contains_key(&eq.name) {
-                                            log::debug!("  Candidate {}", eq);
-                                            new_eqs.insert(eq.name.clone(), eq);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                self.egraph = new_egraph;
-                self.egraph.rebuild();
-                
-                // run new eqs
-                log::info!("running eqsat with {} new rules", self.new_eqs.len());
-                let runner = self.mk_cvec_less_runner(self.egraph.clone());
-                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.new_eqs
-                    .values()
-                    .flat_map(|eq| &eq.rewrites)
-                    .collect();
-                let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
-                for ids in found_unions.values() {
-                    for win in ids.windows(2) {
-                        self.egraph.union(win[0], win[1]);
-                    }
-                }
-
-                self.egraph.rebuild();
-                
-                // run old rewrites
-                let runner = self.mk_cvec_less_runner(self.egraph.clone());
-                let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.old_eqs
-                    .values()
-                    .flat_map(|eq| &eq.rewrites)
-                    .collect();
-                let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
-
-                // these unions are candidate rewrite rules
-                for ids in found_unions.values() {
-                    for win in ids.windows(2) {             
-                        if win[0] != win[1] &&
-                           self.egraph[win[0]].data.is_extractable &&
-                           self.egraph[win[1]].data.is_extractable { 
-                            let extract = Extractor::new(&self.egraph, ExtractableAstSize);
-                            let (_, e1) = extract.find_best(win[0]);
-                            let (_, e2) = extract.find_best(win[1]);
-                            if let Some(mut eq) = Equality::new(&e1, &e2) {
-                                if e1 != e2 &&
-                                    e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
-                                    e2.as_ref().iter().all(|x| x.is_extractable()) {
-                                    if let ValidationResult::Valid = L::validate(&self, &eq.lhs, &eq.rhs) {
-                                        eq.ids = Some((win[0], win[1]));
-                                        if !self.new_eqs.contains_key(&eq.name) {
-                                            new_eqs.insert(eq.name.clone(), eq);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        self.egraph.union(win[0], win[1]);
-                    }
-                }
-
-                self.egraph.rebuild();
-                new_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
-
-                log::info!("Ran {} rules in {:?}", self.all_eqs.len(), start.elapsed());
-                let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
-                log::info!("Time taken in... run_rewrites: {}", run_rewrites);
-
-                let rule_minimize_before = Instant::now();
-                let (eqs, _, num_unknowns) = self.choose_eqs(new_eqs);
+                log::info!("Chose {} good rules", new_rules.len());
+                self.new_eqs.extend(new_rules.clone());
+                self.all_eqs.extend(new_rules);
                 self.smt_unknown += num_unknowns;
-                let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
-                log::info!("Time taken in... rule minimization: {}", rule_minimize);
-
-                log::info!("{} possible rules", eqs.len());
-                let mut valid_eqs = vec![];
-                for (s, eq) in eqs {
-                    if !self.params.no_run_rewrites {
-                        assert!(!self.all_eqs.contains_key(&eq.name));
-                        if let Some((i, j)) = eq.ids {  // inserted
-                            self.egraph.union(i, j);
-                        } else {                        // extracted
-                            // let mut cp = self.egraph.clone();
-                            let mut valid_const = true;
-                            let lrec = L::instantiate(&eq.lhs);
-                            let rrec = L::instantiate(&eq.rhs);
-
-                            let i = self.egraph.add_expr(&lrec);
-                            let seen = &mut HashSet::<Id>::default();
-                            valid_const &= L::valid_constants(&self, &self.egraph, &i, seen);
-
-                            let j = self.egraph.add_expr(&rrec);
-                            seen.clear();
-                            valid_const &= L::valid_constants(&self, &self.egraph, &j, seen);
-
-                            self.egraph.union(i, j);
-                            if !valid_const {   // encountered a constant we don't want to see
-                                continue;
-                            }
-                        }
-                    }
-
-                    log::info!("  {}", eq);
-                    valid_eqs.push((s, eq));
-                }
-
-                log::info!("Chose {} good rules", valid_eqs.len());
-                self.all_eqs.extend(valid_eqs.clone());
-                self.new_eqs.extend(valid_eqs);
             }
+
+            std::mem::swap(&mut tmp, &mut self.egraph);
         }
 
         let time = t.elapsed().as_secs_f64();
@@ -1058,7 +1061,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         if self.params.do_final_run {
             let old = std::mem::replace(&mut self.params.no_conditionals, false);
             let rws = self.all_eqs.values().flat_map(|eq| &eq.rewrites);
-            let final_runner = self.mk_runner(self.egraph.clone());
+            let final_runner = self.mk_cvec_less_runner(self.egraph.clone());
             final_runner.run(rws);
             self.params.no_conditionals = old;
         }
