@@ -55,17 +55,17 @@ jobs:
       - name: "Synthesize bv4 rules"
         run: |
           cargo bv4 --iters 2 --variables 3 --outfile bv4.json
-          cargo run --release --bin rational derive --ci bv4.json tests/bv4.json out.json
+          cargo run --release --bin bv4 derive --ci bv4.json tests/bv4.json out.json
 
       - name: "Synthesize bv32 rules"
         run: |
           cargo bv32 --iters 2 --variables 3 --outfile bv32.json
-          cargo run --release --bin rational derive --ci bv32.json tests/bv32.json out.json
+          cargo run --release --bin bv32 derive --ci bv32.json tests/bv32.json out.json
 
       - name: "Synthesize real rules from rational rules (rule lifting)"
         run: |
           cargo real-rat --iters 2 --variables 3 --no-constants-above-iter 1 --prior-rules rat.json --outfile real.json
-          cargo run --release --bin rational derive --ci real.json tests/real.json out.json
+          cargo run --release --bin real-rat derive --ci real.json tests/real.json out.json
 
       # Need to filter out rational rules from real.json
       # - name: "Synthesize complex rules from real rules (rule lifting, no constants)"
