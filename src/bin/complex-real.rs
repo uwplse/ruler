@@ -169,7 +169,7 @@ define_language! {
         "/R" = RDiv([Id; 2]),
         RealConst(Real),
 
-        // real domain
+        // complex domain
         "~C" = CNeg(Id),
         "+C" = CAdd([Id; 2]),
         "-C" = CSub([Id; 2]),
@@ -278,7 +278,7 @@ fn is_valid_rewrite_rec(
             Math::RDiv([_, j]) |
             Math::CDiv([_, j]) => match &expr[*j] {
                 ENodeOrVar::Var(v) => egraph[subst[*v]].iter().all(|x| !is_zero(x)),
-                _ => true
+                ENodeOrVar::ENode(n) => !is_zero(n),
             },
 
             // binary ops
@@ -301,8 +301,12 @@ fn is_valid_rewrite_rec(
             Math::Abs(i) |
             Math::Arg(i) => is_valid_rewrite_rec(egraph, expr, subst, *i),   
 
+            // consts
+            Math::RealConst(_) |
+            Math::ComplexConst(_) => false,
+
             // other
-            _ => false,
+            _ => true,
         },
     }
 }
@@ -458,6 +462,13 @@ impl SynthLanguage for Math {
             rule_lifting: true,
         });
 
+        let disabled_consts: Vec<&str> =
+            if let Some(s) = &synth.params.disabled_consts {
+                s.split(" ").collect()
+            } else {
+                vec![]
+            };
+
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let var_id = egraph.add(Math::Var(Variable(var)));
@@ -475,7 +486,7 @@ impl SynthLanguage for Math {
             egraph.union(var_id, px_id);
         }
 
-        // // symbolic constants
+        // symbolic constants
         let zero = real_const_symbol("0");
         let one = real_const_symbol("1");
         let pi_2 = real_const_symbol("pi/2");
@@ -485,7 +496,7 @@ impl SynthLanguage for Math {
         let complex_one = complex_const_symbol("1");
         let complex_i = complex_const_symbol("i");
 
-        // // rational constants
+        // rational constants
         let re_zero = egraph.add(Math::RealConst(zero));
         let re_one = egraph.add(Math::RealConst(one));
         let re_pi_2 = egraph.add(Math::RealConst(pi_2));
@@ -494,44 +505,50 @@ impl SynthLanguage for Math {
         let pi_2_pi_2 = egraph.add(Math::RAdd([re_pi_2, re_pi_2]));
         egraph.union(re_pi, pi_2_pi_2);
 
-        // // zero constant
-        let cx_zero = egraph.add(Math::ComplexConst(complex_zero));
-        let zero_mk = egraph.add(Math::Cart([re_zero, re_zero]));
-        let zero_mk_re = egraph.add(Math::Re(cx_zero));
-        let zero_mk_im = egraph.add(Math::Im(cx_zero));
-        let zero_mk_abs = egraph.add(Math::Abs(cx_zero));
-        let zero_mk_arg = egraph.add(Math::Arg(cx_zero));
-        egraph.union(cx_zero, zero_mk);
-        egraph.union(zero_mk_re, re_zero);
-        egraph.union(zero_mk_im, re_zero);
-        egraph.union(zero_mk_abs, re_zero);
-        egraph.union(zero_mk_arg, re_zero);
+        // zero constant
+        if !disabled_consts.contains(&"0") {
+            let cx_zero = egraph.add(Math::ComplexConst(complex_zero));
+            let zero_mk = egraph.add(Math::Cart([re_zero, re_zero]));
+            let zero_mk_re = egraph.add(Math::Re(cx_zero));
+            let zero_mk_im = egraph.add(Math::Im(cx_zero));
+            let zero_mk_abs = egraph.add(Math::Abs(cx_zero));
+            let zero_mk_arg = egraph.add(Math::Arg(cx_zero));
+            egraph.union(cx_zero, zero_mk);
+            egraph.union(zero_mk_re, re_zero);
+            egraph.union(zero_mk_im, re_zero);
+            egraph.union(zero_mk_abs, re_zero);
+            egraph.union(zero_mk_arg, re_zero);
+        }
 
-        // // one constant
-        let cx_one = egraph.add(Math::ComplexConst(complex_one));
-        let one_mk = egraph.add(Math::Cart([re_one, re_zero]));
-        let one_mk_re = egraph.add(Math::Re(cx_one));
-        let one_mk_im = egraph.add(Math::Im(cx_one));
-        let one_mk_abs = egraph.add(Math::Abs(cx_one));
-        let one_mk_arg = egraph.add(Math::Arg(cx_one));
-        egraph.union(cx_one, one_mk);
-        egraph.union(one_mk_re, re_one);
-        egraph.union(one_mk_im, re_zero);
-        egraph.union(one_mk_abs, re_one);
-        egraph.union(one_mk_arg, re_zero);
+        // one constant
+        if !disabled_consts.contains(&"1") {
+            let cx_one = egraph.add(Math::ComplexConst(complex_one));
+            let one_mk = egraph.add(Math::Cart([re_one, re_zero]));
+            let one_mk_re = egraph.add(Math::Re(cx_one));
+            let one_mk_im = egraph.add(Math::Im(cx_one));
+            let one_mk_abs = egraph.add(Math::Abs(cx_one));
+            let one_mk_arg = egraph.add(Math::Arg(cx_one));
+            egraph.union(cx_one, one_mk);
+            egraph.union(one_mk_re, re_one);
+            egraph.union(one_mk_im, re_zero);
+            egraph.union(one_mk_abs, re_one);
+            egraph.union(one_mk_arg, re_zero);
+        }
 
-        // // i constant
-        let cx_i = egraph.add(Math::ComplexConst(complex_i));
-        let i_mk = egraph.add(Math::Cart([re_zero, re_one]));
-        let i_mk_re = egraph.add(Math::Re(cx_i));
-        let i_mk_im = egraph.add(Math::Im(cx_i));
-        let i_mk_abs = egraph.add(Math::Abs(cx_i));
-        let i_mk_arg = egraph.add(Math::Arg(cx_i));
-        egraph.union(cx_i, i_mk);
-        egraph.union(i_mk_re, re_zero);
-        egraph.union(i_mk_im, re_one);
-        egraph.union(i_mk_abs, re_one);
-        egraph.union(i_mk_arg, re_pi_2);
+        // i constant
+        if !disabled_consts.contains(&"i") {
+            let cx_i = egraph.add(Math::ComplexConst(complex_i));
+            let i_mk = egraph.add(Math::Cart([re_zero, re_one]));
+            let i_mk_re = egraph.add(Math::Re(cx_i));
+            let i_mk_im = egraph.add(Math::Im(cx_i));
+            let i_mk_abs = egraph.add(Math::Abs(cx_i));
+            let i_mk_arg = egraph.add(Math::Arg(cx_i));
+            egraph.union(cx_i, i_mk);
+            egraph.union(i_mk_re, re_zero);
+            egraph.union(i_mk_im, re_one);
+            egraph.union(i_mk_abs, re_one);
+            egraph.union(i_mk_arg, re_pi_2);
+        }
 
         synth.lifting_rewrites = vec![
             rewrite!("cartesian-form"; "?a" => "(Cart (Re ?a) (Im ?a))" if is_complex_str("?a")),

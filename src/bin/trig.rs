@@ -220,6 +220,14 @@ fn complex_const_symbol(s: &str) -> Complex {
     Complex::from(s.to_owned() + "C")
 }
 
+fn is_trig_pattern_node(x: &ENodeOrVar<Math>) -> bool {
+    match x {
+        ENodeOrVar::ENode(Math::Sin(_))     |
+        ENodeOrVar::ENode(Math::Cos(_)) => true,
+        _ => false,
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = Real;  // not used
 
@@ -278,6 +286,20 @@ impl SynthLanguage for Math {
             Math::Im(_)         |
             Math::Sqr(_)        |
             Math::RealConst(_)  |
+            Math::Var(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_extractable(&self) -> bool {
+        match self {
+            Math::Sin(_) |
+            Math::Cos(_) |
+            Math::Neg(_) |
+            Math::Add(_) |
+            Math::Mul(_) |
+            Math::Sub(_) |
+            Math::Div(_) |
             Math::Var(_) => true,
             _ => false,
         }
@@ -357,6 +379,7 @@ impl SynthLanguage for Math {
         .concat();
 
         // duplicate rules for HL
+        let mut extra_eqs: EqualityMap<Self> = Default::default();
         for (_, eq) in &synth.old_eqs {
             let l = eq.lhs.to_string();
             let r = eq.rhs.to_string();
@@ -365,7 +388,7 @@ impl SynthLanguage for Math {
             let lhs: RecExpr<Self> = ls.parse().unwrap();
             let rhs: RecExpr<Self> = rs.parse().unwrap();
             if let Some(e) = Equality::new(&lhs, &rhs) {
-                synth.all_eqs.insert(e.name.clone(), e);
+                extra_eqs.insert(e.name.clone(), e);
             }
         }
 
@@ -378,10 +401,12 @@ impl SynthLanguage for Math {
             let lhs: RecExpr<Self> = l.parse().unwrap();
             let rhs: RecExpr<Self> = r.parse().unwrap();
             if let Some(e) = Equality::new(&lhs, &rhs) {
-                synth.all_eqs.insert(e.name.clone(), e);
+                extra_eqs.insert(e.name.clone(), e);
             }
         });
 
+        synth.old_eqs.extend(extra_eqs.clone());
+        synth.all_eqs.extend(extra_eqs);
         synth.egraph = egraph;
     }
 
@@ -426,7 +451,7 @@ impl SynthLanguage for Math {
 
                 if allowedp("+") { to_add.push(Math::Add([i, j])); }
                 // if allowedp("-") { to_add.push(Math::RSub([i, j])); }
-                if allowedp("*") { to_add.push(Math::Mul([i, j])); }
+                // if allowedp("*") { to_add.push(Math::Mul([i, j])); }
                 // if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
                 //     to_add.push(Math::RDiv([i, j]));
                 // }
@@ -436,12 +461,10 @@ impl SynthLanguage for Math {
                 continue;
             }
 
-            // if allowedp("~") { to_add.push(Math::RNeg(i)); }
-            if iter <= 2 {
+            if allowedp("~") { to_add.push(Math::Neg(i)); }
             if allowedp("sin") { to_add.push(Math::Sin(i)); }
             if allowedp("cos") { to_add.push(Math::Cos(i)); }
             if allowedp("sqr") { to_add.push(Math::Sqr(i)); }
-            }
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -450,10 +473,11 @@ impl SynthLanguage for Math {
 
     fn is_valid(
         _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
     ) -> bool {
-        true
+        lhs.ast.as_ref().iter().any(is_trig_pattern_node) &&
+        rhs.ast.as_ref().iter().any(is_trig_pattern_node)
     }
 
     // custom constant folder
