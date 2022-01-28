@@ -575,7 +575,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // build the cvec matching data structure
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
 
-        for id in self.ids() {
+        for id in egraph.classes().map(|c| c.id) {
             let class = &egraph[id];
             if class.data.is_defined() {
                 by_cvec.entry(&class.data.cvec).or_default().push(class.id);
