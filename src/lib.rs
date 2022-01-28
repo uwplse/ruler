@@ -714,6 +714,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         .into_iter()
                         .filter(|eq| !poison_rules.contains(&eq.1))
                         .collect();
+                    filtered_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
 
                     log::info!("Time taken in... run_rewrites: {}, rule discovery: {}",
                                 run_rewrites, rule_discovery);
@@ -746,10 +747,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         for bad in bads {
                             poison_rules.insert(bad.1);
                         }
-                        if eqs.is_empty() {
-                            log::info!("Stopping early, no eqs");
-                            break 'inner;
-                        }
 
                         // filter bad constants
                         log::info!("{} possible rules", eqs.len());
@@ -779,7 +776,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                     }
                                 }
                             }
-
                             log::info!("  {}", eq);
                             valid_eqs.push((s, eq));
                         }
@@ -1405,6 +1401,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut keepers = EqualityMap::default();
         let mut bads = EqualityMap::default();
         let initial_len = new_eqs.len();
+        let mut first_iter = true;
 
         while !new_eqs.is_empty() {
             // best are last
@@ -1412,24 +1409,27 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
             // take step valid rules from the end of new_eqs
             let mut took = 0;
-            while let Some((name, eq)) = new_eqs.pop() {
-                if should_validate {
-                    let valid = L::is_valid(self, &eq.lhs, &eq.rhs);
-                    if valid {
+            if !first_iter {
+                while let Some((name, eq)) = new_eqs.pop() {
+                    if should_validate {
+                        let valid = L::is_valid(self, &eq.lhs, &eq.rhs);
+                        if valid {
+                            let old = keepers.insert(name, eq);
+                            took += old.is_none() as usize;
+                        } else {
+                            bads.insert(name, eq);
+                        }
+                    } else {
                         let old = keepers.insert(name, eq);
                         took += old.is_none() as usize;
-                    } else {
-                        bads.insert(name, eq);
                     }
-                } else {
-                    let old = keepers.insert(name, eq);
-                    took += old.is_none() as usize;
-                }
 
-                if took >= step {
-                    break;
+                    if took >= step {
+                        break;
+                    }
                 }
             }
+            first_iter = false;
 
             if new_eqs.is_empty() {
                 break;
