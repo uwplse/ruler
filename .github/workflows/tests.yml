@@ -11,17 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
-      - name: Cache Rust build
-        uses: actions/cache@v2
-        env:
-          cache-name: rust-build
-        with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-build-${{ hashFiles('Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ hashFiles('Cargo.toml') }}
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
 
       - name: Install Rust compiler
         uses: actions-rs/toolchain@v1
@@ -30,6 +19,8 @@ jobs:
             default: true
             override: true
             components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
 
       - name: "Build"
         run: cargo build --release
