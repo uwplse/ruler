@@ -1,0 +1,75 @@
+name: Unit tests
+
+on: [push]
+
+env:
+  RUST_BACKTRACE: full
+
+jobs:
+  unit:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Cache Rust build
+        uses: actions/cache@v2
+        env:
+          cache-name: rust-build
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-build-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Install Rust compiler
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            default: true
+            override: true
+            components: rustfmt, clippy
+
+      - name: "Build"
+        run: cargo build --release
+
+      - name: "Setup tests"
+        run: mkdir -p out/
+
+      - name: "Unit tests"
+        run: cargo test --release
+
+      - name: "Synthesize rational rules"
+        run: |
+          cargo rational --iters 2 --variables 3 --num-fuzz 50 --do-final-run --outfile out/rat.json
+          cargo run --release --bin rational derive --ci out/rat.json tests/rat.json out/rat-derive.json
+
+      - name: "Synthesize rational rules (EMA)"
+        run: |
+          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --num-fuzz 50 --do-final-run --outfile out/rat-ema.json
+          cargo run --release --bin rational derive --ci out/rat-ema.json tests/rat-ema.json out/rat-ema-derive.json
+
+      - name: "Synthesize rational rules (EMA, no consts)"
+        run: |
+          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --num-fuzz 50 --do-final-run --outfile out/rat-ema-no-const.json
+          cargo run --release --bin rational derive --ci out/rat-ema-no-const.json tests/rat-ema-no-const.json out/rat-ema-no-const-derive.json
+
+      - name: "Synthesize bv4 rules"
+        run: |
+          cargo bv4 --iters 2 --variables 3 --outfile out/bv4.json
+          cargo run --release --bin bv4 derive --ci out/bv4.json tests/bv4.json out/bv4-derive.json
+
+      - name: "Synthesize bv32 rules"
+        run: |
+          cargo bv32 --iters 2 --variables 3 --outfile out/bv32.json
+          cargo run --release --bin bv32 derive --ci out/bv32.json tests/bv32.json out/bv32-derive.json
+
+      - name: "Synthesize real rules from rational rules (rule lifting)"
+        run: |
+          cargo real-rat --iters 2 --variables 3 --no-constants-above-iter 1 --prior-rules out/rat.json --outfile out/real.json
+          cargo run --release --bin real-rat derive --ci --new-eqs out/real.json tests/real.json out/real-derive.json
+
+      # Need to filter out rational rules from real rules
+      # - name: "Synthesize complex rules from real rules (rule lifting, no constants)"
+      #   run: cargo complex-real --iters 2 --variables 3 --no-constants-above-iter 0 --prior-rules real.json --outfile complex.json

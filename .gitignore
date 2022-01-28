@@ -1,18 +1,32 @@
+# Top level
 /target
 /out
+/*.json
+
+# Scripts
 scripts/ablation/output/*
 scripts/eqsat-sound/output/*
 scripts/herbie-float/output/*
 scripts/herbie-rational/output/*
+scripts/**/*.json
+
+# Rust
 Cargo.lock
+
+# Mac
 .DS_Store
+
+# Miscellaneous
 out/
+.vscode/
 *.txt
 *.pdf
 *.bak
+
+# Racket
 *.dep
 *.zo
-*.json
-.vscode/
+
+# Exceptions
 !scripts/ablation/submitted-plots/*.pdf
 !scripts/ablation/submitted-plots/*.json
