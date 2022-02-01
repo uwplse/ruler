@@ -379,10 +379,10 @@ impl SynthLanguage for Math {
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check_assumptions(all) {
                 // match solver.check() {
-                SatResult::Unsat => ValidationResult::Invalid,
+                SatResult::Unsat => ValidationResult::Valid,
                 SatResult::Sat => {
                     // println!("z3 validation: failed for {} => {}", lhs, rhs);
-                    ValidationResult::Valid
+                    ValidationResult::Invalid
                 }
                 SatResult::Unknown => {
                     // println!("z3 validation: unknown for {} => {}", lhs, rhs);
