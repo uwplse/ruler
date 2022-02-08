@@ -27,11 +27,10 @@ symbolic_expressions = "5"
 rayon = "1"
 smallvec = { version = "1.6", features = ["union", "const_generics"] }
 
-egg = "0.7.1"
-
-#[dependencies.egg]
-#git = "https://github.com/egraphs-good/egg"
-#rev = "484fd6eec831a4078455ac47ef1172ede1b03dbf" # send sync
+[dependencies.egg]
+git = "https://github.com/egraphs-good/egg"
+rev = "8d68c8768cc18c2eae97f970e2b4162324cee787"   # 0.7-dev before proofs
+# rev = "484fd6eec831a4078455ac47ef1172ede1b03dbf" # send sync
 # rev = "116295f5c5afc58b34c732066c2e533bc4ad2ce8" # latest
 # rev = "483876ffc7e38a3d1e55a1f249dcd7900093b99e" # use more precise analysis rebuild
 # rev = "5d12e81a43d8eb6bfa8c29b62ba766143ba54a79" # Simplify unionfind
