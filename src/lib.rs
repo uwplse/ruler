@@ -10,7 +10,7 @@ use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{borrow::{Borrow, Cow}};
-use std::{hash::Hash};
+use std::{cmp::Ordering, hash::Hash};
 use std::{
     fmt::{Debug, Display},
     time::Duration,
@@ -73,7 +73,7 @@ impl From<bool> for ValidationResult {
 #[derive(Debug, Clone)]
 pub struct SynthAnalysis {
     /// Length of cvec or characteristic vector.
-    /// All cvecs have the same length.    
+    /// All cvecs have the same length.
     pub cvec_len: usize,
     pub constant_fold: ConstantFoldMethod,
     pub rule_lifting: bool,
@@ -81,7 +81,7 @@ pub struct SynthAnalysis {
 
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { 
+        Self {
             cvec_len: 10,
             constant_fold: ConstantFoldMethod::CvecMatching,
             rule_lifting: false,
@@ -170,7 +170,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
                         map.insert(sym, var);
                         var
                     };
-                    
+
                     let s = var.to_string();
                     Self::mk_var(s[1..].into())
                 }
@@ -545,13 +545,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let extract = Extractor::new(&egraph, AstSize);
 
         let compare = |cvec1: &CVec<L>, cvec2: &CVec<L>| -> bool {
-            let mut _count = 0;
             for tup in cvec1.iter().zip(cvec2) {
-                _count += match tup {
+                match tup {
                     (Some(a), Some(b)) if a != b => return false,
-                    (None, Some(_)) | (Some(_), None) => 1,
-                    _ => 0,
-                };
+                    _ => (),
+                }
             }
             true
         };
@@ -655,7 +653,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
             layer.retain(|n| n.all(|id| !constants.contains(&id)));
         }
-        
+
         // deduplicate and filter bad constants
         let mut cp = self.egraph.clone();
         let mut max_id = cp.number_of_classes();
@@ -810,7 +808,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 // add new rewrites to both all_eqs and new_eqs
                 log::info!("Chose {} good rules", valid_eqs.len());
                 minimized_eqs.extend(valid_eqs);
-                egraph.rebuild();
 
                 // TODO check formatting for Learned...
                 log::info!("Time taken in... rule minimization: {}", rule_minimize);
@@ -984,7 +981,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     let (_, e1) = extract.find_best(win[0]);
                     let (_, e2) = extract.find_best(win[1]);
                     if let Some(mut eq) = Equality::new(&e1, &e2) {
-                        log::info!("candidate; {:?} {:?}", e1.pretty(1000), e2.pretty(1000));
+                        // log::info!("candidate; {:?} {:?}", e1.pretty(1000), e2.pretty(1000));
                         if e1 != e2 &&
                             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
                             e2.as_ref().iter().all(|x| x.is_extractable()) {
@@ -1081,8 +1078,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         log::info!("running HL-LL rewrites");
         let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
         runner = runner.run(&self.lifting_rewrites);
+        runner.egraph.rebuild();
         self.egraph = runner.egraph;
-        self.egraph.rebuild();
 
         assert!(self.params.iters > 0);
         for iter in 1..=self.params.iters {
@@ -1375,6 +1372,27 @@ macro_rules! map {
     };
 }
 
+fn ord_merge(to: &mut Option<Ordering>, from: Ordering) {
+    if let Some(ord) = to.as_mut() {
+        match (*ord, from) {
+            (Ordering::Equal, _) => *ord = from,
+            (_, Ordering::Equal) => (),
+            (_, _) if *ord == from => (),
+            _ => *to = None,
+        }
+    }
+}
+
+// Compatibility between egg 0.6.1-dev and egg 0.7
+fn ord_to_did_merge(ord: Option<Ordering>) -> DidMerge {
+    match ord {
+        Some(Ordering::Equal) => DidMerge(false, false),
+        Some(Ordering::Greater) => DidMerge(false, true),
+        Some(Ordering::Less) => DidMerge(true, false),
+        None => DidMerge(true, true),
+    }
+}
+
 /// The Signature represents eclass analysis data.
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
@@ -1396,7 +1414,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
     fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
-        let mut merge_a = false;
+        let mut ord = Some(Ordering::Equal);
         let cost_fn = |x: &RecExpr<L>| {
             if self.rule_lifting && L::recexpr_in_domain(x) {
                 ExtractableAstSize.cost_rec(x)
@@ -1407,41 +1425,36 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
         // do not merge high-level enode with low-level enode
         assert_eq!(to.in_domain, from.in_domain,
-            "trying to merge HL and LL eclass: {} != {}",
-            to.simplest.pretty(100), from.simplest.pretty(100));
+                   "trying to merge HL and LL eclass: {} != {}",
+                   to.simplest.pretty(100), from.simplest.pretty(100));
 
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
                     (None, Some(_)) => {
                         to.cvec[i] = from.cvec[i].clone();
-                        merge_a = true;
+                        ord_merge(&mut ord, Ordering::Less);
                     }
                     (Some(x), Some(y)) => {
                         assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
+                    }
+                    (Some(_), None) => {
+                        ord_merge(&mut ord, Ordering::Greater);
                     }
                     _ => (),
                 }
             }
 
-            if from.exact && !to.exact {
-                to.exact = true;
-                merge_a = true;
-            }
-
-            if from.is_extractable && !to.is_extractable {
-                to.is_extractable = true;
-                merge_a = true;
-            }
+            ord_merge(&mut ord, to.exact.cmp(&from.exact));
         }
 
+        to.exact |= from.exact;
+        to.is_extractable |= from.is_extractable;
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
             to.simplest = from.simplest.clone();
-            merge_a = true;
         }
 
-        // conservatively just say that b changed
-        DidMerge(merge_a, true)
+        ord_to_did_merge(ord)
     }
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
