@@ -77,8 +77,6 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         egraph: &mut EGraph<L, SynthAnalysis>,
         matched_id: Id,
         subst: &Subst,
-        searcher_ast: Option<&PatternAst<L>>,
-        rule_name: Symbol
     ) -> Vec<Id> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
@@ -104,7 +102,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             return vec![];
         }
 
-        let ids = self.rhs.apply_one(egraph, matched_id, subst, searcher_ast, rule_name);
+        let ids = self.rhs.apply_one(egraph, matched_id, subst);
         // assert_eq!(ids.len(), 1);
         if ids.len() == 0 {
             return vec![];
