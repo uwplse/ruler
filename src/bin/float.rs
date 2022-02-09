@@ -71,7 +71,7 @@ impl SynthLanguage for Math {
             Math::Add([a, b]) => map!(v, a, b => mk_constant((*a + *b).into_inner())),
             Math::Sub([a, b]) => map!(v, a, b => mk_constant((*a - *b).into_inner())),
             Math::Mul([a, b]) => map!(v, a, b => mk_constant((*a * *b).into_inner())),
-            Math::Num(n) => vec![mk_constant(n.clone().into_inner()); cvec_len],
+            Math::Num(n) => vec![mk_constant((*n).into_inner()); cvec_len],
             Math::Var(_) => vec![],
             Math::Div([a, b]) => map!(v, a, b => mk_constant((*a / *b).into_inner())),
             Math::Pow([a, b]) => map!(v, a, b => mk_constant(a.into_inner().powf(b.into_inner()))),
@@ -136,12 +136,12 @@ impl SynthLanguage for Math {
         // let xyz_samples = gen_rand_xyz(rng, params.n_samples);
 
         let xyz_samples = gen_samples(rng, params.n_samples, params.variables);
-        for i in 0..params.variables {
+        for (i, sample) in xyz_samples.iter().enumerate().take(params.variables) {
             let var = Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
 
             egraph[id].data.cvec = (0..params.n_samples)
-                .map(|j| mk_constant(xyz_samples[i][j]))
+                .map(|j| mk_constant(sample[j]))
                 .chain(chain_consts(
                     constants.clone(),
                     params.variables as u32,
@@ -151,7 +151,7 @@ impl SynthLanguage for Math {
         }
 
         for n in &constants {
-            egraph.add(Math::Num(n.clone()));
+            egraph.add(Math::Num(*n));
         }
 
         synth.egraph = egraph;
@@ -224,7 +224,7 @@ fn chain_consts(constants: Vec<Constant>, nvars: u32, i: u32) -> Vec<Option<Cons
     while res.len() < nrows {
         for c in &consts {
             for _ in 0..nc.pow(i) {
-                res.push(c.clone())
+                res.push(*c)
             }
         }
     }
@@ -271,24 +271,24 @@ fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>
     }
     for i in 0..(n_vars - 1) {
         let mut dep_samples = vec![];
-        for j in 0..n_samples {
+        for (j, item) in first.iter().enumerate().take(n_samples) {
             match j % 10 {
                 0 => {
                     if i % 2 == 0 {
-                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg));
+                        dep_samples.push(sample_float_range(rng, *item, ulp_rad_lg));
                     } else {
-                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm));
+                        dep_samples.push(sample_float_range(rng, *item, ulp_rad_sm));
                     }
                 }
                 1 => {
                     if i % 2 == 0 {
-                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm));
+                        dep_samples.push(sample_float_range(rng, *item, ulp_rad_sm));
                     } else {
-                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg));
+                        dep_samples.push(sample_float_range(rng, *item, ulp_rad_lg));
                     }
                 }
-                2 => dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm)),
-                3 => dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg)),
+                2 => dep_samples.push(sample_float_range(rng, *item, ulp_rad_sm)),
+                3 => dep_samples.push(sample_float_range(rng, *item, ulp_rad_lg)),
                 6 => {
                     if i % 2 == 0 {
                         match j % 5 {
@@ -299,12 +299,12 @@ fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>
                             _ => dep_samples.push(f64::MIN),
                         }
                     } else {
-                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_lg));
+                        dep_samples.push(sample_float_range(rng, *item, ulp_rad_lg));
                     }
                 }
                 7 => {
                     if i % 2 == 0 {
-                        dep_samples.push(sample_float_range(rng, first[j], ulp_rad_sm));
+                        dep_samples.push(sample_float_range(rng, *item, ulp_rad_sm));
                     } else {
                         match j % 5 {
                             0 => dep_samples.push(f64::INFINITY),
@@ -321,7 +321,7 @@ fn gen_samples(rng: &mut Pcg64, n_samples: usize, n_vars: usize) -> Vec<Vec<f64>
         all_vecs.push(dep_samples);
     }
     all_vecs.push(first);
-    return all_vecs;
+    all_vecs
 }
 
 /// Entry point.

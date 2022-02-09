@@ -44,7 +44,7 @@ impl From<Real> for &'static str {
 impl FromStr for Real {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 0 && s.chars().next().unwrap() != '?' {
+        if !s.is_empty() && !s.starts_with('?') {
             Ok(s.into())
         } else {
             Err("not real")
@@ -89,12 +89,9 @@ impl From<Variable> for &'static str {
 impl FromStr for Variable {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() == 1 && s.chars().nth(0).unwrap().is_alphabetic() {
+        if s.len() == 1 && s.chars().next().unwrap().is_alphabetic() {
             Ok(s.into())
-        } else if s.len() == 2
-            && s.chars().nth(0).unwrap() == '?'
-            && s.chars().nth(1).unwrap().is_alphabetic()
-        {
+        } else if s.len() == 2 && s.starts_with('?') && s.chars().nth(1).unwrap().is_alphabetic() {
             Ok((&s[1..2]).into())
         } else {
             Err("not variable")
@@ -196,7 +193,7 @@ fn is_zero(n: &Math) -> bool {
 fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
     rec.as_ref().iter().any(|n| match n {
         ENodeOrVar::ENode(Math::RDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_zero(&n),
+            ENodeOrVar::ENode(n) => is_zero(n),
             _ => false,
         },
         _ => false,
@@ -253,32 +250,28 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_constant(&self) -> bool {
-        match self {
-            Math::Real(_) => true,
-            _ => false,
-        }
+        matches!(self, Math::Real(_))
     }
 
     // override default behavior
     fn is_in_domain(&self) -> bool {
-        match self {
-            Math::RNeg(_) => true,
-            Math::RAdd([_, _]) => true,
-            Math::RSub([_, _]) => true,
-            Math::RMul([_, _]) => true,
-            Math::RDiv([_, _]) => true,
-            Math::Var(_) => true,
-            Math::Real(_) => true,
-
-            Math::Lim(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Math::RNeg(_)
+                | Math::RAdd([_, _])
+                | Math::RSub([_, _])
+                | Math::RMul([_, _])
+                | Math::RDiv([_, _])
+                | Math::Var(_)
+                | Math::Real(_)
+                | Math::Lim(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // disabled constants (TODO: validate input)
         let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
-            s.split(" ").collect()
+            s.split(' ').collect()
         } else {
             vec![]
         };
@@ -286,7 +279,7 @@ impl SynthLanguage for Math {
         // this is for adding to the egraph, not used for cvec.
         let constants: Vec<(Rational, &str)> = ["1", "0", "-1"]
             .iter()
-            .filter(|s| disabled_consts.iter().find(|x| x.eq(s)).is_none())
+            .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
             .map(|s| (s.parse().unwrap(), *s))
             .collect();
 
@@ -335,13 +328,13 @@ impl SynthLanguage for Math {
 
         // disabled operators (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
-            s.split(" ").collect()
+            s.split(' ').collect()
         } else {
             vec![]
         };
 
         // predicate if disabled
-        let allowedp = |s| disabled_ops.iter().find(|&x| x.eq(&s)).is_none();
+        let allowedp = |s| !disabled_ops.iter().any(|x| x.eq(&s));
 
         // maps ids to n_ops
         let ids: HashMap<Id, usize> = synth
@@ -362,10 +355,8 @@ impl SynthLanguage for Math {
                     if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
                         continue;
                     }
-                } else {
-                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                        continue;
-                    }
+                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                    continue;
                 };
 
                 if allowedp("+") {
@@ -377,7 +368,7 @@ impl SynthLanguage for Math {
                 if allowedp("/") {
                     to_add.push(Math::RMul([i, j]));
                 }
-                if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
+                if allowedp("/") && !synth.egraph[j].nodes.iter().any(is_zero) {
                     to_add.push(Math::RDiv([i, j]));
                 }
             }
@@ -404,10 +395,7 @@ impl SynthLanguage for Math {
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
         if !egraph[id].data.in_domain {
             // lower domain
-            if egraph[id].nodes.iter().any(|x| match x {
-                Math::Rat(_) => true,
-                _ => false,
-            }) {
+            if egraph[id].nodes.iter().any(|x| matches!(x, Math::Rat(_))) {
                 // early exit if constant exists
                 return;
             }
@@ -422,23 +410,17 @@ impl SynthLanguage for Math {
                     Math::Div([i, j]) => {
                         // explicit because of zero check
                         for n in &egraph[*i].nodes {
-                            match n {
-                                Math::Rat(v) => {
-                                    for n in &egraph[*j].nodes {
-                                        match n {
-                                            Math::Rat(w) => {
-                                                if !w.is_zero() {
-                                                    let r = v / w;
-                                                    let s = r.to_string();
-                                                    to_add = Some((Math::Rat(r), s));
-                                                    break;
-                                                }
-                                            }
-                                            _ => (),
+                            if let Math::Rat(v) = n {
+                                for n in &egraph[*j].nodes {
+                                    if let Math::Rat(w) = n {
+                                        if !w.is_zero() {
+                                            let r = v / w;
+                                            let s = r.to_string();
+                                            to_add = Some((Math::Rat(r), s));
+                                            break;
                                         }
                                     }
                                 }
-                                _ => (),
                             }
                         }
                     }
@@ -451,13 +433,10 @@ impl SynthLanguage for Math {
                 let mut to_update = vec![];
                 for id in egraph.classes().map(|c| c.id) {
                     for n in &egraph[id].nodes {
-                        match n {
-                            Math::Lim(i) => {
-                                if *i == id {
-                                    to_update.push(*i);
-                                }
+                        if let Math::Lim(i) = n {
+                            if *i == id {
+                                to_update.push(*i);
                             }
-                            _ => (),
                         }
                     }
                 }

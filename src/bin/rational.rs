@@ -121,7 +121,7 @@ impl SynthLanguage for Math {
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // disabled constants (TODO: validate input)
         let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
-            s.split(" ").collect()
+            s.split(' ').collect()
         } else {
             vec![]
         };
@@ -129,7 +129,7 @@ impl SynthLanguage for Math {
         // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
-            .filter(|s| disabled_consts.iter().find(|x| x.eq(s)).is_none())
+            .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
             .map(|s| s.parse().unwrap())
             .collect();
 
@@ -174,10 +174,10 @@ impl SynthLanguage for Math {
             rule_lifting: false,
         });
 
-        for i in 0..synth.params.variables {
+        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = consts[i].clone();
+            egraph[id].data.cvec = item.clone();
         }
 
         for n in &constants {
@@ -191,13 +191,13 @@ impl SynthLanguage for Math {
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
         // disabled operators (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
-            s.split(" ").collect()
+            s.split(' ').collect()
         } else {
             vec![]
         };
 
         // predicate if disabled
-        let allowedp = |s| disabled_ops.iter().find(|&x| x.eq(&s)).is_none();
+        let allowedp = |s| !disabled_ops.iter().any(|x| x.eq(&s));
 
         let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let mut to_add = vec![];
@@ -225,10 +225,8 @@ impl SynthLanguage for Math {
                     if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
                         continue;
                     }
-                } else {
-                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                        continue;
-                    }
+                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                    continue;
                 };
 
                 if allowedp("+") {
@@ -270,7 +268,7 @@ impl SynthLanguage for Math {
     ) -> bool {
         // filtered consts (TODO: validate input)
         let filtered_consts: Vec<&str> = if let Some(s) = &synth.params.filtered_consts {
-            s.split(" ").collect()
+            s.split(' ').collect()
         } else {
             vec![]
         };
@@ -354,9 +352,9 @@ impl SynthLanguage for Math {
                 let consts: Vec<BigInt> = filtered_consts
                     .iter()
                     .map(|&s| s.parse::<i32>().unwrap())
-                    .map(|x| BigInt::from(x))
+                    .map(BigInt::from)
                     .collect();
-                consts.iter().any(|x| n.numer().eq(&x))
+                consts.iter().any(|x| n.numer().eq(x))
             }
         })
     }
@@ -460,34 +458,34 @@ fn egg_to_z3<'a>(
 ) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
     let mut buf: Vec<z3::ast::Real> = vec![];
     let mut assumes: Vec<z3::ast::Bool> = vec![];
-    let zero = z3::ast::Real::from_real(&ctx, 0, 1);
+    let zero = z3::ast::Real::from_real(ctx, 0, 1);
     for node in expr.as_ref().iter() {
         match node {
-            Math::Var(v) => buf.push(z3::ast::Real::new_const(&ctx, v.to_string())),
+            Math::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
             Math::Num(c) => buf.push(z3::ast::Real::from_real(
-                &ctx,
+                ctx,
                 (c.numer()).to_i32().unwrap(),
                 (c.denom()).to_i32().unwrap(),
                 // to_i32(c.numer()),
                 // to_i32(c.denom()),
             )),
             Math::Add([a, b]) => buf.push(z3::ast::Real::add(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Sub([a, b]) => buf.push(z3::ast::Real::sub(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Mul([a, b]) => buf.push(z3::ast::Real::mul(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Div([a, b]) => {
                 let denom = &buf[usize::from(*b)];
                 let lez = z3::ast::Real::le(denom, &zero);
                 let gez = z3::ast::Real::ge(denom, &zero);
-                let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
+                let assume = z3::ast::Bool::not(&z3::ast::Bool::and(ctx, &[&lez, &gez]));
                 assumes.push(assume);
                 buf.push(z3::ast::Real::div(
                     &buf[usize::from(*a)],
@@ -500,7 +498,7 @@ fn egg_to_z3<'a>(
                 buf.push(z3::ast::Bool::ite(
                     &z3::ast::Real::le(inner, &zero),
                     &z3::ast::Real::unary_minus(inner),
-                    &inner,
+                    inner,
                 ));
             }
             _ => unimplemented!(),

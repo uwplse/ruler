@@ -259,13 +259,13 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     /// Returns true if the node is in the current domain.
     /// Useful for rule lifting.
     fn is_in_domain(&self) -> bool {
-        return true;
+        true
     }
 
     /// Returns true if the node is extractable
     /// Used for rule lifting.
     fn is_extractable(&self) -> bool {
-        return true;
+        true
     }
 
     /// Returns true if every node in the recexpr is in the domain
@@ -380,7 +380,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     pub fn new(params: SynthParams) -> Self {
         // add prior rules (if any) to old_eqs
         let mut olds: EqualityMap<L> = Default::default();
-        if params.prior_rules.clone().is_some() {
+        if params.prior_rules.is_some() {
             for (l, r) in derive::parse::<L>(params.prior_rules.as_ref().unwrap()) {
                 if let Some(e) = Equality::new(&l, &r) {
                     olds.insert(e.name.clone(), e);
@@ -489,7 +489,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut found_unions = HashMap::default();
         for id in self.ids() {
             let id2 = runner.egraph.find(id);
-            found_unions.entry(id2).or_insert(vec![]).push(id);
+            found_unions.entry(id2).or_insert_with(Vec::new).push(id);
         }
         for ids in found_unions.values() {
             for win in ids.windows(2) {
@@ -578,7 +578,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut new_eqs = EqualityMap::default();
         let extract = Extractor::new(&self.egraph, AstSize);
         for ids in by_cvec.values() {
-            if self.params.linear_cvec_matching || ids.len() > 0 {
+            if self.params.linear_cvec_matching || !ids.is_empty() {
                 let mut terms_ids: Vec<_> =
                     ids.iter().map(|&id| (extract.find_best(id), id)).collect();
                 terms_ids.sort_by_key(|x| x.0 .0);
@@ -612,7 +612,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     /// Enumerates a layer and filters (EMA, constant filtering)
     fn enumerate_layer(&self, iter: usize) -> Vec<L> {
-        let mut layer = L::make_layer(&self, iter);
+        let mut layer = L::make_layer(self, iter);
         layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
 
         // no constants (if set)
@@ -620,13 +620,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         if iter > self.params.no_constants_above_iter {
             let constants: HashSet<Id> = self
                 .ids()
-                .filter_map(|id| {
-                    let expr = &self.egraph[id].data.simplest;
-                    if expr.as_ref().iter().any(|n| n.is_constant()) {
-                        Some(id)
-                    } else {
-                        None
-                    }
+                .filter(|id| {
+                    let expr = &self.egraph[*id].data.simplest;
+                    expr.as_ref().iter().any(|n| n.is_constant())
                 })
                 .collect();
 
@@ -647,7 +643,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
 
                 max_id = usize::from(id);
-                L::valid_constants(&self, &cp, &id, seen)
+                L::valid_constants(self, &cp, &id, seen)
             } else {
                 let id = cp.add(node.clone());
                 if usize::from(id) < max_id {
@@ -655,7 +651,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
 
                 max_id = usize::from(id);
-                L::valid_constants(&self, &cp, &id, seen)
+                L::valid_constants(self, &cp, &id, seen)
             }
         });
 
@@ -915,7 +911,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 let mut found_unions = HashMap::default();
                 for id in self.ids() {
                     let id2 = runner.egraph.find(id);
-                    found_unions.entry(id2).or_insert(vec![]).push(id);
+                    found_unions.entry(id2).or_insert_with(Vec::new).push(id);
                 }
 
                 // these unions are candidate rewrite rules
@@ -960,7 +956,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 let mut found_unions = HashMap::default();
                 for id in self.ids() {
                     let id2 = runner.egraph.find(id);
-                    found_unions.entry(id2).or_insert(vec![]).push(id);
+                    found_unions.entry(id2).or_insert_with(Vec::new).push(id);
                 }
 
                 // these unions are candidate rewrite rules
@@ -1354,7 +1350,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         }
 
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
-            to.simplest = from.simplest.clone();
+            to.simplest = from.simplest;
             merge_a = true;
         }
 

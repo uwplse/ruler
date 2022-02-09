@@ -110,15 +110,15 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_in_domain(&self) -> bool {
-        match self {
-            Math::Band([_, _]) => true,
-            Math::Bor([_, _]) => true,
-            Math::Bxor([_, _]) => true,
-            Math::Bnot(_) => true,
-            Math::Num(_) => true,
-            Math::Var(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Math::Band([_, _])
+                | Math::Bor([_, _])
+                | Math::Bxor([_, _])
+                | Math::Bnot(_)
+                | Math::Num(_)
+                | Math::Var(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
@@ -167,10 +167,8 @@ impl SynthLanguage for Math {
                     if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
                         continue;
                     }
-                } else {
-                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                        continue;
-                    }
+                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                    continue;
                 };
 
                 to_add.push(Math::Band([i, j]));

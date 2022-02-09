@@ -43,7 +43,7 @@ impl From<Complex> for &'static str {
 impl FromStr for Complex {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 1 && s.chars().next().unwrap() != '?' && s.chars().last().unwrap() == 'C' {
+        if s.len() > 1 && !s.starts_with('?') && s.ends_with('C') {
             Ok(s.into())
         } else {
             Err("not complex")
@@ -91,7 +91,7 @@ impl From<Real> for &'static str {
 impl FromStr for Real {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 1 && s.chars().next().unwrap() != '?' && s.chars().last().unwrap() == 'R' {
+        if s.len() > 1 && !s.starts_with('?') && s.ends_with('R') {
             Ok(s.into())
         } else {
             Err("not real")
@@ -136,12 +136,9 @@ impl From<Variable> for &'static str {
 impl FromStr for Variable {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() == 1 && s.chars().nth(0).unwrap().is_alphabetic() {
+        if s.len() == 1 && s.chars().next().unwrap().is_alphabetic() {
             Ok(s.into())
-        } else if s.len() == 2
-            && s.chars().nth(0).unwrap() == '?'
-            && s.chars().nth(1).unwrap().is_alphabetic()
-        {
+        } else if s.len() == 2 && s.starts_with('?') && s.chars().nth(1).unwrap().is_alphabetic() {
             Ok((&s[1..2]).into())
         } else {
             Err("not variable")
@@ -260,7 +257,7 @@ fn is_zero(n: &Math) -> bool {
 fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
     rec.as_ref().iter().any(|n| match n {
         ENodeOrVar::ENode(Math::CDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_zero(&n),
+            ENodeOrVar::ENode(n) => is_zero(n),
             _ => false,
         },
         _ => false,
@@ -410,45 +407,36 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_constant(&self) -> bool {
-        match self {
-            Math::ComplexConst(_) => true,
-            _ => false,
-        }
+        matches!(self, Math::ComplexConst(_))
     }
 
     // override default behavior
     fn is_in_domain(&self) -> bool {
-        match self {
-            Math::CNeg(_) => true,
-            Math::CAdd([_, _]) => true,
-            Math::CSub([_, _]) => true,
-            Math::CMul([_, _]) => true,
-            Math::CDiv([_, _]) => true,
-            Math::Conj(_) => true,
-            Math::Var(_) => true,
-            Math::ComplexConst(_) => true,
-
-            // Math::Re(_) => true,
-            // Math::Im(_) => true,
-            // Math::Abs(_) => true,
-            // Math::Arg(_) => true,
-            Math::Cart([_, _]) => true,
-            Math::Polar([_, _]) => true,
-
-            _ => false,
-        }
+        matches!(
+            self,
+            Math::CNeg(_)
+                | Math::CAdd([_, _])
+                | Math::CSub([_, _])
+                | Math::CMul([_, _])
+                | Math::CDiv([_, _])
+                | Math::Conj(_)
+                | Math::Var(_)
+                | Math::ComplexConst(_)
+                | Math::Cart([_, _])
+                | Math::Polar([_, _])
+        )
     }
 
     fn is_extractable(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Math::RNeg(_)
-            | Math::RAdd(_)
-            | Math::RSub(_)
-            | Math::RMul(_)
-            | Math::RDiv(_)
-            | Math::RealConst(_) => false,
-            _ => true,
-        }
+                | Math::RAdd(_)
+                | Math::RSub(_)
+                | Math::RMul(_)
+                | Math::RDiv(_)
+                | Math::RealConst(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
@@ -592,17 +580,15 @@ impl SynthLanguage for Math {
                     if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
                         continue;
                     }
-                } else {
-                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                        continue;
-                    }
+                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                    continue;
                 };
 
                 to_add.push(Math::CAdd([i, j]));
                 to_add.push(Math::CSub([i, j]));
                 to_add.push(Math::CMul([i, j]));
 
-                if !synth.egraph[j].iter().any(|x| is_zero(x)) {
+                if !synth.egraph[j].iter().any(is_zero) {
                     to_add.push(Math::CDiv([i, j]));
                 }
             }
@@ -641,10 +627,7 @@ impl SynthLanguage for Math {
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
         if !egraph[id].data.in_domain {
             // lower domain
-            if egraph[id].iter().any(|x| match x {
-                Math::RealConst(_) => true,
-                _ => false,
-            }) {
+            if egraph[id].iter().any(|x| matches!(x, Math::RealConst(_))) {
                 // early exit if constant exists
                 return;
             }
@@ -664,11 +647,6 @@ impl SynthLanguage for Math {
             if let Some(n) = to_add {
                 let r_id = egraph.add(n);
                 egraph.union(r_id, id);
-            }
-        } else {
-            // early exit if constant exists
-            if egraph[id].iter().any(|x| x.is_constant()) {
-                return;
             }
         }
     }
