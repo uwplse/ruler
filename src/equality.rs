@@ -78,7 +78,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         matched_id: Id,
         subst: &Subst,
         searcher_ast: Option<&PatternAst<L>>,
-        rule_name: Symbol
+        rule_name: Symbol,
     ) -> Vec<Id> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
@@ -92,9 +92,9 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
                 ENodeOrVar::Var(v) => {
                     let s = v.to_string();
                     L::mk_var(s[1..].into())
-                },
+                }
             };
-            
+
             if egraph[matched_id].data.in_domain != node.is_in_domain() {
                 return vec![];
             }
@@ -104,7 +104,9 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             return vec![];
         }
 
-        let ids = self.rhs.apply_one(egraph, matched_id, subst, searcher_ast, rule_name);
+        let ids = self
+            .rhs
+            .apply_one(egraph, matched_id, subst, searcher_ast, rule_name);
         // assert_eq!(ids.len(), 1);
         if ids.len() == 0 {
             return vec![];

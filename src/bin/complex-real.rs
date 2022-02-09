@@ -2,12 +2,12 @@
     Complex from Reals
 !*/
 
-use std::str::FromStr;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 
-use num::bigint::{BigInt};
-use num::rational::{Ratio, ParseRatioError};
+use num::bigint::BigInt;
+use num::rational::{ParseRatioError, Ratio};
 use num::Zero;
 
 use egg::*;
@@ -18,7 +18,7 @@ pub type Rational = Ratio<BigInt>;
 // custom implementation of a complex value
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Complex {
-    val: Symbol
+    val: Symbol,
 }
 
 impl Complex {
@@ -66,7 +66,7 @@ impl Debug for Complex {
 // custom implementation of real value
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Real {
-    val: Symbol
+    val: Symbol,
 }
 
 impl Real {
@@ -138,8 +138,10 @@ impl FromStr for Variable {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() == 1 && s.chars().nth(0).unwrap().is_alphabetic() {
             Ok(s.into())
-        } else if s.len() == 2 && s.chars().nth(0).unwrap() == '?' &&
-            s.chars().nth(1).unwrap().is_alphabetic() {
+        } else if s.len() == 2
+            && s.chars().nth(0).unwrap() == '?'
+            && s.chars().nth(1).unwrap().is_alphabetic()
+        {
             Ok((&s[1..2]).into())
         } else {
             Err("not variable")
@@ -232,7 +234,9 @@ macro_rules! fold_real {
 //  Helper functions
 //
 
-fn is_complex_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
+fn is_complex_str(
+    s: &'static str,
+) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
     move |egraph, _, subst| egraph[subst[var]].data.in_domain
 }
@@ -255,11 +259,9 @@ fn is_zero(n: &Math) -> bool {
 
 fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
     rec.as_ref().iter().any(|n| match n {
-        ENodeOrVar::ENode(Math::CDiv([_, i])) => {
-            match &rec.as_ref()[usize::from(*i)] {
-                ENodeOrVar::ENode(n) => is_zero(&n),
-                _ => false,
-            }
+        ENodeOrVar::ENode(Math::CDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
+            ENodeOrVar::ENode(n) => is_zero(&n),
+            _ => false,
         },
         _ => false,
     })
@@ -269,37 +271,38 @@ fn is_valid_rewrite_rec(
     egraph: &EGraph<Math, SynthAnalysis>,
     expr: &RecExpr<ENodeOrVar<Math>>,
     subst: &Subst,
-    idx: Id
+    idx: Id,
 ) -> bool {
     match &expr[idx] {
         ENodeOrVar::Var(_) => true,
         ENodeOrVar::ENode(n) => match n {
             // special case: div
-            Math::RDiv([_, j]) |
-            Math::CDiv([_, j]) => match &expr[*j] {
+            Math::RDiv([_, j]) | Math::CDiv([_, j]) => match &expr[*j] {
                 ENodeOrVar::Var(v) => egraph[subst[*v]].iter().all(|x| !is_zero(x)),
-                _ => true
+                _ => true,
             },
 
             // binary ops
-            Math::RAdd([i, j]) |
-            Math::RSub([i, j]) |
-            Math::RMul([i, j]) |
-            Math::CAdd([i, j]) |
-            Math::CSub([i, j]) |
-            Math::CMul([i, j]) |
-            Math::Cart([i, j]) |
-            Math::Polar([i, j]) => is_valid_rewrite_rec(egraph, expr, subst, *i) &&
-                                   is_valid_rewrite_rec(egraph, expr, subst, *j),
+            Math::RAdd([i, j])
+            | Math::RSub([i, j])
+            | Math::RMul([i, j])
+            | Math::CAdd([i, j])
+            | Math::CSub([i, j])
+            | Math::CMul([i, j])
+            | Math::Cart([i, j])
+            | Math::Polar([i, j]) => {
+                is_valid_rewrite_rec(egraph, expr, subst, *i)
+                    && is_valid_rewrite_rec(egraph, expr, subst, *j)
+            }
 
             // unary ops
-            Math::RNeg(i) |
-            Math::CNeg(i) |
-            Math::Conj(i) |
-            Math::Re(i) |
-            Math::Im(i) |
-            Math::Abs(i) |
-            Math::Arg(i) => is_valid_rewrite_rec(egraph, expr, subst, *i),   
+            Math::RNeg(i)
+            | Math::CNeg(i)
+            | Math::Conj(i)
+            | Math::Re(i)
+            | Math::Im(i)
+            | Math::Abs(i)
+            | Math::Arg(i) => is_valid_rewrite_rec(egraph, expr, subst, *i),
 
             // other
             _ => false,
@@ -355,11 +358,13 @@ fn fold_real_div(v1: &Real, v2: &Real) -> Option<Real> {
     let n1 = symbol_to_rational(v1);
     let n2 = symbol_to_rational(v2);
     match (n1, n2) {
-        (Ok(x), Ok(y)) => if y.is_zero() {
-            None
-        } else {
-            Some(real_const_symbol(&(x / y).to_string()))
-        },
+        (Ok(x), Ok(y)) => {
+            if y.is_zero() {
+                None
+            } else {
+                Some(real_const_symbol(&(x / y).to_string()))
+            }
+        }
         _ => None,
     }
 }
@@ -369,7 +374,7 @@ fn fold_real_div(v1: &Real, v2: &Real) -> Option<Real> {
 //
 
 impl SynthLanguage for Math {
-    type Constant = Complex;  // not used
+    type Constant = Complex; // not used
 
     // no evaluation needed
     fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
@@ -427,22 +432,21 @@ impl SynthLanguage for Math {
             // Math::Im(_) => true,
             // Math::Abs(_) => true,
             // Math::Arg(_) => true,
-
             Math::Cart([_, _]) => true,
             Math::Polar([_, _]) => true,
 
-            _ => false
+            _ => false,
         }
     }
 
     fn is_extractable(&self) -> bool {
         match self {
-            Math::RNeg(_) |
-            Math::RAdd(_) |
-            Math::RSub(_) |
-            Math::RMul(_) |
-            Math::RDiv(_) |
-            Math::RealConst(_) => false,
+            Math::RNeg(_)
+            | Math::RAdd(_)
+            | Math::RSub(_)
+            | Math::RMul(_)
+            | Math::RDiv(_)
+            | Math::RealConst(_) => false,
             _ => true,
         }
     }
@@ -537,28 +541,22 @@ impl SynthLanguage for Math {
             rewrite!("cartesian-form"; "?a" => "(Cart (Re ?a) (Im ?a))" if is_complex_str("?a")),
             rewrite!("polar-form"; "?a" => "(Polar (abs ?a) (Arg ?a))" if is_complex_str("?a")),
             // rewrite!("def-abs"; "(+R (*R (Re ?a) (Re ?a)) (*R (Im ?a) (Im ?a))))" => "(*R (abs ?a) (abs ?a))"),
-
             rewrite!("def-neg-cart-re"; "(Re (~C ?a))" => "(~R (Re ?a))"),
             rewrite!("def-neg-cart-im"; "(Im (~C ?a))" => "(~R (Im ?a))"),
             // rewrite!("def-neg-polar-abs"; "(abs (~C ?a))" => "(abs ?a)",
             // rewrite!("def-neg-polar-arg"; "(Arg (~C ?a))" => "(+R (Arg ?a) pi)",
-
             rewrite!("def-conj-re"; "(Re (conj ?a))" => "(Re ?a)"),
             rewrite!("def-conj-im"; "(Im (conj ?a))" => "(~R (Im ?a))"),
             rewrite!("def-conj-abs"; "(abs (conj ?a))" => "(abs ?a)"),
             rewrite!("def-conj-arg"; "(Arg (conj ?a))" => "(~R (Arg ?a))"),
-
             rewrite!("def-add-re"; "(Re (+C ?a ?b))" => "(+R (Re ?a) (Re ?b))"),
             rewrite!("def-add-im"; "(Im (+C ?a ?b))" => "(+R (Im ?a) (Im ?b))"),
-
             rewrite!("def-sub-re"; "(Re (-C ?a ?b))" => "(-R (Re ?a) (Re ?b))"),
             rewrite!("def-sub-im"; "(Im (-C ?a ?b))" => "(-R (Im ?a) (Im ?b))"),
-
             rewrite!("def-mul-re"; "(Re (*C ?a ?b))" => "(-R (*R (Re ?a) (Re ?b)) (*R (Im ?a) (Im ?b)))"),
             rewrite!("def-mul-im"; "(Im (*C ?a ?b))" => "(+R (*R (Re ?a) (Im ?b)) (*R (Im ?a) (Re ?b)))"),
             rewrite!("def-mul-abs"; "(abs (*C ?a ?b))" => "(*R (abs ?a) (abs ?b))"),
             rewrite!("def-mul-arg"; "(Arg (*C ?a ?b))" => "(+R (Arg ?a) (Arg ?b))"),
-
             rewrite!("def-div-re"; "(Re (/C ?a ?b))" => "(/R (+R (*R (Re ?a) (Re ?b)) (*R (Im ?a) (Im ?b)))
                                                              (+R (*R (Re ?b) (Re ?b)) (*R (Im ?b) (Im ?b))))"),
             rewrite!("def-div-im"; "(Im (/C ?a ?b))" => "(/R (-R (*R (Im ?a) (Re ?b)) (*R (Re ?a) (Im ?b)))
@@ -583,9 +581,10 @@ impl SynthLanguage for Math {
 
         for i in synth.ids() {
             for j in synth.ids() {
-                if (ids[&i] + ids[&j] + 1 != iter) ||
-                    !synth.egraph[i].data.in_domain ||
-                    !synth.egraph[j].data.in_domain {
+                if (ids[&i] + ids[&j] + 1 != iter)
+                    || !synth.egraph[i].data.in_domain
+                    || !synth.egraph[j].data.in_domain
+                {
                     continue;
                 }
 
@@ -608,10 +607,11 @@ impl SynthLanguage for Math {
                 }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            {
                 continue;
             }
-            
+
             to_add.push(Math::Conj(i));
             to_add.push(Math::CNeg(i));
         }
@@ -620,30 +620,32 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
-        _synth: &mut Synthesizer<Self>,
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-    ) -> bool {
+    fn is_valid(_synth: &mut Synthesizer<Self>, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
         !contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast)
     }
 
     fn is_valid_rewrite(
         egraph: &EGraph<Self, SynthAnalysis>,
         rhs: &Pattern<Self>,
-        subst: &Subst
+        subst: &Subst,
     ) -> bool {
-        is_valid_rewrite_rec(egraph, &rhs.ast, subst,
-                             Id::from(rhs.ast.as_ref().len() - 1))
+        is_valid_rewrite_rec(
+            egraph,
+            &rhs.ast,
+            subst,
+            Id::from(rhs.ast.as_ref().len() - 1),
+        )
     }
 
     // Constant folding for complex numbers
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        if !egraph[id].data.in_domain { // lower domain
+        if !egraph[id].data.in_domain {
+            // lower domain
             if egraph[id].iter().any(|x| match x {
-                    Math::RealConst(_) => true,
-                    _ => false,
-                }) {        // early exit if constant exists
+                Math::RealConst(_) => true,
+                _ => false,
+            }) {
+                // early exit if constant exists
                 return;
             }
 

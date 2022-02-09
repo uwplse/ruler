@@ -82,7 +82,7 @@ impl SynthLanguage for Math {
             .iter()
             .map(|s| s.parse().unwrap())
             .collect();
-        
+
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {

@@ -44,7 +44,7 @@ define_language! {
 
 /// Returns an ordered float from an f64.
 /// It only returns 0.0 for both -0.0 and 0.0,
-/// and the input for other values. 
+/// and the input for other values.
 pub fn mk_constant(val: f64) -> Option<Constant> {
     // is_normal eliminates 0, but we want 0.
     if val.is_normal() || val == 0.0 || val == -0.0 {

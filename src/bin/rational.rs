@@ -120,12 +120,11 @@ impl SynthLanguage for Math {
     /// Initialize an egraph with some constants and variables.
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // disabled constants (TODO: validate input)
-        let disabled_consts: Vec<&str> =
-            if let Some(s) = &synth.params.disabled_consts {
-                s.split(" ").collect()
-            } else {
-                vec![]
-            };
+        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
+            s.split(" ").collect()
+        } else {
+            vec![]
+        };
 
         // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
@@ -191,16 +190,15 @@ impl SynthLanguage for Math {
     /// Term enumeration.
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
         // disabled operators (TODO: validate input)
-        let disabled_ops: Vec<&str> =
-            if let Some(s) = &synth.params.disabled_ops {
-                s.split(" ").collect()
-            } else {
-                vec![]
-            };
+        let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
+            s.split(" ").collect()
+        } else {
+            vec![]
+        };
 
         // predicate if disabled
         let allowedp = |s| disabled_ops.iter().find(|&x| x.eq(&s)).is_none();
-        
+
         let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let mut to_add = vec![];
 
@@ -209,10 +207,12 @@ impl SynthLanguage for Math {
             .ids()
             .map(|id| (id, extract.find_best_cost(id)))
             .collect();
-    
-        log::info!("Previous layer: {} enodes, {} eclasses ",
-                    synth.egraph.total_number_of_nodes(),
-                    synth.egraph.number_of_classes());
+
+        log::info!(
+            "Previous layer: {} enodes, {} eclasses ",
+            synth.egraph.total_number_of_nodes(),
+            synth.egraph.number_of_classes()
+        );
 
         for i in synth.ids() {
             for j in synth.ids() {
@@ -231,10 +231,18 @@ impl SynthLanguage for Math {
                     }
                 };
 
-                if allowedp("+") { to_add.push(Math::Add([i, j])); }
-                if allowedp("-") { to_add.push(Math::Sub([i, j])); }
-                if allowedp("*") { to_add.push(Math::Mul([i, j])); }
-                if allowedp("/") { to_add.push(Math::Div([i, j])); }
+                if allowedp("+") {
+                    to_add.push(Math::Add([i, j]));
+                }
+                if allowedp("-") {
+                    to_add.push(Math::Sub([i, j]));
+                }
+                if allowedp("*") {
+                    to_add.push(Math::Mul([i, j]));
+                }
+                if allowedp("/") {
+                    to_add.push(Math::Div([i, j]));
+                }
             }
 
             // 1ary ops
@@ -242,8 +250,12 @@ impl SynthLanguage for Math {
                 continue;
             }
 
-            if allowedp("abs") { to_add.push(Math::Abs(i)); }
-            if allowedp("~") { to_add.push(Math::Neg(i)); }
+            if allowedp("abs") {
+                to_add.push(Math::Abs(i));
+            }
+            if allowedp("~") {
+                to_add.push(Math::Neg(i));
+            }
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());
@@ -254,109 +266,99 @@ impl SynthLanguage for Math {
         synth: &Synthesizer<Self>,
         egraph: &EGraph<Self, SynthAnalysis>,
         id: &Id,
-        seen: &mut HashSet<Id>
+        seen: &mut HashSet<Id>,
     ) -> bool {
         // filtered consts (TODO: validate input)
-        let filtered_consts: Vec<&str> =
-            if let Some(s) = &synth.params.filtered_consts {
-                s.split(" ").collect()
-            } else {
-                vec![]
-            };
+        let filtered_consts: Vec<&str> = if let Some(s) = &synth.params.filtered_consts {
+            s.split(" ").collect()
+        } else {
+            vec![]
+        };
 
         // early exit if no need for filtering
         if filtered_consts.is_empty() {
             return true;
         }
 
-        egraph[*id].nodes
-            .iter()
-            .all(|x| {
-                match x {
-                    Math::Neg(a) => {
-                        seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }
-                    }
-                    Math::Add([a, b]) => {
-                        (seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }) &&
-                        (seen.contains(b) || {
-                            seen.insert(*b);
-                            Self::valid_constants(synth, egraph, b, seen)
-                        })
-                    }
-                    Math::Sub([a, b]) => {
-                        (seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }) &&
-                        (seen.contains(b) || {
-                            seen.insert(*b);
-                            Self::valid_constants(synth, egraph, b, seen)
-                        })
-                    }
-                    Math::Mul([a, b]) => { 
-                        (seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }) &&
-                        (seen.contains(b) || {
-                            seen.insert(*b);
-                            Self::valid_constants(synth, egraph, b, seen)
-                        })
-                    }
-                    Math::Div([a, b]) => {
-                        (seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }) &&
-                        (seen.contains(b) || {
-                            seen.insert(*b);
-                            Self::valid_constants(synth, egraph, b, seen)
-                        })
-                    }
-                    Math::Abs(a) => {
-                        seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }
-                    }
-                    Math::Reciprocal(a) => {
-                        seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }
-                    }
-                    Math::Pow([a, b]) => {
-                        (seen.contains(a) || {
-                            seen.insert(*a);
-                            Self::valid_constants(synth, egraph, a, seen)
-                        }) &&
-                        (seen.contains(b) || {
-                            seen.insert(*b);
-                            Self::valid_constants(synth, egraph, b, seen)
-                        })
-                    }
-                    Math::Var(_) => true,
-                    Math::Num(n) => {
-                        let one: BigInt = BigInt::from(1);
-                        if !n.denom().eq(&one) {
-                            return false;
-                        }
-
-                        let consts: Vec<BigInt> = filtered_consts
-                            .iter()
-                            .map(|&s| s.parse::<i32>().unwrap())
-                            .map(|x| BigInt::from(x))
-                            .collect();
-                        consts.iter().any(|x| n.numer().eq(&x))
-                    }
+        egraph[*id].nodes.iter().all(|x| match x {
+            Math::Neg(a) => {
+                seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
                 }
-            })
+            }
+            Math::Add([a, b]) => {
+                (seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
+                }) && (seen.contains(b) || {
+                    seen.insert(*b);
+                    Self::valid_constants(synth, egraph, b, seen)
+                })
+            }
+            Math::Sub([a, b]) => {
+                (seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
+                }) && (seen.contains(b) || {
+                    seen.insert(*b);
+                    Self::valid_constants(synth, egraph, b, seen)
+                })
+            }
+            Math::Mul([a, b]) => {
+                (seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
+                }) && (seen.contains(b) || {
+                    seen.insert(*b);
+                    Self::valid_constants(synth, egraph, b, seen)
+                })
+            }
+            Math::Div([a, b]) => {
+                (seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
+                }) && (seen.contains(b) || {
+                    seen.insert(*b);
+                    Self::valid_constants(synth, egraph, b, seen)
+                })
+            }
+            Math::Abs(a) => {
+                seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
+                }
+            }
+            Math::Reciprocal(a) => {
+                seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
+                }
+            }
+            Math::Pow([a, b]) => {
+                (seen.contains(a) || {
+                    seen.insert(*a);
+                    Self::valid_constants(synth, egraph, a, seen)
+                }) && (seen.contains(b) || {
+                    seen.insert(*b);
+                    Self::valid_constants(synth, egraph, b, seen)
+                })
+            }
+            Math::Var(_) => true,
+            Math::Num(n) => {
+                let one: BigInt = BigInt::from(1);
+                if !n.denom().eq(&one) {
+                    return false;
+                }
+
+                let consts: Vec<BigInt> = filtered_consts
+                    .iter()
+                    .map(|&s| s.parse::<i32>().unwrap())
+                    .map(|x| BigInt::from(x))
+                    .collect();
+                consts.iter().any(|x| n.numer().eq(&x))
+            }
+        })
     }
 
     /// Check the validity of a rewrite rule.
@@ -507,7 +509,7 @@ fn egg_to_z3<'a>(
     (buf.pop().unwrap(), assumes)
 }
 
-/// Entry point 
+/// Entry point
 fn main() {
     Math::main()
 }

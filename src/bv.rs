@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::*;
 
-
 /// General bitvector implementation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]

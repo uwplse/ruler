@@ -164,7 +164,7 @@ impl SynthLanguage for Math {
             },
             rule_lifting: false,
         });
-        
+
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
@@ -260,8 +260,6 @@ impl SynthLanguage for Math {
     }
 }
 
-	
-
 /// Return a randomply sampled BigInt that is not 0
 // randomly sample so that they are not 0
 // Ratio::new will panic if the denom is 0
@@ -293,7 +291,7 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
 }
 
 /// Convert expressions to Z3's syntax for using SMT based rule verification.
-#[allow(unused_mut, mutable_borrow_reservation_conflict)]   // please remove if changing this
+#[allow(unused_mut, mutable_borrow_reservation_conflict)] // please remove if changing this
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],
