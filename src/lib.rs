@@ -697,7 +697,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     let run_rewrites_before = Instant::now();
                     if !self.params.no_run_rewrites {
                         self.run_rewrites();
-                        self.egraph.rebuild();
                     }
                     let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
 
@@ -785,7 +784,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         log::info!("Chose {} good rules", valid_eqs.len());
                         self.all_eqs.extend(valid_eqs.clone());
                         self.new_eqs.extend(valid_eqs);
-                        self.egraph.rebuild();
 
                         // TODO check formatting for Learned...
                         log::info!("Time taken in... rule minimization: {}", rule_minimize);
