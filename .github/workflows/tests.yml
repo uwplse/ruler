@@ -33,17 +33,17 @@ jobs:
 
       - name: "Synthesize rational rules"
         run: |
-          cargo rational --iters 2 --variables 3 --num-fuzz 50 --do-final-run --outfile out/rat.json
+          cargo rational --iters 2 --variables 3 --use-smt --do-final-run --outfile out/rat.json
           cargo run --release --bin rational derive --ci out/rat.json tests/rat.json out/rat-derive.json
 
       - name: "Synthesize rational rules (EMA)"
         run: |
-          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --num-fuzz 50 --do-final-run --outfile out/rat-ema.json
+          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --use-smt --do-final-run --outfile out/rat-ema.json
           cargo run --release --bin rational derive --ci out/rat-ema.json tests/rat-ema.json out/rat-ema-derive.json
 
       - name: "Synthesize rational rules (EMA, no consts)"
         run: |
-          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --num-fuzz 50 --do-final-run --outfile out/rat-ema-no-const.json
+          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --use-smt --do-final-run --outfile out/rat-ema-no-const.json
           cargo run --release --bin rational derive --ci out/rat-ema-no-const.json tests/rat-ema-no-const.json out/rat-ema-no-const-derive.json
 
       - name: "Synthesize bv4 rules"
