@@ -26,17 +26,14 @@ define_language! {
         Num(BV<2>),
 
         // conversions
-        "bv" = Make([Id; 2]), 
+        "bv" = Make([Id; 2]),
         "first" = First(Id),
         "second" = Second(Id),
     }
 }
 
 // transcription of `egraph::add_expr_rec`
-fn add_domain_expr_rec(
-    synth: &mut Synthesizer<Math>,
-    expr: &[Math]
-) -> Id {
+fn add_domain_expr_rec(synth: &mut Synthesizer<Math>, expr: &[Math]) -> Id {
     let e = expr.last().unwrap().clone().map_children(|i| {
         let child = &expr[..usize::from(i) + 1];
         add_domain_expr_rec(synth, child)
@@ -44,38 +41,31 @@ fn add_domain_expr_rec(
     Math::add_domain_node(synth, e)
 }
 
-fn first_bool_id(
-    egraph: &EGraph<Math, SynthAnalysis>,
-    id: Id
-) -> Id {
-    egraph[id].nodes
+fn first_bool_id(egraph: &EGraph<Math, SynthAnalysis>, id: Id) -> Id {
+    egraph[id]
+        .nodes
         .iter()
-        .find_map(|x| {
-            match x {
-                Math::Make([i, _]) => Some(*i),
-                _ => None
-            }})
+        .find_map(|x| match x {
+            Math::Make([i, _]) => Some(*i),
+            _ => None,
+        })
         .unwrap()
 }
 
-fn second_bool_id(
-    egraph: &EGraph<Math, SynthAnalysis>,
-    id: Id
-) -> Id {
-    egraph[id].nodes
+fn second_bool_id(egraph: &EGraph<Math, SynthAnalysis>, id: Id) -> Id {
+    egraph[id]
+        .nodes
         .iter()
-        .find_map(|x| {
-            match x {
-                Math::Make([_, i]) => Some(*i),
-                _ => None
-            }})
+        .find_map(|x| match x {
+            Math::Make([_, i]) => Some(*i),
+            _ => None,
+        })
         .unwrap()
 }
-
 
 // BV-bool language
 impl SynthLanguage for Math {
-    type Constant = BV::<2>;
+    type Constant = BV<2>;
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         let s = s
@@ -120,15 +110,15 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_in_domain(&self) -> bool {
-        match self {
-            Math::Band([_, _]) => true,
-            Math::Bor([_, _]) => true,
-            Math::Bxor([_, _]) => true,
-            Math::Bnot(_) => true,
-            Math::Num(_) => true,
-            Math::Var(_) => true,
-            _ => false
-        }
+        matches!(
+            self,
+            Math::Band([_, _])
+                | Math::Bor([_, _])
+                | Math::Bxor([_, _])
+                | Math::Bnot(_)
+                | Math::Num(_)
+                | Math::Var(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
@@ -166,9 +156,10 @@ impl SynthLanguage for Math {
 
         for i in synth.ids() {
             for j in synth.ids() {
-                if (ids[&i] + ids[&j] + 1 != iter) ||
-                    !synth.egraph[i].data.in_domain ||
-                    !synth.egraph[j].data.in_domain {
+                if (ids[&i] + ids[&j] + 1 != iter)
+                    || !synth.egraph[i].data.in_domain
+                    || !synth.egraph[j].data.in_domain
+                {
                     continue;
                 }
 
@@ -176,10 +167,8 @@ impl SynthLanguage for Math {
                     if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
                         continue;
                     }
-                } else {
-                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                        continue;
-                    }
+                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                    continue;
                 };
 
                 to_add.push(Math::Band([i, j]));
@@ -187,10 +176,11 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Bxor([i, j]));
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            {
                 continue;
             }
-            
+
             to_add.push(Math::Bnot(i));
         }
 
@@ -221,7 +211,7 @@ impl SynthLanguage for Math {
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
                 synth.egraph.union(op_id, mk_id);
                 op_id
-            },
+            }
             Math::Band([i, j]) => {
                 let op_id = synth.egraph.add(node);
                 let fsti_id = first_bool_id(&synth.egraph, i);
@@ -233,7 +223,7 @@ impl SynthLanguage for Math {
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
                 synth.egraph.union(op_id, mk_id);
                 op_id
-            },
+            }
             Math::Bor([i, j]) => {
                 let op_id = synth.egraph.add(node);
                 let fsti_id = first_bool_id(&synth.egraph, i);
@@ -245,7 +235,7 @@ impl SynthLanguage for Math {
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
                 synth.egraph.union(op_id, mk_id);
                 op_id
-            },
+            }
             Math::Bxor([i, j]) => {
                 let op_id = synth.egraph.add(node);
                 let fsti_id = first_bool_id(&synth.egraph, i);
@@ -257,7 +247,7 @@ impl SynthLanguage for Math {
                 let mk_id = synth.egraph.add(Math::Make([nfst_id, nsec_id]));
                 synth.egraph.union(op_id, mk_id);
                 op_id
-            },
+            }
             _ => {
                 panic!("Not a bitvector node {:?}", node);
             }
