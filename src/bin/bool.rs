@@ -44,7 +44,7 @@ impl SynthLanguage for Math {
             Math::Or([a, b]) => map!(v, a, b => Some(*a | *b)),
             Math::Xor([a, b]) => map!(v, a, b => Some(*a ^ *b)),
 
-            Math::Lit(n) => vec![Some(n.clone()); cvec_len],
+            Math::Lit(n) => vec![Some(*n); cvec_len],
             Math::Var(_) => vec![],
         }
     }
@@ -93,10 +93,10 @@ impl SynthLanguage for Math {
         egraph.add(Math::Lit(false));
         egraph.add(Math::Lit(true));
 
-        for i in 0..synth.params.variables {
+        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
             let var = Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = consts[i].clone();
+            egraph[id].data.cvec = item.clone();
         }
 
         synth.egraph = egraph;

@@ -19,7 +19,7 @@ pub fn self_product<T: Clone>(ts: &[T], n: usize) -> Vec<Vec<T>> {
 
 // Division the rounds up
 // Hack from https://www.reddit.com/r/rust/comments/bk7v15/my_next_favourite_way_to_divide_integers_rounding/
-pub fn div_up(a : usize, b: usize) -> usize {
+pub fn div_up(a: usize, b: usize) -> usize {
     (0..a).step_by(b).size_hint().0
 }
 

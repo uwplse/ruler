@@ -2,11 +2,11 @@
     Trigonometry from reals
 !*/
 
-use std::ops::*;
-use std::str::FromStr;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use std::ops::*;
+use std::str::FromStr;
 
 use egg::*;
 use ruler::*;
@@ -21,7 +21,7 @@ impl Complex {
     }
 
     fn is_real(self) -> bool {
-        self.0.as_str().chars().position(|x| x == 'i').is_none()
+        !self.0.as_str().chars().any(|x| x == 'i')
     }
 }
 
@@ -40,7 +40,7 @@ impl From<Complex> for &'static str {
 impl FromStr for Complex {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 1 && s.chars().next().unwrap() != '?' && s.chars().last().unwrap() == 'C' {
+        if s.len() > 1 && !s.starts_with('?') && s.ends_with('C') {
             Ok(s.into())
         } else {
             Err("not complex")
@@ -85,7 +85,7 @@ impl From<Real> for &'static str {
 impl FromStr for Real {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 0 && s.chars().next().unwrap() != '?' {
+        if !s.is_empty() && !s.starts_with('?') {
             Ok(s.into())
         } else {
             Err("not real")
@@ -130,10 +130,9 @@ impl From<Variable> for &'static str {
 impl FromStr for Variable {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() == 1 && s.chars().nth(0).unwrap().is_alphabetic() {
+        if s.len() == 1 && s.chars().next().unwrap().is_alphabetic() {
             Ok(s.into())
-        } else if s.len() == 2 && s.chars().nth(0).unwrap() == '?' &&
-            s.chars().nth(1).unwrap().is_alphabetic() {
+        } else if s.len() == 2 && s.starts_with('?') && s.chars().nth(1).unwrap().is_alphabetic() {
             Ok((&s[1..2]).into())
         } else {
             Err("not variable")
@@ -186,32 +185,30 @@ define_language! {
 #[derive(Debug)]
 struct ComplexToRealApplier(&'static str);
 impl Applier<Math, SynthAnalysis> for ComplexToRealApplier {
-    fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst, _searcher_pat: Option<&PatternAst<Math>>, _rule: Symbol) -> Vec<Id> {
+    fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst) -> Vec<Id> {
         let id = subst[self.0.parse().unwrap()];
         if egraph[id].data.in_domain {
             return vec![];
         }
-        
-        let found = egraph[id]
-            .iter()
-            .find_map(|n| match n {
-                Math::ComplexConst(c) => {
-                    if c.is_real() {
-                        let s = c.as_str();
-                        Some(&s[..(s.len() - 1)])
-                    } else {
-                        None
-                    }
-                },
-                _ => None,
-            });
+
+        let found = egraph[id].iter().find_map(|n| match n {
+            Math::ComplexConst(c) => {
+                if c.is_real() {
+                    let s = c.as_str();
+                    Some(&s[..(s.len() - 1)])
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        });
 
         if let Some(v) = found {
             let re_id = egraph.add(Math::Re(id));
             let cnst_id = egraph.add(Math::RealConst(Real::from(v)));
             egraph.union(re_id, cnst_id);
         }
-        
+
         vec![]
     }
 }
@@ -221,7 +218,7 @@ fn complex_const_symbol(s: &str) -> Complex {
 }
 
 impl SynthLanguage for Math {
-    type Constant = Real;  // not used
+    type Constant = Real; // not used
 
     // no evaluation needed
     fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
@@ -257,45 +254,41 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_constant(&self) -> bool {
-        match self {
-            Math::RealConst(_) => true,
-            _ => false,
-        }
+        matches!(self, Math::RealConst(_))
     }
 
     /// Returns true if the node is in the current domain.
     /// Useful for rule lifting.
     fn is_in_domain(&self) -> bool {
-        match self {
-            Math::Sin(_)        |
-            Math::Cos(_)        |
-            Math::Neg(_)        |
-            Math::Add([_, _])   |
-            Math::Sub([_, _])   |
-            Math::Mul([_, _])   |
-            Math::Div([_, _])   |
-            Math::Re(_)         |
-            Math::Im(_)         |
-            Math::Sqr(_)        |
-            Math::RealConst(_)  |
-            Math::Var(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Math::Sin(_)
+                | Math::Cos(_)
+                | Math::Neg(_)
+                | Math::Add([_, _])
+                | Math::Sub([_, _])
+                | Math::Mul([_, _])
+                | Math::Div([_, _])
+                | Math::Re(_)
+                | Math::Im(_)
+                | Math::Sqr(_)
+                | Math::RealConst(_)
+                | Math::Var(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
         // disabled constants (TODO: validate input)
-        let disabled_consts: Vec<&str> =
-            if let Some(s) = &synth.params.disabled_consts {
-                s.split(" ").collect()
-            } else {
-                vec![]
-            };
+        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
+            s.split(' ').collect()
+        } else {
+            vec![]
+        };
 
         // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Complex> = ["2", "1", "0", "-1", "-2"]
             .iter()
-            .filter(|s| disabled_consts.iter().find(|x| x.eq(s)).is_none())
+            .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
             .map(|s| complex_const_symbol(s))
             .collect();
 
@@ -319,7 +312,7 @@ impl SynthLanguage for Math {
         for c in constants {
             egraph.add(Math::ComplexConst(c));
         }
-        
+
         // i * i = -1;
         let i_id = egraph.add(Math::ComplexConst(complex_const_symbol("i")));
         let i2_id = egraph.add(Math::CMul([i_id, i_id]));
@@ -338,21 +331,18 @@ impl SynthLanguage for Math {
             rewrite!("def-sin"; "(sin ?a)" <=> "(Re (/C (-C (cis ?a) (cis (~ ?a))) 2iC))"),
             rewrite!("def-cis-add"; "(cis (+ ?a ?b))" <=> "(*C (cis ?a) (cis ?b))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-
             rewrite!("def-cos-sqr"; "(sqr (cos ?a))" <=>
                      "(Re (/C (*C (+C (cis ?a) (cis (~ ?a))) (+C (cis ?a) (cis (~ ?a)))) 2C))"),
             rewrite!("def-sin-sqr"; "(sqr (sin ?a))" <=>
                      "(Re (/C (*C (-C (cis ?a) (cis (~ ?a))) (-C (cis ?a) (cis (~ ?a)))) 2iC))"),
-
             // rewrite!("complex-foil"; "(*C (+C ?a ?b) (+C ?c ?d))" <=>
             //         "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))"),
-
             vec![
                 rewrite!("def-add"; "(+ (Re ?a) (Re ?b))" => "(Re (+C ?a ?b))"),
                 rewrite!("def-mul"; "(* (Re ?a) (Re ?b))" => "(Re (*C ?a ?b))"),
                 rewrite!("cancel-cis-mul"; "(*C (cis ?a) (cis (~ ?a)))" => "1C"),
                 rewrite!("pure-real"; "?a" => { ComplexToRealApplier("?a") }),
-            ]
+            ],
         ]
         .concat();
 
@@ -369,11 +359,11 @@ impl SynthLanguage for Math {
             }
         }
 
-        let extra_rewrites = vec![
-            ("(*C (+C ?a ?b) (+C ?c ?d))",
-             "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))"),
-        ];
-        
+        let extra_rewrites = vec![(
+            "(*C (+C ?a ?b) (+C ?c ?d))",
+            "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))",
+        )];
+
         extra_rewrites.iter().for_each(|(l, r)| {
             let lhs: RecExpr<Self> = l.parse().unwrap();
             let rhs: RecExpr<Self> = r.parse().unwrap();
@@ -390,15 +380,14 @@ impl SynthLanguage for Math {
         let mut to_add = vec![];
 
         // disabled operators (TODO: validate input)
-        let disabled_ops: Vec<&str> =
-            if let Some(s) = &synth.params.disabled_ops {
-                s.split(" ").collect()
-            } else {
-                vec![]
-            };
+        let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
+            s.split(' ').collect()
+        } else {
+            vec![]
+        };
 
         // predicate if disabled
-        let allowedp = |s| disabled_ops.iter().find(|&x| x.eq(&s)).is_none();
+        let allowedp = |s| !disabled_ops.iter().any(|x| x.eq(&s));
 
         // maps ids to n_ops
         let ids: HashMap<Id, usize> = synth
@@ -408,9 +397,10 @@ impl SynthLanguage for Math {
 
         for i in synth.ids() {
             for j in synth.ids() {
-                if (ids[&i] + ids[&j] + 1 != iter) ||
-                    !synth.egraph[i].data.in_domain ||
-                    !synth.egraph[j].data.in_domain {
+                if (ids[&i] + ids[&j] + 1 != iter)
+                    || !synth.egraph[i].data.in_domain
+                    || !synth.egraph[j].data.in_domain
+                {
                     continue;
                 }
 
@@ -418,29 +408,38 @@ impl SynthLanguage for Math {
                     if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
                         continue;
                     }
-                } else {
-                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                        continue;
-                    }
+                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                    continue;
                 };
 
-                if allowedp("+") { to_add.push(Math::Add([i, j])); }
+                if allowedp("+") {
+                    to_add.push(Math::Add([i, j]));
+                }
                 // if allowedp("-") { to_add.push(Math::RSub([i, j])); }
-                if allowedp("*") { to_add.push(Math::Mul([i, j])); }
+                if allowedp("*") {
+                    to_add.push(Math::Mul([i, j]));
+                }
                 // if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
                 //     to_add.push(Math::RDiv([i, j]));
                 // }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            {
                 continue;
             }
 
             // if allowedp("~") { to_add.push(Math::RNeg(i)); }
             if iter <= 2 {
-            if allowedp("sin") { to_add.push(Math::Sin(i)); }
-            if allowedp("cos") { to_add.push(Math::Cos(i)); }
-            if allowedp("sqr") { to_add.push(Math::Sqr(i)); }
+                if allowedp("sin") {
+                    to_add.push(Math::Sin(i));
+                }
+                if allowedp("cos") {
+                    to_add.push(Math::Cos(i));
+                }
+                if allowedp("sqr") {
+                    to_add.push(Math::Sqr(i));
+                }
             }
         }
 
@@ -457,8 +456,7 @@ impl SynthLanguage for Math {
     }
 
     // custom constant folder
-    fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {
-    }
+    fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
 
     /// Heuristics for ranking rewrites based on number of variables,
     /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,

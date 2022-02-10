@@ -164,11 +164,11 @@ impl SynthLanguage for Math {
             },
             rule_lifting: false,
         });
-        
-        for i in 0..synth.params.variables {
+
+        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = consts[i].clone();
+            egraph[id].data.cvec = item.clone();
         }
 
         for n in &constants {
@@ -260,8 +260,6 @@ impl SynthLanguage for Math {
     }
 }
 
-	
-
 /// Return a randomply sampled BigInt that is not 0
 // randomly sample so that they are not 0
 // Ratio::new will panic if the denom is 0
@@ -293,41 +291,41 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
 }
 
 /// Convert expressions to Z3's syntax for using SMT based rule verification.
-#[allow(unused_mut, mutable_borrow_reservation_conflict)]   // please remove if changing this
+#[allow(unused_mut, mutable_borrow_reservation_conflict)] // please remove if changing this
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],
 ) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
     let mut buf: Vec<z3::ast::Real> = vec![];
     let mut assumes: Vec<z3::ast::Bool> = vec![];
-    let zero = z3::ast::Real::from_real(&ctx, 0, 1);
+    let zero = z3::ast::Real::from_real(ctx, 0, 1);
     for node in expr.as_ref().iter() {
         match node {
-            Math::Var(v) => buf.push(z3::ast::Real::new_const(&ctx, v.to_string())),
+            Math::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
             Math::Num(c) => buf.push(z3::ast::Real::from_real(
-                &ctx,
+                ctx,
                 (c.numer()).to_i32().unwrap(),
                 (c.denom()).to_i32().unwrap(),
                 // to_i32(c.numer()),
                 // to_i32(c.denom()),
             )),
             Math::Add([a, b]) => buf.push(z3::ast::Real::add(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Sub([a, b]) => buf.push(z3::ast::Real::sub(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Mul([a, b]) => buf.push(z3::ast::Real::mul(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Div([a, b]) => {
                 let denom = &buf[usize::from(*b)];
                 let lez = z3::ast::Real::le(denom, &zero);
                 let gez = z3::ast::Real::ge(denom, &zero);
-                let denom_zero = z3::ast::Bool::and(&ctx, &[&lez, &gez]);
+                let denom_zero = z3::ast::Bool::and(ctx, &[&lez, &gez]);
                 let numer = &buf[usize::from(*a)].clone();
                 buf.push(z3::ast::Bool::ite(
                     &denom_zero,
@@ -341,7 +339,7 @@ fn egg_to_z3<'a>(
                 buf.push(z3::ast::Bool::ite(
                     &z3::ast::Real::le(inner, &zero),
                     &z3::ast::Real::unary_minus(inner),
-                    &inner,
+                    inner,
                 ));
             }
             _ => unimplemented!(),
