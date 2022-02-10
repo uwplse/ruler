@@ -203,10 +203,13 @@ mod test {
             "(| true ?a) => true",
         ];
         assert_eq!(report.num_rules, expected.len());
-        report
-            .all_eqs
-            .iter()
-            .for_each(|rule| assert!(expected.contains(&rule.to_string().as_str())));
+        report.all_eqs.iter().for_each(|rule| {
+            assert!(
+                expected.contains(&rule.to_string().as_str()),
+                "Unexpected Rule: {}",
+                &rule.to_string()
+            )
+        });
     }
 
     #[test]
