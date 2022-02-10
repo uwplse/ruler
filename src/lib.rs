@@ -635,7 +635,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         layer.retain(|node| {
             let seen = &mut HashSet::<Id>::default();
             if iter > self.params.ema_above_iter {
-                let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
+                let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                 let rec2 = L::emt_generalize(&rec);
                 let id = cp.add_expr(&rec2);
                 if usize::from(id) < max_id {
@@ -682,7 +682,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 chunk_num += 1;
                 for node in chunk {
                     if iter > self.params.ema_above_iter {
-                        let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
+                        let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                         self.egraph.add_expr(&L::emt_generalize(&rec));
                     } else {
                         self.egraph.add(node.clone());
@@ -879,7 +879,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 chunk_num += 1;
                 for node in chunk {
                     if iter > self.params.ema_above_iter {
-                        let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
+                        let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                         L::add_domain_expr(&mut self, &rec);
                     } else {
                         L::add_domain_node(&mut self, node.clone());
@@ -1305,7 +1305,7 @@ impl<L: SynthLanguage> Signature<L> {
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
-    fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+    fn merge(&self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let mut merge_a = false;
         let cost_fn = |x: &RecExpr<L>| {
             if self.rule_lifting && L::recexpr_in_domain(x) {

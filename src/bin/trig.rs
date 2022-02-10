@@ -185,14 +185,7 @@ define_language! {
 #[derive(Debug)]
 struct ComplexToRealApplier(&'static str);
 impl Applier<Math, SynthAnalysis> for ComplexToRealApplier {
-    fn apply_one(
-        &self,
-        egraph: &mut EGraph<Math, SynthAnalysis>,
-        _: Id,
-        subst: &Subst,
-        _searcher_pat: Option<&PatternAst<Math>>,
-        _rule: Symbol,
-    ) -> Vec<Id> {
+    fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst) -> Vec<Id> {
         let id = subst[self.0.parse().unwrap()];
         if egraph[id].data.in_domain {
             return vec![];
