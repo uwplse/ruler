@@ -633,7 +633,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut cp = self.egraph.clone();
         let mut max_id = cp.number_of_classes();
         layer.retain(|node| {
-            let seen = &mut HashSet::<Id>::default();
+            // let seen = &mut HashSet::<Id>::default();
             if iter > self.params.ema_above_iter {
                 let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                 let rec2 = L::emt_generalize(&rec);
@@ -763,19 +763,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                 } else {
                                     // extracted
                                     // let mut cp = self.egraph.clone();
-                                    let mut valid_const = true;
+                                    let valid_const = true;
                                     let lrec = L::instantiate(&eq.lhs);
                                     let rrec = L::instantiate(&eq.rhs);
 
                                     let i = self.egraph.add_expr(&lrec);
                                     let seen = &mut HashSet::<Id>::default();
                                     // valid_const &=
-                                        // L::valid_constants(&self, &self.egraph, &i, seen);
+                                    // L::valid_constants(&self, &self.egraph, &i, seen);
 
                                     let j = self.egraph.add_expr(&rrec);
                                     seen.clear();
                                     // valid_const &=
-                                        // L::valid_constants(&self, &self.egraph, &j, seen);
+                                    // L::valid_constants(&self, &self.egraph, &j, seen);
 
                                     self.egraph.union(i, j);
                                     if !valid_const {
