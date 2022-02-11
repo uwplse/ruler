@@ -643,7 +643,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
 
                 max_id = usize::from(id);
-                L::valid_constants(self, &cp, &id, seen)
+                true
+                //L::valid_constants(self, &cp, &id, seen)
             } else {
                 let id = cp.add(node.clone());
                 if usize::from(id) < max_id {
@@ -651,7 +652,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
 
                 max_id = usize::from(id);
-                L::valid_constants(self, &cp, &id, seen)
+                true
+                //L::valid_constants(self, &cp, &id, seen)
             }
         });
 
@@ -767,13 +769,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                                     let i = self.egraph.add_expr(&lrec);
                                     let seen = &mut HashSet::<Id>::default();
-                                    valid_const &=
-                                        L::valid_constants(&self, &self.egraph, &i, seen);
+                                    // valid_const &=
+                                        // L::valid_constants(&self, &self.egraph, &i, seen);
 
                                     let j = self.egraph.add_expr(&rrec);
                                     seen.clear();
-                                    valid_const &=
-                                        L::valid_constants(&self, &self.egraph, &j, seen);
+                                    // valid_const &=
+                                        // L::valid_constants(&self, &self.egraph, &j, seen);
 
                                     self.egraph.union(i, j);
                                     if !valid_const {
