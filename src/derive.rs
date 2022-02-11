@@ -5,11 +5,14 @@ use std::sync::Mutex;
 
 type Pair<L> = (RecExpr<L>, RecExpr<L>);
 
-pub fn parse<L: SynthLanguage>(filename: &String) -> Vec<Pair<L>> {
+pub fn parse<L: SynthLanguage>(filename: &str) -> Vec<Pair<L>> {
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
 
-    report.all_eqs.iter().map(|eq| {
+    report
+        .all_eqs
+        .iter()
+        .map(|eq| {
             let l = L::instantiate(&eq.lhs);
             let r = L::instantiate(&eq.rhs);
             (l, r)
@@ -17,11 +20,14 @@ pub fn parse<L: SynthLanguage>(filename: &String) -> Vec<Pair<L>> {
         .collect()
 }
 
-pub fn parse_new_eqs<L: SynthLanguage>(filename: &String) -> Vec<Pair<L>> {
+pub fn parse_new_eqs<L: SynthLanguage>(filename: &str) -> Vec<Pair<L>> {
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
 
-    report.new_eqs.iter().map(|eq| {
+    report
+        .new_eqs
+        .iter()
+        .map(|eq| {
             let l = L::instantiate(&eq.lhs);
             let r = L::instantiate(&eq.rhs);
             (l, r)
@@ -32,7 +38,10 @@ pub fn parse_new_eqs<L: SynthLanguage>(filename: &String) -> Vec<Pair<L>> {
 /// Perform derivability test between two rulesets.
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
     let (pairs1, pairs2) = if params.new_eqs {
-        (parse_new_eqs::<L>(&params.in1), parse_new_eqs::<L>(&params.in2))
+        (
+            parse_new_eqs::<L>(&params.in1),
+            parse_new_eqs::<L>(&params.in2),
+        )
     } else {
         (parse::<L>(&params.in1), parse::<L>(&params.in2))
     };
@@ -45,7 +54,7 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
             println!("Couldn't derive {}", eq.name);
         }
 
-        if not_derivable.len() != 0 {
+        if !not_derivable.is_empty() {
             std::process::exit(-1);
         }
     } else {
@@ -67,8 +76,8 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
             },
         });
 
-        let file =
-            File::create(&params.out).unwrap_or_else(|_| panic!("Failed to create '{}'", &params.out));
+        let file = File::create(&params.out)
+            .unwrap_or_else(|_| panic!("Failed to create '{}'", &params.out));
         serde_json::to_writer_pretty(file, &json).unwrap();
     }
 }
@@ -95,7 +104,7 @@ fn one_way<L: SynthLanguage>(
             .with_scheduler(egg::SimpleScheduler)
             .with_hook(|r| {
                 if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
-                    Err(format!("Done"))
+                    Err("Done".to_owned())
                 } else {
                     Ok(())
                 }
@@ -114,9 +123,9 @@ fn one_way<L: SynthLanguage>(
         );
 
         if l_id == r_id {
-            results.0.push((l.clone(), r.clone()));
+            results.0.push((l, r));
         } else {
-            results.1.push((l.clone(), r.clone()));
+            results.1.push((l, r));
         }
     });
 

@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::*;
 
-
 /// General bitvector implementation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -14,7 +13,7 @@ const INNER_N: u32 = 32;
 
 impl<const N: u32> BV<N> {
     pub const ZERO: Self = Self(0);
-    pub const ALL_ONES: Self = Self((!(0 as Inner)) >> (INNER_N - N));
+    pub const ALL_ONES: Self = Self((!(0)) >> (INNER_N - N));
     pub const NEG_ONE: Self = Self::ALL_ONES;
     pub const MIN: Self = Self(1 << (N - 1));
     pub const MAX: Self = Self(Self::ALL_ONES.0 >> 1);
@@ -106,11 +105,11 @@ impl<const N: u32> Distribution<BV<N>> for rand::distributions::Standard {
 impl<const N: u32> std::str::FromStr for BV<N> {
     type Err = std::num::ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("#b") {
-            let i = Inner::from_str_radix(&s[2..], 2).unwrap();
+        if let Some(stripped) = s.strip_prefix("#b") {
+            let i = Inner::from_str_radix(stripped, 2).unwrap();
             return Ok(Self::new(i));
         }
-        s.parse().map(|inner: Inner| Self::new(inner))
+        s.parse::<Inner>().map(Self::new)
     }
 }
 

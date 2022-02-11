@@ -77,8 +77,6 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         egraph: &mut EGraph<L, SynthAnalysis>,
         matched_id: Id,
         subst: &Subst,
-        searcher_ast: Option<&PatternAst<L>>,
-        rule_name: Symbol
     ) -> Vec<Id> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
@@ -92,9 +90,9 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
                 ENodeOrVar::Var(v) => {
                     let s = v.to_string();
                     L::mk_var(s[1..].into())
-                },
+                }
             };
-            
+
             if egraph[matched_id].data.in_domain != node.is_in_domain() {
                 return vec![];
             }
@@ -104,9 +102,9 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             return vec![];
         }
 
-        let ids = self.rhs.apply_one(egraph, matched_id, subst, searcher_ast, rule_name);
+        let ids = self.rhs.apply_one(egraph, matched_id, subst);
         // assert_eq!(ids.len(), 1);
-        if ids.len() == 0 {
+        if ids.is_empty() {
             return vec![];
         }
         let id = ids[0];
@@ -150,8 +148,8 @@ impl<L: SynthLanguage> Equality<L> {
         }
         let mut forward: (String, Pattern<L>, Pattern<L>, Option<Rewrite<L, _>>) = {
             let map = &mut HashMap::default();
-            let lhs = L::generalize(&e1, map);
-            let rhs = L::generalize(&e2, map);
+            let lhs = L::generalize(e1, map);
+            let rhs = L::generalize(e2, map);
             let name = format!("{} => {}", lhs, rhs);
             let defined_rhs = NotUndefined {
                 name: name.clone(),
@@ -160,15 +158,15 @@ impl<L: SynthLanguage> Equality<L> {
             (
                 name.clone(),
                 lhs.clone(),
-                rhs.clone(),
-                Rewrite::new(name, lhs.clone(), defined_rhs).ok(),
+                rhs,
+                Rewrite::new(name, lhs, defined_rhs).ok(),
             )
         };
 
         let mut back: (String, Pattern<L>, Pattern<L>, Option<Rewrite<L, _>>) = {
             let map = &mut HashMap::default();
-            let lhs = L::generalize(&e2, map);
-            let rhs = L::generalize(&e1, map);
+            let lhs = L::generalize(e2, map);
+            let rhs = L::generalize(e1, map);
             let name = format!("{} => {}", lhs, rhs);
             let defined_rhs = NotUndefined {
                 name: name.clone(),
@@ -177,8 +175,8 @@ impl<L: SynthLanguage> Equality<L> {
             (
                 name.clone(),
                 lhs.clone(),
-                rhs.clone(),
-                Rewrite::new(name, lhs.clone(), defined_rhs).ok(),
+                rhs,
+                Rewrite::new(name, lhs, defined_rhs).ok(),
             )
         };
 

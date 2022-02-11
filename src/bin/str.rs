@@ -202,10 +202,10 @@ impl SynthLanguage for Lang {
             let mut new = vec![SmallStr::new()];
             for s in &str_consts {
                 let mut s = s.clone();
-                s.push('A' as u8);
+                s.push(b'A');
                 new.push(s.clone());
                 s.pop();
-                s.push('B' as u8);
+                s.push(b'B');
                 new.push(s)
             }
             str_consts = new
@@ -251,20 +251,19 @@ impl SynthLanguage for Lang {
         // egraph.add(Lang::Lit("\"B\"".parse().unwrap()));
         egraph.add(Lang::Lit(Constant::Str(Default::default())));
 
-        for i in 0..synth.params.variables {
+        for (i, item) in str_consts.iter().enumerate().take(synth.params.variables) {
             let var = Symbol::from(letter(i));
             let id = egraph.add(Lang::Var(var));
-            egraph[id].data.cvec = str_consts[i].clone();
+            egraph[id].data.cvec = item.clone();
         }
-        for i in 0..synth.params.str_int_variables {
+        for (i, item) in int_consts
+            .iter()
+            .enumerate()
+            .take(synth.params.str_int_variables)
+        {
             let int_var = Symbol::from(letter(i + synth.params.variables));
             let id = egraph.add(Lang::Var(int_var));
-            egraph[id].data.cvec = int_consts[i]
-                .iter()
-                .cycle()
-                .cloned()
-                .take(cvec_len)
-                .collect();
+            egraph[id].data.cvec = item.iter().cycle().cloned().take(cvec_len).collect();
         }
 
         synth.egraph = egraph;
@@ -341,7 +340,7 @@ impl SynthLanguage for Lang {
     fn validate(
         _synth: &Synthesizer<Self>,
         _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>
+        _rhs: &Pattern<Self>,
     ) -> ValidationResult {
         ValidationResult::Valid
     }

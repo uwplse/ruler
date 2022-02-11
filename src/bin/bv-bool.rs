@@ -26,7 +26,7 @@ define_language! {
         Num(BV<2>),
 
         // conversions
-        "bv" = Make([Id; 2]), 
+        "bv" = Make([Id; 2]),
         "first" = First(Id),
         "second" = Second(Id),
     }
@@ -37,10 +37,9 @@ fn is_bv_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &
     move |egraph, _, subst| egraph[subst[var]].data.in_domain
 }
 
-
 // BV-bool language
 impl SynthLanguage for Math {
-    type Constant = BV::<2>;
+    type Constant = BV<2>;
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         let s = s
@@ -86,14 +85,14 @@ impl SynthLanguage for Math {
     // override default behavior
     fn is_in_domain(&self) -> bool {
         match self {
-            Math::Band([_, _])  |
-            Math::Bor([_, _])   |
-            Math::Bxor([_, _])  |
-            Math::Bnot(_)       |
-            Math::Num(_)        |
-            Math::Var(_)        |
-            Math::Make(_) => true,
-            _ => false
+            Math::Band([_, _])
+            | Math::Bor([_, _])
+            | Math::Bxor([_, _])
+            | Math::Bnot(_)
+            | Math::Num(_)
+            | Math::Var(_)
+            | Math::Make(_) => true,
+            _ => false,
         }
     }
 
@@ -144,9 +143,10 @@ impl SynthLanguage for Math {
 
         for i in synth.ids() {
             for j in synth.ids() {
-                if (ids[&i] + ids[&j] + 1 != iter) ||
-                    !synth.egraph[i].data.in_domain ||
-                    !synth.egraph[j].data.in_domain {
+                if (ids[&i] + ids[&j] + 1 != iter)
+                    || !synth.egraph[i].data.in_domain
+                    || !synth.egraph[j].data.in_domain
+                {
                     continue;
                 }
 
@@ -154,10 +154,8 @@ impl SynthLanguage for Math {
                     if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
                         continue;
                     }
-                } else {
-                    if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                        continue;
-                    }
+                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                    continue;
                 };
 
                 to_add.push(Math::Band([i, j]));
@@ -165,10 +163,11 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Bxor([i, j]));
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain {
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            {
                 continue;
             }
-            
+
             to_add.push(Math::Bnot(i));
         }
 
@@ -179,7 +178,7 @@ impl SynthLanguage for Math {
     fn validate(
         _synth: &Synthesizer<Self>,
         _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>
+        _rhs: &Pattern<Self>,
     ) -> ValidationResult {
         ValidationResult::Valid
     }
