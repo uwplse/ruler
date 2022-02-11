@@ -182,7 +182,7 @@ impl SynthLanguage for Math {
     }
 
     fn validate(
-        synth: &Synthesizer<Self>,
+        synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> ValidationResult {
@@ -197,8 +197,7 @@ impl SynthLanguage for Math {
             env.insert(var, vec![]);
         }
 
-        let rng = &mut rand_pcg::Lcg128Xsl64::new(0, 0);
-        let mut cvecs = gen_samples(rng, n, env.keys().len());
+        let mut cvecs = gen_samples(&mut synth.rng, n, env.keys().len());
         for (_, cvec) in env.iter_mut() {
             let c = cvecs.pop().unwrap();
             for v in c {

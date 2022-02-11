@@ -425,15 +425,15 @@ impl SynthLanguage for Math {
         matches!(
             self,
             Math::CNeg(_)
-            | Math::CAdd([_, _])
-            | Math::CSub([_, _])
-            | Math::CMul([_, _])
-            | Math::CDiv([_, _])
-            | Math::Conj(_)
-            | Math::Var(_)
-            | Math::ComplexConst(_)
-            | Math::Cart([_, _])
-            | Math::Polar([_, _])
+                | Math::CAdd([_, _])
+                | Math::CSub([_, _])
+                | Math::CMul([_, _])
+                | Math::CDiv([_, _])
+                | Math::Conj(_)
+                | Math::Var(_)
+                | Math::ComplexConst(_)
+                | Math::Cart([_, _])
+                | Math::Polar([_, _])
         )
     }
 
@@ -605,7 +605,7 @@ impl SynthLanguage for Math {
     }
 
     fn validate(
-        _synth: &Synthesizer<Self>,
+        _synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> ValidationResult {

@@ -386,7 +386,7 @@ impl SynthLanguage for Math {
     }
 
     fn validate(
-        _synth: &Synthesizer<Self>,
+        _synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> ValidationResult {

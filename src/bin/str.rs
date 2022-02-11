@@ -338,7 +338,7 @@ impl SynthLanguage for Lang {
     }
 
     fn validate(
-        _synth: &Synthesizer<Self>,
+        _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
     ) -> ValidationResult {

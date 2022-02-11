@@ -161,7 +161,7 @@ impl SynthLanguage for Math {
     }
 
     fn validate(
-        synth: &Synthesizer<Self>,
+        synth: &mut Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
         rhs: &egg::Pattern<Self>,
     ) -> ValidationResult {
@@ -184,6 +184,7 @@ impl SynthLanguage for Math {
                 }
                 SatResult::Unknown => {
                     println!("z3 validation: unknown for {} => {}", lhs, rhs);
+                    synth.smt_unknown += 1;
                     ValidationResult::Unknown
                 }
             }
@@ -199,10 +200,9 @@ impl SynthLanguage for Math {
                 env.insert(var, vec![]);
             }
 
-            let rng = &mut rand_pcg::Lcg128Xsl64::new(0, 0);
             for cvec in env.values_mut() {
                 cvec.reserve(n);
-                for s in sampler(rng, 32, n) {
+                for s in sampler(&mut synth.rng, 32, n) {
                     cvec.push(Some(s));
                 }
             }
