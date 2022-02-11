@@ -57,9 +57,9 @@ jobs:
       - name: "Build"
         run: cargo build --release
 
-      - name: "Setup for tests"
-        run: mkdir -p out/
-        
+      - name: "Setup tests"
+        run: mkdir -p out/  
+
       - name: "Unit tests"
         run: cargo test --release
 
@@ -81,6 +81,9 @@ jobs:
 
       - name: "Build"
         run: cargo build --release
+
+      - name: "Setup tests"
+        run: mkdir -p out/          
 
       - name: "Synthesize rational rules"
         run: |
