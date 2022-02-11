@@ -278,17 +278,17 @@ impl SynthLanguage for Math {
     }
 
     fn is_extractable(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Math::Sin(_)
-            | Math::Cos(_)
-            | Math::Add(_)
-            | Math::Sub(_)
-            | Math::Mul(_)
-            | Math::Div(_)
-            | Math::RealConst(_)
-            | Math::Var(_) => true,
-            _ => false,
-        }
+                | Math::Cos(_)
+                | Math::Add(_)
+                | Math::Sub(_)
+                | Math::Mul(_)
+                | Math::Div(_)
+                | Math::RealConst(_)
+                | Math::Var(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {

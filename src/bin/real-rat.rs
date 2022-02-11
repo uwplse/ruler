@@ -193,7 +193,7 @@ fn is_real_zero(n: &Math) -> bool {
 fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
     rec.as_ref().iter().any(|n| match n {
         ENodeOrVar::ENode(Math::RDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_real_zero(&n),
+            ENodeOrVar::ENode(n) => is_real_zero(n),
             _ => false,
         },
         _ => false,
@@ -256,16 +256,16 @@ impl SynthLanguage for Math {
     }
 
     fn is_extractable(&self) -> bool {
-        match self {
-            Math::RNeg(_) => true,
-            Math::RAdd([_, _]) => true,
-            Math::RSub([_, _]) => true,
-            Math::RMul([_, _]) => true,
-            Math::RDiv([_, _]) => true,
-            Math::Var(_) => true,
-            Math::Real(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Math::RNeg(_)
+                | Math::RAdd([_, _])
+                | Math::RSub([_, _])
+                | Math::RMul([_, _])
+                | Math::RDiv([_, _])
+                | Math::Var(_)
+                | Math::Real(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
@@ -326,7 +326,7 @@ impl SynthLanguage for Math {
         // disabled operators from command line
         // (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
-            s.split(" ").collect()
+            s.split(' ').collect()
         } else {
             vec![]
         };
@@ -366,7 +366,7 @@ impl SynthLanguage for Math {
                 if allowedp("/") {
                     to_add.push(Math::RMul([i, j]));
                 }
-                if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_real_zero(x)) {
+                if allowedp("/") && !synth.egraph[j].nodes.iter().any(is_real_zero) {
                     to_add.push(Math::RDiv([i, j]));
                 }
             }

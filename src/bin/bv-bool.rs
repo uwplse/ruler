@@ -84,16 +84,16 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_in_domain(&self) -> bool {
-        match self {
-            Math::Band([_, _])
-            | Math::Bor([_, _])
-            | Math::Bxor([_, _])
-            | Math::Bnot(_)
-            | Math::Num(_)
-            | Math::Var(_)
-            | Math::Make(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Math::Band(_)
+                | Math::Bor(_)
+                | Math::Bxor(_)
+                | Math::Bnot(_)
+                | Math::Num(_)
+                | Math::Var(_)
+                | Math::Make(_)
+        )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {

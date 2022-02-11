@@ -263,7 +263,7 @@ fn is_real_zero(n: &Math) -> bool {
 fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
     rec.as_ref().iter().any(|n| match n {
         ENodeOrVar::ENode(Math::CDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_complex_zero(&n),
+            ENodeOrVar::ENode(n) => is_complex_zero(n),
             _ => false,
         },
         _ => false,
@@ -422,21 +422,19 @@ impl SynthLanguage for Math {
 
     // override default behavior
     fn is_in_domain(&self) -> bool {
-        match self {
-            Math::CNeg(_) => true,
-            Math::CAdd([_, _]) => true,
-            Math::CSub([_, _]) => true,
-            Math::CMul([_, _]) => true,
-            Math::CDiv([_, _]) => true,
-            Math::Conj(_) => true,
-            Math::Var(_) => true,
-            Math::ComplexConst(_) => true,
-
-            Math::Cart([_, _]) => true,
-            Math::Polar([_, _]) => true,
-
-            _ => false,
-        }
+        matches!(
+            self,
+            Math::CNeg(_)
+            | Math::CAdd([_, _])
+            | Math::CSub([_, _])
+            | Math::CMul([_, _])
+            | Math::CDiv([_, _])
+            | Math::Conj(_)
+            | Math::Var(_)
+            | Math::ComplexConst(_)
+            | Math::Cart([_, _])
+            | Math::Polar([_, _])
+        )
     }
 
     fn is_extractable(&self) -> bool {
@@ -588,7 +586,7 @@ impl SynthLanguage for Math {
                 to_add.push(Math::CSub([i, j]));
                 to_add.push(Math::CMul([i, j]));
 
-                if !synth.egraph[j].iter().any(|x| is_complex_zero(x)) {
+                if !synth.egraph[j].iter().any(is_complex_zero) {
                     to_add.push(Math::CDiv([i, j]));
                 }
             }
