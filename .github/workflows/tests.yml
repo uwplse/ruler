@@ -63,6 +63,28 @@ jobs:
       - name: "Unit tests"
         run: cargo test --release
 
+  regression:
+    name: "Regression Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Install Rust compiler
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            default: true
+            override: true
+            components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: "Build"
+        run: cargo build --release
+
+      - name: "Setup tests"
+        run: mkdir -p out/
+
       - name: "Synthesize rational rules"
         run: |
           cargo rational --iters 2 --variables 3 --use-smt --do-final-run --outfile out/rat.json
