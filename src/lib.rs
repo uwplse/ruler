@@ -237,16 +237,6 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     /// Layer wise term enumeration in the egraph.
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self>;
 
-    /// Returns true if the eclass contains valid constants from the domain
-    fn valid_constants(
-        _synth: &Synthesizer<Self>,
-        _egraph: &EGraph<Self, SynthAnalysis>,
-        _id: &Id,
-        _seen: &mut HashSet<Id>,
-    ) -> bool {
-        true
-    }
-
     /// Returns true if the rewrite is valid
     fn is_valid_rewrite(
         _egraph: &EGraph<Self, SynthAnalysis>,
@@ -629,11 +619,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
             layer.retain(|n| n.all(|id| !constants.contains(&id)));
         }
 
-        // deduplicate and filter bad constants
+        // deduplicate
         let mut cp = self.egraph.clone();
         let mut max_id = cp.number_of_classes();
         layer.retain(|node| {
-            // let seen = &mut HashSet::<Id>::default();
             if iter > self.params.ema_above_iter {
                 let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                 let rec2 = L::emt_generalize(&rec);
@@ -641,19 +630,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 if usize::from(id) < max_id {
                     return false;
                 }
-
                 max_id = usize::from(id);
                 true
-                //L::valid_constants(self, &cp, &id, seen)
             } else {
                 let id = cp.add(node.clone());
                 if usize::from(id) < max_id {
                     return false;
                 }
-
                 max_id = usize::from(id);
                 true
-                //L::valid_constants(self, &cp, &id, seen)
             }
         });
 
@@ -763,25 +748,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                 } else {
                                     // extracted
                                     // let mut cp = self.egraph.clone();
-                                    let valid_const = true;
                                     let lrec = L::instantiate(&eq.lhs);
                                     let rrec = L::instantiate(&eq.rhs);
-
                                     let i = self.egraph.add_expr(&lrec);
-                                    let seen = &mut HashSet::<Id>::default();
-                                    // valid_const &=
-                                    // L::valid_constants(&self, &self.egraph, &i, seen);
-
                                     let j = self.egraph.add_expr(&rrec);
-                                    seen.clear();
-                                    // valid_const &=
-                                    // L::valid_constants(&self, &self.egraph, &j, seen);
 
                                     self.egraph.union(i, j);
-                                    if !valid_const {
-                                        // encountered a constant we don't want to see
-                                        continue;
-                                    }
                                 }
                             }
                             log::info!("  {}", eq);
