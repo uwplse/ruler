@@ -236,16 +236,6 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     /// Layer wise term enumeration in the egraph.
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self>;
 
-    /// Returns true if the eclass contains valid constants from the domain
-    fn valid_constants(
-        _synth: &Synthesizer<Self>,
-        _egraph: &EGraph<Self, SynthAnalysis>,
-        _id: &Id,
-        _seen: &mut HashSet<Id>,
-    ) -> bool {
-        true
-    }
-
     /// Returns true if the rewrite is valid
     fn is_valid_rewrite(
         _egraph: &EGraph<Self, SynthAnalysis>,
@@ -640,11 +630,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
             layer.retain(|n| n.all(|id| !constants.contains(&id)));
         }
 
-        // deduplicate and filter bad constants
+        // deduplicate
         let mut cp = self.egraph.clone();
         let mut max_id = cp.number_of_classes();
         layer.retain(|node| {
-            let seen = &mut HashSet::<Id>::default();
             if iter > self.params.ema_above_iter {
                 let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                 let rec2 = L::alpha_renaming(&rec);
@@ -652,17 +641,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 if usize::from(id) < max_id {
                     return false;
                 }
-
                 max_id = usize::from(id);
-                L::valid_constants(self, &cp, &id, seen)
+                true
             } else {
                 let id = cp.add(node.clone());
                 if usize::from(id) < max_id {
                     return false;
                 }
-
                 max_id = usize::from(id);
-                L::valid_constants(self, &cp, &id, seen)
+                true
             }
         });
 
@@ -750,47 +737,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     poison_rules.insert(bad.1);
                 }
 
-                // filter bad constants
-                log::info!("{} possible rules", eqs.len());
-                let mut valid_eqs = vec![];
-                for (s, eq) in eqs {
-                    if !self.params.no_run_rewrites {
-                        assert!(!self.all_eqs.contains_key(&eq.name));
-                        if let Some((i, j)) = eq.ids {
-                            // inserted
-                            self.egraph.union(i, j);
-                        } else {
-                            // extracted
-                            let mut valid_const = true;
-                            let lrec = L::instantiate(&eq.lhs);
-                            let rrec = L::instantiate(&eq.rhs);
-
-                            let i = self.egraph.add_expr(&lrec);
-                            let seen = &mut HashSet::<Id>::default();
-                            valid_const &= L::valid_constants(self, &self.egraph, &i, seen);
-
-                            let j = self.egraph.add_expr(&rrec);
-                            seen.clear();
-                            valid_const &= L::valid_constants(self, &self.egraph, &j, seen);
-
-                            self.egraph.union(i, j);
-                            if !valid_const {
-                                // encountered a constant we don't want to see
-                                continue;
-                            }
-                        }
-                    }
-
-                    log::info!("  {}", eq);
-                    valid_eqs.push((s, eq));
-                }
-
-                // add new rewrites to both all_eqs and new_eqs
-                log::info!("Chose {} good rules", valid_eqs.len());
-                minimized_eqs.extend(valid_eqs);
-
                 // TODO check formatting for Learned...
                 log::info!("Time taken in... rule minimization: {}", rule_minimize);
+                minimized_eqs.extend(eqs);
             }
 
             // break if we have no new eqs
@@ -995,42 +944,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let rule_minimize = rule_minimize_before.elapsed().as_secs_f64();
             log::info!("Time taken in... rule minimization: {}", rule_minimize);
 
-            log::info!("{} possible rules", eqs.len());
-            let mut valid_eqs: EqualityMap<L> = EqualityMap::default();
-            for (s, eq) in eqs {
-                if !self.params.no_run_rewrites {
-                    assert!(!self.all_eqs.contains_key(&eq.name));
-                    if let Some((i, j)) = eq.ids {
-                        // inserted
-                        self.egraph.union(i, j);
-                    } else {
-                        // extracted
-                        let mut valid_const = true;
-                        let lrec = L::instantiate(&eq.lhs);
-                        let rrec = L::instantiate(&eq.rhs);
-
-                        let i = self.egraph.add_expr(&lrec);
-                        let seen = &mut HashSet::<Id>::default();
-                        valid_const &= L::valid_constants(self, &self.egraph, &i, seen);
-
-                        let j = self.egraph.add_expr(&rrec);
-                        seen.clear();
-                        valid_const &= L::valid_constants(self, &self.egraph, &j, seen);
-
-                        self.egraph.union(i, j);
-                        if !valid_const {
-                            // encountered a constant we don't want to see
-                            continue;
-                        }
-                    }
-                }
-
-                log::info!("  {}", eq);
-                valid_eqs.insert(s, eq);
-            }
-
-            log::info!("Chose {} good rules", valid_eqs.len());
-            minimized_eqs.extend(valid_eqs);
+            log::info!("Chose {} good rules", eqs.len());
+            minimized_eqs.extend(eqs);
             self.egraph.rebuild();
         }
 
