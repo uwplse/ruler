@@ -83,7 +83,7 @@ jobs:
         run: cargo build --release
 
       - name: "Setup tests"
-        run: mkdir -p out/
+        run: mkdir -p out/          
 
       - name: "Synthesize rational rules"
         run: |
