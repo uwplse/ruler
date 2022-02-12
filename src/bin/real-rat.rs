@@ -183,21 +183,18 @@ fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id,
     move |egraph, _, subst| egraph[subst[var]].data.in_domain
 }
 
+fn is_rational_zero(n: &Math) -> bool {
+    match n {
+        Math::Rat(v) => v.is_zero(),
+        _ => false,
+    }
+}
+
 fn is_real_zero(n: &Math) -> bool {
     match n {
         Math::Real(v) => *v == real_const_symbol("0"),
         _ => false,
     }
-}
-
-fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
-    rec.as_ref().iter().any(|n| match n {
-        ENodeOrVar::ENode(Math::RDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_real_zero(n),
-            _ => false,
-        },
-        _ => false,
-    })
 }
 
 impl SynthLanguage for Math {
@@ -349,10 +346,10 @@ impl SynthLanguage for Math {
                     continue;
                 }
 
-                if iter > synth.params.no_constants_above_iter {
-                    if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
-                        continue;
-                    }
+                if iter > synth.params.no_constants_above_iter
+                    && (synth.egraph[i].data.exact || synth.egraph[j].data.exact)
+                {
+                    continue;
                 } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
                     continue;
                 };
@@ -363,7 +360,7 @@ impl SynthLanguage for Math {
                 if allowedp("-") {
                     to_add.push(Math::RSub([i, j]));
                 }
-                if allowedp("/") {
+                if allowedp("*") {
                     to_add.push(Math::RMul([i, j]));
                 }
                 if allowedp("/") && !synth.egraph[j].nodes.iter().any(is_real_zero) {
@@ -390,7 +387,39 @@ impl SynthLanguage for Math {
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> ValidationResult {
-        ValidationResult::from(!contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast))
+        let valid_pattern = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::ENode(Math::Div([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_rational_zero(n),
+                },
+                ENodeOrVar::ENode(Math::RDiv([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_real_zero(n),
+                },
+                _ => true,
+            })
+        };
+
+        ValidationResult::from(valid_pattern(&lhs) && valid_pattern(&rhs))
+    }
+
+    fn is_valid_rewrite(
+        egraph: &EGraph<Self, SynthAnalysis>,
+        rhs: &Pattern<Self>,
+        subst: &Subst,
+    ) -> bool {
+        rhs.ast.as_ref().iter().all(|n| match n {
+            ENodeOrVar::ENode(Math::Div([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_rational_zero),
+                ENodeOrVar::ENode(n) => !is_rational_zero(n),
+            },
+            ENodeOrVar::ENode(Math::RDiv([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_real_zero),
+                ENodeOrVar::ENode(n) => !is_real_zero(n),
+            },
+            _ => true,
+        })
     }
 
     // custom constant folder

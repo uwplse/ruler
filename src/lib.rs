@@ -425,7 +425,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     ) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
 
-        let runner = Runner::default()
+        Runner::default()
             .with_node_limit(usize::MAX)
             .with_hook(move |r| {
                 let size = r.egraph.total_number_of_nodes();
@@ -438,8 +438,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .with_node_limit(self.params.eqsat_node_limit * 2)
             .with_iter_limit(self.params.eqsat_iter_limit)
             .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
-            .with_scheduler(SimpleScheduler);
-        runner.with_egraph(egraph)
+            .with_scheduler(SimpleScheduler)
+            .with_egraph(egraph)
     }
 
     /// Apply current ruleset to the term egraph to minimize the term space.
@@ -709,9 +709,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
             let eq_chunk_count = div_up(filtered_eqs.len(), self.params.eq_chunk_size);
             let mut eq_chunk_num = 1;
-            let mut minimized_eqs: EqualityMap<L> = EqualityMap::default();
-            log::info!("Running minimization loop with {} chunks", eq_chunk_count);
+            let mut minimized_eq_count = 0;
 
+            log::info!("Running minimization loop with {} chunks", eq_chunk_count);
             while !filtered_eqs.is_empty() {
                 log::info!("Chunk {} / {}", eq_chunk_num, eq_chunk_count);
                 log::info!(
@@ -739,17 +739,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                 // TODO check formatting for Learned...
                 log::info!("Time taken in... rule minimization: {}", rule_minimize);
-                minimized_eqs.extend(eqs);
+                minimized_eq_count += eqs.len();
+                self.new_eqs.extend(eqs.clone());
+                self.all_eqs.extend(eqs);
             }
 
             // break if we have no new eqs
-            if minimized_eqs.is_empty() {
+            if minimized_eq_count == 0 {
                 log::info!("Stopping early, no minimized eqs");
                 break 'inner;
             }
-
-            self.new_eqs.extend(minimized_eqs.clone());
-            self.all_eqs.extend(minimized_eqs);
 
             // For the no-conditional case which returns
             // a non-empty list of ids that have the same cvec,
@@ -916,12 +915,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
         new_candidate_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
         let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
         log::info!("Time taken in... run_rewrites: {}", run_rewrites);
+        log::info!("Found {} candidates", new_candidate_eqs.len());
 
         let eq_chunk_count = div_up(new_candidate_eqs.len(), self.params.eq_chunk_size);
         let mut eq_chunk_num = 1;
-        log::info!("Running minimization loop with {} chunks", eq_chunk_count);
 
-        let mut minimized_eqs: EqualityMap<L> = Default::default();
+        log::info!("Running minimization loop with {} chunks", eq_chunk_count);
         while !new_candidate_eqs.is_empty() {
             log::info!("Chunk {} / {}", eq_chunk_num, eq_chunk_count);
             log::info!(
@@ -945,12 +944,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("Time taken in... rule minimization: {}", rule_minimize);
 
             log::info!("Chose {} good rules", eqs.len());
-            minimized_eqs.extend(eqs);
+            self.new_eqs.extend(eqs.clone());
+            self.all_eqs.extend(eqs);
             self.egraph.rebuild();
         }
-
-        self.new_eqs.extend(minimized_eqs.clone());
-        self.all_eqs.extend(minimized_eqs);
     }
 
     /// Rule synthesis for rule lifting

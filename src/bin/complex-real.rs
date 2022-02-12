@@ -4,6 +4,7 @@
 
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::*;
 use std::str::FromStr;
 
 use num::bigint::BigInt;
@@ -260,63 +261,6 @@ fn is_real_zero(n: &Math) -> bool {
     }
 }
 
-fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
-    rec.as_ref().iter().any(|n| match n {
-        ENodeOrVar::ENode(Math::CDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_complex_zero(n),
-            _ => false,
-        },
-        _ => false,
-    })
-}
-
-fn is_valid_rewrite_rec(
-    egraph: &EGraph<Math, SynthAnalysis>,
-    expr: &RecExpr<ENodeOrVar<Math>>,
-    subst: &Subst,
-    idx: Id,
-) -> bool {
-    match &expr[idx] {
-        ENodeOrVar::Var(_) => true,
-        ENodeOrVar::ENode(n) => match n {
-            // special case: div
-            Math::RDiv([_, j]) => match &expr[*j] {
-                ENodeOrVar::Var(v) => egraph[subst[*v]].iter().all(|x| !is_real_zero(x)),
-                _ => true,
-            },
-            Math::CDiv([_, j]) => match &expr[*j] {
-                ENodeOrVar::Var(v) => egraph[subst[*v]].iter().all(|x| !is_complex_zero(x)),
-                _ => true,
-            },
-
-            // binary ops
-            Math::RAdd([i, j])
-            | Math::RSub([i, j])
-            | Math::RMul([i, j])
-            | Math::CAdd([i, j])
-            | Math::CSub([i, j])
-            | Math::CMul([i, j])
-            | Math::Cart([i, j])
-            | Math::Polar([i, j]) => {
-                is_valid_rewrite_rec(egraph, expr, subst, *i)
-                    && is_valid_rewrite_rec(egraph, expr, subst, *j)
-            }
-
-            // unary ops
-            Math::RNeg(i)
-            | Math::CNeg(i)
-            | Math::Conj(i)
-            | Math::Re(i)
-            | Math::Im(i)
-            | Math::Abs(i)
-            | Math::Arg(i) => is_valid_rewrite_rec(egraph, expr, subst, *i),
-
-            // other
-            _ => false,
-        },
-    }
-}
-
 //
 //  Constant folding
 //
@@ -440,12 +384,14 @@ impl SynthLanguage for Math {
     fn is_extractable(&self) -> bool {
         matches!(
             self,
-            Math::RNeg(_)
-                | Math::RAdd(_)
-                | Math::RSub(_)
-                | Math::RMul(_)
-                | Math::RDiv(_)
-                | Math::RealConst(_)
+            Math::CNeg(_)
+                | Math::CAdd([_, _])
+                | Math::CSub([_, _])
+                | Math::CMul([_, _])
+                | Math::CDiv([_, _])
+                | Math::Conj(_)
+                | Math::Var(_)
+                | Math::ComplexConst(_)
         )
     }
 
@@ -609,7 +555,25 @@ impl SynthLanguage for Math {
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> ValidationResult {
-        ValidationResult::from(!contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast))
+        let valid_pattern = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::ENode(Math::RDiv([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_real_zero(n),
+                },
+                ENodeOrVar::ENode(Math::CDiv([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_complex_zero(n),
+                },
+                ENodeOrVar::ENode(Math::Polar([i, _])) => match rhs.ast.index(*i) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_real_zero(n),
+                }
+                _ => true,
+            })
+        };
+
+        ValidationResult::from(valid_pattern(&lhs) && valid_pattern(&rhs))
     }
 
     fn is_valid_rewrite(
@@ -617,12 +581,21 @@ impl SynthLanguage for Math {
         rhs: &Pattern<Self>,
         subst: &Subst,
     ) -> bool {
-        is_valid_rewrite_rec(
-            egraph,
-            &rhs.ast,
-            subst,
-            Id::from(rhs.ast.as_ref().len() - 1),
-        )
+        rhs.ast.as_ref().iter().all(|n| match n {
+            ENodeOrVar::ENode(Math::RDiv([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_real_zero),
+                ENodeOrVar::ENode(n) => !is_real_zero(n),
+            },
+            ENodeOrVar::ENode(Math::CDiv([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_complex_zero),
+                ENodeOrVar::ENode(n) => !is_complex_zero(n),
+            },
+            ENodeOrVar::ENode(Math::Polar([i, _])) => match rhs.ast.index(*i) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_real_zero),
+                ENodeOrVar::ENode(n) => !is_real_zero(n),
+            }
+            _ => true,
+        })
     }
 
     // Constant folding for complex numbers
