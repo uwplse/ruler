@@ -9,14 +9,13 @@ use egg::*;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
-use std::borrow::{Borrow, Cow};
-use std::{cmp::Ordering, hash::Hash};
 use std::{
+    borrow::{Borrow, Cow},
     fmt::{Debug, Display},
-    time::Duration,
-    time::Instant,
+    hash::{BuildHasherDefault, Hash},
+    sync::Arc,
+    time::{Duration, Instant},
 };
-use std::{hash::BuildHasherDefault, sync::Arc};
 
 mod bv;
 mod convert_sexp;
@@ -739,6 +738,29 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
                 // TODO check formatting for Learned...
                 log::info!("Time taken in... rule minimization: {}", rule_minimize);
+
+                log::info!("Chose {} good rules", eqs.len());
+                for (_, eq) in &eqs {
+                    if !self.params.no_run_rewrites {
+                        assert!(!self.all_eqs.contains_key(&eq.name));
+                        if let Some((i, j)) = eq.ids {
+                            // inserted
+                            self.egraph.union(i, j);
+                        } else {
+                            // extracted
+                            // let mut cp = self.egraph.clone();
+                            let lrec = L::instantiate(&eq.lhs);
+                            let rrec = L::instantiate(&eq.rhs);
+                            let i = self.egraph.add_expr(&lrec);
+                            let j = self.egraph.add_expr(&rrec);
+
+                            self.egraph.union(i, j);
+                        }
+                    }
+
+                    log::info!("  {}", eq);
+                }
+
                 minimized_eq_count += eqs.len();
                 self.new_eqs.extend(eqs.clone());
                 self.all_eqs.extend(eqs);
@@ -944,6 +966,27 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("Time taken in... rule minimization: {}", rule_minimize);
 
             log::info!("Chose {} good rules", eqs.len());
+            for (_, eq) in &eqs {
+                if !self.params.no_run_rewrites {
+                    assert!(!self.all_eqs.contains_key(&eq.name));
+                    if let Some((i, j)) = eq.ids {
+                        // inserted
+                        self.egraph.union(i, j);
+                    } else {
+                        // extracted
+                        // let mut cp = self.egraph.clone();
+                        let lrec = L::instantiate(&eq.lhs);
+                        let rrec = L::instantiate(&eq.rhs);
+                        let i = self.egraph.add_expr(&lrec);
+                        let j = self.egraph.add_expr(&rrec);
+
+                        self.egraph.union(i, j);
+                    }
+                }
+
+                log::info!("  {}", eq);
+            }
+
             self.new_eqs.extend(eqs.clone());
             self.all_eqs.extend(eqs);
             self.egraph.rebuild();
@@ -1242,27 +1285,6 @@ macro_rules! map {
     };
 }
 
-fn ord_merge(to: &mut Option<Ordering>, from: Ordering) {
-    if let Some(ord) = to.as_mut() {
-        match (*ord, from) {
-            (Ordering::Equal, _) => *ord = from,
-            (_, Ordering::Equal) => (),
-            (_, _) if *ord == from => (),
-            _ => *to = None,
-        }
-    }
-}
-
-// Compatibility between egg 0.6.1-dev and egg 0.7
-fn ord_to_did_merge(ord: Option<Ordering>) -> DidMerge {
-    match ord {
-        Some(Ordering::Equal) => DidMerge(false, false),
-        Some(Ordering::Greater) => DidMerge(false, true),
-        Some(Ordering::Less) => DidMerge(true, false),
-        None => DidMerge(true, true),
-    }
-}
-
 /// The Signature represents eclass analysis data.
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
@@ -1284,7 +1306,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
-        let mut ord = Some(Ordering::Equal);
+        let mut merge_a = false;
         let cost_fn = |x: &RecExpr<L>| {
             if self.rule_lifting && L::recexpr_in_domain(x) {
                 ExtractableAstSize.cost_rec(x)
@@ -1307,28 +1329,33 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
                     (None, Some(_)) => {
                         to.cvec[i] = from.cvec[i].clone();
-                        ord_merge(&mut ord, Ordering::Less);
+                        merge_a = true;
                     }
                     (Some(x), Some(y)) => {
                         assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
-                    }
-                    (Some(_), None) => {
-                        ord_merge(&mut ord, Ordering::Greater);
                     }
                     _ => (),
                 }
             }
 
-            ord_merge(&mut ord, to.exact.cmp(&from.exact));
+            if from.exact && !to.exact {
+                to.exact = true;
+                merge_a = true;
+            }
+
+            if from.is_extractable && !to.is_extractable {
+                to.is_extractable = true;
+                merge_a = true;
+            }
         }
 
-        to.exact |= from.exact;
-        to.is_extractable |= from.is_extractable;
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
             to.simplest = from.simplest;
+            merge_a = true;
         }
 
-        ord_to_did_merge(ord)
+        // conservatively just say that b changed
+        DidMerge(merge_a, true)
     }
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
@@ -1430,8 +1457,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                 }
             }
-            first_iter = false;
 
+            first_iter = false;
             if new_eqs.is_empty() {
                 break;
             }
@@ -1442,12 +1469,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
 
             log::info!("Shrinking with {} keepers", keepers.len());
-
             let rewrites = self
                 .all_eqs
                 .values()
-                .chain(keepers.values())
-                .flat_map(|eq| &eq.rewrites);
+                .flat_map(|eq| &eq.rewrites)
+                .chain(keepers.values().flat_map(|eq| &eq.rewrites));
 
             let mut runner = self.mk_runner(self.initial_egraph.clone());
             for candidate_eq in new_eqs.values() {
@@ -1463,10 +1489,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
             );
 
             let old_len = new_eqs.len();
+            new_eqs.clear();
             if self.egraph.analysis.rule_lifting {
                 let extract = Extractor::new(&runner.egraph, ExtractableAstSize);
-                new_eqs.clear();
-
                 for ids in runner.roots.chunks(2) {
                     if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
                         let left = extract.find_best(ids[0]).1;
@@ -1482,14 +1507,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             } else {
                 let extract = Extractor::new(&runner.egraph, AstSize);
-                new_eqs.clear();
-
                 for ids in runner.roots.chunks(2) {
                     if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
                         let left = extract.find_best(ids[0]).1;
                         let right = extract.find_best(ids[1]).1;
                         if let Some(eq) = Equality::new(&left, &right) {
                             if !self.all_eqs.contains_key(&eq.name) {
+                                log::info!("{}", eq.name);
                                 new_eqs.insert(eq.name.clone(), eq);
                             }
                         }

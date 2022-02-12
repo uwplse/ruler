@@ -350,7 +350,9 @@ impl SynthLanguage for Math {
                     && (synth.egraph[i].data.exact || synth.egraph[j].data.exact)
                 {
                     continue;
-                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                }
+
+                if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
                     continue;
                 };
 
@@ -401,7 +403,7 @@ impl SynthLanguage for Math {
             })
         };
 
-        ValidationResult::from(valid_pattern(&lhs) && valid_pattern(&rhs))
+        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
     }
 
     fn is_valid_rewrite(

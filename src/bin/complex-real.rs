@@ -568,12 +568,12 @@ impl SynthLanguage for Math {
                 ENodeOrVar::ENode(Math::Polar([i, _])) => match rhs.ast.index(*i) {
                     ENodeOrVar::Var(_) => true,
                     ENodeOrVar::ENode(n) => !is_real_zero(n),
-                }
+                },
                 _ => true,
             })
         };
 
-        ValidationResult::from(valid_pattern(&lhs) && valid_pattern(&rhs))
+        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
     }
 
     fn is_valid_rewrite(
@@ -593,7 +593,7 @@ impl SynthLanguage for Math {
             ENodeOrVar::ENode(Math::Polar([i, _])) => match rhs.ast.index(*i) {
                 ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_real_zero),
                 ENodeOrVar::ENode(n) => !is_real_zero(n),
-            }
+            },
             _ => true,
         })
     }
