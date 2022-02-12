@@ -1513,7 +1513,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                         let right = extract.find_best(ids[1]).1;
                         if let Some(eq) = Equality::new(&left, &right) {
                             if !self.all_eqs.contains_key(&eq.name) {
-                                log::info!("{}", eq.name);
                                 new_eqs.insert(eq.name.clone(), eq);
                             }
                         }

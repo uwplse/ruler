@@ -2,6 +2,7 @@
 /target
 /out
 /*.json
+/*.sh
 
 # Scripts
 scripts/ablation/output/*
