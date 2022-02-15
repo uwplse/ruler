@@ -82,7 +82,7 @@ impl SynthLanguage for Math {
             .iter()
             .map(|s| s.parse().unwrap())
             .collect();
-        
+
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
@@ -125,11 +125,10 @@ impl SynthLanguage for Math {
             },
             rule_lifting: false,
         });
-
-        for i in 0..synth.params.variables {
+        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = consts[i].clone();
+            egraph[id].data.cvec = item.clone();
         }
 
         for n in &constants {
@@ -161,11 +160,11 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
+    fn validate(
         synth: &mut Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
         rhs: &egg::Pattern<Self>,
-    ) -> bool {
+    ) -> ValidationResult {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);
@@ -178,15 +177,15 @@ impl SynthLanguage for Math {
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check_assumptions(all) {
                 // match solver.check() {
-                SatResult::Unsat => true,
+                SatResult::Unsat => ValidationResult::Invalid,
                 SatResult::Sat => {
                     println!("z3 validation: failed for {} => {}", lhs, rhs);
-                    false
+                    ValidationResult::Valid
                 }
                 SatResult::Unknown => {
-                    synth.smt_unknown += 1;
                     println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                    false
+                    synth.smt_unknown += 1;
+                    ValidationResult::Unknown
                 }
             }
         } else {
@@ -210,8 +209,7 @@ impl SynthLanguage for Math {
 
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
-
-            lvec == rvec
+            ValidationResult::from(lvec == rvec)
         }
     }
 }
@@ -232,28 +230,28 @@ fn egg_to_z3<'a>(
 ) -> (z3::ast::Int<'a>, Vec<z3::ast::Bool<'a>>) {
     let mut buf: Vec<z3::ast::Int> = vec![];
     let mut assumes: Vec<z3::ast::Bool> = vec![];
-    let zero = z3::ast::Int::from_i64(&ctx, 0);
+    let zero = z3::ast::Int::from_i64(ctx, 0);
     for node in expr.as_ref().iter() {
         match node {
-            Math::Var(v) => buf.push(z3::ast::Int::new_const(&ctx, v.to_string())),
-            Math::Num(c) => buf.push(z3::ast::Int::from_str(&ctx, &c.to_string()).unwrap()),
+            Math::Var(v) => buf.push(z3::ast::Int::new_const(ctx, v.to_string())),
+            Math::Num(c) => buf.push(z3::ast::Int::from_str(ctx, &c.to_string()).unwrap()),
             Math::Add([a, b]) => buf.push(z3::ast::Int::add(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Sub([a, b]) => buf.push(z3::ast::Int::sub(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Mul([a, b]) => buf.push(z3::ast::Int::mul(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
             Math::Div([a, b]) => {
                 let denom = &buf[usize::from(*b)];
                 let lez = z3::ast::Int::le(denom, &zero);
                 let gez = z3::ast::Int::ge(denom, &zero);
-                let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
+                let assume = z3::ast::Bool::not(&z3::ast::Bool::and(ctx, &[&lez, &gez]));
                 assumes.push(assume);
                 buf.push(z3::ast::Int::div(
                     &buf[usize::from(*a)],

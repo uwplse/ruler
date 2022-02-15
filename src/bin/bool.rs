@@ -44,7 +44,7 @@ impl SynthLanguage for Math {
             Math::Or([a, b]) => map!(v, a, b => Some(*a | *b)),
             Math::Xor([a, b]) => map!(v, a, b => Some(*a ^ *b)),
 
-            Math::Lit(n) => vec![Some(n.clone()); cvec_len],
+            Math::Lit(n) => vec![Some(*n); cvec_len],
             Math::Var(_) => vec![],
         }
     }
@@ -93,17 +93,17 @@ impl SynthLanguage for Math {
         egraph.add(Math::Lit(false));
         egraph.add(Math::Lit(true));
 
-        for i in 0..synth.params.variables {
+        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
             let var = Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = consts[i].clone();
+            egraph[id].data.cvec = item.clone();
         }
 
         synth.egraph = egraph;
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let mut extract = Extractor::new(&synth.egraph, NumberOfOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfOps);
 
         // maps ids to n_ops
         let ids: HashMap<Id, usize> = synth
@@ -133,16 +133,121 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
+    fn validate(
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
-    ) -> bool {
-        true
+    ) -> ValidationResult {
+        ValidationResult::Valid
     }
 }
 
 /// Entry point.
 fn main() {
     Math::main()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn get_params(num_iters: usize) -> SynthParams {
+        SynthParams {
+            seed: 0,
+            n_samples: 2,
+            variables: 3,
+            outfile: String::from("out.json"),
+            no_constant_fold: true,
+            iters: num_iters,
+            rules_to_take: 0,
+            node_chunk_size: 0,
+            eq_chunk_size: 0,
+            no_constants_above_iter: 999999,
+            no_conditionals: true,
+            no_run_rewrites: false,
+            linear_cvec_matching: false,
+            ema_above_iter: 999999,
+            disabled_ops: None,
+            disabled_consts: None,
+            filtered_consts: None,
+            eqsat_node_limit: 300000,
+            eqsat_iter_limit: 2,
+            eqsat_time_limit: 60,
+            important_cvec_offsets: 5,
+            str_int_variables: 1,
+            complete_cvec: false,
+            no_xor: false,
+            no_shift: false,
+            num_fuzz: 0,
+            use_smt: false,
+            do_final_run: true,
+            prior_rules: None,
+        }
+    }
+
+    #[test]
+    fn iter1_rules() {
+        let syn = ruler::Synthesizer::<Math>::new(get_params(1));
+        let report = syn.run();
+        let expected = vec![
+            "(& ?a ?b) <=> (& ?b ?a)",
+            "(| ?a ?b) <=> (| ?b ?a)",
+            "(^ ?a ?b) <=> (^ ?b ?a)",
+            "?a <=> (| ?a ?a)",
+            "?a <=> (& ?a ?a)",
+            "(^ ?a ?a) => false",
+            "?a <=> (& true ?a)",
+            "?a <=> (| false ?a)",
+            "?a <=> (^ false ?a)",
+            "(~ ?a) <=> (^ true ?a)",
+            "(& false ?a) => false",
+            "(| true ?a) => true",
+        ];
+        assert_eq!(report.num_rules, expected.len());
+        report.all_eqs.iter().for_each(|rule| {
+            assert!(
+                expected.contains(&rule.to_string().as_str()),
+                "Unexpected Rule: {}",
+                &rule.to_string()
+            )
+        });
+    }
+
+    #[test]
+    fn iter2_rules() {
+        let syn = ruler::Synthesizer::<Math>::new(get_params(2));
+        let report = syn.run();
+        let expected = vec![
+            "(& ?a (& ?b ?c)) <=> (& ?c (& ?a ?b))",
+            "(^ ?a (^ ?b ?c)) <=> (^ ?c (^ ?a ?b))",
+            "(| ?a (| ?b ?c)) <=> (| ?c (| ?a ?b))",
+            "(& ?a ?b) <=> (& ?b ?a)",
+            "(| ?a ?b) <=> (| ?b ?a)",
+            "(^ ?a ?b) <=> (^ ?b ?a)",
+            "(& ?a (| ?a ?b)) => ?a",
+            "(| ?a (& ?a ?b)) => ?a",
+            "(| ?a ?b) <=> (| ?b (^ ?a ?b))",
+            "(& ?a (~ ?b)) <=> (& ?a (^ ?a ?b))",
+            "(^ ?a (& ?a ?b)) <=> (& ?a (~ ?b))",
+            "(^ ?a (| ?a ?b)) <=> (& ?b (~ ?a))",
+            "?a <=> (~ (~ ?a))",
+            "?a <=> (| ?a ?a)",
+            "?a <=> (& ?a ?a)",
+            "(^ ?a ?a) => false",
+            "?a <=> (& true ?a)",
+            "?a <=> (| false ?a)",
+            "?a <=> (^ false ?a)",
+            "(~ ?a) <=> (^ true ?a)",
+            "(& false ?a) => false",
+            "(| true ?a) => true",
+        ];
+        assert_eq!(report.num_rules, expected.len());
+        report.all_eqs.iter().for_each(|rule| {
+            assert!(
+                expected.contains(&rule.to_string().as_str()),
+                "Unexpected Rule: {}",
+                &rule.to_string()
+            )
+        });
+    }
 }

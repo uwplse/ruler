@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::*;
 
-
 /// General bitvector implementation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -14,7 +13,7 @@ const INNER_N: u32 = 32;
 
 impl<const N: u32> BV<N> {
     pub const ZERO: Self = Self(0);
-    pub const ALL_ONES: Self = Self((!(0 as Inner)) >> (INNER_N - N));
+    pub const ALL_ONES: Self = Self((!(0)) >> (INNER_N - N));
     pub const NEG_ONE: Self = Self::ALL_ONES;
     pub const MIN: Self = Self(1 << (N - 1));
     pub const MAX: Self = Self(Self::ALL_ONES.0 >> 1);
@@ -106,11 +105,11 @@ impl<const N: u32> Distribution<BV<N>> for rand::distributions::Standard {
 impl<const N: u32> std::str::FromStr for BV<N> {
     type Err = std::num::ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("#b") {
-            let i = Inner::from_str_radix(&s[2..], 2).unwrap();
+        if let Some(stripped) = s.strip_prefix("#b") {
+            let i = Inner::from_str_radix(stripped, 2).unwrap();
             return Ok(Self::new(i));
         }
-        s.parse().map(|inner: Inner| Self::new(inner))
+        s.parse::<Inner>().map(Self::new)
     }
 }
 
@@ -276,7 +275,7 @@ macro_rules! impl_bv {
             }
 
             fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-                let mut extract = Extractor::new(&synth.egraph, NumberOfOps);
+                let extract = Extractor::new(&synth.egraph, NumberOfOps);
 
                 // maps ids to n_ops
                 let ids: HashMap<Id, usize> = synth
@@ -318,12 +317,11 @@ macro_rules! impl_bv {
                 to_add
             }
 
-
-            fn is_valid(
+            fn validate(
                 synth: &mut Synthesizer<Self>,
                 lhs: &Pattern<Self>,
-                rhs: &Pattern<Self>,
-            ) -> bool {
+                rhs: &Pattern<Self>
+            ) -> ValidationResult {
                 use z3::{*, ast::Ast};
 
                 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
@@ -356,16 +354,16 @@ macro_rules! impl_bv {
                     let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
                     solver.assert(&lexpr._eq(&rexpr).not());
                     match solver.check() {
-                        SatResult::Unsat => true,
-                        SatResult::Sat => {
+                        SatResult::Sat => ValidationResult::Invalid,
+                        SatResult::Unsat => {
                             // println!("z3 validation: failed for {} => {}", lhs, rhs);
-                            false
-                        }
+                            ValidationResult::Valid
+                        },
                         SatResult::Unknown => {
-                            synth.smt_unknown += 1;
                             // println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                            false
-                        }
+                            synth.smt_unknown += 1;
+                            ValidationResult::Unknown
+                        },
                     }
                 } else {
                     let n = synth.params.num_fuzz;
@@ -389,8 +387,7 @@ macro_rules! impl_bv {
 
                     let lvec = Self::eval_pattern(lhs, &env, n);
                     let rvec = Self::eval_pattern(rhs, &env, n);
-
-                    lvec == rvec
+                    ValidationResult::from(lvec == rvec)
                 }
             }
         }

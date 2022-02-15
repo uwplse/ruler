@@ -4,6 +4,7 @@ float =    ["run", "--quiet", "--release", "--bin", "float",    "--", "synth", "
 bool =     ["run", "--quiet", "--release", "--bin", "bool",     "--", "synth", "--no-conditionals"]
 str =      ["run", "--quiet", "--release", "--bin", "str",      "--", "synth", "--no-conditionals"]
 
+
 bv4 =      ["run", "--quiet", "--release", "--bin", "bv4",  "--", "synth", "--complete-cvec", "--no-conditionals"]
 bv4c1 =    ["run", "--quiet", "--release", "--bin", "bv4",  "--", "synth", "--complete-cvec", "--no-conditionals", "--no-constants-above-iter=1"]
 bv4ns =    ["run", "--quiet", "--release", "--bin", "bv4",  "--", "synth", "--complete-cvec", "--no-conditionals", "--no-shift"]
