@@ -11,6 +11,7 @@ use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
+    cmp::Ordering,
     fmt::{Debug, Display},
     hash::{BuildHasherDefault, Hash},
     sync::Arc,
@@ -372,6 +373,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
         };
 
         L::init_synth(&mut synth);
+        synth.initial_egraph = synth.egraph.clone();
+        if synth.egraph.analysis.rule_lifting {
+            // run HL-LL rewrites (iter 0)
+            log::info!("running HL-LL rewrites");
+            let mut runner = synth.mk_cvec_less_runner(synth.egraph.clone());
+            runner = runner.run(&synth.lifting_rewrites);
+            runner.egraph.rebuild();
+            synth.egraph = runner.egraph;
+        }
+
         synth.initial_egraph = synth.egraph.clone();
         synth
     }
@@ -842,6 +853,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut new_candidate_eqs: EqualityMap<L> = EqualityMap::default();
         let run_rewrites_before = Instant::now();
 
+        // run allowed rules
+        log::info!("running allowed rules");
+        let runner = self.mk_cvec_less_runner(self.egraph.clone());
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
+            self.new_eqs.values().flat_map(|eq| &eq.rewrites).collect();
+        let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                self.egraph.union(win[0], win[1]);
+            }
+        }
+
+        self.egraph.rebuild();
+
         // run lifting rules
         log::info!("running lifting rules");
         let runner = self
@@ -855,8 +880,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // using `new_egraph` after this point
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                if win[0] != win[1]
-                    && self.egraph[win[0]].data.is_extractable
+                if self.egraph[win[0]].data.is_extractable
                     && self.egraph[win[1]].data.is_extractable
                 {
                     let extract = Extractor::new(&self.egraph, ExtractableAstSize);
@@ -883,20 +907,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph = new_egraph;
         self.egraph.rebuild();
 
-        // run allowed rules
-        log::info!("running allowed rules");
-        let runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.new_eqs.values().flat_map(|eq| &eq.rewrites).collect();
-        let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
-        for ids in found_unions.values() {
-            for win in ids.windows(2) {
-                self.egraph.union(win[0], win[1]);
-            }
-        }
-
-        self.egraph.rebuild();
-
         // run forbidden rules
         log::info!("running forbidden rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
@@ -907,8 +917,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // these unions are candidate rewrite rules
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                if win[0] != win[1]
-                    && self.egraph[win[0]].data.is_extractable
+                if self.egraph[win[0]].data.is_extractable
                     && self.egraph[win[1]].data.is_extractable
                 {
                     let extract = Extractor::new(&self.egraph, ExtractableAstSize);
@@ -996,13 +1005,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
     /// Rule synthesis for rule lifting
     fn run_rule_lifting(mut self) -> Report<L> {
         let t = Instant::now();
-        // run HL-LL rewrites (iter 0)
-        log::info!("running HL-LL rewrites");
-        let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
-        runner = runner.run(&self.lifting_rewrites);
-        runner.egraph.rebuild();
-        self.egraph = runner.egraph;
-
         assert!(self.params.iters > 0);
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
@@ -1025,6 +1027,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
             final_runner.run(rws);
             self.params.no_conditionals = old;
         }
+
+        // let extractor = Extractor::new(&self.egraph, AstSize);
+        // let mut ids: Vec<Id> = self.ids().collect();
+        // ids.sort();
+        // for id in ids {
+        //     let (_, e) = extractor.find_best(id);
+        //     log::info!("{}: `{}` {:?}", id, e.pretty(500), self.egraph[id].nodes);
+        // }
 
         let num_rules = self.new_eqs.len();
         let mut n_eqs: Vec<_> = self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
@@ -1302,11 +1312,31 @@ impl<L: SynthLanguage> Signature<L> {
     }
 }
 
+fn ord_merge(to: &mut Option<Ordering>, from: Ordering) {
+    if let Some(ord) = to.as_mut() {
+        match (*ord, from) {
+            (Ordering::Equal, _) => *ord = from,
+            (_, Ordering::Equal) => (),
+            (_, _) if *ord == from => (),
+            _ => *to = None,
+        }
+    }
+}
+
+fn ord_to_did_merge(ord: Option<Ordering>) -> DidMerge {
+    match ord {
+        None => DidMerge(true, true),
+        Some(Ordering::Equal) => DidMerge(false, false),
+        Some(Ordering::Greater) => DidMerge(false, true),
+        Some(Ordering::Less) => DidMerge(true, false),
+    }
+}
+
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
-        let mut merge_a = false;
+        let mut ord = Some(Ordering::Equal);
         let cost_fn = |x: &RecExpr<L>| {
             if self.rule_lifting && L::recexpr_in_domain(x) {
                 ExtractableAstSize.cost_rec(x)
@@ -1329,33 +1359,28 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
                     (None, Some(_)) => {
                         to.cvec[i] = from.cvec[i].clone();
-                        merge_a = true;
+                        ord_merge(&mut ord, Ordering::Less);
                     }
                     (Some(x), Some(y)) => {
                         assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
+                    }
+                    (Some(_), None) => {
+                        ord_merge(&mut ord, Ordering::Greater);
                     }
                     _ => (),
                 }
             }
 
-            if from.exact && !to.exact {
-                to.exact = true;
-                merge_a = true;
-            }
-
-            if from.is_extractable && !to.is_extractable {
-                to.is_extractable = true;
-                merge_a = true;
-            }
+            ord_merge(&mut ord, to.exact.cmp(&from.exact));
         }
 
+        to.exact |= from.exact;
+        to.is_extractable |= from.is_extractable;
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
             to.simplest = from.simplest;
-            merge_a = true;
         }
 
-        // conservatively just say that b changed
-        DidMerge(merge_a, true)
+        ord_to_did_merge(ord)
     }
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {

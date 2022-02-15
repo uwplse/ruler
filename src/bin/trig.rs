@@ -160,7 +160,9 @@ define_language! {
         "-C" = CSub([Id; 2]),
         "*C" = CMul([Id; 2]),
         "/C" = CDiv([Id; 2]),
+        "conj" = Conj(Id),
         "cis" = Cis(Id),
+        "cart" = Cart([Id; 2]),
 
         // trig
         "sin" = Sin(Id),
@@ -340,19 +342,39 @@ impl SynthLanguage for Math {
         let neg4_id = egraph.add(Math::ComplexConst(Complex::from("-4C")));
         egraph.union(twoi2_id, neg4_id);
 
+        // 2 * 2 = 4
+        let two_id = egraph.add(Math::ComplexConst(complex_const_symbol("2")));
+        let two2_id = egraph.add(Math::CMul([two_id, two_id]));
+        let four_id = egraph.add(Math::ComplexConst(complex_const_symbol("4")));
+        egraph.union(two2_id, four_id);
+        egraph.rebuild();
+
+        // sin^2 a + cos^2 a
+        egraph.add_expr(&"(+ (sqr (sin a)) (sqr (cos a)))".parse().unwrap());
+
         // rewrites
         synth.lifting_rewrites = vec![
             rewrite!("def-cos"; "(cos ?a)" <=> "(Re (/C (+C (cis ?a) (cis (~ ?a))) 2C))"),
-            rewrite!("def-sin"; "(sin ?a)" <=> "(Re (/C (-C (cis ?a) (cis (~ ?a))) 2iC))"),
-            rewrite!("def-cis-add"; "(cis (+ ?a ?b))" <=> "(*C (cis ?a) (cis ?b))"),
+            rewrite!("def-sin"; "(sin ?a)" <=> "(Im (/C (-C (cis ?a) (cis (~ ?a))) 2iC))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
+            rewrite!("def-cis"; "(cis ?a)" <=> "(cart (cos ?a) (sin ?a))"),
+            rewrite!("def-cis-neg"; "(cis (~ ?a))" <=> "(cart (cos ?a) (~ (sin ?a)))"),
+            rewrite!("cis-add"; "(cis (+ ?a ?b))" <=> "(*C (cis ?a) (cis ?b))"),
+            rewrite!("cis-conj"; "(cis (~ ?a))" <=> "(conj (cis ?a))"),
             rewrite!("def-cos-sqr"; "(sqr (cos ?a))" <=>
                      "(Re (/C (*C (+C (cis ?a) (cis (~ ?a))) (+C (cis ?a) (cis (~ ?a)))) 2C))"),
             rewrite!("def-sin-sqr"; "(sqr (sin ?a))" <=>
                      "(Re (/C (*C (-C (cis ?a) (cis (~ ?a))) (-C (cis ?a) (cis (~ ?a)))) 2iC))"),
+            rewrite!("def-neg-re"; "(~ (Re ?a))" <=> "(Re (~C ?a))"),
+            rewrite!("def-add-re"; "(+ (Re ?a) (Re ?b))" <=> "(Re (+C ?a ?b))"),
+            rewrite!("def-mul-re"; "(* (Re ?a) (Re ?b))" <=> "(Re (*C ?a ?b))"),
+            rewrite!("def-neg-im"; "(~ (Im ?a))" <=> "(Im (~C ?a))"),
+            rewrite!("def-add-im"; "(+ (Im ?a) (Im ?b))" <=> "(Im (+C ?a ?b))"),
+            rewrite!("def-mul-im"; "(* (Im ?a) (Im ?b))" <=> "(Im (*C ?a ?b))"),
             vec![
-                rewrite!("def-add"; "(+ (Re ?a) (Re ?b))" => "(Re (+C ?a ?b))"),
-                rewrite!("def-mul"; "(* (Re ?a) (Re ?b))" => "(Re (*C ?a ?b))"),
+                rewrite!("im-ic"; "(Im iC)" => "1R"),
+                rewrite!("rationalize-2i"; "(/C ?a 2iC)" => "(*C (/C ?a 2C) iC)"),
+                rewrite!("im-to-re"; "(Im (*C ?a iC))" => "(Re ?a)"),
                 rewrite!("cancel-cis-mul"; "(*C (cis ?a) (cis (~ ?a)))" => "1C"),
                 rewrite!("pure-real"; "?a" => { ComplexToRealApplier("?a") }),
             ],
@@ -373,10 +395,10 @@ impl SynthLanguage for Math {
             }
         }
 
-        let extra_rewrites = vec![(
-            "(*C (+C ?a ?b) (+C ?c ?d))",
-            "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))",
-        )];
+        let extra_rewrites = vec![
+            ("(*C (+C ?a ?b) (+C ?c ?d))",
+            "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))"),
+        ];
 
         extra_rewrites.iter().for_each(|(l, r)| {
             let lhs: RecExpr<Self> = l.parse().unwrap();
@@ -432,9 +454,9 @@ impl SynthLanguage for Math {
                     to_add.push(Math::Add([i, j]));
                 }
                 // if allowedp("-") { to_add.push(Math::RSub([i, j])); }
-                if allowedp("*") {
-                    to_add.push(Math::Mul([i, j]));
-                }
+                // if allowedp("*") {
+                //     to_add.push(Math::Mul([i, j]));
+                // }
                 // if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
                 //     to_add.push(Math::RDiv([i, j]));
                 // }
@@ -445,10 +467,18 @@ impl SynthLanguage for Math {
                 continue;
             }
 
-            if allowedp("~") { to_add.push(Math::Neg(i)); }
-            if allowedp("sin") { to_add.push(Math::Sin(i)); }
-            if allowedp("cos") { to_add.push(Math::Cos(i)); }
-            if allowedp("sqr") { to_add.push(Math::Sqr(i)); }
+            if allowedp("~") {
+                to_add.push(Math::Neg(i));
+            }
+            if allowedp("sin") {
+                to_add.push(Math::Sin(i));
+            }
+            if allowedp("cos") {
+                to_add.push(Math::Cos(i));
+            }
+            if allowedp("sqr") {
+                to_add.push(Math::Sqr(i));
+            }
         }
 
         log::info!("Made a layer of {} enodes", to_add.len());

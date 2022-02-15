@@ -406,12 +406,11 @@ impl SynthLanguage for Math {
             rule_lifting: true,
         });
 
-        let disabled_consts: Vec<&str> =
-            if let Some(s) = &synth.params.disabled_consts {
-                s.split(" ").collect()
-            } else {
-                vec![]
-            };
+        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
+            s.split(' ').collect()
+        } else {
+            vec![]
+        };
 
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
