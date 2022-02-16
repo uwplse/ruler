@@ -372,17 +372,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
             params,
         };
 
+        // For rule lifting, do not denote here since
+        // initial_egraph is used during minimization.
+        // It is possible rules will be thrown out due
+        // to some equivalence that is introduced here.
         L::init_synth(&mut synth);
-        synth.initial_egraph = synth.egraph.clone();
-        if synth.egraph.analysis.rule_lifting {
-            // run HL-LL rewrites (iter 0)
-            log::info!("running HL-LL rewrites");
-            let mut runner = synth.mk_cvec_less_runner(synth.egraph.clone());
-            runner = runner.run(&synth.lifting_rewrites);
-            runner.egraph.rebuild();
-            synth.egraph = runner.egraph;
-        }
-
         synth.initial_egraph = synth.egraph.clone();
         synth
     }
@@ -907,11 +901,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph = new_egraph;
         self.egraph.rebuild();
 
-        // run forbidden rules
+        // run forbidden rules + lifting rules
         log::info!("running forbidden rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.old_eqs.values().flat_map(|eq| &eq.rewrites).collect();
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
+            .old_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .chain(self.lifting_rewrites.iter())
+            .collect();
         let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
         // these unions are candidate rewrite rules
@@ -1005,6 +1003,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
     /// Rule synthesis for rule lifting
     fn run_rule_lifting(mut self) -> Report<L> {
         let t = Instant::now();
+        // run lifting rewrites (iter 0)
+        log::info!("running initial lifting rewrites");
+        let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
+        runner = runner.run(&self.lifting_rewrites);
+        runner.egraph.rebuild();
+        self.egraph = runner.egraph;
+
         assert!(self.params.iters > 0);
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
@@ -1028,13 +1033,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
             self.params.no_conditionals = old;
         }
 
-        // let extractor = Extractor::new(&self.egraph, AstSize);
-        // let mut ids: Vec<Id> = self.ids().collect();
-        // ids.sort();
-        // for id in ids {
-        //     let (_, e) = extractor.find_best(id);
-        //     log::info!("{}: `{}` {:?}", id, e.pretty(500), self.egraph[id].nodes);
-        // }
+        let extractor = Extractor::new(&self.egraph, AstSize);
+        let mut ids: Vec<Id> = self.ids().collect();
+        ids.sort();
+        for id in ids {
+            let (_, e) = extractor.find_best(id);
+            log::info!("{}: `{}` {:?}", id, e.pretty(500), self.egraph[id].nodes);
+        }
 
         let num_rules = self.new_eqs.len();
         let mut n_eqs: Vec<_> = self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();

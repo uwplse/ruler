@@ -8,57 +8,16 @@ use std::hash::Hash;
 use std::ops::*;
 use std::str::FromStr;
 
+use num::{
+    bigint::BigInt,
+    rational::{ParseRatioError, Ratio},
+    Zero,
+};
+
 use egg::*;
 use ruler::*;
 
-// custom implementation of a complex value
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Complex(Symbol);
-
-impl Complex {
-    fn as_str(self) -> &'static str {
-        self.0.as_str()
-    }
-
-    fn is_real(self) -> bool {
-        !self.0.as_str().chars().any(|x| x == 'i')
-    }
-}
-
-impl<S: AsRef<str>> From<S> for Complex {
-    fn from(s: S) -> Self {
-        Complex(Symbol::from(s))
-    }
-}
-
-impl From<Complex> for &'static str {
-    fn from(s: Complex) -> Self {
-        s.as_str()
-    }
-}
-
-impl FromStr for Complex {
-    type Err = &'static str;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 1 && !s.starts_with('?') && s.ends_with('C') {
-            Ok(s.into())
-        } else {
-            Err("not complex")
-        }
-    }
-}
-
-impl Display for Complex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(self.as_str(), f)
-    }
-}
-
-impl Debug for Complex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(self.as_str(), f)
-    }
-}
+pub type Rational = Ratio<BigInt>;
 
 // custom implementation of real value
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -85,7 +44,7 @@ impl From<Real> for &'static str {
 impl FromStr for Real {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if !s.is_empty() && !s.starts_with('?') {
+        if !s.is_empty() && s.chars().all(|c| c.is_numeric() || c == '-' || c == '/') {
             Ok(s.into())
         } else {
             Err("not real")
@@ -152,75 +111,44 @@ impl Debug for Variable {
     }
 }
 
+fn real_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
+    r.as_str().parse()
+}
+
+fn extract_constant(nodes: &[Math]) -> Option<Real> {
+    for n in nodes {
+        if let Math::RealConst(v) = n {
+            return Some(*v);
+        }
+    }
+
+    None
+}
+
 define_language! {
     pub enum Math {
-        // complex
-        "~C" = CNeg(Id),
-        "+C" = CAdd([Id; 2]),
-        "-C" = CSub([Id; 2]),
-        "*C" = CMul([Id; 2]),
-        "/C" = CDiv([Id; 2]),
-        "conj" = Conj(Id),
-        "cis" = Cis(Id),
-        "cart" = Cart([Id; 2]),
-
-        // trig
+        // trig operators
         "sin" = Sin(Id),
         "cos" = Cos(Id),
+        "cis" = Cis(Id),
+
+        // arithmetic operators
         "~" = Neg(Id),
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
-        "Re" = Re(Id),
-        "Im" = Im(Id),
         "sqr" = Sqr(Id),
 
         // constants
-        ComplexConst(Complex),
+        "I" = Imag,
         RealConst(Real),
         Var(Variable),
     }
 }
 
-// For any Complex(_) ?a, applier adds (Re ?a) to the egraph for any ?a
-#[derive(Debug)]
-struct ComplexToRealApplier(&'static str);
-impl Applier<Math, SynthAnalysis> for ComplexToRealApplier {
-    fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst) -> Vec<Id> {
-        let id = subst[self.0.parse().unwrap()];
-        if egraph[id].data.in_domain {
-            return vec![];
-        }
-
-        let found = egraph[id].iter().find_map(|n| match n {
-            Math::ComplexConst(c) => {
-                if c.is_real() {
-                    let s = c.as_str();
-                    Some(&s[..(s.len() - 1)])
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        });
-
-        if let Some(v) = found {
-            let re_id = egraph.add(Math::Re(id));
-            let cnst_id = egraph.add(Math::RealConst(Real::from(v)));
-            egraph.union(re_id, cnst_id);
-        }
-
-        vec![]
-    }
-}
-
-fn complex_const_symbol(s: &str) -> Complex {
-    Complex::from(s.to_owned() + "C")
-}
-
 impl SynthLanguage for Math {
-    type Constant = Real; // not used
+    type Constant = Real;
 
     // no evaluation needed
     fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
@@ -259,26 +187,6 @@ impl SynthLanguage for Math {
         matches!(self, Math::RealConst(_))
     }
 
-    /// Returns true if the node is in the current domain.
-    /// Useful for rule lifting.
-    fn is_in_domain(&self) -> bool {
-        matches!(
-            self,
-            Math::Sin(_)
-                | Math::Cos(_)
-                | Math::Neg(_)
-                | Math::Add([_, _])
-                | Math::Sub([_, _])
-                | Math::Mul([_, _])
-                | Math::Div([_, _])
-                | Math::Re(_)
-                | Math::Im(_)
-                | Math::Sqr(_)
-                | Math::RealConst(_)
-                | Math::Var(_)
-        )
-    }
-
     fn is_extractable(&self) -> bool {
         matches!(
             self,
@@ -295,20 +203,6 @@ impl SynthLanguage for Math {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        // disabled constants (TODO: validate input)
-        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
-            s.split(' ').collect()
-        } else {
-            vec![]
-        };
-
-        // this is for adding to the egraph, not used for cvec.
-        let constants: Vec<Complex> = ["2", "1", "0", "-1", "-2"]
-            .iter()
-            .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
-            .map(|s| complex_const_symbol(s))
-            .collect();
-
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
             constant_fold: if synth.params.no_constant_fold {
@@ -326,90 +220,28 @@ impl SynthLanguage for Math {
         }
 
         // constants
-        for c in constants {
-            egraph.add(Math::ComplexConst(c));
-        }
-
-        // i * i = -1;
-        let i_id = egraph.add(Math::ComplexConst(complex_const_symbol("i")));
-        let i2_id = egraph.add(Math::CMul([i_id, i_id]));
-        let neg1_id = egraph.add(Math::ComplexConst(Complex::from("-1C")));
-        egraph.union(i2_id, neg1_id);
-
-        // 2i * 2i = -4;
-        let twoi_id = egraph.add(Math::ComplexConst(complex_const_symbol("2i")));
-        let twoi2_id = egraph.add(Math::CMul([twoi_id, twoi_id]));
-        let neg4_id = egraph.add(Math::ComplexConst(Complex::from("-4C")));
-        egraph.union(twoi2_id, neg4_id);
-
-        // 2 * 2 = 4
-        let two_id = egraph.add(Math::ComplexConst(complex_const_symbol("2")));
-        let two2_id = egraph.add(Math::CMul([two_id, two_id]));
-        let four_id = egraph.add(Math::ComplexConst(complex_const_symbol("4")));
-        egraph.union(two2_id, four_id);
-        egraph.rebuild();
-
-        // sin^2 a + cos^2 a
-        egraph.add_expr(&"(+ (sqr (sin a)) (sqr (cos a)))".parse().unwrap());
+        let zero_id = egraph.add(Math::RealConst(Real::from("0")));
+        egraph.add(Math::Sin(zero_id));
+        egraph.add(Math::Cos(zero_id));
 
         // rewrites
         synth.lifting_rewrites = vec![
-            rewrite!("def-cos"; "(cos ?a)" <=> "(Re (/C (+C (cis ?a) (cis (~ ?a))) 2C))"),
-            rewrite!("def-sin"; "(sin ?a)" <=> "(Im (/C (-C (cis ?a) (cis (~ ?a))) 2iC))"),
+            rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
+            rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-            rewrite!("def-cis"; "(cis ?a)" <=> "(cart (cos ?a) (sin ?a))"),
-            rewrite!("def-cis-neg"; "(cis (~ ?a))" <=> "(cart (cos ?a) (~ (sin ?a)))"),
-            rewrite!("cis-add"; "(cis (+ ?a ?b))" <=> "(*C (cis ?a) (cis ?b))"),
-            rewrite!("cis-conj"; "(cis (~ ?a))" <=> "(conj (cis ?a))"),
-            rewrite!("def-cos-sqr"; "(sqr (cos ?a))" <=>
-                     "(Re (/C (*C (+C (cis ?a) (cis (~ ?a))) (+C (cis ?a) (cis (~ ?a)))) 2C))"),
-            rewrite!("def-sin-sqr"; "(sqr (sin ?a))" <=>
-                     "(Re (/C (*C (-C (cis ?a) (cis (~ ?a))) (-C (cis ?a) (cis (~ ?a)))) 2iC))"),
-            rewrite!("def-neg-re"; "(~ (Re ?a))" <=> "(Re (~C ?a))"),
-            rewrite!("def-add-re"; "(+ (Re ?a) (Re ?b))" <=> "(Re (+C ?a ?b))"),
-            rewrite!("def-mul-re"; "(* (Re ?a) (Re ?b))" <=> "(Re (*C ?a ?b))"),
-            rewrite!("def-neg-im"; "(~ (Im ?a))" <=> "(Im (~C ?a))"),
-            rewrite!("def-add-im"; "(+ (Im ?a) (Im ?b))" <=> "(Im (+C ?a ?b))"),
-            rewrite!("def-mul-im"; "(* (Im ?a) (Im ?b))" <=> "(Im (*C ?a ?b))"),
+            rewrite!("sqr-distribute-mul"; "(sqr (* ?a ?b))" <=> "(* (sqr ?a) (sqr ?b))"),
+            rewrite!("sqr-distribute-div"; "(sqr (/ ?a ?b))" <=> "(/ (sqr ?a) (sqr ?b))"),
+            rewrite!("invert-cis"; "(cis (~ ?a))" <=> "(/ 1 (cis ?a))"),
             vec![
-                rewrite!("im-ic"; "(Im iC)" => "1R"),
-                rewrite!("rationalize-2i"; "(/C ?a 2iC)" => "(*C (/C ?a 2C) iC)"),
-                rewrite!("im-to-re"; "(Im (*C ?a iC))" => "(Re ?a)"),
-                rewrite!("cancel-cis-mul"; "(*C (cis ?a) (cis (~ ?a)))" => "1C"),
-                rewrite!("pure-real"; "?a" => { ComplexToRealApplier("?a") }),
+                rewrite!("square-i"; "(* I I)" => "-1"),
+                rewrite!("add-zero-i"; "(+ I 0)" => "I"),
+                rewrite!("mul-zero-i"; "(* I 0)" => "0"),
+                rewrite!("mul-one-i"; "(* I 1)" => "I"),
+                rewrite!("cis-0"; "(cis 0)" => "1"),
+                rewrite!("add-cis"; "(cis (+ ?a ?b))" => "(* (cis ?a) (cis ?b))"),
             ],
-        ]
-        .concat();
+        ].concat();
 
-        // duplicate rules for HL
-        let mut extra_eqs: EqualityMap<Self> = Default::default();
-        for (_, eq) in &synth.old_eqs {
-            let l = eq.lhs.to_string();
-            let r = eq.rhs.to_string();
-            let ls: String = l.chars().filter(|c| *c != 'C').collect();
-            let rs: String = r.chars().filter(|c| *c != 'C').collect();
-            let lhs: RecExpr<Self> = ls.parse().unwrap();
-            let rhs: RecExpr<Self> = rs.parse().unwrap();
-            if let Some(e) = Equality::new(&lhs, &rhs) {
-                extra_eqs.insert(e.name.clone(), e);
-            }
-        }
-
-        let extra_rewrites = vec![
-            ("(*C (+C ?a ?b) (+C ?c ?d))",
-            "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))"),
-        ];
-
-        extra_rewrites.iter().for_each(|(l, r)| {
-            let lhs: RecExpr<Self> = l.parse().unwrap();
-            let rhs: RecExpr<Self> = r.parse().unwrap();
-            if let Some(e) = Equality::new(&lhs, &rhs) {
-                extra_eqs.insert(e.name.clone(), e);
-            }
-        });
-
-        synth.old_eqs.extend(extra_eqs.clone());
-        synth.all_eqs.extend(extra_eqs);
         synth.egraph = egraph;
     }
 
@@ -427,6 +259,22 @@ impl SynthLanguage for Math {
         // predicate if disabled
         let allowedp = |s| !disabled_ops.iter().any(|x| x.eq(&s));
 
+        // predicate for enumerable
+        let enumerable = |n: &Math| {
+            matches!(
+                n,
+                Math::Sin(_)
+                    | Math::Cos(_)
+                    | Math::Neg(_)
+                    | Math::Add(_)
+                    | Math::Sub(_)
+                    | Math::Mul(_)
+                    | Math::Div(_)
+                    | Math::RealConst(_)
+                    | Math::Var(_)
+            )
+        };
+
         // maps ids to n_ops
         let ids: HashMap<Id, usize> = synth
             .ids()
@@ -438,6 +286,8 @@ impl SynthLanguage for Math {
                 if (ids[&i] + ids[&j] + 1 != iter)
                     || !synth.egraph[i].data.in_domain
                     || !synth.egraph[j].data.in_domain
+                    || !synth.egraph[i].nodes.iter().all(enumerable)
+                    || !synth.egraph[j].nodes.iter().all(enumerable)
                 {
                     continue;
                 }
@@ -453,31 +303,42 @@ impl SynthLanguage for Math {
                 if allowedp("+") {
                     to_add.push(Math::Add([i, j]));
                 }
+
                 // if allowedp("-") { to_add.push(Math::RSub([i, j])); }
-                // if allowedp("*") {
-                //     to_add.push(Math::Mul([i, j]));
+
+                // if iter <= 1 {
+                //     if allowedp("*") {
+                //         to_add.push(Math::Mul([i, j]));
+                //     }
                 // }
+
                 // if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
                 //     to_add.push(Math::RDiv([i, j]));
                 // }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            if ids[&i] + 1 != iter
+                || synth.egraph[i].data.exact
+                || !synth.egraph[i].data.in_domain
+                || !synth.egraph[i].nodes.iter().all(enumerable)
             {
                 continue;
             }
 
-            if allowedp("~") {
-                to_add.push(Math::Neg(i));
+            if iter <= 3 {
+                if allowedp("~") {
+                    to_add.push(Math::Neg(i));
+                }
+                if allowedp("sqr") {
+                    to_add.push(Math::Sqr(i));
+                }
             }
+
             if allowedp("sin") {
                 to_add.push(Math::Sin(i));
             }
             if allowedp("cos") {
                 to_add.push(Math::Cos(i));
-            }
-            if allowedp("sqr") {
-                to_add.push(Math::Sqr(i));
             }
         }
 
@@ -494,7 +355,90 @@ impl SynthLanguage for Math {
     }
 
     // custom constant folder
-    fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
+    fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if egraph[id]
+            .nodes
+            .iter()
+            .any(|x| matches!(x, Math::RealConst(_)))
+        {
+            return;
+        }
+
+        let mut to_add: Option<Math> = None;
+        for n in &egraph[id].nodes {
+            match n {
+                Math::Neg(i) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Ok(x) = real_to_rational(&v) {
+                            let r = Real::from((-x).to_string());
+                            to_add = Some(Self::mk_constant(r));
+                            break;
+                        }
+                    }
+                }
+                Math::Add([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x + y).to_string());
+                                    to_add = Some(Self::mk_constant(r));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Math::Sub([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x - y).to_string());
+                                    to_add = Some(Self::mk_constant(r));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Math::Mul([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x * y).to_string());
+                                    to_add = Some(Self::mk_constant(r));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Math::Div([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    if !y.is_zero() {
+                                        let r = Real::from((x / y).to_string());
+                                        to_add = Some(Self::mk_constant(r));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if let Some(v) = to_add {
+            let cnst_id = egraph.add(v);
+            egraph.union(cnst_id, id);
+        }
+    }
 }
 
 /// Entry point.
