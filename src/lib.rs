@@ -842,7 +842,36 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut new_candidate_eqs: EqualityMap<L> = EqualityMap::default();
         let run_rewrites_before = Instant::now();
 
-        // run lifting rules
+        // 1) Allowed rules
+        // This phase compacts the egraph by running rules that were
+        // learned during this run of Ruler.
+        // Effectively functions like `run_rewrites` phase
+        // of the cvec-based rule synthesis.
+        // Dispose of the runner and only apply unions
+        // to not introduce new (allowed) enodes.
+        log::info!("running allowed rules");
+        let runner = self.mk_cvec_less_runner(self.egraph.clone());
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
+            self.new_eqs.values().flat_map(|eq| &eq.rewrites).collect();
+        let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                self.egraph.union(win[0], win[1]);
+            }
+        }
+
+        self.egraph.rebuild();
+
+        // 2) Lifting rules
+        // This phase denotes newly added allowed nodes in terms
+        // of a forbidden denotation.
+        // It is essential that these rules fully saturate
+        // and that extraneous nodes are kept to a minimum
+        // Keep the runner egraph since it has
+        // the fully denoted forms.
+        // It is possible to learn rules during this phase
+        // so extract potential candidates for
+        // every union.
         log::info!("running lifting rules");
         let runner = self
             .mk_cvec_less_runner(self.egraph.clone())
@@ -850,9 +879,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.lifting_rewrites.iter().collect();
         let (new_egraph, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
-        // These unions are candidate rewrite rules.
-        // Do not apply unions on `egraph` since we are
-        // using `new_egraph` after this point
         for ids in found_unions.values() {
             for win in ids.windows(2) {
                 if win[0] != win[1]
@@ -883,25 +909,21 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph = new_egraph;
         self.egraph.rebuild();
 
-        // run allowed rules
-        log::info!("running allowed rules");
-        let runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.new_eqs.values().flat_map(|eq| &eq.rewrites).collect();
-        let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
-        for ids in found_unions.values() {
-            for win in ids.windows(2) {
-                self.egraph.union(win[0], win[1]);
-            }
-        }
-
-        self.egraph.rebuild();
-
-        // run forbidden rules
+        // 3) Forbidden rules
+        // This phase runs forbidden rules provided by the `--prior-rules` flag.
+        // Any union among allowed eclasses is a candidate equality.
+        // Dispose of the runner and only apply unions
+        // to not introduce new forbidden enodes.
+        // Make sure to use lifting rules since lifting rules
+        // are just a special set of forbidden rules.
         log::info!("running forbidden rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.old_eqs.values().flat_map(|eq| &eq.rewrites).collect();
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
+            .old_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .chain(self.lifting_rewrites.iter())
+            .collect();
         let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
         // these unions are candidate rewrite rules
@@ -996,8 +1018,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     /// Rule synthesis for rule lifting
     fn run_rule_lifting(mut self) -> Report<L> {
         let t = Instant::now();
-        // run HL-LL rewrites (iter 0)
-        log::info!("running HL-LL rewrites");
+        // run lifting rewrites (iter 0)
+        log::info!("running lifting rewrites");
         let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
         runner = runner.run(&self.lifting_rewrites);
         runner.egraph.rebuild();
