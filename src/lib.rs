@@ -1341,7 +1341,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         assert_eq!(
             to.is_allowed,
             from.is_allowed,
-            "trying to merge HL and LL eclass: {} != {}",
+            "trying to merge allowed and forbidden eclasses: {} != {}",
             to.simplest.pretty(100),
             from.simplest.pretty(100)
         );
@@ -1359,16 +1359,16 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                     _ => (),
                 }
             }
+        }
 
-            if from.exact && !to.exact {
-                to.exact = true;
-                merge_a = true;
-            }
+        if from.exact && !to.exact {
+            to.exact = true;
+            merge_a = true;
+        }
 
-            if from.is_extractable && !to.is_extractable {
-                to.is_extractable = true;
-                merge_a = true;
-            }
+        if from.is_extractable && !to.is_extractable {
+            to.is_extractable = true;
+            merge_a = true;
         }
 
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
