@@ -93,7 +93,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
                 }
             };
 
-            if egraph[matched_id].data.in_domain != node.is_in_domain() {
+            if egraph[matched_id].data.is_allowed != node.is_allowed() {
                 return vec![];
             }
         }

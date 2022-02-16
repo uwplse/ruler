@@ -4,6 +4,7 @@
 
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::*;
 use std::str::FromStr;
 
 use num::bigint::BigInt;
@@ -111,7 +112,7 @@ impl Debug for Real {
     }
 }
 
-// custom implementation of a variable value
+// custom implementation of a variable
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Variable(Symbol);
 
@@ -235,7 +236,7 @@ fn is_complex_str(
     s: &'static str,
 ) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
-    move |egraph, _, subst| egraph[subst[var]].data.in_domain
+    move |egraph, _, subst| egraph[subst[var]].data.is_allowed
 }
 
 fn real_const_symbol(s: &str) -> Real {
@@ -246,64 +247,17 @@ fn complex_const_symbol(s: &str) -> Complex {
     Complex::from(s.to_owned() + "C")
 }
 
-fn is_zero(n: &Math) -> bool {
+fn is_complex_zero(n: &Math) -> bool {
     match n {
         Math::ComplexConst(v) => *v == complex_const_symbol("0"),
-        Math::RealConst(v) => *v == real_const_symbol("0"),
         _ => false,
     }
 }
 
-fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
-    rec.as_ref().iter().any(|n| match n {
-        ENodeOrVar::ENode(Math::CDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_zero(n),
-            _ => false,
-        },
+fn is_real_zero(n: &Math) -> bool {
+    match n {
+        Math::RealConst(v) => *v == real_const_symbol("0"),
         _ => false,
-    })
-}
-
-fn is_valid_rewrite_rec(
-    egraph: &EGraph<Math, SynthAnalysis>,
-    expr: &RecExpr<ENodeOrVar<Math>>,
-    subst: &Subst,
-    idx: Id,
-) -> bool {
-    match &expr[idx] {
-        ENodeOrVar::Var(_) => true,
-        ENodeOrVar::ENode(n) => match n {
-            // special case: div
-            Math::RDiv([_, j]) | Math::CDiv([_, j]) => match &expr[*j] {
-                ENodeOrVar::Var(v) => egraph[subst[*v]].iter().all(|x| !is_zero(x)),
-                _ => true,
-            },
-
-            // binary ops
-            Math::RAdd([i, j])
-            | Math::RSub([i, j])
-            | Math::RMul([i, j])
-            | Math::CAdd([i, j])
-            | Math::CSub([i, j])
-            | Math::CMul([i, j])
-            | Math::Cart([i, j])
-            | Math::Polar([i, j]) => {
-                is_valid_rewrite_rec(egraph, expr, subst, *i)
-                    && is_valid_rewrite_rec(egraph, expr, subst, *j)
-            }
-
-            // unary ops
-            Math::RNeg(i)
-            | Math::CNeg(i)
-            | Math::Conj(i)
-            | Math::Re(i)
-            | Math::Im(i)
-            | Math::Abs(i)
-            | Math::Arg(i) => is_valid_rewrite_rec(egraph, expr, subst, *i),
-
-            // other
-            _ => false,
-        },
     }
 }
 
@@ -411,7 +365,7 @@ impl SynthLanguage for Math {
     }
 
     // override default behavior
-    fn is_in_domain(&self) -> bool {
+    fn is_allowed(&self) -> bool {
         matches!(
             self,
             Math::CNeg(_)
@@ -430,12 +384,14 @@ impl SynthLanguage for Math {
     fn is_extractable(&self) -> bool {
         matches!(
             self,
-            Math::RNeg(_)
-                | Math::RAdd(_)
-                | Math::RSub(_)
-                | Math::RMul(_)
-                | Math::RDiv(_)
-                | Math::RealConst(_)
+            Math::CNeg(_)
+                | Math::CAdd([_, _])
+                | Math::CSub([_, _])
+                | Math::CMul([_, _])
+                | Math::CDiv([_, _])
+                | Math::Conj(_)
+                | Math::Var(_)
+                | Math::ComplexConst(_)
         )
     }
 
@@ -452,22 +408,10 @@ impl SynthLanguage for Math {
 
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
-            let var_id = egraph.add(Math::Var(Variable(var)));
-            // real
-            let re_id = egraph.add(Math::Re(var_id));
-            let im_id = egraph.add(Math::Im(var_id));
-
-            // complex
-            let abs_id = egraph.add(Math::Abs(var_id));
-            let arg_id = egraph.add(Math::Arg(var_id));
-            let cx_id = egraph.add(Math::Cart([re_id, im_id]));
-            let px_id = egraph.add(Math::Polar([abs_id, arg_id]));
-
-            egraph.union(var_id, cx_id);
-            egraph.union(var_id, px_id);
+            egraph.add(Math::Var(Variable(var)));
         }
 
-        // // symbolic constants
+        // symbolic constants
         let zero = real_const_symbol("0");
         let one = real_const_symbol("1");
         let pi_2 = real_const_symbol("pi/2");
@@ -477,7 +421,7 @@ impl SynthLanguage for Math {
         let complex_one = complex_const_symbol("1");
         let complex_i = complex_const_symbol("i");
 
-        // // rational constants
+        // rational constants
         let re_zero = egraph.add(Math::RealConst(zero));
         let re_one = egraph.add(Math::RealConst(one));
         let re_pi_2 = egraph.add(Math::RealConst(pi_2));
@@ -486,7 +430,7 @@ impl SynthLanguage for Math {
         let pi_2_pi_2 = egraph.add(Math::RAdd([re_pi_2, re_pi_2]));
         egraph.union(re_pi, pi_2_pi_2);
 
-        // // zero constant
+        // zero constant
         let cx_zero = egraph.add(Math::ComplexConst(complex_zero));
         let zero_mk = egraph.add(Math::Cart([re_zero, re_zero]));
         let zero_mk_re = egraph.add(Math::Re(cx_zero));
@@ -499,7 +443,7 @@ impl SynthLanguage for Math {
         egraph.union(zero_mk_abs, re_zero);
         egraph.union(zero_mk_arg, re_zero);
 
-        // // one constant
+        // one constant
         let cx_one = egraph.add(Math::ComplexConst(complex_one));
         let one_mk = egraph.add(Math::Cart([re_one, re_zero]));
         let one_mk_re = egraph.add(Math::Re(cx_one));
@@ -512,7 +456,7 @@ impl SynthLanguage for Math {
         egraph.union(one_mk_abs, re_one);
         egraph.union(one_mk_arg, re_zero);
 
-        // // i constant
+        // i constant
         let cx_i = egraph.add(Math::ComplexConst(complex_i));
         let i_mk = egraph.add(Math::Cart([re_zero, re_one]));
         let i_mk_re = egraph.add(Math::Re(cx_i));
@@ -528,7 +472,6 @@ impl SynthLanguage for Math {
         synth.lifting_rewrites = vec![
             rewrite!("cartesian-form"; "?a" => "(Cart (Re ?a) (Im ?a))" if is_complex_str("?a")),
             rewrite!("polar-form"; "?a" => "(Polar (abs ?a) (Arg ?a))" if is_complex_str("?a")),
-            // rewrite!("def-abs"; "(+R (*R (Re ?a) (Re ?a)) (*R (Im ?a) (Im ?a))))" => "(*R (abs ?a) (abs ?a))"),
             rewrite!("def-neg-cart-re"; "(Re (~C ?a))" => "(~R (Re ?a))"),
             rewrite!("def-neg-cart-im"; "(Im (~C ?a))" => "(~R (Im ?a))"),
             // rewrite!("def-neg-polar-abs"; "(abs (~C ?a))" => "(abs ?a)",
@@ -551,6 +494,7 @@ impl SynthLanguage for Math {
                                                              (+R (*R (Re ?b) (Re ?b)) (*R (Im ?b) (Im ?b))))"),
             rewrite!("def-div-abs"; "(abs (/C ?a ?b))" => "(/R (abs ?a) (abs ?b))"),
             rewrite!("def-div-arg"; "(Arg (/C ?a ?b))" => "(-R (Arg ?a) (Arg ?b))"),
+            // rewrite!("def-abssq"; "(+R (*R (Re ?a) (Re ?a)) (*R (Im ?a) (Im ?a))))" => "(*R (abs ?a) (abs ?a))"),
         ];
 
         synth.egraph = egraph;
@@ -558,7 +502,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
         let mut to_add = vec![];
 
         // maps ids to n_ops
@@ -570,8 +514,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.in_domain
-                    || !synth.egraph[j].data.in_domain
+                    || !synth.egraph[i].data.is_allowed
+                    || !synth.egraph[j].data.is_allowed
                 {
                     continue;
                 }
@@ -588,12 +532,12 @@ impl SynthLanguage for Math {
                 to_add.push(Math::CSub([i, j]));
                 to_add.push(Math::CMul([i, j]));
 
-                if !synth.egraph[j].iter().any(is_zero) {
+                if !synth.egraph[j].iter().any(is_complex_zero) {
                     to_add.push(Math::CDiv([i, j]));
                 }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
             {
                 continue;
             }
@@ -606,8 +550,30 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(_synth: &mut Synthesizer<Self>, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
-        !contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast)
+    fn validate(
+        _synth: &mut Synthesizer<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+    ) -> ValidationResult {
+        let valid_pattern = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::ENode(Math::RDiv([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_real_zero(n),
+                },
+                ENodeOrVar::ENode(Math::CDiv([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_complex_zero(n),
+                },
+                ENodeOrVar::ENode(Math::Polar([i, _])) => match rhs.ast.index(*i) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_real_zero(n),
+                },
+                _ => true,
+            })
+        };
+
+        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
     }
 
     fn is_valid_rewrite(
@@ -615,17 +581,26 @@ impl SynthLanguage for Math {
         rhs: &Pattern<Self>,
         subst: &Subst,
     ) -> bool {
-        is_valid_rewrite_rec(
-            egraph,
-            &rhs.ast,
-            subst,
-            Id::from(rhs.ast.as_ref().len() - 1),
-        )
+        rhs.ast.as_ref().iter().all(|n| match n {
+            ENodeOrVar::ENode(Math::RDiv([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_real_zero),
+                ENodeOrVar::ENode(n) => !is_real_zero(n),
+            },
+            ENodeOrVar::ENode(Math::CDiv([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_complex_zero),
+                ENodeOrVar::ENode(n) => !is_complex_zero(n),
+            },
+            ENodeOrVar::ENode(Math::Polar([i, _])) => match rhs.ast.index(*i) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_real_zero),
+                ENodeOrVar::ENode(n) => !is_real_zero(n),
+            },
+            _ => true,
+        })
     }
 
     // Constant folding for complex numbers
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        if !egraph[id].data.in_domain {
+        if !egraph[id].data.is_allowed {
             // lower domain
             if egraph[id].iter().any(|x| matches!(x, Math::RealConst(_))) {
                 // early exit if constant exists

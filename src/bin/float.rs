@@ -181,7 +181,11 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(synth: &mut Synthesizer<Self>, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+    fn validate(
+        synth: &mut Synthesizer<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+    ) -> ValidationResult {
         let n = synth.params.num_fuzz;
         let mut env = HashMap::default();
 
@@ -203,8 +207,7 @@ impl SynthLanguage for Math {
 
         let lvec = Self::eval_pattern(lhs, &env, n);
         let rvec = Self::eval_pattern(rhs, &env, n);
-
-        lvec == rvec
+        ValidationResult::from(lvec == rvec)
     }
 }
 

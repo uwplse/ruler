@@ -187,7 +187,7 @@ struct ComplexToRealApplier(&'static str);
 impl Applier<Math, SynthAnalysis> for ComplexToRealApplier {
     fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst) -> Vec<Id> {
         let id = subst[self.0.parse().unwrap()];
-        if egraph[id].data.in_domain {
+        if egraph[id].data.is_allowed {
             return vec![];
         }
 
@@ -259,7 +259,7 @@ impl SynthLanguage for Math {
 
     /// Returns true if the node is in the current domain.
     /// Useful for rule lifting.
-    fn is_in_domain(&self) -> bool {
+    fn is_allowed(&self) -> bool {
         matches!(
             self,
             Math::Sin(_)
@@ -272,6 +272,20 @@ impl SynthLanguage for Math {
                 | Math::Re(_)
                 | Math::Im(_)
                 | Math::Sqr(_)
+                | Math::RealConst(_)
+                | Math::Var(_)
+        )
+    }
+
+    fn is_extractable(&self) -> bool {
+        matches!(
+            self,
+            Math::Sin(_)
+                | Math::Cos(_)
+                | Math::Add(_)
+                | Math::Sub(_)
+                | Math::Mul(_)
+                | Math::Div(_)
                 | Math::RealConst(_)
                 | Math::Var(_)
         )
@@ -335,8 +349,6 @@ impl SynthLanguage for Math {
                      "(Re (/C (*C (+C (cis ?a) (cis (~ ?a))) (+C (cis ?a) (cis (~ ?a)))) 2C))"),
             rewrite!("def-sin-sqr"; "(sqr (sin ?a))" <=>
                      "(Re (/C (*C (-C (cis ?a) (cis (~ ?a))) (-C (cis ?a) (cis (~ ?a)))) 2iC))"),
-            // rewrite!("complex-foil"; "(*C (+C ?a ?b) (+C ?c ?d))" <=>
-            //         "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))"),
             vec![
                 rewrite!("def-add"; "(+ (Re ?a) (Re ?b))" => "(Re (+C ?a ?b))"),
                 rewrite!("def-mul"; "(* (Re ?a) (Re ?b))" => "(Re (*C ?a ?b))"),
@@ -376,7 +388,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
         let mut to_add = vec![];
 
         // disabled operators (TODO: validate input)
@@ -398,8 +410,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.in_domain
-                    || !synth.egraph[j].data.in_domain
+                    || !synth.egraph[i].data.is_allowed
+                    || !synth.egraph[j].data.is_allowed
                 {
                     continue;
                 }
@@ -424,7 +436,7 @@ impl SynthLanguage for Math {
                 // }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
             {
                 continue;
             }
@@ -447,67 +459,16 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
+    fn validate(
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
-    ) -> bool {
-        true
+    ) -> ValidationResult {
+        ValidationResult::Valid
     }
 
     // custom constant folder
     fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
-
-    /// Heuristics for ranking rewrites based on number of variables,
-    /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
-    /// and number of ops.
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
-        let lhs_recpat = Self::recpat_instantiate(&lhs.ast);
-        let rhs_recpat = Self::recpat_instantiate(&rhs.ast);
-        let sz_lhs = ExtractableAstSize.cost_rec(&lhs_recpat) as i32;
-        let sz_rhs = ExtractableAstSize.cost_rec(&rhs_recpat) as i32;
-        // let sz_max_pattern = sz_lhs.max(sz_rhs);
-
-        // lhs.vars() and rhs.vars() is deduping
-        // examples
-        //   (- x x) => 0 --- 1 b/c x only var
-        //   (- x 0) => x --- 1 b/c x only var
-        //   (+ x y) => (+ y x) --- 2 b/c x, y only vars
-        let mut var_set: HashSet<Var> = Default::default();
-        var_set.extend(lhs.vars());
-        var_set.extend(rhs.vars());
-        let n_vars_rule = var_set.len() as i32;
-
-        let mut op_set: HashSet<String> = Default::default();
-        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-            if !node.is_leaf() {
-                op_set.insert(node.to_string());
-            }
-        }
-        let n_ops = op_set.len() as i32;
-
-        let n_consts = lhs
-            .ast
-            .as_ref()
-            .iter()
-            .chain(rhs.ast.as_ref())
-            .filter(|n| match n {
-                ENodeOrVar::ENode(n) => n.is_constant(),
-                ENodeOrVar::Var(_) => false,
-            })
-            .count() as i32;
-
-        // (-sz_max_pattern, n_vars_rule)
-        [
-            n_vars_rule,
-            -n_consts,
-            -i32::max(sz_lhs, sz_rhs),
-            // -i32::min(sz_lhs, sz_rhs),
-            -(sz_lhs + sz_rhs),
-            -n_ops,
-            // 0
-        ]
-    }
 }
 
 /// Entry point.

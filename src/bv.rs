@@ -317,12 +317,11 @@ macro_rules! impl_bv {
                 to_add
             }
 
-
-            fn is_valid(
+            fn validate(
                 synth: &mut Synthesizer<Self>,
                 lhs: &Pattern<Self>,
-                rhs: &Pattern<Self>,
-            ) -> bool {
+                rhs: &Pattern<Self>
+            ) -> ValidationResult {
                 use z3::{*, ast::Ast};
 
                 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {
@@ -355,16 +354,16 @@ macro_rules! impl_bv {
                     let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
                     solver.assert(&lexpr._eq(&rexpr).not());
                     match solver.check() {
-                        SatResult::Unsat => true,
-                        SatResult::Sat => {
+                        SatResult::Sat => ValidationResult::Invalid,
+                        SatResult::Unsat => {
                             // println!("z3 validation: failed for {} => {}", lhs, rhs);
-                            false
-                        }
+                            ValidationResult::Valid
+                        },
                         SatResult::Unknown => {
-                            synth.smt_unknown += 1;
                             // println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                            false
-                        }
+                            synth.smt_unknown += 1;
+                            ValidationResult::Unknown
+                        },
                     }
                 } else {
                     let n = synth.params.num_fuzz;
@@ -388,8 +387,7 @@ macro_rules! impl_bv {
 
                     let lvec = Self::eval_pattern(lhs, &env, n);
                     let rvec = Self::eval_pattern(rhs, &env, n);
-
-                    lvec == rvec
+                    ValidationResult::from(lvec == rvec)
                 }
             }
         }

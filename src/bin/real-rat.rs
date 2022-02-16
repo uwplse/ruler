@@ -64,7 +64,7 @@ impl Debug for Real {
     }
 }
 
-// custom implementation of a variable value
+// custom implementation of a variable
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Variable(Symbol);
 
@@ -165,8 +165,8 @@ define_language! {
         "-R" = RSub([Id; 2]),
         "*R" = RMul([Id; 2]),
         "/R" = RDiv([Id; 2]),
-        Var(Variable),
         Real(Real),
+        Var(Variable),
 
         // conversions
         "Lim" = Lim(Id),
@@ -180,38 +180,22 @@ fn real_const_symbol(s: &str) -> Real {
 
 fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
-    move |egraph, _, subst| egraph[subst[var]].data.in_domain
+    move |egraph, _, subst| egraph[subst[var]].data.is_allowed
 }
 
-fn is_zero(n: &Math) -> bool {
+fn is_rational_zero(n: &Math) -> bool {
+    match n {
+        Math::Rat(v) => v.is_zero(),
+        _ => false,
+    }
+}
+
+fn is_real_zero(n: &Math) -> bool {
     match n {
         Math::Real(v) => *v == real_const_symbol("0"),
         _ => false,
     }
 }
-
-fn contains_div_by_zero(rec: &RecExpr<ENodeOrVar<Math>>) -> bool {
-    rec.as_ref().iter().any(|n| match n {
-        ENodeOrVar::ENode(Math::RDiv([_, i])) => match &rec.as_ref()[usize::from(*i)] {
-            ENodeOrVar::ENode(n) => is_zero(n),
-            _ => false,
-        },
-        _ => false,
-    })
-}
-
-// returns the sequence associated with the eclass
-// fn sequence_ids(egraph: &EGraph<Math, SynthAnalysis>, id: &Id) -> Vec<Id> {
-//     egraph[*id].nodes
-//         .iter()
-//         .filter_map(|x| {
-//             match x {
-//                 Math::Lim(i) => Some(*i),
-//                 _ => None,
-//             }
-//         })
-//         .collect()
-// }
 
 impl SynthLanguage for Math {
     type Constant = Rational; // not used
@@ -254,7 +238,7 @@ impl SynthLanguage for Math {
     }
 
     // override default behavior
-    fn is_in_domain(&self) -> bool {
+    fn is_allowed(&self) -> bool {
         matches!(
             self,
             Math::RNeg(_)
@@ -265,6 +249,19 @@ impl SynthLanguage for Math {
                 | Math::Var(_)
                 | Math::Real(_)
                 | Math::Lim(_)
+        )
+    }
+
+    fn is_extractable(&self) -> bool {
+        matches!(
+            self,
+            Math::RNeg(_)
+                | Math::RAdd([_, _])
+                | Math::RSub([_, _])
+                | Math::RMul([_, _])
+                | Math::RDiv([_, _])
+                | Math::Var(_)
+                | Math::Real(_)
         )
     }
 
@@ -295,10 +292,7 @@ impl SynthLanguage for Math {
 
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
-            let var_id = egraph.add(Math::Var(Variable(var)));
-            let seq_id = egraph.add(Math::Seq(var_id));
-            let lim_id = egraph.add(Math::Lim(seq_id));
-            egraph.union(var_id, lim_id);
+            egraph.add(Math::Var(Variable(var)));
         }
 
         for (c, s) in constants {
@@ -323,10 +317,11 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
         let mut to_add = vec![];
 
-        // disabled operators (TODO: validate input)
+        // disabled operators from command line
+        // (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
             s.split(' ').collect()
         } else {
@@ -345,17 +340,19 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.in_domain
-                    || !synth.egraph[j].data.in_domain
+                    || !synth.egraph[i].data.is_allowed
+                    || !synth.egraph[j].data.is_allowed
                 {
                     continue;
                 }
 
-                if iter > synth.params.no_constants_above_iter {
-                    if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
-                        continue;
-                    }
-                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
+                if iter > synth.params.no_constants_above_iter
+                    && (synth.egraph[i].data.exact || synth.egraph[j].data.exact)
+                {
+                    continue;
+                }
+
+                if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
                     continue;
                 };
 
@@ -365,15 +362,15 @@ impl SynthLanguage for Math {
                 if allowedp("-") {
                     to_add.push(Math::RSub([i, j]));
                 }
-                if allowedp("/") {
+                if allowedp("*") {
                     to_add.push(Math::RMul([i, j]));
                 }
-                if allowedp("/") && !synth.egraph[j].nodes.iter().any(is_zero) {
+                if allowedp("/") && !synth.egraph[j].nodes.iter().any(is_real_zero) {
                     to_add.push(Math::RDiv([i, j]));
                 }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
             {
                 continue;
             }
@@ -387,13 +384,49 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(_synth: &mut Synthesizer<Self>, lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
-        !contains_div_by_zero(&lhs.ast) && !contains_div_by_zero(&rhs.ast)
+    fn validate(
+        _synth: &mut Synthesizer<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+    ) -> ValidationResult {
+        let valid_pattern = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::ENode(Math::Div([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_rational_zero(n),
+                },
+                ENodeOrVar::ENode(Math::RDiv([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_real_zero(n),
+                },
+                _ => true,
+            })
+        };
+
+        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
+    }
+
+    fn is_valid_rewrite(
+        egraph: &EGraph<Self, SynthAnalysis>,
+        rhs: &Pattern<Self>,
+        subst: &Subst,
+    ) -> bool {
+        rhs.ast.as_ref().iter().all(|n| match n {
+            ENodeOrVar::ENode(Math::Div([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_rational_zero),
+                ENodeOrVar::ENode(n) => !is_rational_zero(n),
+            },
+            ENodeOrVar::ENode(Math::RDiv([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_real_zero),
+                ENodeOrVar::ENode(n) => !is_real_zero(n),
+            },
+            _ => true,
+        })
     }
 
     // custom constant folder
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        if !egraph[id].data.in_domain {
+        if !egraph[id].data.is_allowed {
             // lower domain
             if egraph[id].nodes.iter().any(|x| matches!(x, Math::Rat(_))) {
                 // early exit if constant exists
@@ -468,66 +501,10 @@ impl SynthLanguage for Math {
                 })
                 .collect();
 
-            // if !lim_ids.is_empty() {
-            //     log::info!("constant fold higher");
-            // }
-
             for id in lim_ids {
                 Self::constant_fold(egraph, id);
             }
         }
-    }
-
-    /// @Override
-    /// Heuristics for ranking rewrites based on number of variables,
-    /// constants, size of the `lhs` and `rhs`, total size of `lhs` and `rhs`,
-    /// and number of ops.
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
-        let lhs_recpat = Self::recpat_instantiate(&lhs.ast);
-        let rhs_recpat = Self::recpat_instantiate(&rhs.ast);
-        let sz_lhs = ExtractableAstSize.cost_rec(&lhs_recpat) as i32;
-        let sz_rhs = ExtractableAstSize.cost_rec(&rhs_recpat) as i32;
-        // let sz_max_pattern = sz_lhs.max(sz_rhs);
-
-        // lhs.vars() and rhs.vars() is deduping
-        // examples
-        //   (- x x) => 0 --- 1 b/c x only var
-        //   (- x 0) => x --- 1 b/c x only var
-        //   (+ x y) => (+ y x) --- 2 b/c x, y only vars
-        let mut var_set: HashSet<Var> = Default::default();
-        var_set.extend(lhs.vars());
-        var_set.extend(rhs.vars());
-        let n_vars_rule = var_set.len() as i32;
-
-        let mut op_set: HashSet<String> = Default::default();
-        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-            if !node.is_leaf() {
-                op_set.insert(node.to_string());
-            }
-        }
-        let n_ops = op_set.len() as i32;
-
-        let n_consts = lhs
-            .ast
-            .as_ref()
-            .iter()
-            .chain(rhs.ast.as_ref())
-            .filter(|n| match n {
-                ENodeOrVar::ENode(n) => n.is_constant(),
-                ENodeOrVar::Var(_) => false,
-            })
-            .count() as i32;
-
-        // (-sz_max_pattern, n_vars_rule)
-        [
-            n_vars_rule,
-            -n_consts,
-            -i32::max(sz_lhs, sz_rhs),
-            // -i32::min(sz_lhs, sz_rhs),
-            -(sz_lhs + sz_rhs),
-            -n_ops,
-            // 0
-        ]
     }
 }
 

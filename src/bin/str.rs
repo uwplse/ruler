@@ -337,12 +337,12 @@ impl SynthLanguage for Lang {
         to_add
     }
 
-    fn is_valid(
+    fn validate(
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
-    ) -> bool {
-        true
+    ) -> ValidationResult {
+        ValidationResult::Valid
     }
 }
 

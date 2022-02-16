@@ -203,11 +203,11 @@ impl SynthLanguage for Math {
         to_add
     }
 
-    fn is_valid(
+    fn validate(
         synth: &mut Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
         rhs: &egg::Pattern<Self>,
-    ) -> bool {
+    ) -> ValidationResult {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);
@@ -217,15 +217,15 @@ impl SynthLanguage for Math {
             let (rexpr, _) = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check() {
-                SatResult::Unsat => true,
+                SatResult::Unsat => ValidationResult::Invalid,
                 SatResult::Sat => {
                     // println!("z3 validation: failed for {} => {}", lhs, rhs);
-                    false
+                    ValidationResult::Valid
                 }
                 SatResult::Unknown => {
-                    synth.smt_unknown += 1;
                     // println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                    false
+                    synth.smt_unknown += 1;
+                    ValidationResult::Unknown
                 }
             }
         } else {
@@ -254,8 +254,7 @@ impl SynthLanguage for Math {
 
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
-
-            lvec == rvec
+            ValidationResult::from(lvec == rvec)
         }
     }
 }

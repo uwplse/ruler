@@ -263,11 +263,11 @@ impl SynthLanguage for Math {
     /// Check the validity of a rewrite rule.
     /// Depending on the value of `use_smt`, it either uses
     /// Z3 to verify the rules or fuzzing to validate them.
-    fn is_valid(
+    fn validate(
         synth: &mut Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
         rhs: &egg::Pattern<Self>,
-    ) -> bool {
+    ) -> ValidationResult {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);
@@ -280,15 +280,15 @@ impl SynthLanguage for Math {
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check_assumptions(all) {
                 // match solver.check() {
-                SatResult::Unsat => true,
+                SatResult::Unsat => ValidationResult::Valid,
                 SatResult::Sat => {
                     // println!("z3 validation: failed for {} => {}", lhs, rhs);
-                    false
+                    ValidationResult::Invalid
                 }
                 SatResult::Unknown => {
+                    // println!("z3 validation: unknown for {} => {}", lhs, rhs)
                     synth.smt_unknown += 1;
-                    // println!("z3 validation: unknown for {} => {}", lhs, rhs);
-                    false
+                    ValidationResult::Unknown
                 }
             }
         } else {
@@ -317,8 +317,7 @@ impl SynthLanguage for Math {
 
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
-
-            lvec == rvec
+            ValidationResult::from(lvec == rvec)
         }
     }
 }
