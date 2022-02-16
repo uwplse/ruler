@@ -187,7 +187,7 @@ struct ComplexToRealApplier(&'static str);
 impl Applier<Math, SynthAnalysis> for ComplexToRealApplier {
     fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst) -> Vec<Id> {
         let id = subst[self.0.parse().unwrap()];
-        if egraph[id].data.in_domain {
+        if egraph[id].data.is_allowed {
             return vec![];
         }
 
@@ -259,7 +259,7 @@ impl SynthLanguage for Math {
 
     /// Returns true if the node is in the current domain.
     /// Useful for rule lifting.
-    fn is_in_domain(&self) -> bool {
+    fn is_allowed(&self) -> bool {
         matches!(
             self,
             Math::Sin(_)
@@ -388,7 +388,7 @@ impl SynthLanguage for Math {
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
         let mut to_add = vec![];
 
         // disabled operators (TODO: validate input)
@@ -410,8 +410,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.in_domain
-                    || !synth.egraph[j].data.in_domain
+                    || !synth.egraph[i].data.is_allowed
+                    || !synth.egraph[j].data.is_allowed
                 {
                     continue;
                 }
@@ -436,7 +436,7 @@ impl SynthLanguage for Math {
                 // }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.in_domain
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
             {
                 continue;
             }
