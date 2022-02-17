@@ -11,7 +11,6 @@ use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
-    cmp::Ordering,
     fmt::{Debug, Display},
     hash::{BuildHasherDefault, Hash},
     sync::Arc,
@@ -245,9 +244,9 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         true
     }
 
-    /// Returns true if the node is in the current domain.
+    /// Returns true if the node is in an allowed node
     /// Useful for rule lifting.
-    fn is_in_domain(&self) -> bool {
+    fn is_allowed(&self) -> bool {
         true
     }
 
@@ -258,8 +257,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     }
 
     /// Returns true if every node in the recexpr is in the domain
-    fn recexpr_in_domain(expr: &RecExpr<Self>) -> bool {
-        expr.as_ref().iter().all(|x| x.is_in_domain())
+    fn recexpr_is_allowed(expr: &RecExpr<Self>) -> bool {
+        expr.as_ref().iter().all(|x| x.is_allowed())
     }
 
     /// Constant folding done explicitly by the language
@@ -788,7 +787,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     /// Rule synthesis for one domain, i.e., Ruler as presented at OOPSLA'21
-    fn run_one_domain(mut self) -> Report<L> {
+    fn run_cvec_synth(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
 
@@ -847,7 +846,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut new_candidate_eqs: EqualityMap<L> = EqualityMap::default();
         let run_rewrites_before = Instant::now();
 
-        // run allowed rules
+        // 1) Allowed rules
+        // This phase compacts the egraph by running rules that were
+        // learned during this run of Ruler.
+        // Effectively functions like `run_rewrites` phase
+        // of the cvec-based rule synthesis.
+        // Dispose of the runner and only apply unions
+        // to not introduce new (allowed) enodes.
         log::info!("running allowed rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
@@ -861,7 +866,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         self.egraph.rebuild();
 
-        // run lifting rules
+        // 2) Lifting rules
+        // This phase denotes newly added allowed nodes in terms
+        // of a forbidden denotation.
+        // It is essential that these rules fully saturate
+        // and that extraneous nodes are kept to a minimum
+        // Keep the runner egraph since it has
+        // the fully denoted forms.
+        // It is possible to learn rules during this phase
+        // so extract potential candidates for
+        // every union.
         log::info!("running lifting rules");
         let runner = self
             .mk_cvec_less_runner(self.egraph.clone())
@@ -869,9 +883,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.lifting_rewrites.iter().collect();
         let (new_egraph, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
-        // These unions are candidate rewrite rules.
-        // Do not apply unions on `egraph` since we are
-        // using `new_egraph` after this point
         for ids in found_unions.values() {
             for win in ids.windows(2) {
                 if self.egraph[win[0]].data.is_extractable
@@ -901,7 +912,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph = new_egraph;
         self.egraph.rebuild();
 
-        // run forbidden rules + lifting rules
+        // 3) Forbidden rules
+        // This phase runs forbidden rules provided by the `--prior-rules` flag.
+        // Any union among allowed eclasses is a candidate equality.
+        // Dispose of the runner and only apply unions
+        // to not introduce new forbidden enodes.
+        // Make sure to use lifting rules since lifting rules
+        // are just a special set of forbidden rules.
         log::info!("running forbidden rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
@@ -1004,7 +1021,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn run_rule_lifting(mut self) -> Report<L> {
         let t = Instant::now();
         // run lifting rewrites (iter 0)
-        log::info!("running initial lifting rewrites");
+        log::info!("running lifting rewrites");
         let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
         runner = runner.run(&self.lifting_rewrites);
         runner.egraph.rebuild();
@@ -1083,7 +1100,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         if self.egraph.analysis.rule_lifting {
             self.run_rule_lifting()
         } else {
-            self.run_one_domain()
+            self.run_cvec_synth()
         }
     }
 }
@@ -1306,7 +1323,7 @@ pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
     pub simplest: RecExpr<L>,
     pub exact: bool,
-    pub in_domain: bool,
+    pub is_allowed: bool,
     pub is_extractable: bool,
 }
 
@@ -1317,33 +1334,13 @@ impl<L: SynthLanguage> Signature<L> {
     }
 }
 
-fn ord_merge(to: &mut Option<Ordering>, from: Ordering) {
-    if let Some(ord) = to.as_mut() {
-        match (*ord, from) {
-            (Ordering::Equal, _) => *ord = from,
-            (_, Ordering::Equal) => (),
-            (_, _) if *ord == from => (),
-            _ => *to = None,
-        }
-    }
-}
-
-fn ord_to_did_merge(ord: Option<Ordering>) -> DidMerge {
-    match ord {
-        None => DidMerge(true, true),
-        Some(Ordering::Equal) => DidMerge(false, false),
-        Some(Ordering::Greater) => DidMerge(false, true),
-        Some(Ordering::Less) => DidMerge(true, false),
-    }
-}
-
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
-        let mut ord = Some(Ordering::Equal);
+        let mut merge_a = false;
         let cost_fn = |x: &RecExpr<L>| {
-            if self.rule_lifting && L::recexpr_in_domain(x) {
+            if self.rule_lifting && L::recexpr_is_allowed(x) {
                 ExtractableAstSize.cost_rec(x)
             } else {
                 AstSize.cost_rec(x)
@@ -1352,9 +1349,9 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
         // do not merge high-level enode with low-level enode
         assert_eq!(
-            to.in_domain,
-            from.in_domain,
-            "trying to merge HL and LL eclass: {} != {}",
+            to.is_allowed,
+            from.is_allowed,
+            "trying to merge allowed and forbidden eclasses: {} != {}",
             to.simplest.pretty(100),
             from.simplest.pretty(100)
         );
@@ -1364,28 +1361,32 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
                     (None, Some(_)) => {
                         to.cvec[i] = from.cvec[i].clone();
-                        ord_merge(&mut ord, Ordering::Less);
+                        merge_a = true;
                     }
                     (Some(x), Some(y)) => {
                         assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
                     }
-                    (Some(_), None) => {
-                        ord_merge(&mut ord, Ordering::Greater);
-                    }
                     _ => (),
                 }
             }
-
-            ord_merge(&mut ord, to.exact.cmp(&from.exact));
         }
 
-        to.exact |= from.exact;
-        to.is_extractable |= from.is_extractable;
+        if from.exact && !to.exact {
+            to.exact = true;
+            merge_a = true;
+        }
+
+        if from.is_extractable && !to.is_extractable {
+            to.is_extractable = true;
+            merge_a = true;
+        }
+
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
             to.simplest = from.simplest;
+            merge_a = true;
         }
 
-        ord_to_did_merge(ord)
+        DidMerge(merge_a, true)
     }
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
@@ -1393,7 +1394,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         let get_simplest = |i: &Id| &egraph[*i].data.simplest;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
-            simplest: if enode.is_in_domain() && (enode.is_var() || enode.is_constant()) {
+            simplest: if enode.is_allowed() && (enode.is_var() || enode.is_constant()) {
                 let mut rec = RecExpr::<L>::default();
                 rec.add(enode.clone());
                 rec
@@ -1416,7 +1417,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 RecExpr::from(nodes)
             },
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
-            in_domain: enode.is_in_domain(),
+            is_allowed: enode.is_allowed(),
             is_extractable: enode.is_extractable(),
         }
     }
@@ -1526,7 +1527,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
                         let left = extract.find_best(ids[0]).1;
                         let right = extract.find_best(ids[1]).1;
-                        if L::recexpr_in_domain(&left) && L::recexpr_in_domain(&right) {
+                        if L::recexpr_is_allowed(&left) && L::recexpr_is_allowed(&right) {
                             if let Some(eq) = Equality::new(&left, &right) {
                                 if !self.all_eqs.contains_key(&eq.name) {
                                     new_eqs.insert(eq.name.clone(), eq);
@@ -1635,14 +1636,14 @@ impl<L: Language> egg::CostFunction<L> for NumberOfOps {
 
 // Cost function only counting ops in the domain
 // Penalizes ops not in the domain
-pub struct NumberOfDomainOps;
-impl<L: SynthLanguage> egg::CostFunction<L> for NumberOfDomainOps {
+pub struct NumberOfAllowedOps;
+impl<L: SynthLanguage> egg::CostFunction<L> for NumberOfAllowedOps {
     type Cost = usize;
     fn cost<C>(&mut self, enode: &L, mut costs: C) -> Self::Cost
     where
         C: FnMut(Id) -> Self::Cost,
     {
-        if !enode.is_in_domain() {
+        if !enode.is_allowed() {
             usize::max_value()
         } else if enode.is_var() || enode.is_constant() {
             0

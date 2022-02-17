@@ -240,13 +240,14 @@ impl SynthLanguage for Math {
                 rewrite!("cis-0"; "(cis 0)" => "1"),
                 rewrite!("add-cis"; "(cis (+ ?a ?b))" => "(* (cis ?a) (cis ?b))"),
             ],
-        ].concat();
+        ]
+        .concat();
 
         synth.egraph = egraph;
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfDomainOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
         let mut to_add = vec![];
 
         // disabled operators (TODO: validate input)
@@ -284,8 +285,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.in_domain
-                    || !synth.egraph[j].data.in_domain
+                    || !synth.egraph[i].data.is_allowed
+                    || !synth.egraph[j].data.is_allowed
                     || !synth.egraph[i].nodes.iter().all(enumerable)
                     || !synth.egraph[j].nodes.iter().all(enumerable)
                 {
@@ -319,7 +320,7 @@ impl SynthLanguage for Math {
 
             if ids[&i] + 1 != iter
                 || synth.egraph[i].data.exact
-                || !synth.egraph[i].data.in_domain
+                || !synth.egraph[i].data.is_allowed
                 || !synth.egraph[i].nodes.iter().all(enumerable)
             {
                 continue;
