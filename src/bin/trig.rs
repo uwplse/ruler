@@ -253,8 +253,14 @@ impl SynthLanguage for Math {
         let extra_rewrites = vec![
             ("(sqr (* ?a ?b))", "(* (sqr ?a) (sqr ?b))"),
             ("(sqr (/ ?a ?b))", "(/ (sqr ?a) (sqr ?b))"),
-            ("(sqr (+ ?a ?b))", "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
-            ("(sqr (- ?a ?b))", "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
+            (
+                "(sqr (+ ?a ?b))",
+                "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))",
+            ),
+            (
+                "(sqr (- ?a ?b))",
+                "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))",
+            ),
             // ("(* (+ ?a ?b) (- ?a ?b))", "(+ (sqr ?a) (sqr ?b))")
         ];
 
@@ -335,7 +341,9 @@ impl SynthLanguage for Math {
                     to_add.push(Math::Add([i, j]));
                 }
 
-                // if allowedp("-") { to_add.push(Math::RSub([i, j])); }
+                // if allowedp("-") {
+                //     to_add.push(Math::Sub([i, j]));
+                // }
 
                 // if iter <= 1 {
                 //     if allowedp("*") {
@@ -363,13 +371,12 @@ impl SynthLanguage for Math {
                 if allowedp("sqr") {
                     to_add.push(Math::Sqr(i));
                 }
-            }
-
-            if allowedp("sin") {
-                to_add.push(Math::Sin(i));
-            }
-            if allowedp("cos") {
-                to_add.push(Math::Cos(i));
+                if allowedp("sin") {
+                    to_add.push(Math::Sin(i));
+                }
+                if allowedp("cos") {
+                    to_add.push(Math::Cos(i));
+                }
             }
         }
 

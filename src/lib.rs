@@ -883,26 +883,21 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.lifting_rewrites.iter().collect();
         let (new_egraph, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
+        let extract = Extractor::new(&self.egraph, ExtractableAstSize);
+        let mut unvalidated = EqualityMap::default();
         for ids in found_unions.values() {
             for win in ids.windows(2) {
                 if self.egraph[win[0]].data.is_extractable
                     && self.egraph[win[1]].data.is_extractable
                 {
-                    let extract = Extractor::new(&self.egraph, ExtractableAstSize);
                     let (_, e1) = extract.find_best(win[0]);
                     let (_, e2) = extract.find_best(win[1]);
-                    if let Some(mut eq) = Equality::new(&e1, &e2) {
+                    if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 &&
                             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
                             e2.as_ref().iter().all(|x| x.is_extractable())
                         {
-                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                                eq.ids = Some((win[0], win[1]));
-                                if !new_candidate_eqs.contains_key(&eq.name) {
-                                    log::debug!("  Candidate {}", eq);
-                                    new_candidate_eqs.insert(eq.name.clone(), eq);
-                                }
-                            }
+                            unvalidated.insert(eq.name.clone(), eq);
                         }
                     }
                 }
@@ -911,6 +906,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         self.egraph = new_egraph;
         self.egraph.rebuild();
+
+        for (_, eq) in unvalidated {
+            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                if !new_candidate_eqs.contains_key(&eq.name) {
+                    log::debug!("  Candidate {}", eq);
+                    new_candidate_eqs.insert(eq.name.clone(), eq);
+                }
+            }
+        }
 
         // 3) Forbidden rules
         // This phase runs forbidden rules provided by the `--prior-rules` flag.
@@ -930,34 +934,44 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
         // these unions are candidate rewrite rules
+        let extract = Extractor::new(&self.egraph, ExtractableAstSize);
+        let mut unvalidated = EqualityMap::default();
         for ids in found_unions.values() {
             for win in ids.windows(2) {
                 if self.egraph[win[0]].data.is_extractable
                     && self.egraph[win[1]].data.is_extractable
                 {
-                    let extract = Extractor::new(&self.egraph, ExtractableAstSize);
                     let (_, e1) = extract.find_best(win[0]);
                     let (_, e2) = extract.find_best(win[1]);
-                    if let Some(mut eq) = Equality::new(&e1, &e2) {
+                    if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 &&
                             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
                             e2.as_ref().iter().all(|x| x.is_extractable())
                         {
-                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                                eq.ids = Some((win[0], win[1]));
-                                if !new_candidate_eqs.contains_key(&eq.name) {
-                                    new_candidate_eqs.insert(eq.name.clone(), eq);
-                                }
-                            }
+                            unvalidated.insert(eq.name.clone(), eq);
                         }
                     }
                 }
+            }
+        }
 
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
                 self.egraph.union(win[0], win[1]);
             }
         }
 
         self.egraph.rebuild();
+
+        for (_, eq) in unvalidated {
+            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                if !new_candidate_eqs.contains_key(&eq.name) {
+                    log::debug!("  Candidate {}", eq);
+                    new_candidate_eqs.insert(eq.name.clone(), eq);
+                }
+            }
+        }
+
         new_candidate_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
         let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
         log::info!("Time taken in... run_rewrites: {}", run_rewrites);
@@ -991,29 +1005,36 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
             log::info!("Chose {} good rules", eqs.len());
             for (_, eq) in &eqs {
-                if !self.params.no_run_rewrites {
-                    assert!(!self.all_eqs.contains_key(&eq.name));
-                    if let Some((i, j)) = eq.ids {
-                        // inserted
-                        self.egraph.union(i, j);
-                    } else {
-                        // extracted
-                        // let mut cp = self.egraph.clone();
-                        let lrec = L::instantiate(&eq.lhs);
-                        let rrec = L::instantiate(&eq.rhs);
-                        let i = self.egraph.add_expr(&lrec);
-                        let j = self.egraph.add_expr(&rrec);
+                log::info!("  {}", eq);
+            }
 
+            if !self.params.no_run_rewrites {
+                let mut inserted = EqualityMap::default();
+                let mut extracted = EqualityMap::default();
+
+                for (_, eq) in &eqs {
+                    if eq.ids.is_some() {
+                        inserted.insert(eq.name.clone(), eq.clone());
+                    } else {
+                        extracted.insert(eq.name.clone(), eq.clone());
+                    }
+                }
+
+                for (_, eq) in inserted {
+                    if let Some((i, j)) = eq.ids {
                         self.egraph.union(i, j);
                     }
                 }
 
-                log::info!("  {}", eq);
+                if !extracted.is_empty() {
+                    let rewrites = extracted.values().flat_map(|eq| &eq.rewrites);
+                    let runner = self.mk_cvec_less_runner(self.egraph.clone()).run(rewrites);
+                    self.egraph = runner.egraph;
+                }
             }
 
             self.new_eqs.extend(eqs.clone());
             self.all_eqs.extend(eqs);
-            self.egraph.rebuild();
         }
     }
 
