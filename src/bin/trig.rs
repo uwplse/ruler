@@ -1,5 +1,5 @@
 /*!
-    Trigonometry from reals
+    Trigonometry from complex
 !*/
 
 use std::fmt;
@@ -11,7 +11,7 @@ use std::str::FromStr;
 use num::{
     bigint::BigInt,
     rational::{ParseRatioError, Ratio},
-    Zero,
+    {Signed, Zero},
 };
 
 use egg::*;
@@ -108,6 +108,13 @@ impl Display for Variable {
 impl Debug for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(self.as_str(), f)
+    }
+}
+
+fn is_zero(n: &Math) -> bool {
+    match n {
+        Math::RealConst(v) => *v == Real::from("0"),
+        _ => false,
     }
 }
 
@@ -220,28 +227,50 @@ impl SynthLanguage for Math {
         }
 
         // constants
-        let zero_id = egraph.add(Math::RealConst(Real::from("0")));
-        egraph.add(Math::Sin(zero_id));
-        egraph.add(Math::Cos(zero_id));
+        egraph.add(Math::RealConst(Real::from("-1")));
+        egraph.add(Math::RealConst(Real::from("0")));
+        egraph.add(Math::RealConst(Real::from("1")));
+
+        // important expressions
+        egraph.add_expr(&"(cos 0)".parse().unwrap());
+        egraph.add_expr(&"(sin 0)".parse().unwrap());
+        // egraph.add_expr(&"(+ (sqr (sin a)) (sqr (cos a)))".parse().unwrap());
 
         // rewrites
         synth.lifting_rewrites = vec![
             rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-            rewrite!("sqr-distribute-mul"; "(sqr (* ?a ?b))" <=> "(* (sqr ?a) (sqr ?b))"),
-            rewrite!("sqr-distribute-div"; "(sqr (/ ?a ?b))" <=> "(/ (sqr ?a) (sqr ?b))"),
             rewrite!("invert-cis"; "(cis (~ ?a))" <=> "(/ 1 (cis ?a))"),
+            rewrite!("add-cis"; "(cis (+ ?a ?b))" <=> "(* (cis ?a) (cis ?b))"),
             vec![
                 rewrite!("square-i"; "(* I I)" => "-1"),
-                rewrite!("add-zero-i"; "(+ I 0)" => "I"),
-                rewrite!("mul-zero-i"; "(* I 0)" => "0"),
-                rewrite!("mul-one-i"; "(* I 1)" => "I"),
                 rewrite!("cis-0"; "(cis 0)" => "1"),
-                rewrite!("add-cis"; "(cis (+ ?a ?b))" => "(* (cis ?a) (cis ?b))"),
             ],
         ]
         .concat();
+
+        let extra_rewrites = vec![
+            ("(sqr (* ?a ?b))", "(* (sqr ?a) (sqr ?b))"),
+            ("(sqr (/ ?a ?b))", "(/ (sqr ?a) (sqr ?b))"),
+            ("(sqr (+ ?a ?b))", "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
+            ("(sqr (- ?a ?b))", "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
+            // ("(* (+ ?a ?b) (- ?a ?b))", "(+ (sqr ?a) (sqr ?b))")
+        ];
+
+        for (l, r) in extra_rewrites {
+            let lrec: RecExpr<Math> = l.parse().unwrap();
+            let rrec: RecExpr<Math> = r.parse().unwrap();
+            if let Some(e) = Equality::new(&lrec, &rrec) {
+                synth.old_eqs.insert(e.name.clone(), e.clone());
+                synth.all_eqs.insert(e.name.clone(), e);
+            }
+
+            if let Some(e) = Equality::new(&rrec, &lrec) {
+                synth.old_eqs.insert(e.name.clone(), e.clone());
+                synth.all_eqs.insert(e.name.clone(), e);
+            }
+        }
 
         synth.egraph = egraph;
     }
@@ -271,6 +300,7 @@ impl SynthLanguage for Math {
                     | Math::Sub(_)
                     | Math::Mul(_)
                     | Math::Div(_)
+                    | Math::Sqr(_)
                     | Math::RealConst(_)
                     | Math::Var(_)
             )
@@ -326,7 +356,7 @@ impl SynthLanguage for Math {
                 continue;
             }
 
-            if iter <= 3 {
+            if iter <= 2 {
                 if allowedp("~") {
                     to_add.push(Math::Neg(i));
                 }
@@ -349,10 +379,34 @@ impl SynthLanguage for Math {
 
     fn validate(
         _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
     ) -> ValidationResult {
-        ValidationResult::Valid
+        let valid_pattern = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::ENode(Math::Div([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_zero(n),
+                },
+                _ => true,
+            })
+        };
+
+        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
+    }
+
+    fn is_valid_rewrite(
+        egraph: &EGraph<Self, SynthAnalysis>,
+        rhs: &Pattern<Self>,
+        subst: &Subst,
+    ) -> bool {
+        rhs.ast.as_ref().iter().all(|n| match n {
+            ENodeOrVar::ENode(Math::Div([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_zero),
+                ENodeOrVar::ENode(n) => !is_zero(n),
+            },
+            _ => true,
+        })
     }
 
     // custom constant folder
@@ -436,6 +490,17 @@ impl SynthLanguage for Math {
         }
 
         if let Some(v) = to_add {
+            // add (~ v) if v is negative
+            if let Math::RealConst(n) = v {
+                if let Ok(x) = real_to_rational(&n) {
+                    if x.is_negative() {
+                        let pos_id = egraph.add(Self::mk_constant(Real::from((-x).to_string())));
+                        let neg_id = egraph.add(Math::Neg(pos_id));
+                        egraph.union(neg_id, id);
+                    }
+                }
+            }
+
             let cnst_id = egraph.add(v);
             egraph.union(cnst_id, id);
         }
