@@ -14,7 +14,7 @@ use std::{
     fmt::{Debug, Display},
     hash::{BuildHasherDefault, Hash},
     sync::Arc,
-    time::{Duration, Instant},
+    time::{Duration, Instant}, fs::File, io::{BufReader, BufRead},
 };
 
 mod bv;
@@ -41,6 +41,19 @@ pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
     &alpha[i..i + 1]
 }
+
+pub fn get_terms_from_workload<L: SynthLanguage>(fnm: String) -> Vec<RecExpr<L>> {
+    let mut ret: Vec<RecExpr<L>> = vec![];
+    // open the file, read each line, make a recexpr from them add add to ret
+    let f = File::open(fnm).unwrap();
+    let file = BufReader::new(&f);
+    for line in file.lines() {
+        let sexp: RecExpr<L> = line.unwrap().parse().unwrap();
+        ret.push(sexp);
+    }
+    return ret
+}
+
 
 /// Constant folding method
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -230,7 +243,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     }
 
     /// Initialize an egraph with variables and interesting constants from the domain.
-    fn init_synth(synth: &mut Synthesizer<Self>);
+    fn init_synth(synth: &mut Synthesizer<Self>, workload: Vec<RecExpr<Self>>);
 
     /// Layer wise term enumeration in the egraph.
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self>;
@@ -371,7 +384,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
             params,
         };
 
-        L::init_synth(&mut synth);
+        let workload_terms: Vec<RecExpr<L>> = match &synth.params.workload {
+            Some (workload) => get_terms_from_workload::<L> (workload.to_string()),
+            None => vec![]
+        };
+
+        L::init_synth(&mut synth, workload_terms);
         synth.initial_egraph = synth.egraph.clone();
         synth
     }
@@ -1227,6 +1245,12 @@ pub struct SynthParams {
     ///////////////////
     #[clap(long)]
     pub prior_rules: Option<String>,
+
+    ///////////////////
+    // workload params //
+    ///////////////////
+    #[clap(long)]
+    pub workload: Option<String>,
 }
 
 /// Derivability report.
