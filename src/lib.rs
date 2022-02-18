@@ -51,7 +51,7 @@ pub fn get_terms_from_workload<L: SynthLanguage>(fnm: String) -> Vec<RecExpr<L>>
         let sexp: RecExpr<L> = line.unwrap().parse().unwrap();
         ret.push(sexp);
     }
-    return ret
+    ret
 }
 
 
