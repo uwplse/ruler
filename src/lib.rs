@@ -12,9 +12,11 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
     fmt::{Debug, Display},
+    fs::File,
     hash::{BuildHasherDefault, Hash},
+    io::{BufRead, BufReader},
     sync::Arc,
-    time::{Duration, Instant}, fs::File, io::{BufReader, BufRead},
+    time::{Duration, Instant},
 };
 
 mod bv;
@@ -53,7 +55,6 @@ pub fn get_terms_from_workload<L: SynthLanguage>(fnm: String) -> Vec<RecExpr<L>>
     }
     ret
 }
-
 
 /// Constant folding method
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -385,8 +386,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         };
 
         let workload_terms: Vec<RecExpr<L>> = match &synth.params.workload {
-            Some (workload) => get_terms_from_workload::<L> (workload.to_string()),
-            None => vec![]
+            Some(workload) => get_terms_from_workload::<L>(workload.to_string()),
+            None => vec![],
         };
 
         L::init_synth(&mut synth, workload_terms);
