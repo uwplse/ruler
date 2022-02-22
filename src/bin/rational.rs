@@ -49,6 +49,34 @@ fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
     }
 }
 
+fn neg(interval: Interval<Constant>) -> Interval<Constant> {
+    (interval.1.map(|x| x.neg()), interval.0.map(|x| x.neg()))
+}
+
+fn abs(interval: Interval<Constant>) -> Interval<Constant> {
+    let (min, max) = interval;
+    let zero = Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap());
+
+    let new_min = match (min.clone(), max.clone()) {
+        (None, None) => zero,
+        (Some(a), None) => a.max(zero).abs(),
+        (None, Some(b)) => b.min(zero).abs(),
+        (Some(a), Some(b)) => {
+            if a.le(&zero) && b.ge(&zero) {
+                zero
+            } else {
+                a.abs().min(b.abs())
+            }
+        }
+    };
+
+    let new_max = match (min, max) {
+        (Some(a), Some(b)) => Some(a.abs().max(b.abs())),
+        _ => None,
+    };
+    (Some(new_min), new_max)
+}
+
 impl SynthLanguage for Math {
     type Constant = Constant;
 
@@ -99,13 +127,10 @@ impl SynthLanguage for Math {
         match self {
             Math::Num(n) => (Some(n.clone()), Some(n.clone())),
             Math::Var(_) => (None, None),
-            Math::Neg(a) => {
-                let interval = egraph[*a].data.interval.clone();
-                (interval.1.map(|x| x.neg()), interval.0.map(|x| x.neg()))
-            }
+            Math::Neg(a) => neg(egraph[*a].data.interval.clone()),
+            Math::Abs(a) => abs(egraph[*a].data.interval.clone()),
 
             // TODO
-            Math::Abs(_a) => (None, None),
             Math::Reciprocal(_a) => (None, None),
             Math::Add([_a, _b]) => (None, None),
             Math::Sub([_a, _b]) => (None, None),
