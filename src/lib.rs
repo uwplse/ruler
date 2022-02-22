@@ -94,7 +94,7 @@ impl Default for SynthAnalysis {
 /// `eval` implements an interpreter for the domain. It returns a `Cvec` of length `cvec_len`
 /// where each cvec element is computed using `eval`.
 pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
-    type Constant: Clone + Hash + Eq + Debug + Display;
+    type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
     where
@@ -227,6 +227,10 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
             -n_ops,
             // 0
         ]
+    }
+
+    fn mk_interval(&self) -> Interval<Self::Constant> {
+        (None, None)
     }
 
     /// Initialize an egraph with variables and interesting constants from the domain.
@@ -1307,6 +1311,8 @@ macro_rules! map {
     };
 }
 
+pub type Interval<T> = (Option<T>, Option<T>);
+
 /// The Signature represents eclass analysis data.
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
@@ -1315,6 +1321,7 @@ pub struct Signature<L: SynthLanguage> {
     pub exact: bool,
     pub is_allowed: bool,
     pub is_extractable: bool,
+    pub interval: Interval<L::Constant>,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -1376,6 +1383,18 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             merge_a = true;
         }
 
+        // // New interval is max of mins, min of maxes
+        let new_min = match (to.interval.0.as_ref(), from.interval.0.as_ref()) {
+            (Some(a), Some(b)) => Some(a.max(b)),
+            (a, b) => a.or(b),
+        };
+
+        let new_max = match (to.interval.1.as_ref(), from.interval.1.as_ref()) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+        to.interval = (new_min.cloned(), new_max.cloned());
+
         // conservatively just say that b changed
         DidMerge(merge_a, true)
     }
@@ -1410,6 +1429,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
             is_allowed: enode.is_allowed(),
             is_extractable: enode.is_extractable(),
+            interval: enode.mk_interval(),
         }
     }
 
