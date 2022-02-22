@@ -9,6 +9,8 @@
    - implement `is_valid` for checking the validity of the rules in your domain.
 !*/
 
+use std::ops::Neg;
+
 use egg::*;
 use ruler::*;
 
@@ -90,6 +92,26 @@ impl SynthLanguage for Math {
                     Some(a.recip())
                 }
             }),
+        }
+    }
+
+    fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+        match self {
+            Math::Num(n) => (Some(n.clone()), Some(n.clone())),
+            Math::Var(_) => (None, None),
+            Math::Neg(a) => {
+                let interval = egraph[*a].data.interval.clone();
+                (interval.1.map(|x| x.neg()), interval.0.map(|x| x.neg()))
+            }
+
+            // TODO
+            Math::Abs(_a) => (None, None),
+            Math::Reciprocal(_a) => (None, None),
+            Math::Add([_a, _b]) => (None, None),
+            Math::Sub([_a, _b]) => (None, None),
+            Math::Mul([_a, _b]) => (None, None),
+            Math::Div([_a, _b]) => (None, None),
+            Math::Pow([_a, _b]) => (None, None),
         }
     }
 

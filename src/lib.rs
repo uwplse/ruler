@@ -229,7 +229,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         ]
     }
 
-    fn mk_interval(&self) -> Interval<Self::Constant> {
+    fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
         (None, None)
     }
 
@@ -1429,7 +1429,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
             is_allowed: enode.is_allowed(),
             is_extractable: enode.is_extractable(),
-            interval: enode.mk_interval(),
+            interval: enode.mk_interval(egraph),
         }
     }
 
