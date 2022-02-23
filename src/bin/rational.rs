@@ -117,6 +117,47 @@ fn add(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
     Interval::new(new_min, new_max)
 }
 
+fn mul(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
+    let mul = |(a, b): (Constant, Constant)| a * b;
+    let (sign_a, sign_b) = (sign(&a), sign(&b));
+
+    match (sign_a, sign_b) {
+        (Sign::Negative, Sign::Negative) => {
+            Interval::new(a.high.zip(b.high).map(mul), a.low.zip(b.low).map(mul))
+        }
+        (Sign::Positive, Sign::Positive) => {
+            Interval::new(a.low.zip(b.low).map(mul), a.high.zip(b.high).map(mul))
+        }
+
+        (Sign::Positive, Sign::Negative) => {
+            Interval::new(a.high.zip(b.low).map(mul), a.low.zip(b.high).map(mul))
+        }
+        (Sign::Negative, Sign::Positive) => {
+            Interval::new(a.low.zip(b.high).map(mul), a.high.zip(b.low).map(mul))
+        }
+
+        (Sign::Positive, Sign::ContainsZero) => Interval::new(
+            a.high.clone().zip(b.low).map(mul),
+            a.high.zip(b.high).map(mul),
+        ),
+        (Sign::ContainsZero, Sign::Positive) => Interval::new(
+            a.low.zip(b.high.clone()).map(mul),
+            a.high.zip(b.high).map(mul),
+        ),
+
+        (Sign::Negative, Sign::ContainsZero) => Interval::new(
+            a.low.clone().zip(b.high).map(mul),
+            a.low.zip(b.low).map(mul),
+        ),
+        (Sign::ContainsZero, Sign::Negative) => Interval::new(
+            a.high.zip(b.low.clone()).map(mul),
+            a.low.zip(b.low).map(mul),
+        ),
+
+        (Sign::ContainsZero, Sign::ContainsZero) => Interval::new(None, None), // TODO: this can be tightened
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = Constant;
 
@@ -177,10 +218,13 @@ impl SynthLanguage for Math {
                 egraph[*a].data.interval.clone(),
                 neg(egraph[*b].data.interval.clone()),
             ),
+            Math::Mul([a, b]) => mul(
+                egraph[*a].data.interval.clone(),
+                egraph[*b].data.interval.clone(),
+            ),
 
             // TODO
             Math::Reciprocal(_a) => Interval::default(),
-            Math::Mul([_a, _b]) => Interval::default(),
             Math::Div([_a, _b]) => Interval::default(),
             Math::Pow([_a, _b]) => Interval::default(),
         }
@@ -577,6 +621,57 @@ mod test {
         assert_eq!(
             add(interval(Some(-20), Some(5)), interval(Some(-10), Some(10))),
             interval(Some(-30), Some(15))
+        );
+    }
+
+    #[test]
+    fn mul_interval_test() {
+        assert_eq!(
+            mul(interval(None, Some(-3)), interval(None, Some(-4))),
+            interval(Some(12), None)
+        );
+        assert_eq!(
+            mul(
+                interval(Some(-100), Some(-2)),
+                interval(Some(-50), Some(-20))
+            ),
+            interval(Some(40), Some(5000))
+        );
+        assert_eq!(
+            mul(interval(Some(2), None), interval(Some(50), None)),
+            interval(Some(100), None)
+        );
+        assert_eq!(
+            mul(interval(Some(30), Some(50)), interval(Some(2), Some(3))),
+            interval(Some(60), Some(150))
+        );
+        assert_eq!(
+            mul(interval(Some(-10), Some(-5)), interval(Some(6), Some(100))),
+            interval(Some(-1000), Some(-30))
+        );
+        assert_eq!(
+            mul(interval(Some(3), Some(10)), interval(None, Some(-1))),
+            interval(None, Some(-3))
+        );
+        assert_eq!(
+            mul(interval(Some(2), Some(5)), interval(Some(-3), Some(4))),
+            interval(Some(-15), Some(20))
+        );
+        assert_eq!(
+            mul(interval(Some(-2), None), interval(Some(3), Some(4))),
+            interval(Some(-8), None)
+        );
+        assert_eq!(
+            mul(interval(None, None), interval(Some(-10), Some(-4))),
+            interval(None, None)
+        );
+        assert_eq!(
+            mul(interval(Some(-8), Some(6)), interval(Some(-3), Some(-2))),
+            interval(Some(-18), Some(24))
+        );
+        assert_eq!(
+            mul(interval(Some(-4), Some(6)), interval(Some(-8), Some(10))),
+            interval(None, None) // TODO: Can be tightened to (-48, 60)
         );
     }
 }
