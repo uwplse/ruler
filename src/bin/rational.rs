@@ -9,7 +9,7 @@
    - implement `is_valid` for checking the validity of the rules in your domain.
 !*/
 
-use std::ops::{Add, Neg};
+use std::ops::{Add, Mul, Neg};
 
 use egg::*;
 use ruler::*;
@@ -23,6 +23,12 @@ use z3::*;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
+
+enum Sign {
+    Positive,
+    ContainsZero,
+    Negative,
+}
 
 define_language! {
     /// Define the operators for the domain.
@@ -54,6 +60,7 @@ fn neg(interval: Interval<Constant>) -> Interval<Constant> {
 }
 
 fn abs(interval: Interval<Constant>) -> Interval<Constant> {
+    let sign = sign(&interval);
     let (min, max) = interval;
     let zero = Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap());
 
@@ -62,7 +69,7 @@ fn abs(interval: Interval<Constant>) -> Interval<Constant> {
         (Some(a), None) => a.max(zero).abs(),
         (None, Some(b)) => b.min(zero).abs(),
         (Some(a), Some(b)) => {
-            if a.le(&zero) && b.ge(&zero) {
+            if let Sign::ContainsZero = sign {
                 zero
             } else {
                 a.abs().min(b.abs())
@@ -82,6 +89,66 @@ fn add(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
     let new_min = a.0.zip(b.0).and_then(add);
     let new_max = a.1.zip(b.1).and_then(add);
     (new_min, new_max)
+}
+
+fn sign(interval: &Interval<Constant>) -> Sign {
+    match interval {
+        (None, None) => Sign::ContainsZero,
+        (Some(a), None) => {
+            if a.is_positive() {
+                Sign::Positive
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (None, Some(b)) => {
+            if b.is_negative() {
+                Sign::Negative
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (Some(a), Some(b)) => {
+            if a.is_negative() && b.is_negative() {
+                Sign::Negative
+            } else if a.is_positive() && b.is_positive() {
+                Sign::Positive
+            } else {
+                Sign::ContainsZero
+            }
+        }
+    }
+}
+
+fn mul(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
+    let mul = |(a, b): (Constant, Constant)| a.mul(b);
+    let (sign_a, sign_b) = (sign(&a), sign(&b));
+    let (a_min, a_max) = a;
+    let (b_min, b_max) = b;
+
+    match (sign_a, sign_b) {
+        (Sign::Negative, Sign::Negative) => (a_max.zip(b_max).map(mul), a_min.zip(b_min).map(mul)),
+        (Sign::Positive, Sign::Positive) => (a_min.zip(b_min).map(mul), a_max.zip(b_max).map(mul)),
+
+        (Sign::Positive, Sign::Negative) => (a_max.zip(b_min).map(mul), a_min.zip(b_max).map(mul)),
+        (Sign::Negative, Sign::Positive) => (a_min.zip(b_max).map(mul), a_max.zip(b_min).map(mul)),
+
+        (Sign::Positive, Sign::ContainsZero) => {
+            (a_max.clone().zip(b_min).map(mul), a_max.zip(b_max).map(mul))
+        }
+        (Sign::ContainsZero, Sign::Positive) => {
+            (a_min.zip(b_max.clone()).map(mul), a_max.zip(b_max).map(mul))
+        }
+
+        (Sign::Negative, Sign::ContainsZero) => {
+            (a_min.clone().zip(b_max).map(mul), a_min.zip(b_min).map(mul))
+        }
+        (Sign::ContainsZero, Sign::Negative) => {
+            (a_max.zip(b_min.clone()).map(mul), a_min.zip(b_min).map(mul))
+        }
+
+        (Sign::ContainsZero, Sign::ContainsZero) => (None, None), // TODO: this can be tightened
+    }
 }
 
 impl SynthLanguage for Math {
@@ -144,10 +211,13 @@ impl SynthLanguage for Math {
                 egraph[*a].data.interval.clone(),
                 neg(egraph[*b].data.interval.clone()),
             ),
+            Math::Mul([a, b]) => mul(
+                egraph[*a].data.interval.clone(),
+                egraph[*b].data.interval.clone(),
+            ),
 
             // TODO
             Math::Reciprocal(_a) => (None, None),
-            Math::Mul([_a, _b]) => (None, None),
             Math::Div([_a, _b]) => (None, None),
             Math::Pow([_a, _b]) => (None, None),
         }
