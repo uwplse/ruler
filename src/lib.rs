@@ -94,7 +94,7 @@ impl Default for SynthAnalysis {
 /// `eval` implements an interpreter for the domain. It returns a `Cvec` of length `cvec_len`
 /// where each cvec element is computed using `eval`.
 pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
-    type Constant: Clone + Hash + Eq + Debug + Display;
+    type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
     where
@@ -227,6 +227,10 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
             -n_ops,
             // 0
         ]
+    }
+
+    fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+        Interval::default()
     }
 
     /// Initialize an egraph with variables and interesting constants from the domain.
@@ -1307,6 +1311,21 @@ macro_rules! map {
     };
 }
 
+#[derive(Debug, Clone)]
+pub struct Interval<T> {
+    pub low: Option<T>,  // None represents -inf
+    pub high: Option<T>, // None represents +inf
+}
+
+impl<T> Default for Interval<T> {
+    fn default() -> Self {
+        Self {
+            low: None,
+            high: None,
+        }
+    }
+}
+
 /// The Signature represents eclass analysis data.
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
@@ -1315,6 +1334,7 @@ pub struct Signature<L: SynthLanguage> {
     pub exact: bool,
     pub is_allowed: bool,
     pub is_extractable: bool,
+    pub interval: Interval<L::Constant>,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -1376,6 +1396,21 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             merge_a = true;
         }
 
+        // // New interval is max of mins, min of maxes
+        let new_min = match (to.interval.low.as_ref(), from.interval.low.as_ref()) {
+            (Some(a), Some(b)) => Some(a.max(b)),
+            (a, b) => a.or(b),
+        };
+
+        let new_max = match (to.interval.high.as_ref(), from.interval.high.as_ref()) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+        to.interval = Interval {
+            low: new_min.cloned(),
+            high: new_max.cloned(),
+        };
+
         // conservatively just say that b changed
         DidMerge(merge_a, true)
     }
@@ -1410,6 +1445,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
             is_allowed: enode.is_allowed(),
             is_extractable: enode.is_extractable(),
+            interval: enode.mk_interval(egraph),
         }
     }
 
