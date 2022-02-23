@@ -479,3 +479,70 @@ fn egg_to_z3<'a>(
 fn main() {
     Math::main()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
+        let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
+        Interval {
+            low: low.map(i32_to_constant),
+            high: high.map(i32_to_constant),
+        }
+    }
+
+    #[test]
+    fn abs_interval_test() {
+        assert_eq!(abs(interval(None, None)), interval(Some(0), None));
+        assert_eq!(
+            abs(interval(Some(-4), Some(10))),
+            interval(Some(0), Some(10))
+        );
+        assert_eq!(
+            abs(interval(Some(5), Some(10))),
+            interval(Some(5), Some(10))
+        );
+        assert_eq!(
+            abs(interval(Some(-10), Some(-1))),
+            interval(Some(1), Some(10))
+        );
+        assert_eq!(abs(interval(None, Some(2))), interval(Some(0), None));
+        assert_eq!(abs(interval(None, Some(-4))), interval(Some(4), None));
+        assert_eq!(abs(interval(Some(-1), None)), interval(Some(0), None));
+        assert_eq!(abs(interval(Some(1), None)), interval(Some(1), None));
+    }
+
+    #[test]
+    fn neg_interval_test() {
+        assert_eq!(neg(interval(None, None)), interval(None, None));
+        assert_eq!(neg(interval(Some(10), None)), interval(None, Some(-10)));
+        assert_eq!(neg(interval(Some(-10), None)), interval(None, Some(10)));
+        assert_eq!(neg(interval(None, Some(10))), interval(Some(-10), None));
+        assert_eq!(neg(interval(None, Some(-10))), interval(Some(10), None));
+        assert_eq!(
+            neg(interval(Some(5), Some(10))),
+            interval(Some(-10), Some(-5))
+        );
+    }
+
+    #[test]
+    fn add_interval_test() {
+        assert_eq!(
+            add(interval(None, None), interval(None, None)),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(interval(None, None), interval(Some(-10), Some(10))),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(interval(Some(-10), Some(10)), interval(None, None)),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(interval(Some(-20), Some(5)), interval(Some(-10), Some(10))),
+            interval(Some(-30), Some(15))
+        );
+    }
+}

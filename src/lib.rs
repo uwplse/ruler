@@ -1311,7 +1311,7 @@ macro_rules! map {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Interval<T> {
     pub low: Option<T>,  // None represents -inf
     pub high: Option<T>, // None represents +inf
