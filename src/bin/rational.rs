@@ -9,7 +9,7 @@
    - implement `is_valid` for checking the validity of the rules in your domain.
 !*/
 
-use std::ops::Neg;
+use std::ops::{Add, Neg};
 
 use egg::*;
 use ruler::*;
@@ -77,6 +77,13 @@ fn abs(interval: Interval<Constant>) -> Interval<Constant> {
     (Some(new_min), new_max)
 }
 
+fn add(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
+    let add = |(a, b): (Constant, Constant)| Some(a.add(b));
+    let new_min = a.0.zip(b.0).and_then(add);
+    let new_max = a.1.zip(b.1).and_then(add);
+    (new_min, new_max)
+}
+
 impl SynthLanguage for Math {
     type Constant = Constant;
 
@@ -129,11 +136,17 @@ impl SynthLanguage for Math {
             Math::Var(_) => (None, None),
             Math::Neg(a) => neg(egraph[*a].data.interval.clone()),
             Math::Abs(a) => abs(egraph[*a].data.interval.clone()),
+            Math::Add([a, b]) => add(
+                egraph[*a].data.interval.clone(),
+                egraph[*b].data.interval.clone(),
+            ),
+            Math::Sub([a, b]) => add(
+                egraph[*a].data.interval.clone(),
+                neg(egraph[*b].data.interval.clone()),
+            ),
 
             // TODO
             Math::Reciprocal(_a) => (None, None),
-            Math::Add([_a, _b]) => (None, None),
-            Math::Sub([_a, _b]) => (None, None),
             Math::Mul([_a, _b]) => (None, None),
             Math::Div([_a, _b]) => (None, None),
             Math::Pow([_a, _b]) => (None, None),
