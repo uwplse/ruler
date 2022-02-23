@@ -230,7 +230,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     }
 
     fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
-        (None, None)
+        Interval::default()
     }
 
     /// Initialize an egraph with variables and interesting constants from the domain.
@@ -1311,7 +1311,20 @@ macro_rules! map {
     };
 }
 
-pub type Interval<T> = (Option<T>, Option<T>);
+#[derive(Debug, Clone)]
+pub struct Interval<T> {
+    pub low: Option<T>,  // None represents -inf
+    pub high: Option<T>, // None represents +inf
+}
+
+impl<T> Default for Interval<T> {
+    fn default() -> Self {
+        Self {
+            low: None,
+            high: None,
+        }
+    }
+}
 
 /// The Signature represents eclass analysis data.
 #[derive(Debug, Clone)]
@@ -1384,16 +1397,19 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         }
 
         // // New interval is max of mins, min of maxes
-        let new_min = match (to.interval.0.as_ref(), from.interval.0.as_ref()) {
+        let new_min = match (to.interval.low.as_ref(), from.interval.low.as_ref()) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (a, b) => a.or(b),
         };
 
-        let new_max = match (to.interval.1.as_ref(), from.interval.1.as_ref()) {
+        let new_max = match (to.interval.high.as_ref(), from.interval.high.as_ref()) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
         };
-        to.interval = (new_min.cloned(), new_max.cloned());
+        to.interval = Interval {
+            low: new_min.cloned(),
+            high: new_max.cloned(),
+        };
 
         // conservatively just say that b changed
         DidMerge(merge_a, true)

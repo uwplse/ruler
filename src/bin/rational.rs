@@ -9,8 +9,6 @@
    - implement `is_valid` for checking the validity of the rules in your domain.
 !*/
 
-use std::ops::{Add, Neg};
-
 use egg::*;
 use ruler::*;
 
@@ -50,14 +48,16 @@ fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
 }
 
 fn neg(interval: Interval<Constant>) -> Interval<Constant> {
-    (interval.1.map(|x| x.neg()), interval.0.map(|x| x.neg()))
+    Interval {
+        low: interval.high.map(|x| -x),
+        high: interval.low.map(|x| -x),
+    }
 }
 
 fn abs(interval: Interval<Constant>) -> Interval<Constant> {
-    let (min, max) = interval;
     let zero = Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap());
 
-    let new_min = match (min.clone(), max.clone()) {
+    let new_min = match (interval.low.clone(), interval.high.clone()) {
         (None, None) => zero,
         (Some(a), None) => a.max(zero).abs(),
         (None, Some(b)) => b.min(zero).abs(),
@@ -70,18 +70,23 @@ fn abs(interval: Interval<Constant>) -> Interval<Constant> {
         }
     };
 
-    let new_max = match (min, max) {
+    let new_max = match (interval.low, interval.high) {
         (Some(a), Some(b)) => Some(a.abs().max(b.abs())),
         _ => None,
     };
-    (Some(new_min), new_max)
+    Interval {
+        low: Some(new_min),
+        high: new_max,
+    }
 }
 
 fn add(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
-    let add = |(a, b): (Constant, Constant)| Some(a.add(b));
-    let new_min = a.0.zip(b.0).and_then(add);
-    let new_max = a.1.zip(b.1).and_then(add);
-    (new_min, new_max)
+    let new_min = a.low.zip(b.low).map(|(x, y)| x + y);
+    let new_max = a.high.zip(b.high).map(|(x, y)| x + y);
+    Interval {
+        low: new_min,
+        high: new_max,
+    }
 }
 
 impl SynthLanguage for Math {
@@ -132,8 +137,11 @@ impl SynthLanguage for Math {
 
     fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
         match self {
-            Math::Num(n) => (Some(n.clone()), Some(n.clone())),
-            Math::Var(_) => (None, None),
+            Math::Num(n) => Interval {
+                low: Some(n.clone()),
+                high: Some(n.clone()),
+            },
+            Math::Var(_) => Interval::default(),
             Math::Neg(a) => neg(egraph[*a].data.interval.clone()),
             Math::Abs(a) => abs(egraph[*a].data.interval.clone()),
             Math::Add([a, b]) => add(
@@ -146,10 +154,10 @@ impl SynthLanguage for Math {
             ),
 
             // TODO
-            Math::Reciprocal(_a) => (None, None),
-            Math::Mul([_a, _b]) => (None, None),
-            Math::Div([_a, _b]) => (None, None),
-            Math::Pow([_a, _b]) => (None, None),
+            Math::Reciprocal(_a) => Interval::default(),
+            Math::Mul([_a, _b]) => Interval::default(),
+            Math::Div([_a, _b]) => Interval::default(),
+            Math::Pow([_a, _b]) => Interval::default(),
         }
     }
 
