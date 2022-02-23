@@ -132,6 +132,14 @@ fn extract_constant(nodes: &[Math]) -> Option<Real> {
     None
 }
 
+fn trig_node(ns: &[Math], egraph: &EGraph<Math, SynthAnalysis>) -> bool {
+    ns.iter().any(|n| match n {
+        Math::Sin(_) | Math::Cos(_) => true,
+        Math::Sqr(i) => trig_node(&egraph[*i].nodes, egraph),
+        _ => false,
+    })
+}
+
 define_language! {
     pub enum Math {
         // trig operators
@@ -235,54 +243,60 @@ impl SynthLanguage for Math {
         egraph.add_expr(&"(cos 0)".parse().unwrap());
         egraph.add_expr(&"(sin 0)".parse().unwrap());
         // egraph.add_expr(&"(+ (sqr (sin a)) (sqr (cos a)))".parse().unwrap());
+        // egraph.add_expr(&"(- (sqr (cos a)) (sqr (sin a)))".parse().unwrap());
+        // // egraph.add_expr(&"(cos (* 2 a))".parse().unwrap());
+        // egraph.add_expr(&"(sin (* 2 a))".parse().unwrap());
 
         // rewrites
         synth.lifting_rewrites = vec![
             rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
+            // rewrite!("def-cis"; "(cis ?a)" <=> "(+ (cos ?a) (* (sin ?a) I))"),
+            // rewrite!("def-neg-cis"; "(cis (~ ?a))" <=> "(- (cos ?a) (* (sin ?a) I))"),
+            rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=> "(/ (+ (+ (sqr (cis ?a)) (sqr (cis ?a))) 2) 4)"),
+            rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=> "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis ?a))) 2) 4))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-            rewrite!("invert-cis"; "(cis (~ ?a))" <=> "(/ 1 (cis ?a))"),
             rewrite!("add-cis"; "(cis (+ ?a ?b))" <=> "(* (cis ?a) (cis ?b))"),
             vec![
+                // rewrite!("distr-sqr-mul"; "(sqr (* ?a ?b))" => "(* (sqr ?a) (sqr ?b))"),
+                // rewrite!("distr-sqr-div"; "(sqr (/ ?a ?b))" => "(/ (sqr ?a) (sqr ?b))"),
+                // rewrite!("foil-add"; "(sqr (+ ?a ?b))" => "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
+                // rewrite!("foil-sub"; "(sqr (- ?a ?b))" => "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
+                // rewrite!("mul-complex"; "(* (* ?a I) (* ?b I))" => "(~ (* ?a ?b))"),
+                // rewrite!("def-inv-cis"; "(cis (~ ?a))" => "(/ 1 (cis ?a))"),
+                rewrite!("cancel-cis"; "(* (cis ?a) (cis (~ ?a)))" => "1"),
                 rewrite!("square-i"; "(* I I)" => "-1"),
                 rewrite!("cis-0"; "(cis 0)" => "1"),
             ],
         ]
         .concat();
 
-        let extra_rewrites = vec![
-            ("(sqr (* ?a ?b))", "(* (sqr ?a) (sqr ?b))"),
-            ("(sqr (/ ?a ?b))", "(/ (sqr ?a) (sqr ?b))"),
-            (
-                "(sqr (+ ?a ?b))",
-                "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))",
-            ),
-            (
-                "(sqr (- ?a ?b))",
-                "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))",
-            ),
-            // ("(* (+ ?a ?b) (- ?a ?b))", "(+ (sqr ?a) (sqr ?b))")
-        ];
+        // let extra_rewrites = vec![
+        //     ("(sqr (* ?a ?b))", "(* (sqr ?a) (sqr ?b))"),
+        //     ("(sqr (/ ?a ?b))", "(/ (sqr ?a) (sqr ?b))"),
+        //     ("(sqr (+ ?a ?b))", "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
+        //     ("(sqr (- ?a ?b))", "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
+        // ];
 
-        for (l, r) in extra_rewrites {
-            let lrec: RecExpr<Math> = l.parse().unwrap();
-            let rrec: RecExpr<Math> = r.parse().unwrap();
-            if let Some(e) = Equality::new(&lrec, &rrec) {
-                synth.old_eqs.insert(e.name.clone(), e.clone());
-                synth.all_eqs.insert(e.name.clone(), e);
-            }
+        // for (l, r) in extra_rewrites {
+        //     let lrec: RecExpr<Math> = l.parse().unwrap();
+        //     let rrec: RecExpr<Math> = r.parse().unwrap();
+        //     if let Some(e) = Equality::new(&lrec, &rrec) {
+        //         synth.old_eqs.insert(e.name.clone(), e.clone());
+        //         synth.all_eqs.insert(e.name.clone(), e);
+        //     }
 
-            if let Some(e) = Equality::new(&rrec, &lrec) {
-                synth.old_eqs.insert(e.name.clone(), e.clone());
-                synth.all_eqs.insert(e.name.clone(), e);
-            }
-        }
+        //     if let Some(e) = Equality::new(&rrec, &lrec) {
+        //         synth.old_eqs.insert(e.name.clone(), e.clone());
+        //         synth.all_eqs.insert(e.name.clone(), e);
+        //     }
+        // }
 
         synth.egraph = egraph;
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
+        let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let mut to_add = vec![];
 
         // disabled operators (TODO: validate input)
@@ -293,23 +307,23 @@ impl SynthLanguage for Math {
         };
 
         // predicate if disabled
-        let allowedp = |s| !disabled_ops.iter().any(|x| x.eq(&s));
+        let allowedp = |s: &str| !disabled_ops.iter().any(|x| x.eq(&s));
 
-        // predicate for enumerable
-        let enumerable = |n: &Math| {
-            matches!(
-                n,
-                Math::Sin(_)
-                    | Math::Cos(_)
-                    | Math::Neg(_)
-                    | Math::Add(_)
-                    | Math::Sub(_)
-                    | Math::Mul(_)
-                    | Math::Div(_)
-                    | Math::Sqr(_)
-                    | Math::RealConst(_)
-                    | Math::Var(_)
-            )
+        // predicate for enumerating arithmetic ops
+        let arithmetic = |ns: &Vec<Math>| {
+            ns.iter().all(|n| {
+                matches!(
+                    n,
+                    Math::Neg(_)
+                        | Math::Add(_)
+                        | Math::Sub(_)
+                        | Math::Mul(_)
+                        | Math::Div(_)
+                        | Math::Sqr(_)
+                        | Math::RealConst(_)
+                        | Math::Var(_)
+                )
+            })
         };
 
         // maps ids to n_ops
@@ -320,11 +334,9 @@ impl SynthLanguage for Math {
 
         for i in synth.ids() {
             for j in synth.ids() {
-                if (ids[&i] + ids[&j] + 1 != iter)
+                if ids[&i] + ids[&j] + 1 != iter
                     || !synth.egraph[i].data.is_allowed
                     || !synth.egraph[j].data.is_allowed
-                    || !synth.egraph[i].nodes.iter().all(enumerable)
-                    || !synth.egraph[j].nodes.iter().all(enumerable)
                 {
                     continue;
                 }
@@ -337,29 +349,29 @@ impl SynthLanguage for Math {
                     continue;
                 };
 
-                if allowedp("+") {
-                    to_add.push(Math::Add([i, j]));
+                if iter <= 2
+                    || (trig_node(&synth.egraph[i].nodes, &synth.egraph)
+                        && trig_node(&synth.egraph[j].nodes, &synth.egraph))
+                {
+                    if allowedp("+") {
+                        to_add.push(Math::Add([i, j]));
+                    }
+
+                    if allowedp("-") {
+                        to_add.push(Math::Sub([i, j]));
+                    }
                 }
 
-                // if allowedp("-") {
-                //     to_add.push(Math::Sub([i, j]));
-                // }
-
-                // if iter <= 1 {
-                //     if allowedp("*") {
-                //         to_add.push(Math::Mul([i, j]));
-                //     }
-                // }
+                if iter <= 2 && allowedp("*") {
+                    to_add.push(Math::Mul([i, j]));
+                }
 
                 // if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
                 //     to_add.push(Math::RDiv([i, j]));
                 // }
             }
 
-            if ids[&i] + 1 != iter
-                || synth.egraph[i].data.exact
-                || !synth.egraph[i].data.is_allowed
-                || !synth.egraph[i].nodes.iter().all(enumerable)
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
             {
                 continue;
             }
@@ -368,14 +380,18 @@ impl SynthLanguage for Math {
                 if allowedp("~") {
                     to_add.push(Math::Neg(i));
                 }
+
                 if allowedp("sqr") {
                     to_add.push(Math::Sqr(i));
                 }
-                if allowedp("sin") {
-                    to_add.push(Math::Sin(i));
-                }
-                if allowedp("cos") {
-                    to_add.push(Math::Cos(i));
+
+                if arithmetic(&synth.egraph[i].nodes) {
+                    if allowedp("sin") {
+                        to_add.push(Math::Sin(i));
+                    }
+                    if allowedp("cos") {
+                        to_add.push(Math::Cos(i));
+                    }
                 }
             }
         }
