@@ -22,6 +22,13 @@ use z3::*;
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Sign {
+    Positive,
+    ContainsZero,
+    Negative,
+}
+
 define_language! {
     /// Define the operators for the domain.
     pub enum Math {
@@ -47,14 +54,41 @@ fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
     }
 }
 
-fn neg(interval: Interval<Constant>) -> Interval<Constant> {
-    Interval {
-        low: interval.high.map(|x| -x),
-        high: interval.low.map(|x| -x),
+fn sign(interval: &Interval<Constant>) -> Sign {
+    match (&interval.low, &interval.high) {
+        (None, None) => Sign::ContainsZero,
+        (Some(a), None) => {
+            if a.is_positive() {
+                Sign::Positive
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (None, Some(b)) => {
+            if b.is_negative() {
+                Sign::Negative
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (Some(a), Some(b)) => {
+            if a.is_positive() && b.is_positive() {
+                Sign::Positive
+            } else if a.is_negative() && b.is_negative() {
+                Sign::Negative
+            } else {
+                Sign::ContainsZero
+            }
+        }
     }
 }
 
+fn neg(interval: Interval<Constant>) -> Interval<Constant> {
+    Interval::new(interval.high.map(|x| -x), interval.low.map(|x| -x))
+}
+
 fn abs(interval: Interval<Constant>) -> Interval<Constant> {
+    let sign = sign(&interval);
     let zero = Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap());
 
     let new_min = match (interval.low.clone(), interval.high.clone()) {
@@ -62,7 +96,7 @@ fn abs(interval: Interval<Constant>) -> Interval<Constant> {
         (Some(a), None) => a.max(zero).abs(),
         (None, Some(b)) => b.min(zero).abs(),
         (Some(a), Some(b)) => {
-            if a.le(&zero) && b.ge(&zero) {
+            if let Sign::ContainsZero = sign {
                 zero
             } else {
                 a.abs().min(b.abs())
@@ -74,19 +108,13 @@ fn abs(interval: Interval<Constant>) -> Interval<Constant> {
         (Some(a), Some(b)) => Some(a.abs().max(b.abs())),
         _ => None,
     };
-    Interval {
-        low: Some(new_min),
-        high: new_max,
-    }
+    Interval::new(Some(new_min), new_max)
 }
 
 fn add(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
     let new_min = a.low.zip(b.low).map(|(x, y)| x + y);
     let new_max = a.high.zip(b.high).map(|(x, y)| x + y);
-    Interval {
-        low: new_min,
-        high: new_max,
-    }
+    Interval::new(new_min, new_max)
 }
 
 impl SynthLanguage for Math {
@@ -137,10 +165,7 @@ impl SynthLanguage for Math {
 
     fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
         match self {
-            Math::Num(n) => Interval {
-                low: Some(n.clone()),
-                high: Some(n.clone()),
-            },
+            Math::Num(n) => Interval::new(Some(n.clone()), Some(n.clone())),
             Math::Var(_) => Interval::default(),
             Math::Neg(a) => neg(egraph[*a].data.interval.clone()),
             Math::Abs(a) => abs(egraph[*a].data.interval.clone()),
@@ -486,10 +511,19 @@ mod test {
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
-        Interval {
-            low: low.map(i32_to_constant),
-            high: high.map(i32_to_constant),
-        }
+        Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
+    }
+
+    #[test]
+    fn sign_test() {
+        assert_eq!(sign(&interval(None, None)), Sign::ContainsZero);
+        assert_eq!(sign(&interval(None, Some(-100))), Sign::Negative);
+        assert_eq!(sign(&interval(None, Some(100))), Sign::ContainsZero);
+        assert_eq!(sign(&interval(Some(-100), None)), Sign::ContainsZero);
+        assert_eq!(sign(&interval(Some(100), None)), Sign::Positive);
+        assert_eq!(sign(&interval(Some(-100), Some(-50))), Sign::Negative);
+        assert_eq!(sign(&interval(Some(50), Some(100))), Sign::Positive);
+        assert_eq!(sign(&interval(Some(-10), Some(100))), Sign::ContainsZero);
     }
 
     #[test]
