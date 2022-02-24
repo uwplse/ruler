@@ -1480,7 +1480,6 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 } = interval
                 {
                     if a == b {
-                        println!("fold");
                         let enode = L::mk_constant(a.clone());
                         let added = egraph.add(enode);
                         egraph.union(id, added);
