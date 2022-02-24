@@ -45,9 +45,10 @@ pub fn letter(i: usize) -> &'static str {
 /// Constant folding method
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ConstantFoldMethod {
-    NoFold,       // disables constant folding
-    CvecMatching, // constant folding done by cvec matching
-    Lang,         // constant folding implemented by language
+    NoFold,           // disables constant folding
+    CvecMatching,     // constant folding done by cvec matching
+    IntervalAnalysis, // constant folding done by interval analysis
+    Lang,             // constant folding implemented by language
 }
 
 /// Validation result
@@ -1466,6 +1467,20 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                     let first = sig.cvec.iter().find_map(|x| x.as_ref());
                     if let Some(first) = first {
                         let enode = L::mk_constant(first.clone());
+                        let added = egraph.add(enode);
+                        egraph.union(id, added);
+                    }
+                }
+            }
+            ConstantFoldMethod::IntervalAnalysis => {
+                let interval = &egraph[id].data.interval;
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = interval
+                {
+                    if a == b {
+                        let enode = L::mk_constant(a.clone());
                         let added = egraph.add(enode);
                         egraph.union(id, added);
                     }
