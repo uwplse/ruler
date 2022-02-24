@@ -154,7 +154,16 @@ fn mul(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
             a.low.zip(b.low).map(mul),
         ),
 
-        (Sign::ContainsZero, Sign::ContainsZero) => Interval::new(None, None), // TODO: this can be tightened
+        (Sign::ContainsZero, Sign::ContainsZero) => {
+            let al_bh = a.low.clone().zip(b.high.clone()).map(mul);
+            let ah_bl = a.high.clone().zip(b.low.clone()).map(mul);
+            let min = al_bh.zip(ah_bl).map(|(x, y)| x.min(y));
+
+            let ah_bh = a.high.zip(b.high).map(mul);
+            let al_bl = a.low.zip(b.low).map(mul);
+            let max = ah_bh.zip(al_bl).map(|(x, y)| x.max(y));
+            Interval::new(min, max)
+        }
     }
 }
 
@@ -687,7 +696,27 @@ mod test {
         );
         assert_eq!(
             mul(interval(Some(-4), Some(6)), interval(Some(-8), Some(10))),
-            interval(None, None) // TODO: Can be tightened to (-48, 60)
+            interval(Some(-48), Some(60))
+        );
+        assert_eq!(
+            mul(interval(Some(-100), Some(50)), interval(Some(-5), Some(7))),
+            interval(Some(-700), Some(500))
+        );
+        assert_eq!(
+            mul(interval(Some(-5), Some(6)), interval(Some(-4), Some(8))),
+            interval(Some(-40), Some(48))
+        );
+        assert_eq!(
+            mul(interval(Some(-4), Some(10)), interval(Some(-8), Some(6))),
+            interval(Some(-80), Some(60))
+        );
+        assert_eq!(
+            mul(interval(None, Some(10)), interval(Some(-5), Some(15))),
+            interval(None, None)
+        );
+        assert_eq!(
+            mul(interval(Some(-4), Some(10)), interval(Some(-8), None)),
+            interval(None, None)
         );
     }
 
