@@ -331,7 +331,7 @@ impl SynthLanguage for Math {
             constant_fold: if synth.params.no_constant_fold {
                 ConstantFoldMethod::NoFold
             } else {
-                ConstantFoldMethod::CvecMatching
+                ConstantFoldMethod::IntervalAnalysis
             },
             rule_lifting: false,
         });

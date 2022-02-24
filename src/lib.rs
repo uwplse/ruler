@@ -1474,19 +1474,18 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             }
             ConstantFoldMethod::IntervalAnalysis => {
                 let interval = &egraph[id].data.interval;
-                match interval {
-                    Interval {
-                        low: Some(a),
-                        high: Some(b),
-                    } => {
-                        if a == b {
-                            let enode = L::mk_constant(a.clone());
-                            let added = egraph.add(enode);
-                            egraph.union(id, added);
-                        }
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = interval
+                {
+                    if a == b {
+                        println!("fold");
+                        let enode = L::mk_constant(a.clone());
+                        let added = egraph.add(enode);
+                        egraph.union(id, added);
                     }
-                    _ => {}
-                };
+                }
             }
             ConstantFoldMethod::Lang => {
                 if egraph[id].data.exact {
