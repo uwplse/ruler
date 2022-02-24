@@ -158,6 +158,19 @@ fn mul(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
     }
 }
 
+fn recip(interval: Interval<Constant>) -> Interval<Constant> {
+    let sign = sign(&interval);
+    if let (Some(a), Some(b)) = (interval.low, interval.high) {
+        if let Sign::ContainsZero = sign {
+            Interval::default() // TODO: Can we tighten the interval when it contains zero?
+        } else {
+            Interval::new(Some(b.recip()), Some(a.recip()))
+        }
+    } else {
+        Interval::default() // TODO: Can we tighten the interval when it contains infinity?
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = Constant;
 
@@ -222,10 +235,13 @@ impl SynthLanguage for Math {
                 egraph[*a].data.interval.clone(),
                 egraph[*b].data.interval.clone(),
             ),
+            Math::Reciprocal(a) => recip(egraph[*a].data.interval.clone()),
+            Math::Div([a, b]) => mul(
+                egraph[*a].data.interval.clone(),
+                recip(egraph[*b].data.interval.clone()),
+            ),
 
             // TODO
-            Math::Reciprocal(_a) => Interval::default(),
-            Math::Div([_a, _b]) => Interval::default(),
             Math::Pow([_a, _b]) => Interval::default(),
         }
     }
@@ -672,6 +688,31 @@ mod test {
         assert_eq!(
             mul(interval(Some(-4), Some(6)), interval(Some(-8), Some(10))),
             interval(None, None) // TODO: Can be tightened to (-48, 60)
+        );
+    }
+
+    #[test]
+    fn recip_interval_test() {
+        assert_eq!(recip(interval(None, None)), interval(None, None));
+        assert_eq!(
+            recip(interval(Some(50), Some(100))),
+            Interval::new(
+                Some(Ratio::new(1.to_bigint().unwrap(), 100.to_bigint().unwrap())),
+                Some(Ratio::new(1.to_bigint().unwrap(), 50.to_bigint().unwrap())),
+            )
+        );
+        assert_eq!(
+            recip(interval(Some(-10), Some(-5))),
+            Interval::new(
+                Some(Ratio::new(
+                    1.to_bigint().unwrap(),
+                    (-5).to_bigint().unwrap()
+                )),
+                Some(Ratio::new(
+                    1.to_bigint().unwrap(),
+                    (-10).to_bigint().unwrap()
+                )),
+            )
         );
     }
 }
