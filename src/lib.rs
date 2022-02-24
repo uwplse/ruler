@@ -1317,6 +1317,18 @@ pub struct Interval<T> {
     pub high: Option<T>, // None represents +inf
 }
 
+impl<T: Ord> Interval<T> {
+    pub fn new(low: Option<T>, high: Option<T>) -> Self {
+        if let (Some(a), Some(b)) = (&low, &high) {
+            assert!(
+                a.le(b),
+                "Invalid interval: low must be less than or equal to high"
+            );
+        }
+        Self { low, high }
+    }
+}
+
 impl<T> Default for Interval<T> {
     fn default() -> Self {
         Self {
@@ -1406,10 +1418,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
         };
-        to.interval = Interval {
-            low: new_min.cloned(),
-            high: new_max.cloned(),
-        };
+        to.interval = Interval::new(new_min.cloned(), new_max.cloned());
 
         // conservatively just say that b changed
         DidMerge(merge_a, true)
