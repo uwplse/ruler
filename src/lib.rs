@@ -1321,7 +1321,7 @@ impl<T: Ord> Interval<T> {
     pub fn new(low: Option<T>, high: Option<T>) -> Self {
         if let (Some(a), Some(b)) = (&low, &high) {
             assert!(
-                a.le(&b),
+                a.le(b),
                 "Invalid interval: low must be less than or equal to high"
             );
         }
