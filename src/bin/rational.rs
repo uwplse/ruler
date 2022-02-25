@@ -22,6 +22,13 @@ use z3::*;
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Sign {
+    Positive,
+    ContainsZero,
+    Negative,
+}
+
 define_language! {
     /// Define the operators for the domain.
     pub enum Math {
@@ -44,6 +51,132 @@ fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
         None
     } else {
         Some(Ratio::new(n.clone(), d.clone()))
+    }
+}
+
+fn sign(interval: &Interval<Constant>) -> Sign {
+    match (&interval.low, &interval.high) {
+        (None, None) => Sign::ContainsZero,
+        (Some(a), None) => {
+            if a.is_positive() {
+                Sign::Positive
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (None, Some(b)) => {
+            if b.is_negative() {
+                Sign::Negative
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (Some(a), Some(b)) => {
+            if a.is_positive() && b.is_positive() {
+                Sign::Positive
+            } else if a.is_negative() && b.is_negative() {
+                Sign::Negative
+            } else {
+                Sign::ContainsZero
+            }
+        }
+    }
+}
+
+fn neg(interval: Interval<Constant>) -> Interval<Constant> {
+    Interval::new(interval.high.map(|x| -x), interval.low.map(|x| -x))
+}
+
+fn abs(interval: Interval<Constant>) -> Interval<Constant> {
+    let sign = sign(&interval);
+    let zero = Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap());
+
+    let new_min = match (interval.low.clone(), interval.high.clone()) {
+        (None, None) => zero,
+        (Some(a), None) => a.max(zero).abs(),
+        (None, Some(b)) => b.min(zero).abs(),
+        (Some(a), Some(b)) => {
+            if let Sign::ContainsZero = sign {
+                zero
+            } else {
+                a.abs().min(b.abs())
+            }
+        }
+    };
+
+    let new_max = match (interval.low, interval.high) {
+        (Some(a), Some(b)) => Some(a.abs().max(b.abs())),
+        _ => None,
+    };
+    Interval::new(Some(new_min), new_max)
+}
+
+fn add(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
+    let new_min = a.low.zip(b.low).map(|(x, y)| x + y);
+    let new_max = a.high.zip(b.high).map(|(x, y)| x + y);
+    Interval::new(new_min, new_max)
+}
+
+fn mul(a: Interval<Constant>, b: Interval<Constant>) -> Interval<Constant> {
+    let mul = |(a, b): (Constant, Constant)| a * b;
+    let (sign_a, sign_b) = (sign(&a), sign(&b));
+
+    match (sign_a, sign_b) {
+        (Sign::Negative, Sign::Negative) => {
+            Interval::new(a.high.zip(b.high).map(mul), a.low.zip(b.low).map(mul))
+        }
+        (Sign::Positive, Sign::Positive) => {
+            Interval::new(a.low.zip(b.low).map(mul), a.high.zip(b.high).map(mul))
+        }
+
+        (Sign::Positive, Sign::Negative) => {
+            Interval::new(a.high.zip(b.low).map(mul), a.low.zip(b.high).map(mul))
+        }
+        (Sign::Negative, Sign::Positive) => {
+            Interval::new(a.low.zip(b.high).map(mul), a.high.zip(b.low).map(mul))
+        }
+
+        (Sign::Positive, Sign::ContainsZero) => Interval::new(
+            a.high.clone().zip(b.low).map(mul),
+            a.high.zip(b.high).map(mul),
+        ),
+        (Sign::ContainsZero, Sign::Positive) => Interval::new(
+            a.low.zip(b.high.clone()).map(mul),
+            a.high.zip(b.high).map(mul),
+        ),
+
+        (Sign::Negative, Sign::ContainsZero) => Interval::new(
+            a.low.clone().zip(b.high).map(mul),
+            a.low.zip(b.low).map(mul),
+        ),
+        (Sign::ContainsZero, Sign::Negative) => Interval::new(
+            a.high.zip(b.low.clone()).map(mul),
+            a.low.zip(b.low).map(mul),
+        ),
+
+        (Sign::ContainsZero, Sign::ContainsZero) => {
+            let al_bh = a.low.clone().zip(b.high.clone()).map(mul);
+            let ah_bl = a.high.clone().zip(b.low.clone()).map(mul);
+            let min = al_bh.zip(ah_bl).map(|(x, y)| x.min(y));
+
+            let ah_bh = a.high.zip(b.high).map(mul);
+            let al_bl = a.low.zip(b.low).map(mul);
+            let max = ah_bh.zip(al_bl).map(|(x, y)| x.max(y));
+            Interval::new(min, max)
+        }
+    }
+}
+
+fn recip(interval: Interval<Constant>) -> Interval<Constant> {
+    let sign = sign(&interval);
+    if let (Some(a), Some(b)) = (interval.low, interval.high) {
+        if let Sign::ContainsZero = sign {
+            Interval::default() // TODO: Can we tighten the interval when it contains zero?
+        } else {
+            Interval::new(Some(b.recip()), Some(a.recip()))
+        }
+    } else {
+        Interval::default() // TODO: Can we tighten the interval when it contains infinity?
     }
 }
 
@@ -90,6 +223,35 @@ impl SynthLanguage for Math {
                     Some(a.recip())
                 }
             }),
+        }
+    }
+
+    fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+        match self {
+            Math::Num(n) => Interval::new(Some(n.clone()), Some(n.clone())),
+            Math::Var(_) => Interval::default(),
+            Math::Neg(a) => neg(egraph[*a].data.interval.clone()),
+            Math::Abs(a) => abs(egraph[*a].data.interval.clone()),
+            Math::Add([a, b]) => add(
+                egraph[*a].data.interval.clone(),
+                egraph[*b].data.interval.clone(),
+            ),
+            Math::Sub([a, b]) => add(
+                egraph[*a].data.interval.clone(),
+                neg(egraph[*b].data.interval.clone()),
+            ),
+            Math::Mul([a, b]) => mul(
+                egraph[*a].data.interval.clone(),
+                egraph[*b].data.interval.clone(),
+            ),
+            Math::Reciprocal(a) => recip(egraph[*a].data.interval.clone()),
+            Math::Div([a, b]) => mul(
+                egraph[*a].data.interval.clone(),
+                recip(egraph[*b].data.interval.clone()),
+            ),
+
+            // TODO
+            Math::Pow([_a, _b]) => Interval::default(),
         }
     }
 
@@ -169,7 +331,7 @@ impl SynthLanguage for Math {
             constant_fold: if synth.params.no_constant_fold {
                 ConstantFoldMethod::NoFold
             } else {
-                ConstantFoldMethod::CvecMatching
+                ConstantFoldMethod::IntervalAnalysis
             },
             rule_lifting: false,
         });
@@ -410,4 +572,176 @@ fn egg_to_z3<'a>(
 /// Entry point
 fn main() {
     Math::main()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
+        let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
+        Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
+    }
+
+    #[test]
+    fn sign_test() {
+        assert_eq!(sign(&interval(None, None)), Sign::ContainsZero);
+        assert_eq!(sign(&interval(None, Some(-100))), Sign::Negative);
+        assert_eq!(sign(&interval(None, Some(100))), Sign::ContainsZero);
+        assert_eq!(sign(&interval(Some(-100), None)), Sign::ContainsZero);
+        assert_eq!(sign(&interval(Some(100), None)), Sign::Positive);
+        assert_eq!(sign(&interval(Some(-100), Some(-50))), Sign::Negative);
+        assert_eq!(sign(&interval(Some(50), Some(100))), Sign::Positive);
+        assert_eq!(sign(&interval(Some(-10), Some(100))), Sign::ContainsZero);
+    }
+
+    #[test]
+    fn abs_interval_test() {
+        assert_eq!(abs(interval(None, None)), interval(Some(0), None));
+        assert_eq!(
+            abs(interval(Some(-4), Some(10))),
+            interval(Some(0), Some(10))
+        );
+        assert_eq!(
+            abs(interval(Some(5), Some(10))),
+            interval(Some(5), Some(10))
+        );
+        assert_eq!(
+            abs(interval(Some(-10), Some(-1))),
+            interval(Some(1), Some(10))
+        );
+        assert_eq!(abs(interval(None, Some(2))), interval(Some(0), None));
+        assert_eq!(abs(interval(None, Some(-4))), interval(Some(4), None));
+        assert_eq!(abs(interval(Some(-1), None)), interval(Some(0), None));
+        assert_eq!(abs(interval(Some(1), None)), interval(Some(1), None));
+    }
+
+    #[test]
+    fn neg_interval_test() {
+        assert_eq!(neg(interval(None, None)), interval(None, None));
+        assert_eq!(neg(interval(Some(10), None)), interval(None, Some(-10)));
+        assert_eq!(neg(interval(Some(-10), None)), interval(None, Some(10)));
+        assert_eq!(neg(interval(None, Some(10))), interval(Some(-10), None));
+        assert_eq!(neg(interval(None, Some(-10))), interval(Some(10), None));
+        assert_eq!(
+            neg(interval(Some(5), Some(10))),
+            interval(Some(-10), Some(-5))
+        );
+    }
+
+    #[test]
+    fn add_interval_test() {
+        assert_eq!(
+            add(interval(None, None), interval(None, None)),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(interval(None, None), interval(Some(-10), Some(10))),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(interval(Some(-10), Some(10)), interval(None, None)),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(interval(Some(-20), Some(5)), interval(Some(-10), Some(10))),
+            interval(Some(-30), Some(15))
+        );
+    }
+
+    #[test]
+    fn mul_interval_test() {
+        assert_eq!(
+            mul(interval(None, Some(-3)), interval(None, Some(-4))),
+            interval(Some(12), None)
+        );
+        assert_eq!(
+            mul(
+                interval(Some(-100), Some(-2)),
+                interval(Some(-50), Some(-20))
+            ),
+            interval(Some(40), Some(5000))
+        );
+        assert_eq!(
+            mul(interval(Some(2), None), interval(Some(50), None)),
+            interval(Some(100), None)
+        );
+        assert_eq!(
+            mul(interval(Some(30), Some(50)), interval(Some(2), Some(3))),
+            interval(Some(60), Some(150))
+        );
+        assert_eq!(
+            mul(interval(Some(-10), Some(-5)), interval(Some(6), Some(100))),
+            interval(Some(-1000), Some(-30))
+        );
+        assert_eq!(
+            mul(interval(Some(3), Some(10)), interval(None, Some(-1))),
+            interval(None, Some(-3))
+        );
+        assert_eq!(
+            mul(interval(Some(2), Some(5)), interval(Some(-3), Some(4))),
+            interval(Some(-15), Some(20))
+        );
+        assert_eq!(
+            mul(interval(Some(-2), None), interval(Some(3), Some(4))),
+            interval(Some(-8), None)
+        );
+        assert_eq!(
+            mul(interval(None, None), interval(Some(-10), Some(-4))),
+            interval(None, None)
+        );
+        assert_eq!(
+            mul(interval(Some(-8), Some(6)), interval(Some(-3), Some(-2))),
+            interval(Some(-18), Some(24))
+        );
+        assert_eq!(
+            mul(interval(Some(-4), Some(6)), interval(Some(-8), Some(10))),
+            interval(Some(-48), Some(60))
+        );
+        assert_eq!(
+            mul(interval(Some(-100), Some(50)), interval(Some(-5), Some(7))),
+            interval(Some(-700), Some(500))
+        );
+        assert_eq!(
+            mul(interval(Some(-5), Some(6)), interval(Some(-4), Some(8))),
+            interval(Some(-40), Some(48))
+        );
+        assert_eq!(
+            mul(interval(Some(-4), Some(10)), interval(Some(-8), Some(6))),
+            interval(Some(-80), Some(60))
+        );
+        assert_eq!(
+            mul(interval(None, Some(10)), interval(Some(-5), Some(15))),
+            interval(None, None)
+        );
+        assert_eq!(
+            mul(interval(Some(-4), Some(10)), interval(Some(-8), None)),
+            interval(None, None)
+        );
+    }
+
+    #[test]
+    fn recip_interval_test() {
+        assert_eq!(recip(interval(None, None)), interval(None, None));
+        assert_eq!(
+            recip(interval(Some(50), Some(100))),
+            Interval::new(
+                Some(Ratio::new(1.to_bigint().unwrap(), 100.to_bigint().unwrap())),
+                Some(Ratio::new(1.to_bigint().unwrap(), 50.to_bigint().unwrap())),
+            )
+        );
+        assert_eq!(
+            recip(interval(Some(-10), Some(-5))),
+            Interval::new(
+                Some(Ratio::new(
+                    1.to_bigint().unwrap(),
+                    (-5).to_bigint().unwrap()
+                )),
+                Some(Ratio::new(
+                    1.to_bigint().unwrap(),
+                    (-10).to_bigint().unwrap()
+                )),
+            )
+        );
+    }
 }
