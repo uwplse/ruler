@@ -253,8 +253,8 @@ impl SynthLanguage for Math {
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
             // rewrite!("def-cis"; "(cis ?a)" <=> "(+ (cos ?a) (* (sin ?a) I))"),
             // rewrite!("def-neg-cis"; "(cis (~ ?a))" <=> "(- (cos ?a) (* (sin ?a) I))"),
-            rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=> "(/ (+ (+ (sqr (cis ?a)) (sqr (cis ?a))) 2) 4)"),
-            rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=> "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis ?a))) 2) 4))"),
+            rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=> "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
+            rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=> "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
             rewrite!("add-cis"; "(cis (+ ?a ?b))" <=> "(* (cis ?a) (cis ?b))"),
             vec![
@@ -381,7 +381,7 @@ impl SynthLanguage for Math {
                     to_add.push(Math::Neg(i));
                 }
 
-                if allowedp("sqr") {
+                if allowedp("sqr") && trig_node(&synth.egraph[i].nodes, &synth.egraph) {
                     to_add.push(Math::Sqr(i));
                 }
 

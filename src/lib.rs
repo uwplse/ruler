@@ -429,7 +429,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let node_limit = self.params.eqsat_node_limit;
         let scheduler = BackoffScheduler::default()
             .with_initial_match_limit(250000)
-            .with_ban_length(1);
+            .with_ban_length(0);
 
         Runner::default()
             .with_node_limit(usize::MAX)
@@ -625,30 +625,22 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // no constants (if set)
         log::info!("Made layer of {} nodes", layer.len());
         if iter > self.params.no_constants_above_iter {
-            // let constants: HashSet<Id> = if iter > self.params.ema_above_iter {
-            //     self.ids()
-            //         .filter(|id| {
-            //             let expr = &self.egraph[*id].data.simplest;
-            //             expr.as_ref().iter().any(|n| n.is_constant())
-            //         })
-            //         .collect()
-            // } else {
-            //     let extract = Extractor::new(&self.egraph, NumberOfOps);
-            //     self.ids()
-            //         .filter(|id| {
-            //             let (_, best) = extract.find_best(*id);
-            //             best.as_ref().iter().any(|n| n.is_constant())
-            //         })
-            //         .collect()
-            // };
-
-            let constants: HashSet<Id> = self
-                .ids()
-                .filter(|id| {
-                    let expr = &self.egraph[*id].data.simplest;
-                    expr.as_ref().iter().any(|n| n.is_constant())
-                })
-                .collect();
+            let constants: HashSet<Id> = if iter > self.params.ema_above_iter {
+                self.ids()
+                    .filter(|id| {
+                        let expr = &self.egraph[*id].data.simplest;
+                        expr.as_ref().iter().any(|n| n.is_constant())
+                    })
+                    .collect()
+            } else {
+                let extract = Extractor::new(&self.egraph, NumberOfOps);
+                self.ids()
+                    .filter(|id| {
+                        let (_, best) = extract.find_best(*id);
+                        best.as_ref().iter().any(|n| n.is_constant())
+                    })
+                    .collect()
+            };
 
             layer.retain(|n| n.all(|id| !constants.contains(&id)));
         }
