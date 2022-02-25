@@ -1410,16 +1410,22 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         }
 
         // // New interval is max of mins, min of maxes
-        let new_min = match (to.interval.low.as_ref(), from.interval.low.as_ref()) {
-            (Some(a), Some(b)) => Some(a.max(b)),
-            (a, b) => a.or(b),
-        };
-
-        let new_max = match (to.interval.high.as_ref(), from.interval.high.as_ref()) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (a, b) => a.or(b),
-        };
-        to.interval = Interval::new(new_min.cloned(), new_max.cloned());
+        let new_interval = Interval::new(
+            match (to.interval.low.as_ref(), from.interval.low.as_ref()) {
+                (Some(a), Some(b)) => Some(a.max(b)),
+                (a, b) => a.or(b),
+            }
+            .cloned(),
+            match (to.interval.high.as_ref(), from.interval.high.as_ref()) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            }
+            .cloned(),
+        );
+        if to.interval != new_interval {
+            to.interval = new_interval;
+            merge_a = true;
+        }
 
         // conservatively just say that b changed
         DidMerge(merge_a, true)
