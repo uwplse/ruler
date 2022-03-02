@@ -157,6 +157,7 @@ define_language! {
 
         // constants
         "I" = Imag,
+        "PI" = Pi,
         RealConst(Real),
         Var(Variable),
     }
@@ -214,6 +215,7 @@ impl SynthLanguage for Math {
                 | Math::Div(_)
                 | Math::RealConst(_)
                 | Math::Var(_)
+                | Math::Pi
         )
     }
 
@@ -239,13 +241,21 @@ impl SynthLanguage for Math {
         egraph.add(Math::RealConst(Real::from("0")));
         egraph.add(Math::RealConst(Real::from("1")));
 
-        // important expressions
+        // constant values of cosine and sine
         egraph.add_expr(&"(cos 0)".parse().unwrap());
         egraph.add_expr(&"(sin 0)".parse().unwrap());
-        // egraph.add_expr(&"(+ (sqr (sin a)) (sqr (cos a)))".parse().unwrap());
-        // egraph.add_expr(&"(- (sqr (cos a)) (sqr (sin a)))".parse().unwrap());
-        // // egraph.add_expr(&"(cos (* 2 a))".parse().unwrap());
-        // egraph.add_expr(&"(sin (* 2 a))".parse().unwrap());
+        egraph.add_expr(&"(cos (/ PI 6))".parse().unwrap());
+        egraph.add_expr(&"(sin (/ PI 6))".parse().unwrap());
+        egraph.add_expr(&"(cos (/ PI 4))".parse().unwrap());
+        egraph.add_expr(&"(sin (/ PI 4))".parse().unwrap());
+        egraph.add_expr(&"(cos (/ PI 3))".parse().unwrap());
+        egraph.add_expr(&"(sin (/ PI 3))".parse().unwrap());
+        egraph.add_expr(&"(cos (/ PI 2))".parse().unwrap());
+        egraph.add_expr(&"(sin (/ PI 2))".parse().unwrap());
+        egraph.add_expr(&"(cos PI)".parse().unwrap());
+        egraph.add_expr(&"(sin PI)".parse().unwrap());
+        egraph.add_expr(&"(cos (* 2 PI))".parse().unwrap());
+        egraph.add_expr(&"(sin (* 2 PI))".parse().unwrap());
 
         // rewrites
         synth.lifting_rewrites = vec![
@@ -256,41 +266,38 @@ impl SynthLanguage for Math {
             rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=> "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
             rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=> "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-            rewrite!("add-cis"; "(cis (+ ?a ?b))" <=> "(* (cis ?a) (cis ?b))"),
+            // rewrite!("def-inv-cis"; "(cis (~ ?a))" <=> "(/ 1 (cis ?a))"),
             vec![
-                // rewrite!("distr-sqr-mul"; "(sqr (* ?a ?b))" => "(* (sqr ?a) (sqr ?b))"),
-                // rewrite!("distr-sqr-div"; "(sqr (/ ?a ?b))" => "(/ (sqr ?a) (sqr ?b))"),
-                // rewrite!("foil-add"; "(sqr (+ ?a ?b))" => "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
-                // rewrite!("foil-sub"; "(sqr (- ?a ?b))" => "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
-                // rewrite!("mul-complex"; "(* (* ?a I) (* ?b I))" => "(~ (* ?a ?b))"),
-                // rewrite!("def-inv-cis"; "(cis (~ ?a))" => "(/ 1 (cis ?a))"),
+                rewrite!("add-cis"; "(cis (+ ?a ?b))" => "(* (cis ?a) (cis ?b))"),
+                rewrite!("sub-cis"; "(cis (- ?a ?b))" => "(* (cis ?a) (cis (~ ?b)))"),
                 rewrite!("cancel-cis"; "(* (cis ?a) (cis (~ ?a)))" => "1"),
                 rewrite!("square-i"; "(* I I)" => "-1"),
                 rewrite!("cis-0"; "(cis 0)" => "1"),
+                rewrite!("cis-pi"; "(cis (/ PI 2))" => "I"),
             ],
         ]
         .concat();
 
-        // let extra_rewrites = vec![
-        //     ("(sqr (* ?a ?b))", "(* (sqr ?a) (sqr ?b))"),
-        //     ("(sqr (/ ?a ?b))", "(/ (sqr ?a) (sqr ?b))"),
-        //     ("(sqr (+ ?a ?b))", "(+ (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
-        //     ("(sqr (- ?a ?b))", "(- (+ (sqr ?a) (sqr ?b)) (* 2 (* ?a ?b)))"),
-        // ];
+        let extra_rewrites = vec![
+            ("(* (cis ?a) (cis ?b))", "(cis (+ ?a ?b))", false),
+            ("(* (cis ?a) (cis (~ ?b)))", "(cis (- ?a ?b))", false),
+        ];
 
-        // for (l, r) in extra_rewrites {
-        //     let lrec: RecExpr<Math> = l.parse().unwrap();
-        //     let rrec: RecExpr<Math> = r.parse().unwrap();
-        //     if let Some(e) = Equality::new(&lrec, &rrec) {
-        //         synth.old_eqs.insert(e.name.clone(), e.clone());
-        //         synth.all_eqs.insert(e.name.clone(), e);
-        //     }
+        for (l, r, bi) in extra_rewrites {
+            let lrec: RecExpr<Math> = l.parse().unwrap();
+            let rrec: RecExpr<Math> = r.parse().unwrap();
+            if let Some(e) = Equality::new(&lrec, &rrec) {
+                synth.old_eqs.insert(e.name.clone(), e.clone());
+                synth.all_eqs.insert(e.name.clone(), e);
+            }
 
-        //     if let Some(e) = Equality::new(&rrec, &lrec) {
-        //         synth.old_eqs.insert(e.name.clone(), e.clone());
-        //         synth.all_eqs.insert(e.name.clone(), e);
-        //     }
-        // }
+            if bi {
+                if let Some(e) = Equality::new(&rrec, &lrec) {
+                    synth.old_eqs.insert(e.name.clone(), e.clone());
+                    synth.all_eqs.insert(e.name.clone(), e);
+                }
+            }
+        }
 
         synth.egraph = egraph;
     }
@@ -298,6 +305,10 @@ impl SynthLanguage for Math {
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
         let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let mut to_add = vec![];
+
+        if iter == 3 || iter == 4 || iter == 6 {
+            return vec![];
+        }
 
         // disabled operators (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
@@ -310,7 +321,7 @@ impl SynthLanguage for Math {
         let allowedp = |s: &str| !disabled_ops.iter().any(|x| x.eq(&s));
 
         // predicate for enumerating arithmetic ops
-        let arithmetic = |ns: &Vec<Math>| {
+        let arithmetic = |ns: &Vec<Self>| {
             ns.iter().all(|n| {
                 matches!(
                     n,
@@ -349,7 +360,7 @@ impl SynthLanguage for Math {
                     continue;
                 };
 
-                if iter <= 2
+                if iter <= 1
                     || (trig_node(&synth.egraph[i].nodes, &synth.egraph)
                         && trig_node(&synth.egraph[j].nodes, &synth.egraph))
                 {
@@ -360,15 +371,11 @@ impl SynthLanguage for Math {
                     if allowedp("-") {
                         to_add.push(Math::Sub([i, j]));
                     }
-                }
 
-                if iter <= 2 && allowedp("*") {
-                    to_add.push(Math::Mul([i, j]));
+                    if allowedp("*") {
+                        to_add.push(Math::Mul([i, j]));
+                    }
                 }
-
-                // if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
-                //     to_add.push(Math::RDiv([i, j]));
-                // }
             }
 
             if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
@@ -377,14 +384,6 @@ impl SynthLanguage for Math {
             }
 
             if iter <= 2 {
-                if allowedp("~") {
-                    to_add.push(Math::Neg(i));
-                }
-
-                if allowedp("sqr") && trig_node(&synth.egraph[i].nodes, &synth.egraph) {
-                    to_add.push(Math::Sqr(i));
-                }
-
                 if arithmetic(&synth.egraph[i].nodes) {
                     if allowedp("sin") {
                         to_add.push(Math::Sin(i));
@@ -392,6 +391,16 @@ impl SynthLanguage for Math {
                     if allowedp("cos") {
                         to_add.push(Math::Cos(i));
                     }
+                }
+            }
+
+            if iter == 2 {
+                if allowedp("~") && trig_node(&synth.egraph[i].nodes, &synth.egraph) {
+                    to_add.push(Math::Neg(i));
+                }
+
+                if allowedp("sqr") && trig_node(&synth.egraph[i].nodes, &synth.egraph) {
+                    to_add.push(Math::Sqr(i));
                 }
             }
         }
@@ -415,7 +424,16 @@ impl SynthLanguage for Math {
             })
         };
 
-        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
+        let contains_trig_node = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().any(|n|
+                matches!(n, ENodeOrVar::ENode(Math::Sin(_)) | ENodeOrVar::ENode(Math::Cos(_)))
+            )
+        };
+
+        ValidationResult::from(
+            (valid_pattern(lhs) && valid_pattern(rhs)) &&
+            (contains_trig_node(lhs) || contains_trig_node(rhs))
+        )
     }
 
     fn is_valid_rewrite(

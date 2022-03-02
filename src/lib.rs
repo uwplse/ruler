@@ -433,7 +433,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     ) -> Runner<L, SynthAnalysis, ()> {
         let node_limit = self.params.eqsat_node_limit;
         let scheduler = BackoffScheduler::default()
-            .with_initial_match_limit(250000)
+            .with_initial_match_limit(1_000_000)
             .with_ban_length(0);
 
         Runner::default()
@@ -894,9 +894,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // so extract potential candidates for
         // every union.
         log::info!("running lifting rules");
-        let runner = self
-            .mk_cvec_less_runner(self.egraph.clone())
-            .with_iter_limit(self.params.eqsat_iter_limit + 1); // increase iter limit by 1 to ensure saturation
+        let runner = self.mk_cvec_less_runner(self.egraph.clone());
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self.lifting_rewrites.iter().collect();
         let (new_egraph, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
 
@@ -976,8 +974,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
 
         self.egraph.rebuild();
-
         new_candidate_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
+
         let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
         log::info!("Time taken in... run_rewrites: {}", run_rewrites);
         log::info!("Found {} candidates", new_candidate_eqs.len());
