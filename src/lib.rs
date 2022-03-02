@@ -1058,7 +1058,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         n_eqs.sort_by_key(|eq| eq.score());
         n_eqs.reverse();
         let num_olds = self.old_eqs.len();
-        let o_eqs: Vec<_> = self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
         for eq in &n_eqs {
             println!("  {:?}   {}", eq.score(), eq);
         }
@@ -1070,9 +1069,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
             params: self.params,
             time,
             num_rules,
-            all_eqs: eqs,
+            /* Needed so that doubly lifted rule inference doesn't have parsing issues.
+            Caveat: can't see all old and new rules in `all_eqs`.
+            */
+            all_eqs: n_eqs.clone(),
             new_eqs: n_eqs,
-            old_eqs: o_eqs,
+            /* Needed so that doubly lifted rule inference doesn't have parsing issues.
+            Caveat: can't see the rules used for learning the lifted domain.
+            */
+            old_eqs: vec![],
             smt_unknown: self.smt_unknown,
         }
     }
