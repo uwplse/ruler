@@ -231,9 +231,16 @@ impl SynthLanguage for Math {
         )
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>) {
+    fn init_synth(synth: &mut Synthesizer<Self>, workload: Vec<RecExpr<Self>>) {
         // disabled operators (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
+            s.split(' ').collect()
+        } else {
+            vec![]
+        };
+
+        // disabled constants (TODO: validate input)
+        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
             s.split(' ').collect()
         } else {
             vec![]
@@ -343,6 +350,10 @@ impl SynthLanguage for Math {
                     synth.all_eqs.insert(e.name.clone(), e);
                 }
             }
+        }
+
+        for expr in workload {
+            synth.egraph.add_expr(expr);
         }
 
         synth.egraph = egraph;

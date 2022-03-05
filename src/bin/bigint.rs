@@ -74,7 +74,7 @@ impl SynthLanguage for Math {
         Math::Num(c)
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>) {
+    fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
         // this is for adding to the egraph, not used for cvec.
         // let constants: Vec<Constant> = vec![];
         // let constants: Vec<Constant> = ["0"]

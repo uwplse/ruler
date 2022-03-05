@@ -100,7 +100,7 @@ impl SynthLanguage for Math {
         )
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>) {
+    fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
             constant_fold: if synth.params.no_constant_fold {

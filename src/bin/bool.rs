@@ -144,7 +144,7 @@ impl SynthLanguage for Math {
         Math::Lit(c)
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>) {
+    fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
         // let consts: Vec<Option<bool>> = vec![];
         let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
 
@@ -253,6 +253,7 @@ mod test {
             use_smt: false,
             do_final_run: true,
             prior_rules: None,
+            workload: None,
         }
     }
 

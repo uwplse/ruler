@@ -280,7 +280,7 @@ impl SynthLanguage for Math {
     }
 
     /// Initialize an egraph with some constants and variables.
-    fn init_synth(synth: &mut Synthesizer<Self>) {
+    fn init_synth(synth: &mut Synthesizer<Self>, workload: Vec<RecExpr<Self>>) {
         // disabled constants (TODO: validate input)
         let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
             s.split(' ').collect()
@@ -344,6 +344,10 @@ impl SynthLanguage for Math {
 
         for n in &constants {
             egraph.add(Math::Num(n.clone()));
+        }
+
+        for t in workload {
+            egraph.add_expr(&t);
         }
 
         synth.egraph = egraph;
