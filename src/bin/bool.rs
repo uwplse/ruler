@@ -49,6 +49,77 @@ impl SynthLanguage for Math {
         }
     }
 
+    fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+        let mut interval = Interval::default();
+        match self {
+            Math::Lit(n) => interval = Interval::new(Some(*n), Some(*n)),
+            Math::Var(_) => interval = Interval::new(Some(false), Some(true)),
+            Math::Not(x) => {
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = egraph[*x].data.interval.clone()
+                {
+                    interval = Interval::new(Some(!b), Some(!a))
+                }
+            }
+            Math::And([x, y]) => {
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = egraph[*x].data.interval.clone()
+                {
+                    if let Interval {
+                        low: Some(c),
+                        high: Some(d),
+                    } = egraph[*y].data.interval.clone()
+                    {
+                        interval = Interval::new(Some(a && c), Some(b && d))
+                    }
+                }
+            }
+            Math::Or([x, y]) => {
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = egraph[*x].data.interval.clone()
+                {
+                    if let Interval {
+                        low: Some(c),
+                        high: Some(d),
+                    } = egraph[*y].data.interval.clone()
+                    {
+                        interval = Interval::new(Some(a || c), Some(b || d))
+                    }
+                }
+            }
+            Math::Xor([x, y]) => {
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = egraph[*x].data.interval.clone()
+                {
+                    if let Interval {
+                        low: Some(c),
+                        high: Some(d),
+                    } = egraph[*y].data.interval.clone()
+                    {
+                        if a == b && c == d {
+                            interval = Interval::new(Some(b != c), Some(b != c))
+                        } else {
+                            interval = Interval::new(Some(false), Some(true))
+                        }
+                    }
+                }
+            }
+        };
+        if interval.low == None || interval.high == None {
+            panic!("There shouldn't be infinite intervals for bool.");
+        } else {
+            interval
+        }
+    }
+
     fn to_var(&self) -> Option<Symbol> {
         if let Math::Var(sym) = self {
             Some(*sym)
@@ -85,7 +156,7 @@ impl SynthLanguage for Math {
             constant_fold: if synth.params.no_constant_fold {
                 ConstantFoldMethod::NoFold
             } else {
-                ConstantFoldMethod::CvecMatching
+                ConstantFoldMethod::IntervalAnalysis
             },
             rule_lifting: false,
         });

@@ -59,9 +59,10 @@ pub fn get_terms_from_workload<L: SynthLanguage>(fnm: String) -> Vec<RecExpr<L>>
 /// Constant folding method
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ConstantFoldMethod {
-    NoFold,       // disables constant folding
-    CvecMatching, // constant folding done by cvec matching
-    Lang,         // constant folding implemented by language
+    NoFold,           // disables constant folding
+    CvecMatching,     // constant folding done by cvec matching
+    IntervalAnalysis, // constant folding done by interval analysis
+    Lang,             // constant folding implemented by language
 }
 
 /// Validation result
@@ -108,7 +109,7 @@ impl Default for SynthAnalysis {
 /// `eval` implements an interpreter for the domain. It returns a `Cvec` of length `cvec_len`
 /// where each cvec element is computed using `eval`.
 pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
-    type Constant: Clone + Hash + Eq + Debug + Display;
+    type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
     where
@@ -241,6 +242,10 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
             -n_ops,
             // 0
         ]
+    }
+
+    fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+        Interval::default()
     }
 
     /// Initialize an egraph with variables and interesting constants from the domain.
@@ -1332,6 +1337,33 @@ macro_rules! map {
     };
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Interval<T> {
+    pub low: Option<T>,  // None represents -inf
+    pub high: Option<T>, // None represents +inf
+}
+
+impl<T: Ord> Interval<T> {
+    pub fn new(low: Option<T>, high: Option<T>) -> Self {
+        if let (Some(a), Some(b)) = (&low, &high) {
+            assert!(
+                a.le(b),
+                "Invalid interval: low must be less than or equal to high"
+            );
+        }
+        Self { low, high }
+    }
+}
+
+impl<T> Default for Interval<T> {
+    fn default() -> Self {
+        Self {
+            low: None,
+            high: None,
+        }
+    }
+}
+
 /// The Signature represents eclass analysis data.
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
@@ -1340,6 +1372,7 @@ pub struct Signature<L: SynthLanguage> {
     pub exact: bool,
     pub is_allowed: bool,
     pub is_extractable: bool,
+    pub interval: Interval<L::Constant>,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -1401,6 +1434,24 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             merge_a = true;
         }
 
+        // // New interval is max of mins, min of maxes
+        let new_interval = Interval::new(
+            match (to.interval.low.as_ref(), from.interval.low.as_ref()) {
+                (Some(a), Some(b)) => Some(a.max(b)),
+                (a, b) => a.or(b),
+            }
+            .cloned(),
+            match (to.interval.high.as_ref(), from.interval.high.as_ref()) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            }
+            .cloned(),
+        );
+        if to.interval != new_interval {
+            to.interval = new_interval;
+            merge_a = true;
+        }
+
         // conservatively just say that b changed
         DidMerge(merge_a, true)
     }
@@ -1435,6 +1486,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
             is_allowed: enode.is_allowed(),
             is_extractable: enode.is_extractable(),
+            interval: enode.mk_interval(egraph),
         }
     }
 
@@ -1446,6 +1498,20 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                     let first = sig.cvec.iter().find_map(|x| x.as_ref());
                     if let Some(first) = first {
                         let enode = L::mk_constant(first.clone());
+                        let added = egraph.add(enode);
+                        egraph.union(id, added);
+                    }
+                }
+            }
+            ConstantFoldMethod::IntervalAnalysis => {
+                let interval = &egraph[id].data.interval;
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = interval
+                {
+                    if a == b {
+                        let enode = L::mk_constant(a.clone());
                         let added = egraph.add(enode);
                         egraph.union(id, added);
                     }
