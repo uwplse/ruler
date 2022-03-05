@@ -145,6 +145,7 @@ define_language! {
         // trig operators
         "sin" = Sin(Id),
         "cos" = Cos(Id),
+        "tan" = Tan(Id),
         "cis" = Cis(Id),
 
         // arithmetic operators
@@ -203,23 +204,44 @@ impl SynthLanguage for Math {
         matches!(self, Math::RealConst(_))
     }
 
+    fn is_allowed(&self) -> bool {
+        matches!(
+            self,
+            Math::Sin(_)
+                | Math::Cos(_)
+                | Math::Tan(_)
+                | Math::Pi
+        )
+    }
+
     fn is_extractable(&self) -> bool {
         matches!(
             self,
             Math::Sin(_)
                 | Math::Cos(_)
+                | Math::Tan(_)
                 | Math::Neg(_)
                 | Math::Add(_)
                 | Math::Sub(_)
                 | Math::Mul(_)
                 | Math::Div(_)
                 | Math::RealConst(_)
-                | Math::Var(_)
                 | Math::Pi
+                | Math::Var(_)
         )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
+        // disabled operators (TODO: validate input)
+        let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
+            s.split(' ').collect()
+        } else {
+            vec![]
+        };
+
+        // predicate if disabled
+        let allowedp = |s: &str| !disabled_ops.iter().any(|x| x.eq(&s));
+
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
             constant_fold: if synth.params.no_constant_fold {
@@ -241,44 +263,68 @@ impl SynthLanguage for Math {
         egraph.add(Math::RealConst(Real::from("0")));
         egraph.add(Math::RealConst(Real::from("1")));
 
-        // constant values of cosine and sine
-        egraph.add_expr(&"(cos 0)".parse().unwrap());
-        egraph.add_expr(&"(sin 0)".parse().unwrap());
-        egraph.add_expr(&"(cos (/ PI 6))".parse().unwrap());
-        egraph.add_expr(&"(sin (/ PI 6))".parse().unwrap());
-        egraph.add_expr(&"(cos (/ PI 4))".parse().unwrap());
-        egraph.add_expr(&"(sin (/ PI 4))".parse().unwrap());
-        egraph.add_expr(&"(cos (/ PI 3))".parse().unwrap());
-        egraph.add_expr(&"(sin (/ PI 3))".parse().unwrap());
-        egraph.add_expr(&"(cos (/ PI 2))".parse().unwrap());
-        egraph.add_expr(&"(sin (/ PI 2))".parse().unwrap());
-        egraph.add_expr(&"(cos PI)".parse().unwrap());
-        egraph.add_expr(&"(sin PI)".parse().unwrap());
-        egraph.add_expr(&"(cos (* 2 PI))".parse().unwrap());
-        egraph.add_expr(&"(sin (* 2 PI))".parse().unwrap());
+        // constant values of sin, cosine, tangent
+        if allowedp("sin") {
+            egraph.add_expr(&"(sin 0)".parse().unwrap());
+            egraph.add_expr(&"(sin (/ PI 6))".parse().unwrap());
+            egraph.add_expr(&"(sin (/ PI 4))".parse().unwrap());
+            egraph.add_expr(&"(sin (/ PI 3))".parse().unwrap());
+            egraph.add_expr(&"(sin (/ PI 2))".parse().unwrap());
+            egraph.add_expr(&"(sin PI)".parse().unwrap());
+            egraph.add_expr(&"(sin (* 2 PI))".parse().unwrap());
+        }
+
+        if allowedp("cos") {
+            egraph.add_expr(&"(cos 0)".parse().unwrap());
+            egraph.add_expr(&"(cos (/ PI 6))".parse().unwrap());
+            egraph.add_expr(&"(cos (/ PI 4))".parse().unwrap());
+            egraph.add_expr(&"(cos (/ PI 3))".parse().unwrap());
+            egraph.add_expr(&"(cos (/ PI 2))".parse().unwrap());
+            egraph.add_expr(&"(cos PI)".parse().unwrap());
+            egraph.add_expr(&"(cos (* 2 PI))".parse().unwrap());
+        }
+
+        if allowedp("tan") {
+            egraph.add_expr(&"(tan 0)".parse().unwrap());
+            egraph.add_expr(&"(tan (/ PI 6))".parse().unwrap());
+            egraph.add_expr(&"(tan (/ PI 4))".parse().unwrap());
+            egraph.add_expr(&"(tan (/ PI 3))".parse().unwrap());
+            // egraph.add_expr(&"(tan (/ PI 2))".parse().unwrap());
+            egraph.add_expr(&"(tan PI)".parse().unwrap());
+            egraph.add_expr(&"(tan (* 2 PI))".parse().unwrap());
+        }
 
         // rewrites
         synth.lifting_rewrites = vec![
             rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
-            // rewrite!("def-cis"; "(cis ?a)" <=> "(+ (cos ?a) (* (sin ?a) I))"),
-            // rewrite!("def-neg-cis"; "(cis (~ ?a))" <=> "(- (cos ?a) (* (sin ?a) I))"),
+            rewrite!("def-tan"; "(tan ?a)" <=> "(* i (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"),
+            rewrite!("def-tan2"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
             rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=> "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
             rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=> "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-            // rewrite!("def-inv-cis"; "(cis (~ ?a))" <=> "(/ 1 (cis ?a))"),
             vec![
+                // constant folding for PI
+                rewrite!("add-pi"; "(+ PI PI)" => "(* 2 PI)"),
+
+                // constant folding for cis
+                rewrite!("cis-0"; "(cis 0)" => "1"),
+                rewrite!("cis-pi"; "(cis (/ PI 2))" => "I"),
+
+                // cis identities
+                // rewrite!("inv-cis"; "(cis (~ ?a))" => "(/ 1 (cis ?a))"),
                 rewrite!("add-cis"; "(cis (+ ?a ?b))" => "(* (cis ?a) (cis ?b))"),
                 rewrite!("sub-cis"; "(cis (- ?a ?b))" => "(* (cis ?a) (cis (~ ?b)))"),
                 rewrite!("cancel-cis"; "(* (cis ?a) (cis (~ ?a)))" => "1"),
+
+                // definition of cis
                 rewrite!("square-i"; "(* I I)" => "-1"),
-                rewrite!("cis-0"; "(cis 0)" => "1"),
-                rewrite!("cis-pi"; "(cis (/ PI 2))" => "I"),
             ],
         ]
         .concat();
 
         let extra_rewrites = vec![
+            // reverse of cis identities above
             ("(* (cis ?a) (cis ?b))", "(cis (+ ?a ?b))", false),
             ("(* (cis ?a) (cis (~ ?b)))", "(cis (- ?a ?b))", false),
         ];
@@ -306,7 +352,8 @@ impl SynthLanguage for Math {
         let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let mut to_add = vec![];
 
-        if iter == 3 || iter == 4 || iter == 6 {
+        // disabled iters
+        if iter == 4 || iter == 6 {
             return vec![];
         }
 
@@ -333,7 +380,8 @@ impl SynthLanguage for Math {
                         | Math::Sqr(_)
                         | Math::RealConst(_)
                         | Math::Var(_)
-                )
+                ) &&
+                !matches!(n, Math::Imag)
             })
         };
 
@@ -345,10 +393,7 @@ impl SynthLanguage for Math {
 
         for i in synth.ids() {
             for j in synth.ids() {
-                if ids[&i] + ids[&j] + 1 != iter
-                    || !synth.egraph[i].data.is_allowed
-                    || !synth.egraph[j].data.is_allowed
-                {
+                if ids[&i] + ids[&j] + 1 != iter {
                     continue;
                 }
 
@@ -360,9 +405,25 @@ impl SynthLanguage for Math {
                     continue;
                 };
 
-                if iter <= 1
-                    || (trig_node(&synth.egraph[i].nodes, &synth.egraph)
-                        && trig_node(&synth.egraph[j].nodes, &synth.egraph))
+                if iter <= 2 {
+                    // either both are trig or neither are trig
+                    if trig_node(&synth.egraph[i].nodes, &synth.egraph)
+                        == trig_node(&synth.egraph[j].nodes, &synth.egraph)
+                    {
+                        if allowedp("+") {
+                            to_add.push(Math::Add([i, j]));
+                        }
+
+                        if allowedp("-") {
+                            to_add.push(Math::Sub([i, j]));
+                        }
+
+                        if allowedp("*") {
+                            to_add.push(Math::Mul([i, j]));
+                        }
+                    }
+                } else if trig_node(&synth.egraph[i].nodes, &synth.egraph)
+                    && trig_node(&synth.egraph[j].nodes, &synth.egraph)
                 {
                     if allowedp("+") {
                         to_add.push(Math::Add([i, j]));
@@ -371,26 +432,24 @@ impl SynthLanguage for Math {
                     if allowedp("-") {
                         to_add.push(Math::Sub([i, j]));
                     }
-
-                    if allowedp("*") {
-                        to_add.push(Math::Mul([i, j]));
-                    }
                 }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
+            if ids[&i] + 1 != iter
+                || synth.egraph[i].data.exact
             {
                 continue;
             }
 
-            if iter <= 2 {
-                if arithmetic(&synth.egraph[i].nodes) {
-                    if allowedp("sin") {
-                        to_add.push(Math::Sin(i));
-                    }
-                    if allowedp("cos") {
-                        to_add.push(Math::Cos(i));
-                    }
+            if iter <= 2 && arithmetic(&synth.egraph[i].nodes) {
+                if allowedp("sin") {
+                    to_add.push(Math::Sin(i));
+                }
+                if allowedp("cos") {
+                    to_add.push(Math::Cos(i));
+                }
+                if allowedp("tan") {
+                    to_add.push(Math::Tan(i));
                 }
             }
 
@@ -425,14 +484,17 @@ impl SynthLanguage for Math {
         };
 
         let contains_trig_node = |pat: &Pattern<Self>| {
-            pat.ast.as_ref().iter().any(|n|
-                matches!(n, ENodeOrVar::ENode(Math::Sin(_)) | ENodeOrVar::ENode(Math::Cos(_)))
-            )
+            pat.ast.as_ref().iter().any(|n| {
+                matches!(
+                    n,
+                    ENodeOrVar::ENode(Math::Sin(_)) | ENodeOrVar::ENode(Math::Cos(_))
+                )
+            })
         };
 
         ValidationResult::from(
-            (valid_pattern(lhs) && valid_pattern(rhs)) &&
-            (contains_trig_node(lhs) || contains_trig_node(rhs))
+            (valid_pattern(lhs) && valid_pattern(rhs))
+                && (contains_trig_node(lhs) || contains_trig_node(rhs)),
         )
     }
 

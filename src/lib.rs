@@ -249,7 +249,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         true
     }
 
-    /// Returns true if the node is in an allowed node
+    /// Returns true if the node is in an allowed node.
     /// Useful for rule lifting.
     fn is_allowed(&self) -> bool {
         true
@@ -261,9 +261,9 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         true
     }
 
-    /// Returns true if every node in the recexpr is in the domain
-    fn recexpr_is_allowed(expr: &RecExpr<Self>) -> bool {
-        expr.as_ref().iter().all(|x| x.is_allowed())
+    /// Returns true if every node in the recexpr is extractable
+    fn recexpr_is_extractable(expr: &RecExpr<Self>) -> bool {
+        expr.as_ref().iter().all(|x| x.is_extractable())
     }
 
     /// Constant folding done explicitly by the language
@@ -872,8 +872,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // to not introduce new (allowed) enodes.
         log::info!("running allowed rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.new_eqs.values().flat_map(|eq| &eq.rewrites).collect();
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
+            .new_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .collect();
         let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
         for ids in found_unions.values() {
             for win in ids.windows(2) {
@@ -1375,7 +1378,6 @@ pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
     pub simplest: RecExpr<L>,
     pub exact: bool,
-    pub is_allowed: bool,
     pub is_extractable: bool,
     pub interval: Interval<L::Constant>,
 }
@@ -1393,21 +1395,12 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let mut merge_a = false;
         let cost_fn = |x: &RecExpr<L>| {
-            if self.rule_lifting && L::recexpr_is_allowed(x) {
+            if self.rule_lifting && L::recexpr_is_extractable(x) {
                 ExtractableAstSize.cost_rec(x)
             } else {
                 AstSize.cost_rec(x)
             }
         };
-
-        // do not merge high-level enode with low-level enode
-        assert_eq!(
-            to.is_allowed,
-            from.is_allowed,
-            "trying to merge allowed and forbidden eclasses: {} != {}",
-            to.simplest.pretty(100),
-            from.simplest.pretty(100)
-        );
 
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
@@ -1466,7 +1459,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         let get_simplest = |i: &Id| &egraph[*i].data.simplest;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
-            simplest: if enode.is_allowed() && (enode.is_var() || enode.is_constant()) {
+            simplest: if enode.is_var() || enode.is_constant() {
                 let mut rec = RecExpr::<L>::default();
                 rec.add(enode.clone());
                 rec
@@ -1489,7 +1482,6 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 RecExpr::from(nodes)
             },
             exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
-            is_allowed: enode.is_allowed(),
             is_extractable: enode.is_extractable(),
             interval: enode.mk_interval(egraph),
         }
@@ -1614,7 +1606,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
                         let left = extract.find_best(ids[0]).1;
                         let right = extract.find_best(ids[1]).1;
-                        if L::recexpr_is_allowed(&left) && L::recexpr_is_allowed(&right) {
+                        if L::recexpr_is_extractable(&left) && L::recexpr_is_extractable(&right) {
                             if let Some(eq) = Equality::new(&left, &right) {
                                 if !self.all_eqs.contains_key(&eq.name) {
                                     new_eqs.insert(eq.name.clone(), eq);

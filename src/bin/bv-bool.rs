@@ -32,9 +32,13 @@ define_language! {
     }
 }
 
+fn allowed_nodes(nodes: &[Math]) -> bool {
+    nodes.iter().any(|n| Math::is_allowed(n))
+}
+
 fn is_bv_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
-    move |egraph, _, subst| egraph[subst[var]].data.is_allowed
+    move |egraph, _, subst| allowed_nodes(&egraph[subst[var]].nodes)
 }
 
 // BV-bool language
@@ -144,8 +148,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.is_allowed
-                    || !synth.egraph[j].data.is_allowed
+                    || !allowed_nodes(&synth.egraph[i].nodes)
+                    || !allowed_nodes(&synth.egraph[j].nodes)
                 {
                     continue;
                 }
@@ -163,7 +167,9 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Bxor([i, j]));
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
+            if ids[&i] + 1 != iter
+                || synth.egraph[i].data.exact
+                || !allowed_nodes(&synth.egraph[i].nodes)
             {
                 continue;
             }
