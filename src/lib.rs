@@ -616,7 +616,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     /// Enumerates a layer and filters (EMA, constant filtering)
-    fn enumerate_layer(&self, iter: usize) -> Vec<L> {
+    fn enumerate_layer(&self, iter: usize) -> Vec<RecExpr<L>> {
         let mut layer = L::make_layer(self, iter);
         layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
 
@@ -658,23 +658,28 @@ impl<L: SynthLanguage> Synthesizer<L> {
         });
 
         layer
+            .iter()
+            .map(|node| {
+                let expr = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                if iter > self.params.ema_above_iter {
+                    L::alpha_renaming(&expr)
+                } else {
+                    expr
+                }
+            })
+            .collect()
     }
 
     // Adds a slice of nodes to the egraph
-    fn add_chunk(egraph: &mut EGraph<L, SynthAnalysis>, chunk: &[L], ema: bool) {
+    fn add_chunk(egraph: &mut EGraph<L, SynthAnalysis>, chunk: &[RecExpr<L>]) {
         for node in chunk {
-            if ema {
-                let rec = node.to_recexpr(|id| egraph[id].data.simplest.as_ref());
-                egraph.add_expr(&L::alpha_renaming(&rec));
-            } else {
-                egraph.add(node.clone());
-            }
+            egraph.add_expr(node);
         }
     }
 
     // Run single chunk
-    fn run_chunk(&mut self, chunk: &[L], iter: usize, poison_rules: &mut HashSet<Equality<L>>) {
-        Synthesizer::add_chunk(&mut self.egraph, chunk, iter > self.params.ema_above_iter);
+    fn run_chunk(&mut self, chunk: &[RecExpr<L>], poison_rules: &mut HashSet<Equality<L>>) {
+        Synthesizer::add_chunk(&mut self.egraph, chunk);
 
         'inner: loop {
             let run_rewrites_before = Instant::now();
@@ -797,7 +802,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("[[[ Iteration {} ]]]", iter);
             let layer = self.enumerate_layer(iter);
             for chunk in layer.chunks(self.params.node_chunk_size) {
-                self.run_chunk(chunk, iter, &mut poison_rules);
+                self.run_chunk(chunk, &mut poison_rules);
             }
         }
 
@@ -841,8 +846,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     // Run single chunk
-    fn run_chunk_rule_lifting(&mut self, chunk: &[L], iter: usize) {
-        Synthesizer::add_chunk(&mut self.egraph, chunk, iter > self.params.ema_above_iter);
+    fn run_chunk_rule_lifting(&mut self, chunk: &[RecExpr<L>]) {
+        Synthesizer::add_chunk(&mut self.egraph, chunk);
 
         let mut new_candidate_eqs: EqualityMap<L> = EqualityMap::default();
         let run_rewrites_before = Instant::now();
@@ -1035,7 +1040,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("[[[ Iteration {} ]]]", iter);
             let layer = self.enumerate_layer(iter);
             for chunk in layer.chunks(self.params.node_chunk_size) {
-                self.run_chunk_rule_lifting(chunk, iter);
+                self.run_chunk_rule_lifting(chunk);
             }
         }
 
