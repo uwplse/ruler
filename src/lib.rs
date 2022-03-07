@@ -792,17 +792,35 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
     }
 
+    fn enumerate_workload(&self) -> Vec<RecExpr<L>> {
+        let infile = std::fs::File::open("./tests/terms.txt").expect("can't open file");
+        let reader = std::io::BufReader::new(infile);
+        let mut terms = vec![];
+        for line in std::io::BufRead::lines(reader) {
+            let line = line.unwrap();
+            let l = L::convert_parse(&line);
+            terms.push(l);
+        }
+        terms
+    }
+
     /// Rule synthesis for one domain, i.e., Ruler as presented at OOPSLA'21
     fn run_cvec_synth(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
 
-        assert!(self.params.iters > 0);
-        for iter in 1..=self.params.iters {
-            log::info!("[[[ Iteration {} ]]]", iter);
-            let layer = self.enumerate_layer(iter);
-            for chunk in layer.chunks(self.params.node_chunk_size) {
+        if self.params.iters == 0 {
+            let terms = self.enumerate_workload();
+            for chunk in terms.chunks(self.params.node_chunk_size) {
                 self.run_chunk(chunk, &mut poison_rules);
+            }
+        } else {
+            for iter in 1..=self.params.iters {
+                log::info!("[[[ Iteration {} ]]]", iter);
+                let layer = self.enumerate_layer(iter);
+                for chunk in layer.chunks(self.params.node_chunk_size) {
+                    self.run_chunk(chunk, &mut poison_rules);
+                }
             }
         }
 
