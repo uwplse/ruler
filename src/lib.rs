@@ -792,8 +792,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
     }
 
-    fn enumerate_workload(&self) -> Vec<RecExpr<L>> {
-        let infile = std::fs::File::open("./tests/terms.txt").expect("can't open file");
+    fn enumerate_workload(&self, filename: &str) -> Vec<RecExpr<L>> {
+        let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
         let mut terms = vec![];
         for line in std::io::BufRead::lines(reader) {
@@ -810,7 +810,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let t = Instant::now();
 
         if self.params.iters == 0 {
-            let terms = self.enumerate_workload();
+            let terms = self.enumerate_workload(&self.params.workload);
             for chunk in terms.chunks(self.params.node_chunk_size) {
                 self.run_chunk(chunk, &mut poison_rules);
             }
@@ -1255,6 +1255,9 @@ pub struct SynthParams {
     ///////////////////
     #[clap(long)]
     pub prior_rules: Option<String>,
+
+    #[clap(long, default_value = "terms.txt")]
+    pub workload: String,
 }
 
 /// Derivability report.
