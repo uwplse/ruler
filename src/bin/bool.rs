@@ -253,6 +253,7 @@ mod test {
             use_smt: false,
             do_final_run: true,
             prior_rules: None,
+            workload: String::from("terms.txt"),
         }
     }
 
