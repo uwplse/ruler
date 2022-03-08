@@ -637,34 +637,25 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // deduplicate
         let mut cp = self.egraph.clone();
         let mut max_id = cp.number_of_classes();
-        layer.retain(|node| {
-            if iter > self.params.ema_above_iter {
-                let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
-                let rec2 = L::alpha_renaming(&rec);
-                let id = cp.add_expr(&rec2);
-                if usize::from(id) < max_id {
-                    return false;
-                }
-                max_id = usize::from(id);
-                true
-            } else {
-                let id = cp.add(node.clone());
-                if usize::from(id) < max_id {
-                    return false;
-                }
-                max_id = usize::from(id);
-                true
-            }
-        });
-
         layer
             .iter()
-            .map(|node| {
-                let expr = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+            .filter_map(|node| {
+                let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
                 if iter > self.params.ema_above_iter {
-                    L::alpha_renaming(&expr)
+                    let rec2 = L::alpha_renaming(&rec);
+                    let id = cp.add_expr(&rec2);
+                    if usize::from(id) < max_id {
+                        return None;
+                    }
+                    max_id = usize::from(id);
+                    Some(rec2)
                 } else {
-                    expr
+                    let id = cp.add(node.clone());
+                    if usize::from(id) < max_id {
+                        return None;
+                    }
+                    max_id = usize::from(id);
+                    Some(rec)
                 }
             })
             .collect()
