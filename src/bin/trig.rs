@@ -134,7 +134,7 @@ fn extract_constant(nodes: &[Math]) -> Option<Real> {
 
 fn trig_node(ns: &[Math], egraph: &EGraph<Math, SynthAnalysis>) -> bool {
     ns.iter().any(|n| match n {
-        Math::Sin(_) | Math::Cos(_) => true,
+        Math::Sin(_) | Math::Cos(_) | Math::Tan(_) => true,
         Math::Sqr(i) => trig_node(&egraph[*i].nodes, egraph),
         _ => false,
     })
@@ -239,13 +239,6 @@ impl SynthLanguage for Math {
             vec![]
         };
 
-        // disabled constants (TODO: validate input)
-        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
-            s.split(' ').collect()
-        } else {
-            vec![]
-        };
-
         // predicate if disabled
         let allowedp = |s: &str| !disabled_ops.iter().any(|x| x.eq(&s));
 
@@ -259,53 +252,60 @@ impl SynthLanguage for Math {
             rule_lifting: true,
         });
 
-        // variables
-        for i in 0..synth.params.variables {
-            let var = Variable::from(letter(i));
-            egraph.add(Math::Var(var));
-        }
+        // workload
+        if synth.params.workload.is_some() {
+            for expr in workload {
+                egraph.add_expr(&expr);
+            }
+        } else {
+            // variables
+            for i in 0..synth.params.variables {
+                let var = Variable::from(letter(i));
+                egraph.add(Math::Var(var));
+            }
 
-        // constants
-        egraph.add(Math::RealConst(Real::from("-1")));
-        egraph.add(Math::RealConst(Real::from("0")));
-        egraph.add(Math::RealConst(Real::from("1")));
+            // constants
+            egraph.add(Math::RealConst(Real::from("-1")));
+            egraph.add(Math::RealConst(Real::from("0")));
+            egraph.add(Math::RealConst(Real::from("1")));
 
-        // constant values of sin, cosine, tangent
-        if allowedp("sin") {
-            egraph.add_expr(&"(sin 0)".parse().unwrap());
-            egraph.add_expr(&"(sin (/ PI 6))".parse().unwrap());
-            egraph.add_expr(&"(sin (/ PI 4))".parse().unwrap());
-            egraph.add_expr(&"(sin (/ PI 3))".parse().unwrap());
-            egraph.add_expr(&"(sin (/ PI 2))".parse().unwrap());
-            egraph.add_expr(&"(sin PI)".parse().unwrap());
-            egraph.add_expr(&"(sin (* 2 PI))".parse().unwrap());
-        }
+            // constant values of sin, cosine, tangent
+            if allowedp("sin") {
+                egraph.add_expr(&"(sin 0)".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 6))".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 4))".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 3))".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 2))".parse().unwrap());
+                egraph.add_expr(&"(sin PI)".parse().unwrap());
+                egraph.add_expr(&"(sin (* 2 PI))".parse().unwrap());
+            }
 
-        if allowedp("cos") {
-            egraph.add_expr(&"(cos 0)".parse().unwrap());
-            egraph.add_expr(&"(cos (/ PI 6))".parse().unwrap());
-            egraph.add_expr(&"(cos (/ PI 4))".parse().unwrap());
-            egraph.add_expr(&"(cos (/ PI 3))".parse().unwrap());
-            egraph.add_expr(&"(cos (/ PI 2))".parse().unwrap());
-            egraph.add_expr(&"(cos PI)".parse().unwrap());
-            egraph.add_expr(&"(cos (* 2 PI))".parse().unwrap());
-        }
+            if allowedp("cos") {
+                egraph.add_expr(&"(cos 0)".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 6))".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 4))".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 3))".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 2))".parse().unwrap());
+                egraph.add_expr(&"(cos PI)".parse().unwrap());
+                egraph.add_expr(&"(cos (* 2 PI))".parse().unwrap());
+            }
 
-        if allowedp("tan") {
-            egraph.add_expr(&"(tan 0)".parse().unwrap());
-            egraph.add_expr(&"(tan (/ PI 6))".parse().unwrap());
-            egraph.add_expr(&"(tan (/ PI 4))".parse().unwrap());
-            egraph.add_expr(&"(tan (/ PI 3))".parse().unwrap());
-            // egraph.add_expr(&"(tan (/ PI 2))".parse().unwrap());
-            egraph.add_expr(&"(tan PI)".parse().unwrap());
-            egraph.add_expr(&"(tan (* 2 PI))".parse().unwrap());
+            if allowedp("tan") {
+                egraph.add_expr(&"(tan 0)".parse().unwrap());
+                egraph.add_expr(&"(tan (/ PI 6))".parse().unwrap());
+                egraph.add_expr(&"(tan (/ PI 4))".parse().unwrap());
+                egraph.add_expr(&"(tan (/ PI 3))".parse().unwrap());
+                // egraph.add_expr(&"(tan (/ PI 2))".parse().unwrap());
+                egraph.add_expr(&"(tan PI)".parse().unwrap());
+                egraph.add_expr(&"(tan (* 2 PI))".parse().unwrap());
+            }
         }
 
         // rewrites
         synth.lifting_rewrites = vec![
             rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
-            rewrite!("def-tan"; "(tan ?a)" <=> "(* i (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"),
+            rewrite!("def-tan"; "(tan ?a)" <=> "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"),
             rewrite!("def-tan2"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
             rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=> "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
             rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=> "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
@@ -352,16 +352,14 @@ impl SynthLanguage for Math {
             }
         }
 
-        for expr in workload {
-            synth.egraph.add_expr(expr);
-        }
-
         synth.egraph = egraph;
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfOps);
-        let mut to_add = vec![];
+        // workload
+        if synth.params.workload.is_some() {
+            return vec![];
+        }
 
         // disabled iters
         if iter == 4 || iter == 6 {
@@ -397,11 +395,13 @@ impl SynthLanguage for Math {
         };
 
         // maps ids to n_ops
+        let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let ids: HashMap<Id, usize> = synth
             .ids()
             .map(|id| (id, extract.find_best_cost(id)))
             .collect();
 
+        let mut to_add = vec![];
         for i in synth.ids() {
             for j in synth.ids() {
                 if ids[&i] + ids[&j] + 1 != iter {
@@ -498,7 +498,9 @@ impl SynthLanguage for Math {
             pat.ast.as_ref().iter().any(|n| {
                 matches!(
                     n,
-                    ENodeOrVar::ENode(Math::Sin(_)) | ENodeOrVar::ENode(Math::Cos(_))
+                    ENodeOrVar::ENode(Math::Sin(_))
+                        | ENodeOrVar::ENode(Math::Cos(_))
+                        | ENodeOrVar::ENode(Math::Tan(_))
                 )
             })
         };

@@ -875,6 +875,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn run_chunk_rule_lifting(&mut self, chunk: &[L], iter: usize) {
         Synthesizer::add_chunk(&mut self.egraph, chunk, iter > self.params.ema_above_iter);
 
+        let mut old_allowed_eqs: EqualityMap<L> = EqualityMap::default();
+        let mut old_forbidden_eqs: EqualityMap<L> = EqualityMap::default();
+        for (name, eq) in self.old_eqs.clone() {
+            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                old_allowed_eqs.insert(name, eq);
+            } else {
+                old_forbidden_eqs.insert(name, eq);
+            }
+        }
+
         let mut new_candidate_eqs: EqualityMap<L> = EqualityMap::default();
         let run_rewrites_before = Instant::now();
 
@@ -890,6 +900,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
             .new_eqs
             .values()
+            .chain(old_allowed_eqs.values())
             .flat_map(|eq| &eq.rewrites)
             .collect();
         let (_, found_unions) = self.run_rewrites_with_unions(rewrites, runner);
@@ -955,8 +966,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // are just a special set of forbidden rules.
         log::info!("running forbidden rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
-            .old_eqs
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = old_forbidden_eqs
             .values()
             .flat_map(|eq| &eq.rewrites)
             .chain(self.lifting_rewrites.iter())
@@ -977,9 +987,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
                             e2.as_ref().iter().all(|x| x.is_extractable())
                         {
+                            log::debug!("  Candidate {}", eq);
                             if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
                                 if !new_candidate_eqs.contains_key(&eq.name) {
-                                    log::debug!("  Candidate {}", eq);
                                     new_candidate_eqs.insert(eq.name.clone(), eq);
                                 }
                             }
@@ -1029,30 +1039,30 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 log::info!("  {}", eq);
             }
 
-            if !self.params.no_run_rewrites {
-                let mut inserted = EqualityMap::default();
-                let mut extracted = EqualityMap::default();
+            // if !self.params.no_run_rewrites {
+            //     let mut inserted = EqualityMap::default();
+            //     let mut extracted = EqualityMap::default();
 
-                for (_, eq) in &eqs {
-                    if eq.ids.is_some() {
-                        inserted.insert(eq.name.clone(), eq.clone());
-                    } else {
-                        extracted.insert(eq.name.clone(), eq.clone());
-                    }
-                }
+            //     for (_, eq) in &eqs {
+            //         if eq.ids.is_some() {
+            //             inserted.insert(eq.name.clone(), eq.clone());
+            //         } else {
+            //             extracted.insert(eq.name.clone(), eq.clone());
+            //         }
+            //     }
 
-                for (_, eq) in inserted {
-                    if let Some((i, j)) = eq.ids {
-                        self.egraph.union(i, j);
-                    }
-                }
+            //     for (_, eq) in inserted {
+            //         if let Some((i, j)) = eq.ids {
+            //             self.egraph.union(i, j);
+            //         }
+            //     }
 
-                if !extracted.is_empty() {
-                    let rewrites = extracted.values().flat_map(|eq| &eq.rewrites);
-                    let runner = self.mk_cvec_less_runner(self.egraph.clone()).run(rewrites);
-                    self.egraph = runner.egraph;
-                }
-            }
+            //     if !extracted.is_empty() {
+            //         let rewrites = extracted.values().flat_map(|eq| &eq.rewrites);
+            //         let runner = self.mk_cvec_less_runner(self.egraph.clone()).run(rewrites);
+            //         self.egraph = runner.egraph;
+            //     }
+            // }
 
             self.new_eqs.extend(eqs.clone());
             self.all_eqs.extend(eqs);
@@ -1074,9 +1084,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
             let layer = self.enumerate_layer(iter);
-            for chunk in layer.chunks(self.params.node_chunk_size) {
-                self.run_chunk_rule_lifting(chunk, iter);
+            if layer.len() == 0 {
+                let empty: Vec<L> = vec![];
+                self.run_chunk_rule_lifting(&empty, iter);
+            } else {
+                for chunk in layer.chunks(self.params.node_chunk_size) {
+                    self.run_chunk_rule_lifting(chunk, iter);
+                }
             }
+
         }
 
         let time = t.elapsed().as_secs_f64();
