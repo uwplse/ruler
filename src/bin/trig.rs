@@ -134,7 +134,9 @@ fn extract_constant(nodes: &[Math]) -> Option<Real> {
 
 fn trig_node(ns: &[Math], egraph: &EGraph<Math, SynthAnalysis>) -> bool {
     ns.iter().any(|n| match n {
-        Math::Sin(_) | Math::Cos(_) | Math::Tan(_) => true,
+        Math::Sin(_) | Math::Cos(_) | Math::Tan(_) | Math::Csc(_) | Math::Sec(_) | Math::Cot(_) => {
+            true
+        }
         Math::Sqr(i) => trig_node(&egraph[*i].nodes, egraph),
         _ => false,
     })
@@ -146,6 +148,11 @@ define_language! {
         "sin" = Sin(Id),
         "cos" = Cos(Id),
         "tan" = Tan(Id),
+        "csc" = Csc(Id),
+        "sec" = Sec(Id),
+        "cot" = Cot(Id),
+
+        // complex exponetial
         "cis" = Cis(Id),
 
         // arithmetic operators
@@ -210,6 +217,9 @@ impl SynthLanguage for Math {
             Math::Sin(_)
                 | Math::Cos(_)
                 | Math::Tan(_)
+                | Math::Csc(_)
+                | Math::Sec(_)
+                | Math::Cot(_)
                 | Math::Pi
         )
     }
@@ -217,6 +227,7 @@ impl SynthLanguage for Math {
     fn is_extractable(&self) -> bool {
         matches!(
             self,
+            // Standard extractable nodes
             Math::Sin(_)
                 | Math::Cos(_)
                 | Math::Tan(_)
@@ -228,6 +239,15 @@ impl SynthLanguage for Math {
                 | Math::RealConst(_)
                 | Math::Pi
                 | Math::Var(_)
+
+                // Interesting complex nodes
+                // | Math::Cis(_)
+                // | Math::Imag
+
+                // Reciprocal trig
+                | Math::Csc(_)
+                | Math::Sec(_)
+                | Math::Cot(_)
         )
     }
 
@@ -299,19 +319,37 @@ impl SynthLanguage for Math {
         // rewrites
         synth.lifting_rewrites = vec![
             // definition of sine, cosine, tangent
-            rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
+            rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
             rewrite!("def-tan"; "(tan ?a)" <=> "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"),
-            rewrite!("def-tan2"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
+
+            // definition of cosecant, secant, cotangent
+            rewrite!("def-csc"; "(csc ?a)" <=> "(/ 1 (sin ?a))"),
+            rewrite!("def-sec"; "(sec ?a)" <=> "(/ 1 (cos ?a))"),
+            rewrite!("def-cot"; "(cot ?a)" <=> "(/ 1 (tan ?a))"),
+
+            // relating tangent to sine and cosine
+            rewrite!("def-tan-ratio"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
+
             // definition of cos(a) * cos(b)
             rewrite!("def-prod-cos"; "(* (cos ?a) (cos ?b))" <=>
-                     "(/ (+ (* (cis ?a) (cis ?b)) (+ (* (cis (~ ?a)) (cis (~ ?b))) (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4)"),
+                     "(/ (+ (* (cis ?a) (cis ?b)) (+ (* (cis (~ ?a)) (cis (~ ?b))) \
+                        (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4)"),
             // definition of sin(a) * sin(b)
             rewrite!("def-prod-sin"; "(* (sin ?a) (sin ?b))" <=>
-                     "(~ (/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis (~ ?b))) (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4))"),
+                     "(~ (/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis (~ ?b))) \
+                        (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4))"),
             // definition of cos(a) * sin(b)
             rewrite!("def-prod-cos-sin"; "(* (cos ?a) (sin ?b))" <=>
-                     "(/ (+ (* (cis ?a) (cis ?b)) (+ (~ (* (cis (~ ?a)) (cis (~ ?b)))) (+ (~ (* (cis ?a) (cis (~ ?b)))) (* (cis (~ ?a)) (cis ?b))))) (* 4 I))"),
+                     "(/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis b)) \
+                        (+ (* (cis (~ ?a)) (cis (~ ?b))) (* (cis ?a) (cis (~ ?b)))))) (* 4 I))"),
+
+            // definition of cos^2(a) and sin^2(a)
+            // rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=>
+            //          "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
+            // rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=>
+            //          "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
+
             // definition of square
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
             vec![
@@ -393,8 +431,7 @@ impl SynthLanguage for Math {
                         | Math::Sqr(_)
                         | Math::RealConst(_)
                         | Math::Var(_)
-                ) &&
-                !matches!(n, Math::Imag)
+                ) && !matches!(n, Math::Imag)
             })
         };
 
@@ -450,9 +487,7 @@ impl SynthLanguage for Math {
                 }
             }
 
-            if ids[&i] + 1 != iter
-                || synth.egraph[i].data.exact
-            {
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact {
                 continue;
             }
 
@@ -505,6 +540,9 @@ impl SynthLanguage for Math {
                     ENodeOrVar::ENode(Math::Sin(_))
                         | ENodeOrVar::ENode(Math::Cos(_))
                         | ENodeOrVar::ENode(Math::Tan(_))
+                        | ENodeOrVar::ENode(Math::Csc(_))
+                        | ENodeOrVar::ENode(Math::Sec(_))
+                        | ENodeOrVar::ENode(Math::Cot(_))
                 )
             })
         };

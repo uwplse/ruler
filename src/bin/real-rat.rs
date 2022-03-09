@@ -179,7 +179,7 @@ fn real_const_symbol(s: &str) -> Real {
 }
 
 fn allowed_nodes(nodes: &[Math]) -> bool {
-    nodes.iter().any(|n| Math::is_allowed(n))
+    nodes.iter().any(Math::is_allowed)
 }
 
 fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {

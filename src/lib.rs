@@ -1091,7 +1091,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for iter in 1..=self.params.iters {
             log::info!("[[[ Iteration {} ]]]", iter);
             let layer = self.enumerate_layer(iter);
-            if layer.len() == 0 {
+            if self.params.workload.is_some() {
                 let empty: Vec<L> = vec![];
                 self.run_chunk_rule_lifting(&empty, iter);
             } else {
