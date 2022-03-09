@@ -231,7 +231,7 @@ impl SynthLanguage for Math {
         )
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>, workload: Vec<RecExpr<Self>>) {
+    fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
         // disabled operators (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
             s.split(' ').collect()
@@ -252,12 +252,7 @@ impl SynthLanguage for Math {
             rule_lifting: true,
         });
 
-        // workload
-        if synth.params.workload.is_some() {
-            for expr in workload {
-                egraph.add_expr(&expr);
-            }
-        } else {
+        if synth.params.workload.is_none() {
             // variables
             for i in 0..synth.params.variables {
                 let var = Variable::from(letter(i));
@@ -303,12 +298,21 @@ impl SynthLanguage for Math {
 
         // rewrites
         synth.lifting_rewrites = vec![
+            // definition of sine, cosine, tangent
             rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
             rewrite!("def-tan"; "(tan ?a)" <=> "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"),
             rewrite!("def-tan2"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
-            rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=> "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
-            rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=> "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
+            // definition of cos(a) * cos(b)
+            rewrite!("def-prod-cos"; "(* (cos ?a) (cos ?b))" <=>
+                     "(/ (+ (* (cis ?a) (cis ?b)) (+ (* (cis (~ ?a)) (cis (~ ?b))) (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4)"),
+            // definition of sin(a) * sin(b)
+            rewrite!("def-prod-sin"; "(* (sin ?a) (sin ?b))" <=>
+                     "(~ (/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis (~ ?b))) (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4))"),
+            // definition of cos(a) * sin(b)
+            rewrite!("def-prod-cos-sin"; "(* (cos ?a) (sin ?b))" <=>
+                     "(/ (+ (* (cis ?a) (cis ?b)) (+ (~ (* (cis (~ ?a)) (cis (~ ?b)))) (+ (~ (* (cis ?a) (cis (~ ?b)))) (* (cis (~ ?a)) (cis ?b))))) (* 4 I))"),
+            // definition of square
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
             vec![
                 // constant folding for PI

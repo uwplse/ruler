@@ -395,8 +395,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
             None => vec![],
         };
 
-        L::init_synth(&mut synth, workload_terms);
+        // initialize egraph with variables and constants
+        L::init_synth(&mut synth, vec![]);
         synth.initial_egraph = synth.egraph.clone();
+
+        // workload
+        for term in workload_terms {
+            synth.egraph.add_expr(&term);
+        }
+
         synth
     }
 
@@ -1092,7 +1099,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     self.run_chunk_rule_lifting(chunk, iter);
                 }
             }
-
         }
 
         let time = t.elapsed().as_secs_f64();
