@@ -1437,6 +1437,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
     fn merge(&self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let mut merge_a = false;
+        let mut merge_b = false;
         let cost_fn = |x: &RecExpr<L>| {
             if self.rule_lifting && L::recexpr_is_extractable(x) {
                 ExtractableAstSize.cost_rec(x)
@@ -1452,6 +1453,9 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                         to.cvec[i] = from.cvec[i].clone();
                         merge_a = true;
                     }
+                    (Some(_), None) => {
+                        merge_b = true;
+                    }
                     (Some(x), Some(y)) => {
                         assert_eq!(x, y, "cvecs do not match at index {}: {} != {}", i, x, y)
                     }
@@ -1463,16 +1467,22 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         if from.exact && !to.exact {
             to.exact = true;
             merge_a = true;
+        } else if !from.exact && to.exact {
+            merge_b = true;
         }
 
         if from.is_extractable && !to.is_extractable {
             to.is_extractable = true;
             merge_a = true;
+        } else if !from.is_extractable && to.is_extractable {
+            merge_b = true;
         }
 
         if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
             to.simplest = from.simplest;
             merge_a = true;
+        } else if to.simplest != from.simplest {
+            merge_b = true;
         }
 
         // // New interval is max of mins, min of maxes
@@ -1488,13 +1498,18 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             }
             .cloned(),
         );
+
         if to.interval != new_interval {
             to.interval = new_interval;
             merge_a = true;
         }
 
+        if to.interval != from.interval {
+            merge_b = true;
+        }
+
         // conservatively just say that b changed
-        DidMerge(merge_a, true)
+        DidMerge(merge_a, merge_b)
     }
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {

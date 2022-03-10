@@ -381,16 +381,13 @@ impl SynthLanguage for Math {
         for (l, r, bi) in extra_rewrites {
             let lrec: RecExpr<Math> = l.parse().unwrap();
             let rrec: RecExpr<Math> = r.parse().unwrap();
-            if let Some(e) = Equality::new(&lrec, &rrec) {
+            if let Some(mut e) = Equality::new(&lrec, &rrec) {
+                if !bi && e.rewrites.len() == 2 {
+                    e.rewrites.pop();
+                }
+
                 synth.old_eqs.insert(e.name.clone(), e.clone());
                 synth.all_eqs.insert(e.name.clone(), e);
-            }
-
-            if bi {
-                if let Some(e) = Equality::new(&rrec, &lrec) {
-                    synth.old_eqs.insert(e.name.clone(), e.clone());
-                    synth.all_eqs.insert(e.name.clone(), e);
-                }
             }
         }
 
