@@ -316,7 +316,7 @@ impl SynthLanguage for Math {
             }
         }
 
-        // rewrites
+        // rewrites and extra rewrites
         synth.lifting_rewrites = vec![
             // definition of sine, cosine, tangent
             rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
@@ -331,24 +331,46 @@ impl SynthLanguage for Math {
             // relating tangent to sine and cosine
             rewrite!("def-tan-ratio"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
 
-            // definition of cos(a) * cos(b)
-            rewrite!("def-prod-cos"; "(* (cos ?a) (cos ?b))" <=>
-                     "(/ (+ (* (cis ?a) (cis ?b)) (+ (* (cis (~ ?a)) (cis (~ ?b))) \
-                        (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4)"),
-            // definition of sin(a) * sin(b)
-            rewrite!("def-prod-sin"; "(* (sin ?a) (sin ?b))" <=>
-                     "(~ (/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis (~ ?b))) \
-                        (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4))"),
-            // definition of cos(a) * sin(b)
-            rewrite!("def-prod-cos-sin"; "(* (cos ?a) (sin ?b))" <=>
-                     "(/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis b)) \
-                        (+ (* (cis (~ ?a)) (cis (~ ?b))) (* (cis ?a) (cis (~ ?b)))))) (* 4 I))"),
+            // // definition of cos(a) * cos(b)
+            // rewrite!("def-prod-cos"; "(* (cos ?a) (cos ?b))" <=>
+            //          "(/ (+ (* (cis ?a) (cis ?b))                   \
+            //                 (+ (* (cis ?a) (cis (~ ?b)))            \
+            //                    (+ (* (cis (~ ?a)) (cis ?b))         \
+            //                       (* (cis (~ ?a)) (cis (~ ?b))))))  \
+            //              4)"),
+            // // definition of sin(a) * sin(b)
+            // rewrite!("def-prod-sin"; "(* (sin ?a) (sin ?b))" <=>
+            //          "(~ (/ (+ (* (cis ?a) (cis ?b))                \
+            //                 (+ (~ (* (cis ?a) (cis (~ ?b))))        \
+            //                    (+ (~ (* (cis (~ ?a)) (cis ?b)))     \
+            //                       (* (cis (~ ?a)) (cis (~ ?b))))))  \
+            //                 4))"),
+            // // definition of sin(a) * cos(b)
+            // rewrite!("def-prod-sin-cos"; "(* (sin ?a) (cos ?b))" <=>
+            //                 "(/ (+ (* (cis ?a) (cis ?b))                        \
+            //                        (+ (* (cis ?a) (cis (~ ?b)))                 \
+            //                           (+ (~ (* (cis (~ ?a)) (cis ?b)))          \
+            //                              (~ (* (cis (~ ?a)) (cis (~ ?b)))))))   \
+            //                     (* 4 I))"),
+
+            // // definition of cos(a) * cos(b)
+            // rewrite!("def-prod-cos"; "(* (cos ?a) (cos ?b))" <=>
+            //          "(/ (+ (* (cis ?a) (cis ?b)) (+ (* (cis (~ ?a)) (cis (~ ?b))) \
+            //             (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4)"),
+            // // definition of sin(a) * sin(b)
+            // rewrite!("def-prod-sin"; "(* (sin ?a) (sin ?b))" <=>
+            //          "(~ (/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis (~ ?b))) \
+            //             (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4))"),
+            // // definition of cos(a) * sin(b)
+            // rewrite!("def-prod-cos-sin"; "(* (cos ?a) (sin ?b))" <=>
+            //          "(/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis b)) \
+            //             (+ (* (cis (~ ?a)) (cis (~ ?b))) (* (cis ?a) (cis (~ ?b)))))) (* 4 I))"),
 
             // definition of cos^2(a) and sin^2(a)
-            // rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=>
-            //          "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
-            // rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=>
-            //          "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
+            rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=>
+                     "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
+            rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=>
+                     "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
 
             // definition of square
             rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
@@ -369,8 +391,7 @@ impl SynthLanguage for Math {
                 // definition of cis
                 rewrite!("square-i"; "(* I I)" => "-1"),
             ],
-        ]
-        .concat();
+        ].concat();
 
         let extra_rewrites = vec![
             // reverse of cis identities above
@@ -387,7 +408,6 @@ impl SynthLanguage for Math {
                 }
 
                 synth.old_eqs.insert(e.name.clone(), e.clone());
-                synth.all_eqs.insert(e.name.clone(), e);
             }
         }
 

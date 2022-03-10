@@ -12,11 +12,7 @@ pub fn parse<L: SynthLanguage>(filename: &str) -> Vec<Pair<L>> {
     report
         .all_eqs
         .iter()
-        .map(|eq| {
-            let l = L::instantiate(&eq.lhs);
-            let r = L::instantiate(&eq.rhs);
-            (l, r)
-        })
+        .map(|eq| (L::instantiate(&eq.lhs), L::instantiate(&eq.rhs)))
         .collect()
 }
 
@@ -27,28 +23,25 @@ pub fn parse_new_eqs<L: SynthLanguage>(filename: &str) -> Vec<Pair<L>> {
     report
         .new_eqs
         .iter()
-        .map(|eq| {
-            let l = L::instantiate(&eq.lhs);
-            let r = L::instantiate(&eq.rhs);
-            (l, r)
-        })
+        .map(|eq| (L::instantiate(&eq.lhs), L::instantiate(&eq.rhs)))
         .collect()
 }
 
 /// Perform derivability test between two rulesets.
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
-    let (pairs1, pairs2) = if params.new_eqs {
-        (
-            parse_new_eqs::<L>(&params.in1),
-            parse_new_eqs::<L>(&params.in2),
-        )
-    } else {
-        (parse::<L>(&params.in1), parse::<L>(&params.in2))
-    };
+    let all_eqs_1 = parse::<L>(&params.in1);
+    let all_eqs_2 = parse::<L>(&params.in2);
+    let new_eqs_1 = parse_new_eqs::<L>(&params.in1);
+    let new_eqs_2 = parse_new_eqs::<L>(&params.in2);
 
     if params.ci {
         println!("Using {} to derive {}", params.in1, params.in2);
-        let (_, not_derivable) = one_way(&params, &pairs1, &pairs2);
+        let (_, not_derivable) = if params.new_eqs {
+            one_way(&params, &all_eqs_1, &new_eqs_2)
+        } else {
+            one_way(&params, &all_eqs_1, &all_eqs_2)
+        };
+
         let not_derivable_eqs = pairs_to_eqs(&not_derivable);
         for eq in not_derivable_eqs {
             println!("Couldn't derive {}", eq.name);
@@ -59,10 +52,18 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
         }
     } else {
         println!("Using {} to derive {}", params.in1, params.in2);
-        let (derivable, not_derivable) = one_way(&params, &pairs1, &pairs2);
+        let (derivable, not_derivable) = if params.new_eqs {
+            one_way(&params, &all_eqs_1, &new_eqs_2)
+        } else {
+            one_way(&params, &all_eqs_1, &all_eqs_2)
+        };
 
         println!("\nUsing {} to derive {}", params.in2, params.in1);
-        let (rev_derivable, rev_not_derivable) = one_way(&params, &pairs2, &pairs1);
+        let (rev_derivable, rev_not_derivable) = if params.new_eqs {
+            one_way(&params, &all_eqs_2, &new_eqs_1)
+        } else {
+            one_way(&params, &all_eqs_2, &all_eqs_1)
+        };
 
         let json = serde_json::json!({
             "files": [params.in1, params.in2],

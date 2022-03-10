@@ -244,6 +244,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         ]
     }
 
+    /// Returns interval analysis data based on this node.
     fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
         Interval::default()
     }
