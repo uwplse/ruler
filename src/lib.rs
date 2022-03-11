@@ -264,6 +264,14 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         true
     }
 
+    /// Returns true if the rewrite is allowed.
+    fn is_allowed_rewrite(
+        _lhs: &Pattern<Self>,
+        _rhs: &Pattern<Self>,
+    ) -> bool {
+        true
+    }
+
     /// Returns true if the node is in an allowed node.
     /// Useful for rule lifting.
     fn is_allowed(&self) -> bool {
@@ -883,10 +891,20 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn run_chunk_rule_lifting(&mut self, chunk: &[L], iter: usize) {
         Synthesizer::add_chunk(&mut self.egraph, chunk, iter > self.params.ema_above_iter);
 
+        let mut new_allowed_eqs: EqualityMap<L> = EqualityMap::default();
+        let mut new_forbidden_eqs: EqualityMap<L> = EqualityMap::default();
+        for (name, eq) in self.new_eqs.clone() {
+            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
+                new_allowed_eqs.insert(name, eq);
+            } else {
+                new_forbidden_eqs.insert(name, eq);
+            }
+        }
+
         let mut old_allowed_eqs: EqualityMap<L> = EqualityMap::default();
         let mut old_forbidden_eqs: EqualityMap<L> = EqualityMap::default();
         for (name, eq) in self.old_eqs.clone() {
-            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
                 old_allowed_eqs.insert(name, eq);
             } else {
                 old_forbidden_eqs.insert(name, eq);
@@ -905,8 +923,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // to not introduce new (allowed) enodes.
         log::info!("running allowed rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
-            .new_eqs
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = new_allowed_eqs
             .values()
             .chain(old_allowed_eqs.values())
             .flat_map(|eq| &eq.rewrites)
@@ -937,22 +954,36 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                if self.egraph[win[0]].data.is_extractable
-                    && self.egraph[win[1]].data.is_extractable
-                {
-                    let extract = Extractor::new(&self.egraph, ExtractableAstSize);
-                    let (_, e1) = extract.find_best(win[0]);
-                    let (_, e2) = extract.find_best(win[1]);
-                    if let Some(eq) = Equality::new(&e1, &e2) {
-                        if e1 != e2 &&
-                            e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
-                            e2.as_ref().iter().all(|x| x.is_extractable())
-                        {
-                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                                if !new_candidate_eqs.contains_key(&eq.name) {
-                                    log::debug!("  Candidate {}", eq);
-                                    new_candidate_eqs.insert(eq.name.clone(), eq);
-                                }
+                // if self.egraph[win[0]].data.is_extractable
+                //     && self.egraph[win[1]].data.is_extractable
+                // {
+                //     let extract = Extractor::new(&self.egraph, ExtractableAstSize);
+                //     let (_, e1) = extract.find_best(win[0]);
+                //     let (_, e2) = extract.find_best(win[1]);
+                //     if let Some(eq) = Equality::new(&e1, &e2) {
+                //         if e1 != e2 &&
+                //             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
+                //             e2.as_ref().iter().all(|x| x.is_extractable())
+                //         {
+                //             if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                //                 if !new_candidate_eqs.contains_key(&eq.name) {
+                //                     log::debug!("  Candidate {}", eq);
+                //                     new_candidate_eqs.insert(eq.name.clone(), eq);
+                //                 }
+                //             }
+                //         }
+                //     }
+                // }
+
+                let extract = Extractor::new(&self.egraph, AstSize);
+                let (_, e1) = extract.find_best(win[0]);
+                let (_, e2) = extract.find_best(win[1]);
+                if let Some(eq) = Equality::new(&e1, &e2) {
+                    if e1 != e2 {
+                        if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                            if !new_candidate_eqs.contains_key(&eq.name) {
+                                log::debug!("  Candidate {}", eq);
+                                new_candidate_eqs.insert(eq.name.clone(), eq);
                             }
                         }
                     }
@@ -976,6 +1007,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = old_forbidden_eqs
             .values()
+            .chain(new_forbidden_eqs.values())
             .flat_map(|eq| &eq.rewrites)
             .chain(self.lifting_rewrites.iter())
             .collect();
@@ -984,22 +1016,36 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // these unions are candidate rewrite rules
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                if self.egraph[win[0]].data.is_extractable
-                    && self.egraph[win[1]].data.is_extractable
-                {
-                    let extract = Extractor::new(&self.egraph, ExtractableAstSize);
-                    let (_, e1) = extract.find_best(win[0]);
-                    let (_, e2) = extract.find_best(win[1]);
-                    if let Some(eq) = Equality::new(&e1, &e2) {
-                        if e1 != e2 &&
-                            e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
-                            e2.as_ref().iter().all(|x| x.is_extractable())
-                        {
-                            log::debug!("  Candidate {}", eq);
-                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                                if !new_candidate_eqs.contains_key(&eq.name) {
-                                    new_candidate_eqs.insert(eq.name.clone(), eq);
-                                }
+                // if self.egraph[win[0]].data.is_extractable
+                //     && self.egraph[win[1]].data.is_extractable
+                // {
+                //     let extract = Extractor::new(&self.egraph, ExtractableAstSize);
+                //     let (_, e1) = extract.find_best(win[0]);
+                //     let (_, e2) = extract.find_best(win[1]);
+                //     if let Some(eq) = Equality::new(&e1, &e2) {
+                //         if e1 != e2 &&
+                //             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
+                //             e2.as_ref().iter().all(|x| x.is_extractable())
+                //         {
+                //             log::debug!("  Candidate {}", eq);
+                //             if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                //                 if !new_candidate_eqs.contains_key(&eq.name) {
+                //                     new_candidate_eqs.insert(eq.name.clone(), eq);
+                //                 }
+                //             }
+                //         }
+                //     }
+                // }
+
+                let extract = Extractor::new(&self.egraph, AstSize);
+                let (_, e1) = extract.find_best(win[0]);
+                let (_, e2) = extract.find_best(win[1]);
+                if let Some(eq) = Equality::new(&e1, &e2) {
+                    if e1 != e2 {
+                        if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                            if !new_candidate_eqs.contains_key(&eq.name) {
+                                log::debug!("  Candidate {}", eq);
+                                new_candidate_eqs.insert(eq.name.clone(), eq);
                             }
                         }
                     }
@@ -1103,9 +1149,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
 
         let time = t.elapsed().as_secs_f64();
-        let mut eqs: Vec<_> = self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
-        eqs.sort_by_key(|eq| eq.score());
-        eqs.reverse();
 
         // final run_rewrites
         if self.params.do_final_run {
@@ -1124,12 +1167,39 @@ impl<L: SynthLanguage> Synthesizer<L> {
             log::info!("{}: `{}` {:?}", id, e.pretty(500), self.egraph[id].nodes);
         }
 
-        let num_rules = self.new_eqs.len();
-        let mut n_eqs: Vec<_> = self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        let mut n_eqs: Vec<Equality<L>> = vec![];
+        let mut bad_n_eqs: Vec<Equality<L>> = vec![];
+        let mut bad_n_eq_names: HashSet<Arc<str>> = Default::default();
+        for (k, eq) in self.new_eqs {
+            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
+                n_eqs.push(eq.clone());
+            } else {
+                bad_n_eq_names.insert(k.clone());
+                bad_n_eqs.push(eq.clone());
+            }
+        }
+        
+        let num_rules = n_eqs.len();
         n_eqs.sort_by_key(|eq| eq.score());
         n_eqs.reverse();
+
+        let num_other_rules = bad_n_eqs.len();
+        bad_n_eqs.sort_by_key(|eq| eq.score());
+        bad_n_eqs.reverse();
+        
         let num_olds = self.old_eqs.len();
         let o_eqs: Vec<_> = self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+
+        let mut eqs: Vec<_> = self.all_eqs.clone().into_iter().filter_map(|(k, eq)| {
+            if bad_n_eq_names.contains(&k) {
+                None
+            } else {
+                Some(eq)
+            }
+        }).collect();
+        eqs.sort_by_key(|eq| eq.score());
+        eqs.reverse();
+
         for eq in &n_eqs {
             println!("  {:?}   {}", eq.score(), eq);
         }
@@ -1137,6 +1207,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
             "Learned {} rules in {:?} using {} old rules.",
             num_rules, time, num_olds
         );
+
+        println!("Learned {} other rules. Run with `--show-all` to display these rules.", num_other_rules);
+        if self.params.show_all {
+            for eq in &bad_n_eqs {
+                println!("  {:?}   {}", eq.score(), eq);
+            }
+        }
+
         Report {
             params: self.params,
             time,
@@ -1297,6 +1375,12 @@ pub struct SynthParams {
     /// For a final round of run_rewrites to remove redundant rules.
     #[clap(long)]
     pub do_final_run: bool,
+
+    ///////////////////
+    // display params //
+    ///////////////////
+    #[clap(long)]
+    pub show_all: bool,
 
     ///////////////////
     // persistence params //
@@ -1659,35 +1743,48 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
             let old_len = new_eqs.len();
             new_eqs.clear();
-            if self.egraph.analysis.rule_lifting {
-                let extract = Extractor::new(&runner.egraph, ExtractableAstSize);
-                for ids in runner.roots.chunks(2) {
-                    if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
-                        let left = extract.find_best(ids[0]).1;
-                        let right = extract.find_best(ids[1]).1;
-                        if L::recexpr_is_extractable(&left) && L::recexpr_is_extractable(&right) {
-                            if let Some(eq) = Equality::new(&left, &right) {
-                                if !self.all_eqs.contains_key(&eq.name) {
-                                    new_eqs.insert(eq.name.clone(), eq);
-                                }
-                            }
+            // if self.egraph.analysis.rule_lifting {
+            //     let extract = Extractor::new(&runner.egraph, ExtractableAstSize);
+            //     for ids in runner.roots.chunks(2) {
+            //         if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
+            //             let left = extract.find_best(ids[0]).1;
+            //             let right = extract.find_best(ids[1]).1;
+            //             if L::recexpr_is_extractable(&left) && L::recexpr_is_extractable(&right) {
+            //                 if let Some(eq) = Equality::new(&left, &right) {
+            //                     if !self.all_eqs.contains_key(&eq.name) {
+            //                         new_eqs.insert(eq.name.clone(), eq);
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            // } else {
+            //     let extract = Extractor::new(&runner.egraph, AstSize);
+            //     for ids in runner.roots.chunks(2) {
+            //         if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
+            //             let left = extract.find_best(ids[0]).1;
+            //             let right = extract.find_best(ids[1]).1;
+            //             if let Some(eq) = Equality::new(&left, &right) {
+            //                 if !self.all_eqs.contains_key(&eq.name) {
+            //                     new_eqs.insert(eq.name.clone(), eq);
+            //                 }
+            //             }
+            //         }
+            //     }
+            // };
+
+            let extract = Extractor::new(&runner.egraph, AstSize);
+            for ids in runner.roots.chunks(2) {
+                if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
+                    let left = extract.find_best(ids[0]).1;
+                    let right = extract.find_best(ids[1]).1;
+                    if let Some(eq) = Equality::new(&left, &right) {
+                        if !self.all_eqs.contains_key(&eq.name) {
+                            new_eqs.insert(eq.name.clone(), eq);
                         }
                     }
                 }
-            } else {
-                let extract = Extractor::new(&runner.egraph, AstSize);
-                for ids in runner.roots.chunks(2) {
-                    if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
-                        let left = extract.find_best(ids[0]).1;
-                        let right = extract.find_best(ids[1]).1;
-                        if let Some(eq) = Equality::new(&left, &right) {
-                            if !self.all_eqs.contains_key(&eq.name) {
-                                new_eqs.insert(eq.name.clone(), eq);
-                            }
-                        }
-                    }
-                }
-            };
+            }
 
             log::info!(
                 "Minimizing... threw away {} rules, {} / {} remain",

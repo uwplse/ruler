@@ -550,6 +550,13 @@ impl SynthLanguage for Math {
             })
         };
 
+        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
+    }
+
+    fn is_allowed_rewrite(
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+    ) -> bool {
         let contains_trig_node = |pat: &Pattern<Self>| {
             pat.ast.as_ref().iter().any(|n| {
                 matches!(
@@ -563,11 +570,8 @@ impl SynthLanguage for Math {
                 )
             })
         };
-
-        ValidationResult::from(
-            (valid_pattern(lhs) && valid_pattern(rhs))
-                && (contains_trig_node(lhs) || contains_trig_node(rhs)),
-        )
+    
+        contains_trig_node(lhs) || contains_trig_node(rhs)
     }
 
     fn is_valid_rewrite(
