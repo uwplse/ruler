@@ -265,10 +265,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     }
 
     /// Returns true if the rewrite is allowed.
-    fn is_allowed_rewrite(
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> bool {
+    fn is_allowed_rewrite(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> bool {
         true
     }
 
@@ -954,27 +951,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                // if self.egraph[win[0]].data.is_extractable
-                //     && self.egraph[win[1]].data.is_extractable
-                // {
-                //     let extract = Extractor::new(&self.egraph, ExtractableAstSize);
-                //     let (_, e1) = extract.find_best(win[0]);
-                //     let (_, e2) = extract.find_best(win[1]);
-                //     if let Some(eq) = Equality::new(&e1, &e2) {
-                //         if e1 != e2 &&
-                //             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
-                //             e2.as_ref().iter().all(|x| x.is_extractable())
-                //         {
-                //             if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                //                 if !new_candidate_eqs.contains_key(&eq.name) {
-                //                     log::debug!("  Candidate {}", eq);
-                //                     new_candidate_eqs.insert(eq.name.clone(), eq);
-                //                 }
-                //             }
-                //         }
-                //     }
-                // }
-
                 let extract = Extractor::new(&self.egraph, AstSize);
                 let (_, e1) = extract.find_best(win[0]);
                 let (_, e2) = extract.find_best(win[1]);
@@ -1016,27 +992,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // these unions are candidate rewrite rules
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                // if self.egraph[win[0]].data.is_extractable
-                //     && self.egraph[win[1]].data.is_extractable
-                // {
-                //     let extract = Extractor::new(&self.egraph, ExtractableAstSize);
-                //     let (_, e1) = extract.find_best(win[0]);
-                //     let (_, e2) = extract.find_best(win[1]);
-                //     if let Some(eq) = Equality::new(&e1, &e2) {
-                //         if e1 != e2 &&
-                //             e1.as_ref().iter().all(|x| x.is_extractable()) &&        // extractable and valid
-                //             e2.as_ref().iter().all(|x| x.is_extractable())
-                //         {
-                //             log::debug!("  Candidate {}", eq);
-                //             if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                //                 if !new_candidate_eqs.contains_key(&eq.name) {
-                //                     new_candidate_eqs.insert(eq.name.clone(), eq);
-                //                 }
-                //             }
-                //         }
-                //     }
-                // }
-
                 let extract = Extractor::new(&self.egraph, AstSize);
                 let (_, e1) = extract.find_best(win[0]);
                 let (_, e2) = extract.find_best(win[1]);
@@ -1056,7 +1011,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
 
         self.egraph.rebuild();
-        new_candidate_eqs.retain(|k, _v| !self.all_eqs.contains_key(k));
+        new_candidate_eqs.retain(|k, _| !self.all_eqs.contains_key(k));
+        if !self.params.keep_all {
+            new_candidate_eqs.retain(|_, v| L::is_allowed_rewrite(&v.lhs, &v.rhs));
+        }
 
         let run_rewrites = run_rewrites_before.elapsed().as_secs_f64();
         log::info!("Time taken in... run_rewrites: {}", run_rewrites);
@@ -1093,7 +1051,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 log::info!("  {}", eq);
             }
 
-            // if !self.params.no_run_rewrites {
             //     let mut inserted = EqualityMap::default();
             //     let mut extracted = EqualityMap::default();
 
@@ -1178,7 +1135,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 bad_n_eqs.push(eq.clone());
             }
         }
-        
+
         let num_rules = n_eqs.len();
         n_eqs.sort_by_key(|eq| eq.score());
         n_eqs.reverse();
@@ -1186,17 +1143,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let num_other_rules = bad_n_eqs.len();
         bad_n_eqs.sort_by_key(|eq| eq.score());
         bad_n_eqs.reverse();
-        
+
         let num_olds = self.old_eqs.len();
         let o_eqs: Vec<_> = self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
 
-        let mut eqs: Vec<_> = self.all_eqs.clone().into_iter().filter_map(|(k, eq)| {
-            if bad_n_eq_names.contains(&k) {
-                None
-            } else {
-                Some(eq)
-            }
-        }).collect();
+        let mut eqs: Vec<_> = self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
         eqs.sort_by_key(|eq| eq.score());
         eqs.reverse();
 
@@ -1208,11 +1159,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
             num_rules, time, num_olds
         );
 
-        println!("Learned {} other rules. Run with `--show-all` to display these rules.", num_other_rules);
-        if self.params.show_all {
+        if self.params.keep_all {
             for eq in &bad_n_eqs {
                 println!("  {:?}   {}", eq.score(), eq);
             }
+            println!("Learned {} other rules", num_other_rules);
+        } else {
+            assert!(bad_n_eqs.is_empty(), "found forbidden rules!");
         }
 
         Report {
@@ -1329,6 +1282,9 @@ pub struct SynthParams {
     // consts allowed in final rules, empty implies no filter
     #[clap(long)]
     pub filtered_consts: Option<String>,
+    // for rule lifting, keeps forbidden rules as well
+    #[clap(long)]
+    pub keep_all: bool,
 
     ////////////////
     // eqsat args //
@@ -1375,12 +1331,6 @@ pub struct SynthParams {
     /// For a final round of run_rewrites to remove redundant rules.
     #[clap(long)]
     pub do_final_run: bool,
-
-    ///////////////////
-    // display params //
-    ///////////////////
-    #[clap(long)]
-    pub show_all: bool,
 
     ///////////////////
     // persistence params //
@@ -1742,38 +1692,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
             );
 
             let old_len = new_eqs.len();
-            new_eqs.clear();
-            // if self.egraph.analysis.rule_lifting {
-            //     let extract = Extractor::new(&runner.egraph, ExtractableAstSize);
-            //     for ids in runner.roots.chunks(2) {
-            //         if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
-            //             let left = extract.find_best(ids[0]).1;
-            //             let right = extract.find_best(ids[1]).1;
-            //             if L::recexpr_is_extractable(&left) && L::recexpr_is_extractable(&right) {
-            //                 if let Some(eq) = Equality::new(&left, &right) {
-            //                     if !self.all_eqs.contains_key(&eq.name) {
-            //                         new_eqs.insert(eq.name.clone(), eq);
-            //                     }
-            //                 }
-            //             }
-            //         }
-            //     }
-            // } else {
-            //     let extract = Extractor::new(&runner.egraph, AstSize);
-            //     for ids in runner.roots.chunks(2) {
-            //         if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
-            //             let left = extract.find_best(ids[0]).1;
-            //             let right = extract.find_best(ids[1]).1;
-            //             if let Some(eq) = Equality::new(&left, &right) {
-            //                 if !self.all_eqs.contains_key(&eq.name) {
-            //                     new_eqs.insert(eq.name.clone(), eq);
-            //                 }
-            //             }
-            //         }
-            //     }
-            // };
-
             let extract = Extractor::new(&runner.egraph, AstSize);
+            new_eqs.clear();
+
             for ids in runner.roots.chunks(2) {
                 if runner.egraph.find(ids[0]) != runner.egraph.find(ids[1]) {
                     let left = extract.find_best(ids[0]).1;

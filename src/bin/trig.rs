@@ -474,7 +474,7 @@ impl SynthLanguage for Math {
                     continue;
                 };
 
-                if iter <= 2 {
+                if iter <= 3 {
                     // either both are trig or neither are trig
                     if trig_node(&synth.egraph[i].nodes, &synth.egraph)
                         == trig_node(&synth.egraph[j].nodes, &synth.egraph)
@@ -553,10 +553,7 @@ impl SynthLanguage for Math {
         ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
     }
 
-    fn is_allowed_rewrite(
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-    ) -> bool {
+    fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
         let contains_trig_node = |pat: &Pattern<Self>| {
             pat.ast.as_ref().iter().any(|n| {
                 matches!(
@@ -570,8 +567,17 @@ impl SynthLanguage for Math {
                 )
             })
         };
-    
-        contains_trig_node(lhs) || contains_trig_node(rhs)
+
+        let pattern_is_extractable = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::Var(_) => true,
+                ENodeOrVar::ENode(n) => n.is_extractable(),
+            })
+        };
+
+        (contains_trig_node(lhs) || contains_trig_node(rhs))
+            && pattern_is_extractable(lhs)
+            && pattern_is_extractable(rhs)
     }
 
     fn is_valid_rewrite(

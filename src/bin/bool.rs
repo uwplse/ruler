@@ -241,6 +241,7 @@ mod test {
             disabled_ops: None,
             disabled_consts: None,
             filtered_consts: None,
+            keep_all: false,
             eqsat_node_limit: 300000,
             eqsat_iter_limit: 2,
             eqsat_time_limit: 60,
