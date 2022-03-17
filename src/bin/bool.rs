@@ -229,7 +229,7 @@ mod test {
             variables: 3,
             outfile: String::from("out.json"),
             no_constant_fold: true,
-            iters: num_iters,
+            iters: Some(num_iters),
             rules_to_take: 0,
             node_chunk_size: 0,
             eq_chunk_size: 0,
@@ -253,7 +253,7 @@ mod test {
             use_smt: false,
             do_final_run: true,
             prior_rules: None,
-            workload: String::from("terms.txt"),
+            workload: None,
         }
     }
 

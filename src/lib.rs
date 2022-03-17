@@ -800,13 +800,17 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
 
-        if self.params.iters == 0 {
-            let terms = self.enumerate_workload(&self.params.workload);
+        if let Some(filename) = &self.params.workload {
+            let terms = self.enumerate_workload(filename);
             for chunk in terms.chunks(self.params.node_chunk_size) {
                 self.run_chunk(chunk, &mut poison_rules);
             }
         } else {
-            for iter in 1..=self.params.iters {
+            let iters = self
+                .params
+                .iters
+                .expect("Either iters or workload is required.");
+            for iter in 1..=iters {
                 log::info!("[[[ Iteration {} ]]]", iter);
                 let layer = self.enumerate_layer(iter);
                 for chunk in layer.chunks(self.params.node_chunk_size) {
@@ -1044,8 +1048,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         runner.egraph.rebuild();
         self.egraph = runner.egraph;
 
-        assert!(self.params.iters > 0);
-        for iter in 1..=self.params.iters {
+        let iters = self.params.iters.expect("iters required for rule lifting");
+        assert!(iters > 0);
+        for iter in 1..=iters {
             log::info!("[[[ Iteration {} ]]]", iter);
             let layer = self.enumerate_layer(iter);
             for chunk in layer.chunks(self.params.node_chunk_size) {
@@ -1160,8 +1165,8 @@ pub struct SynthParams {
     // search params //
     ///////////////////
     /// Number of iterations
-    #[clap(long, default_value = "1")]
-    pub iters: usize,
+    #[clap(long)]
+    pub iters: Option<usize>,
     /// 0 is unlimited
     #[clap(long, default_value = "0")]
     pub rules_to_take: usize,
@@ -1247,8 +1252,8 @@ pub struct SynthParams {
     #[clap(long)]
     pub prior_rules: Option<String>,
 
-    #[clap(long, default_value = "terms.txt")]
-    pub workload: String,
+    #[clap(long, conflicts_with = "iters")]
+    pub workload: Option<String>,
 }
 
 /// Derivability report.
