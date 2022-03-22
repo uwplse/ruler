@@ -555,7 +555,8 @@ impl SynthLanguage for Math {
 
             if ids[&i] + 1 != iter
                 || synth.egraph[i].data.exact
-                || !allowed_nodes(&synth.egraph[i].nodes) {
+                || !allowed_nodes(&synth.egraph[i].nodes)
+            {
                 continue;
             }
 
