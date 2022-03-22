@@ -107,7 +107,7 @@ impl SynthLanguage for Math {
         Math::Num(c)
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
+    fn init_synth(synth: &mut Synthesizer<Self>) {
         let params = &synth.params;
 
         // let constants: Vec<Constant> = ["1", "0", "-1"]

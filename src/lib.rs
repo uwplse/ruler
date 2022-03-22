@@ -250,7 +250,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     }
 
     /// Initialize an egraph with variables and interesting constants from the domain.
-    fn init_synth(synth: &mut Synthesizer<Self>, workload: Vec<RecExpr<Self>>);
+    fn init_synth(synth: &mut Synthesizer<Self>);
 
     /// Layer wise term enumeration in the egraph.
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self>;
@@ -396,19 +396,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
             params,
         };
 
-        let workload_terms: Vec<RecExpr<L>> = match &synth.params.workload {
-            Some(workload) => get_terms_from_workload::<L>(workload.to_string()),
-            None => vec![],
-        };
-
         // initialize egraph with variables and constants
-        L::init_synth(&mut synth, vec![]);
+        L::init_synth(&mut synth);
         synth.initial_egraph = synth.egraph.clone();
-
-        // workload
-        for term in workload_terms {
-            synth.egraph.add_expr(&term);
-        }
 
         synth
     }
@@ -651,7 +641,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     /// Enumerates a layer and filters (EMA, constant filtering)
-    fn enumerate_layer(&self, iter: usize) -> Vec<L> {
+    fn enumerate_layer(&self, iter: usize) -> Vec<RecExpr<L>> {
         let mut layer = L::make_layer(self, iter);
         layer.retain(|n| !n.all(|id| self.egraph[id].data.exact));
 
@@ -681,44 +671,40 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // deduplicate
         let mut cp = self.egraph.clone();
         let mut max_id = cp.number_of_classes();
-        layer.retain(|node| {
-            if iter > self.params.ema_above_iter {
-                let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
-                let rec2 = L::alpha_renaming(&rec);
-                let id = cp.add_expr(&rec2);
-                if usize::from(id) < max_id {
-                    return false;
-                }
-                max_id = usize::from(id);
-                true
-            } else {
-                let id = cp.add(node.clone());
-                if usize::from(id) < max_id {
-                    return false;
-                }
-                max_id = usize::from(id);
-                true
-            }
-        });
-
         layer
+            .iter()
+            .filter_map(|node| {
+                let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                if iter > self.params.ema_above_iter {
+                    let rec2 = L::alpha_renaming(&rec);
+                    let id = cp.add_expr(&rec2);
+                    if usize::from(id) < max_id {
+                        return None;
+                    }
+                    max_id = usize::from(id);
+                    Some(rec2)
+                } else {
+                    let id = cp.add(node.clone());
+                    if usize::from(id) < max_id {
+                        return None;
+                    }
+                    max_id = usize::from(id);
+                    Some(rec)
+                }
+            })
+            .collect()
     }
 
     // Adds a slice of nodes to the egraph
-    fn add_chunk(egraph: &mut EGraph<L, SynthAnalysis>, chunk: &[L], ema: bool) {
+    fn add_chunk(egraph: &mut EGraph<L, SynthAnalysis>, chunk: &[RecExpr<L>]) {
         for node in chunk {
-            if ema {
-                let rec = node.to_recexpr(|id| egraph[id].data.simplest.as_ref());
-                egraph.add_expr(&L::alpha_renaming(&rec));
-            } else {
-                egraph.add(node.clone());
-            }
+            egraph.add_expr(node);
         }
     }
 
     // Run single chunk
-    fn run_chunk(&mut self, chunk: &[L], iter: usize, poison_rules: &mut HashSet<Equality<L>>) {
-        Synthesizer::add_chunk(&mut self.egraph, chunk, iter > self.params.ema_above_iter);
+    fn run_chunk(&mut self, chunk: &[RecExpr<L>], poison_rules: &mut HashSet<Equality<L>>) {
+        Synthesizer::add_chunk(&mut self.egraph, chunk);
 
         'inner: loop {
             let run_rewrites_before = Instant::now();
@@ -831,17 +817,39 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
     }
 
+    fn enumerate_workload(&self, filename: &str) -> Vec<RecExpr<L>> {
+        let infile = std::fs::File::open(filename).expect("can't open file");
+        let reader = std::io::BufReader::new(infile);
+        let mut terms = vec![];
+        for line in std::io::BufRead::lines(reader) {
+            let line = line.unwrap();
+            let l = L::convert_parse(&line);
+            terms.push(l);
+        }
+        terms
+    }
+
     /// Rule synthesis for one domain, i.e., Ruler as presented at OOPSLA'21
     fn run_cvec_synth(mut self) -> Report<L> {
         let mut poison_rules: HashSet<Equality<L>> = HashSet::default();
         let t = Instant::now();
 
-        assert!(self.params.iters > 0);
-        for iter in 1..=self.params.iters {
-            log::info!("[[[ Iteration {} ]]]", iter);
-            let layer = self.enumerate_layer(iter);
-            for chunk in layer.chunks(self.params.node_chunk_size) {
-                self.run_chunk(chunk, iter, &mut poison_rules);
+        if let Some(filename) = &self.params.workload {
+            let terms = self.enumerate_workload(filename);
+            for chunk in terms.chunks(self.params.node_chunk_size) {
+                self.run_chunk(chunk, &mut poison_rules);
+            }
+        } else {
+            let iters = self
+                .params
+                .iters
+                .expect("Either iters or workload is required.");
+            for iter in 1..=iters {
+                log::info!("[[[ Iteration {} ]]]", iter);
+                let layer = self.enumerate_layer(iter);
+                for chunk in layer.chunks(self.params.node_chunk_size) {
+                    self.run_chunk(chunk, &mut poison_rules);
+                }
             }
         }
 
@@ -885,8 +893,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     // Run single chunk
-    fn run_chunk_rule_lifting(&mut self, chunk: &[L], iter: usize) {
-        Synthesizer::add_chunk(&mut self.egraph, chunk, iter > self.params.ema_above_iter);
+    fn run_chunk_rule_lifting(&mut self, chunk: &[RecExpr<L>]) {
+        Synthesizer::add_chunk(&mut self.egraph, chunk);
 
         let mut new_allowed_eqs: EqualityMap<L> = EqualityMap::default();
         let mut new_forbidden_eqs: EqualityMap<L> = EqualityMap::default();
@@ -1091,16 +1099,21 @@ impl<L: SynthLanguage> Synthesizer<L> {
         runner.egraph.rebuild();
         self.egraph = runner.egraph;
 
-        assert!(self.params.iters > 0);
-        for iter in 1..=self.params.iters {
-            log::info!("[[[ Iteration {} ]]]", iter);
-            let layer = self.enumerate_layer(iter);
-            if self.params.workload.is_some() {
-                let empty: Vec<L> = vec![];
-                self.run_chunk_rule_lifting(&empty, iter);
-            } else {
+        if let Some(filename) = &self.params.workload {
+            let terms = self.enumerate_workload(filename);
+            for chunk in terms.chunks(self.params.node_chunk_size) {
+                self.run_chunk_rule_lifting(chunk);
+            }
+        } else {
+            let iters = self
+                .params
+                .iters
+                .expect("Either iters or workload is required.");
+            for iter in 1..=iters {
+                log::info!("[[[ Iteration {} ]]]", iter);
+                let layer = self.enumerate_layer(iter);
                 for chunk in layer.chunks(self.params.node_chunk_size) {
-                    self.run_chunk_rule_lifting(chunk, iter);
+                    self.run_chunk_rule_lifting(chunk);
                 }
             }
         }
@@ -1248,8 +1261,8 @@ pub struct SynthParams {
     // search params //
     ///////////////////
     /// Number of iterations
-    #[clap(long, default_value = "1")]
-    pub iters: usize,
+    #[clap(long)]
+    pub iters: Option<usize>,
     /// 0 is unlimited
     #[clap(long, default_value = "0")]
     pub rules_to_take: usize,
@@ -1338,10 +1351,7 @@ pub struct SynthParams {
     #[clap(long)]
     pub prior_rules: Option<String>,
 
-    ///////////////////
-    // workload params //
-    ///////////////////
-    #[clap(long)]
+    #[clap(long, conflicts_with = "iters")]
     pub workload: Option<String>,
 }
 

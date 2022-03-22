@@ -251,7 +251,7 @@ impl SynthLanguage for Math {
         )
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
+    fn init_synth(synth: &mut Synthesizer<Self>) {
         // disabled operators (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
             s.split(' ').collect()

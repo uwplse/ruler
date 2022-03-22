@@ -224,7 +224,7 @@ macro_rules! impl_bv {
                 Math::Num(c)
             }
 
-            fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
+            fn init_synth(synth: &mut Synthesizer<Self>) {
                 let mut consts: Vec<Option<BV>> = vec![];
                 if synth.params.complete_cvec {
                     consts = (0..1u64 << $n).map(|i| Some((i as u32).into())).collect();

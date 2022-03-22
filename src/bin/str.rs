@@ -196,7 +196,7 @@ impl SynthLanguage for Lang {
         Lang::Lit(c)
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>, _workload: Vec<RecExpr<Self>>) {
+    fn init_synth(synth: &mut Synthesizer<Self>) {
         let mut str_consts: Vec<SmallStr> = vec![SmallStr::new()];
         for _ in 0..3 {
             let mut new = vec![SmallStr::new()];
