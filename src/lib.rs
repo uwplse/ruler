@@ -12,9 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
     fmt::{Debug, Display},
-    fs::File,
     hash::{BuildHasherDefault, Hash},
-    io::{BufRead, BufReader},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -42,18 +40,6 @@ pub use util::*;
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
     &alpha[i..i + 1]
-}
-
-pub fn get_terms_from_workload<L: SynthLanguage>(fnm: String) -> Vec<RecExpr<L>> {
-    let mut ret: Vec<RecExpr<L>> = vec![];
-    // open the file, read each line, make a recexpr from them add add to ret
-    let f = File::open(fnm).unwrap();
-    let file = BufReader::new(&f);
-    for line in file.lines() {
-        let sexp: RecExpr<L> = line.unwrap().parse().unwrap();
-        ret.push(sexp);
-    }
-    ret
 }
 
 /// Constant folding method
