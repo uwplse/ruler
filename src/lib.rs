@@ -265,8 +265,15 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     }
 
     /// Returns true if the rewrite is allowed.
-    fn is_allowed_rewrite(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> bool {
-        true
+    fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        let pattern_is_extractable = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::Var(_) => true,
+                ENodeOrVar::ENode(n) => n.is_extractable(),
+            })
+        };
+
+        pattern_is_extractable(lhs) && pattern_is_extractable(rhs)
     }
 
     /// Returns true if the node is in an allowed node.
