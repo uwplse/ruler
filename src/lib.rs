@@ -33,6 +33,7 @@ pub type HashSet<K> = rustc_hash::FxHashSet<K>;
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
 
 pub use bv::*;
+pub use derive::RuleType;
 pub use equality::*;
 pub use util::*;
 
@@ -345,7 +346,13 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
                     .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
                 serde_json::to_writer_pretty(file, &report).expect("failed to write json");
             }
-            Command::Derive(params) => derive::derive::<Self>(params),
+            Command::Derive(params) => {
+                if params.ci {
+                    derive::derive_ci::<Self>(params);
+                } else {
+                    derive::derive::<Self>(params);
+                }
+            }
             Command::ConvertSexp(params) => convert_sexp::convert::<Self>(params),
         }
     }
@@ -370,7 +377,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // add prior rules (if any) to old_eqs
         let mut olds: EqualityMap<L> = Default::default();
         if params.prior_rules.is_some() {
-            for (l, r) in derive::parse::<L>(params.prior_rules.as_ref().unwrap()) {
+            for (l, r) in derive::parse::<L>(params.prior_rules.as_ref().unwrap(), RuleType::All) {
                 if let Some(e) = Equality::new(&l, &r) {
                     olds.insert(e.name.clone(), e);
                 }
