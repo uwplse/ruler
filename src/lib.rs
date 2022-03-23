@@ -1105,13 +1105,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
             self.params.no_conditionals = old;
         }
 
-        let extractor = Extractor::new(&self.egraph, AstSize);
-        let mut ids: Vec<Id> = self.ids().collect();
-        ids.sort();
-        for id in ids {
-            let (_, e) = extractor.find_best(id);
-            log::info!("{}: `{}` {:?}", id, e.pretty(500), self.egraph[id].nodes);
-        }
+        // let extractor = Extractor::new(&self.egraph, AstSize);
+        // let mut ids: Vec<Id> = self.ids().collect();
+        // ids.sort();
+        // for id in ids {
+        //     let (_, e) = extractor.find_best(id);
+        //     log::info!("{}: `{}` {:?}", id, e.pretty(500), self.egraph[id].nodes);
+        // }
 
         let mut n_eqs: Vec<Equality<L>> = vec![];
         let mut bad_n_eqs: Vec<Equality<L>> = vec![];

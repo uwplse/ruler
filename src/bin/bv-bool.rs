@@ -22,8 +22,8 @@ define_language! {
         "or" = Bor([Id; 2]),
         "xor" = Bxor([Id; 2]),
         "not" = Bnot(Id),
-        Var(egg::Symbol),
         Num(BV<2>),
+        Var(egg::Symbol),
 
         // conversions
         "bv" = Make([Id; 2]),
@@ -223,24 +223,21 @@ impl SynthLanguage for Math {
         }
 
         for n in &egraph[id].nodes {
-            match n {
-                Math::Make([i, j]) => {
-                    if let Some(v) = extract_bool_constant(&egraph[*i].nodes) {
-                        if let Some(w) = extract_bool_constant(&egraph[*j].nodes) {
-                            let cnst = match (v, w) {
-                                (true, true) => BV::<2>::from(3),
-                                (true, false) => BV::<2>::from(2),
-                                (false, true) => BV::<2>::from(1),
-                                (false, false) => BV::<2>::from(0),
-                            };
+            if let Math::Make([i, j]) = n {
+                if let Some(v) = extract_bool_constant(&egraph[*i].nodes) {
+                    if let Some(w) = extract_bool_constant(&egraph[*j].nodes) {
+                        let cnst = match (v, w) {
+                            (true, true) => BV::<2>::from(3),
+                            (true, false) => BV::<2>::from(2),
+                            (false, true) => BV::<2>::from(1),
+                            (false, false) => BV::<2>::from(0),
+                        };
 
-                            let c_id = egraph.add(Math::Num(cnst));
-                            egraph.union(id, c_id);
-                            return;
-                        }
+                        let c_id = egraph.add(Math::Num(cnst));
+                        egraph.union(id, c_id);
+                        return;
                     }
                 }
-                _ => ()
             }
         }
     }
