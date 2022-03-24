@@ -959,19 +959,23 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                let extract = Extractor::new(&self.egraph, AstSize);
-                let (_, e1) = extract.find_best(win[0]);
-                let (_, e2) = extract.find_best(win[1]);
-                if let Some(eq) = Equality::new(&e1, &e2) {
-                    if e1 != e2 {
-                        if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                            if !new_candidate_eqs.contains_key(&eq.name) {
-                                log::debug!("  Candidate {}", eq);
-                                new_candidate_eqs.insert(eq.name.clone(), eq);
+                if self.params.keep_all ||
+                    (self.egraph[win[0]].nodes.iter().any(L::is_extractable) &&
+                    self.egraph[win[1]].nodes.iter().any(L::is_extractable)) {
+                    let extract = Extractor::new(&self.egraph, AstSize);
+                    let (_, e1) = extract.find_best(win[0]);
+                    let (_, e2) = extract.find_best(win[1]);
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        if e1 != e2 {
+                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                                if !new_candidate_eqs.contains_key(&eq.name) {
+                                    log::debug!("  Candidate {}", eq);
+                                    new_candidate_eqs.insert(eq.name.clone(), eq);
+                                }
                             }
                         }
                     }
-                }
+            }
 
                 self.egraph.union(win[0], win[1]);
             }
@@ -1000,15 +1004,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // these unions are candidate rewrite rules
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                let extract = Extractor::new(&self.egraph, AstSize);
-                let (_, e1) = extract.find_best(win[0]);
-                let (_, e2) = extract.find_best(win[1]);
-                if let Some(eq) = Equality::new(&e1, &e2) {
-                    if e1 != e2 {
-                        if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                            if !new_candidate_eqs.contains_key(&eq.name) {
-                                log::debug!("  Candidate {}", eq);
-                                new_candidate_eqs.insert(eq.name.clone(), eq);
+                if self.params.keep_all ||
+                    (self.egraph[win[0]].nodes.iter().any(L::is_extractable) &&
+                    self.egraph[win[1]].nodes.iter().any(L::is_extractable)) {
+                    let extract = Extractor::new(&self.egraph, AstSize);
+                    let (_, e1) = extract.find_best(win[0]);
+                    let (_, e2) = extract.find_best(win[1]);
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        if e1 != e2 {
+                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                                if !new_candidate_eqs.contains_key(&eq.name) {
+                                    log::debug!("  Candidate {}", eq);
+                                    new_candidate_eqs.insert(eq.name.clone(), eq);
+                                }
                             }
                         }
                     }
