@@ -82,22 +82,6 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             return vec![];
         }
 
-        // check that the domain matches
-        let rhs_top = self.rhs.ast.as_ref().last();
-        if let Some(n) = rhs_top {
-            let node = match n {
-                ENodeOrVar::ENode(n) => n.clone(),
-                ENodeOrVar::Var(v) => {
-                    let s = v.to_string();
-                    L::mk_var(s[1..].into())
-                }
-            };
-
-            if egraph[matched_id].data.is_allowed != node.is_allowed() {
-                return vec![];
-            }
-        }
-
         if !L::is_valid_rewrite(egraph, &self.rhs, subst) {
             return vec![];
         }

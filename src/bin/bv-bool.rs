@@ -22,8 +22,8 @@ define_language! {
         "or" = Bor([Id; 2]),
         "xor" = Bxor([Id; 2]),
         "not" = Bnot(Id),
-        Var(egg::Symbol),
         Num(BV<2>),
+        Var(egg::Symbol),
 
         // conversions
         "bv" = Make([Id; 2]),
@@ -34,7 +34,17 @@ define_language! {
 
 fn is_bv_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
-    move |egraph, _, subst| egraph[subst[var]].data.is_allowed
+    move |egraph, _, subst| egraph[subst[var]].nodes.iter().any(Math::is_allowed)
+}
+
+fn extract_bool_constant(nodes: &[Math]) -> Option<bool> {
+    for n in nodes {
+        if let Math::Lit(v) = n {
+            return Some(*v);
+        }
+    }
+
+    None
 }
 
 // BV-bool language
@@ -96,6 +106,18 @@ impl SynthLanguage for Math {
         )
     }
 
+    fn is_extractable(&self) -> bool {
+        matches!(
+            self,
+            Math::Band(_)
+                | Math::Bor(_)
+                | Math::Bxor(_)
+                | Math::Bnot(_)
+                | Math::Num(_)
+                | Math::Var(_)
+        )
+    }
+
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
@@ -115,6 +137,16 @@ impl SynthLanguage for Math {
             let mk_id = egraph.add(Math::Make([fst_id, sec_id]));
             egraph.union(var_id, mk_id);
         }
+
+        // seed egraph with bool constants
+        egraph.add(Math::Lit(true));
+        egraph.add(Math::Lit(false));
+
+        // seed egraph with bv constants
+        egraph.add(Math::Num(BV::<2>::from(3)));
+        egraph.add(Math::Num(BV::<2>::from(2)));
+        egraph.add(Math::Num(BV::<2>::from(1)));
+        egraph.add(Math::Num(BV::<2>::from(0)));
 
         synth.lifting_rewrites = vec![
             rewrite!("def-bv"; "?a" => "(bv (first ?a) (second ?a))" if is_bv_str("?a")),
@@ -144,8 +176,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.is_allowed
-                    || !synth.egraph[j].data.is_allowed
+                    || !synth.egraph[i].nodes.iter().any(Math::is_allowed)
+                    || !synth.egraph[j].nodes.iter().any(Math::is_allowed)
                 {
                     continue;
                 }
@@ -163,7 +195,9 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Bxor([i, j]));
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
+            if ids[&i] + 1 != iter
+                || synth.egraph[i].data.exact
+                || !synth.egraph[i].nodes.iter().any(Math::is_allowed)
             {
                 continue;
             }
@@ -181,6 +215,31 @@ impl SynthLanguage for Math {
         _rhs: &Pattern<Self>,
     ) -> ValidationResult {
         ValidationResult::Valid
+    }
+
+    fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if egraph[id].nodes.iter().any(|n| matches!(n, Math::Num(_))) {
+            return;
+        }
+
+        for n in &egraph[id].nodes {
+            if let Math::Make([i, j]) = n {
+                if let Some(v) = extract_bool_constant(&egraph[*i].nodes) {
+                    if let Some(w) = extract_bool_constant(&egraph[*j].nodes) {
+                        let cnst = match (v, w) {
+                            (true, true) => BV::<2>::from(3),
+                            (true, false) => BV::<2>::from(2),
+                            (false, true) => BV::<2>::from(1),
+                            (false, false) => BV::<2>::from(0),
+                        };
+
+                        let c_id = egraph.add(Math::Num(cnst));
+                        egraph.union(id, c_id);
+                        return;
+                    }
+                }
+            }
+        }
     }
 }
 
