@@ -238,9 +238,20 @@ impl SynthLanguage for Math {
                 (None, None) => {
                 }
                 _ => {
-                    for key in env.keys() {
-                        write!(file, "Counterexample: {} = {:?}\n\n", key.clone(), env.get(key).unwrap()[i].clone().unwrap()).ok();
+                    match l {
+                        None => {
+                            write!(file, "Counterexample: None = {}\n", r.unwrap()).ok();
+                        }
+                        _ => {
+                            write!(file, "Counterexample: {} = None\n", l.unwrap()).ok();
+                        }
                     }
+                    for key in env.keys() {
+                        write!(file, "Assignment: {} = {:?}\n", key.clone(), env.get(key).unwrap()[i].clone().unwrap()).ok();
+                    }
+                    write!(file, "\n").ok();
+                    // only need a single example
+                    break;
                 }
             }
         }
