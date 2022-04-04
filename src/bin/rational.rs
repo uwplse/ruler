@@ -18,6 +18,8 @@ use rand::Rng;
 use rand_pcg::Pcg64;
 use z3::ast::Ast;
 use z3::*;
+use std::io::Write;
+use std::fs::OpenOptions;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
@@ -442,13 +444,15 @@ impl SynthLanguage for Math {
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check_assumptions(all) {
                 // match solver.check() {
-                SatResult::Unsat => ValidationResult::Valid,
+                SatResult::Unsat => {
+                    println!("z3 validation: succeeeded for {} => {}", lhs, rhs); 
+                    ValidationResult::Valid}
                 SatResult::Sat => {
-                    // println!("z3 validation: failed for {} => {}", lhs, rhs);
+                    println!("z3 validation: failed for {} => {}", lhs, rhs);
                     ValidationResult::Invalid
                 }
                 SatResult::Unknown => {
-                    // println!("z3 validation: unknown for {} => {}", lhs, rhs)
+                    println!("z3 validation: unknown for {} => {}", lhs, rhs);
                     synth.smt_unknown += 1;
                     ValidationResult::Unknown
                 }
@@ -479,6 +483,32 @@ impl SynthLanguage for Math {
 
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
+            
+            let mut file = OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .open("counterexamples.txt")
+                        .unwrap();
+
+            write!(file, "Rule: {} = {}\n", lhs, rhs).ok();
+
+            for (i, (l, r)) in lvec
+                                        .iter()
+                                        .zip(&rvec)
+                                        .enumerate() {
+                                            
+                        // println!("{}: {} = {}", i, l.clone().unwrap(), r.clone().unwrap());
+
+                        // testing for inequality rather than equality because it doesn't seem this
+                        // function often results in actually FINDING a counterexample...
+                        if l.clone().unwrap() == r.clone().unwrap() {
+                            for key in env.keys() {
+                                write!(file, "{} = {:?}\n\n", key.clone(), env.get(key).unwrap()[i].clone().unwrap()).ok();
+                            }
+                            // only need a single example
+                            break;
+                        }
+                    }
             ValidationResult::from(lvec == rvec)
         }
     }

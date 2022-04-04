@@ -209,6 +209,13 @@ impl SynthLanguage for Math {
 
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
+
+            if lvec == rvec {
+                println!("Valid rule: {} = {}", lhs, rhs);
+            } else {
+                println!("Invalid rule: {} = {}", lhs, rhs);
+            }
+            
             ValidationResult::from(lvec == rvec)
         }
     }

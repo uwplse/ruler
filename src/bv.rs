@@ -387,6 +387,22 @@ macro_rules! impl_bv {
 
                     let lvec = Self::eval_pattern(lhs, &env, n);
                     let rvec = Self::eval_pattern(rhs, &env, n);
+
+                    // println!("{:?} = {:?}", lvec, rvec);
+/*
+                    for (i, (l, r)) in lvec
+                                        .iter()
+                                        .zip(&rvec)
+                                        .enumerate() {
+                        if l == r {
+                            for val in env.values()
+                                        .clone() {
+                                // println!("cvec: {:?}", val);
+                                println!("{}", val[i].unwrap());
+                            }
+                        }
+                    }
+*/
                     ValidationResult::from(lvec == rvec)
                 }
             }
