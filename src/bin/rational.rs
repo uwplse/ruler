@@ -493,10 +493,10 @@ impl SynthLanguage for Math {
             write!(file, "Rule: {} = {}\n", lhs, rhs).ok();
 
             for (i, (l, r)) in lvec
-                                        .iter()
-                                        .zip(&rvec)
-                                        .enumerate() {
-                                            
+                            .iter()
+                            .zip(&rvec)
+                            .enumerate() {
+
                         // println!("{}: {} = {}", i, l.clone().unwrap(), r.clone().unwrap());
 
                         // testing for inequality rather than equality because it doesn't seem this
