@@ -99,11 +99,6 @@ impl SynthLanguage for Math {
             consts.swap(0, 1);
         }
 
-        println!("initial cvec");
-        for c in &consts {
-            println!("\t{:?}", c);
-        }
-
         let mut consts = self_product(&consts, synth.params.variables);
         // add the necessary random values, if any
         for row in consts.iter_mut() {
@@ -148,7 +143,7 @@ impl SynthLanguage for Math {
                 to_add.push(Math::Add([i, j]));
                 to_add.push(Math::Sub([i, j]));
                 to_add.push(Math::Mul([i, j]));
-                to_add.push(Math::Div([i, j]));
+                // to_add.push(Math::Div([i, j]));
             }
             if synth.egraph[i].data.exact {
                 continue;
@@ -177,10 +172,10 @@ impl SynthLanguage for Math {
             solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check_assumptions(all) {
                 // match solver.check() {
-                SatResult::Unsat => ValidationResult::Invalid,
+                SatResult::Unsat => ValidationResult::Valid,
                 SatResult::Sat => {
                     println!("z3 validation: failed for {} => {}", lhs, rhs);
-                    ValidationResult::Valid
+                    ValidationResult::Invalid
                 }
                 SatResult::Unknown => {
                     println!("z3 validation: unknown for {} => {}", lhs, rhs);
