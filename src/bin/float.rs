@@ -210,7 +210,6 @@ impl SynthLanguage for Math {
         let lvec = Self::eval_pattern(lhs, &env, n);
         let rvec = Self::eval_pattern(rhs, &env, n);
 
-        
         let mut file = OpenOptions::new()
         .write(true)
         .append(true)
@@ -255,7 +254,6 @@ impl SynthLanguage for Math {
                 }
             }
         }
-
         ValidationResult::from(lvec == rvec)
     }
 }

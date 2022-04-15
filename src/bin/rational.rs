@@ -20,11 +20,16 @@ use z3::ast::Ast;
 use z3::*;
 use std::io::Write;
 use std::fs::OpenOptions;
+use serde::{Serialize, Deserialize};
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufRead;
+use std::str::FromStr;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 enum Sign {
     Positive,
     ContainsZero,
@@ -44,6 +49,42 @@ define_language! {
         "recip" = Reciprocal(Id),
         Num(Constant),
         Var(egg::Symbol),
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Assignment {
+    variable: String,
+    value: Fraction,
+}
+
+impl Assignment {
+    fn new(variable: String, value: Fraction) -> Assignment {
+        Assignment { variable: variable, value: value }
+    }
+}
+
+struct Counterexample {
+    variable: Var,
+    value: Constant,
+}
+
+impl Counterexample {
+    fn new(variable: Var, value: Constant) -> Counterexample {
+        Counterexample { variable: variable, value: value }
+    }
+}
+
+// Seems Ratio doesn't implement de/serialization, so I'm re-implementing it, basically.
+#[derive(Serialize, Deserialize, Clone)]
+struct Fraction {
+    numer: BigInt,
+    denom: BigInt,
+}
+
+impl Fraction {
+    fn new(numer: BigInt, denom: BigInt) -> Fraction {
+        Fraction { numer: numer, denom: denom }
     }
 }
 
@@ -290,6 +331,23 @@ impl SynthLanguage for Math {
             vec![]
         };
 
+        let file = File::open("counterexamples.txt");
+        assert!(file.is_ok());
+        let reader = BufReader::new(file.unwrap());
+
+        // deserialize from file
+        let assn : Vec<Assignment> = reader.lines().map(|l| serde_json::from_str(&l.unwrap()).unwrap()).collect();
+
+        // make them Ratios again, lol
+        let ces : Vec<Counterexample> = assn.iter().map(|f| 
+            Counterexample::new(Var::from_str(&f.variable).unwrap(), 
+            Ratio::new(f.value.numer.clone(), f.value.denom.clone()) as Constant)).collect();
+
+        // Check that deserializing works, at least... (it does! Currently!)
+        for ce in ces {
+            println!("{} = {}", ce.variable.to_string(), ce.value);
+        }
+
         // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
@@ -490,11 +548,11 @@ impl SynthLanguage for Math {
                         .open("counterexamples.txt")
                         .unwrap();
 
-            write!(file, "Rule: {} = {}\n", lhs, rhs).ok();
+            // write!(file, "Rule: {} = {}\n", lhs, rhs).ok();
 
             for (i, (l, r)) in lvec
                             .iter()
-                            .zip(&rvec)
+                            .zip(rvec.clone())
                             .enumerate() {
 
                         // println!("{}: {} = {}", i, l.clone().unwrap(), r.clone().unwrap());
@@ -503,7 +561,12 @@ impl SynthLanguage for Math {
                         // function often results in actually FINDING a counterexample...
                         if l.clone().unwrap() == r.clone().unwrap() {
                             for key in env.keys() {
-                                write!(file, "{} = {:?}\n\n", key.clone(), env.get(key).unwrap()[i].clone().unwrap()).ok();
+                                let value = env.get(key).unwrap()[i].clone().unwrap();
+                                // println!("{} = {}", key.to_string(), value);
+                                let value_to_fraction = Fraction::new(value.numer().clone(), value.denom().clone());
+                                let assignment = Assignment::new(key.to_string(), value_to_fraction);
+                                let to_string = serde_json::to_string(&assignment).unwrap();
+                                write!(file, "{}\n", to_string).ok();
                             }
                             // only need a single example
                             break;
