@@ -340,7 +340,6 @@ impl SynthLanguage for Math {
 
         // deserialize from file
         let assns : Vec<Vec<Assignment>> = reader.lines().map(|l| serde_json::from_str(&l.unwrap()).unwrap()).collect();
-
         let mut ces : Vec<Vec<Counterexample>> = vec![];
 
         for assn in assns {
@@ -354,12 +353,14 @@ impl SynthLanguage for Math {
             ces.push(ce);
         }
 
+        // Old implementation using non-random, length 729 cvecs.
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
             .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
             .map(|s| s.parse().unwrap())
             .collect();
 
+        /*
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
@@ -395,6 +396,15 @@ impl SynthLanguage for Math {
             row.extend(vals);
         }
 
+        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
+            let var = egg::Symbol::from(letter(i));
+            let id = egraph.add(Math::Var(var));
+            egraph[id].data.cvec = item.clone();
+        }
+
+        */
+
+        // Generate random cvecs of length 3
         let mut vars_w_random_cvecs : HashMap<egg::Symbol, Vec<Option<Constant>>> = HashMap::new();
 
         for i in 0..synth.params.variables {
@@ -407,10 +417,8 @@ impl SynthLanguage for Math {
             vars_w_random_cvecs.insert(var, vals);
         }
 
-        // let mut vars_w_random_cvecs_and_ces : Vec<egg::Symbol, 
-
         let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: 3,
+            cvec_len: 3 + 10,
             constant_fold: if synth.params.no_constant_fold {
                 ConstantFoldMethod::NoFold
             } else {
@@ -419,22 +427,16 @@ impl SynthLanguage for Math {
             rule_lifting: false,
         });
 
-        /* for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
-            let var = egg::Symbol::from(letter(i));
-            let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = item.clone();
-        } */
-
-        for (var, cvec) in vars_w_random_cvecs.iter() {
-            let id = egraph.add(Math::Var(var.clone()));
-            egraph[id].data.cvec = cvec.clone();
-        }
-
-        for mut ce in ces {
+        // add the ces into our randomly-generated cvecs, padding out with None where there
+        // is a counterexample with no assignment to a given variable 
+        // (e.g., ?a = 1/2, ?b = 3/4 -> a: Some(1/2), b: Some(3/4), c: None)
+        // 
+        // Currently, just take the first 10 counterexamples, since each run generates new 
+        // counterexamples (usually) and that gets out-of-hand fast.
+        for mut ce in ces.drain(0..10) {
             ce.sort_by(|a, b| a.variable.cmp(&b.variable));
-            // println!("{:?}\n", ce);
             for (i, (_var, cvec)) in vars_w_random_cvecs.iter_mut().sorted().enumerate() {
-                // println!("{}: {:?}, {:?}\n", i, var, cvec);
+                // println!("{}: {:?}, {:?}\n", i, _var, cvec);
                 if i < ce.len() {
                     // println!("{:?}\n\n", ce[i].clone().variable);
                     cvec.push(Some(ce[i].clone().value));
@@ -444,7 +446,11 @@ impl SynthLanguage for Math {
             }
         }
 
-        // println!("{:?}", vars_w_random_cvecs);
+        // add the variables and their cvecs into the egraph
+        for (var, cvec) in vars_w_random_cvecs.iter() {
+            let id = egraph.add(Math::Var(var.clone()));
+            egraph[id].data.cvec = cvec.clone();
+        }
 
         for n in &constants {
             egraph.add(Math::Num(n.clone()));
