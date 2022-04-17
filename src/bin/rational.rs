@@ -12,6 +12,7 @@
 use egg::*;
 use ruler::*;
 
+use itertools::Itertools;
 use num::bigint::{BigInt, RandBigInt, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive, Zero};
 use rand::Rng;
@@ -25,6 +26,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 use std::str::FromStr;
+use std::collections::HashMap;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
@@ -64,13 +66,14 @@ impl Assignment {
     }
 }
 
+#[derive(Clone, Debug)]
 struct Counterexample {
-    variable: Var,
+    variable: egg::Symbol,
     value: Constant,
 }
 
 impl Counterexample {
-    fn new(variable: Var, value: Constant) -> Counterexample {
+    fn new(variable: egg::Symbol, value: Constant) -> Counterexample {
         Counterexample { variable: variable, value: value }
     }
 }
@@ -336,19 +339,21 @@ impl SynthLanguage for Math {
         let reader = BufReader::new(file.unwrap());
 
         // deserialize from file
-        let assn : Vec<Assignment> = reader.lines().map(|l| serde_json::from_str(&l.unwrap()).unwrap()).collect();
+        let assns : Vec<Vec<Assignment>> = reader.lines().map(|l| serde_json::from_str(&l.unwrap()).unwrap()).collect();
 
-        // make them Ratios again, lol
-        let ces : Vec<Counterexample> = assn.iter().map(|f| 
-            Counterexample::new(Var::from_str(&f.variable).unwrap(), 
-            Ratio::new(f.value.numer.clone(), f.value.denom.clone()) as Constant)).collect();
+        let mut ces : Vec<Vec<Counterexample>> = vec![];
 
-        // Check that deserializing works, at least... (it does! Currently!)
-        for ce in ces {
-            println!("{} = {}", ce.variable.to_string(), ce.value);
+        for assn in assns {
+            let ce : Vec<Counterexample> = assn.iter().map(|f| 
+                    Counterexample::new(egg::Symbol::from_str(&f.variable).unwrap(), 
+                    Ratio::new(f.value.numer.clone(), f.value.denom.clone()) as Constant)).collect();
+
+            /* for element in ce.clone() {
+                println!("{} = {}", element.variable.to_string(), element.value);
+            } */
+            ces.push(ce);
         }
 
-        // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
             .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
@@ -372,6 +377,10 @@ impl SynthLanguage for Math {
         consts.dedup();
 
         let mut consts = self_product(&consts, synth.params.variables);
+
+        // println!("Consts: {:?}\n Len: {}", consts, consts.len());
+
+        // this code is not being run by default, since n_samples = 0;
         // add the necessary random values, if any
         for row in consts.iter_mut() {
             let n_samples = synth.params.n_samples;
@@ -386,8 +395,22 @@ impl SynthLanguage for Math {
             row.extend(vals);
         }
 
+        let mut vars_w_random_cvecs : HashMap<egg::Symbol, Vec<Option<Constant>>> = HashMap::new();
+
+        for i in 0..synth.params.variables {
+            let var = egg::Symbol::from(letter(i));
+            let svals: Vec<Constant> = sampler(&mut synth.rng, 8, 6, 3);
+            let mut vals: Vec<Option<Constant>> = vec![];
+            for v in svals {
+                vals.push(Some(v));
+            }
+            vars_w_random_cvecs.insert(var, vals);
+        }
+
+        // let mut vars_w_random_cvecs_and_ces : Vec<egg::Symbol, 
+
         let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: consts[0].len(),
+            cvec_len: 3,
             constant_fold: if synth.params.no_constant_fold {
                 ConstantFoldMethod::NoFold
             } else {
@@ -396,11 +419,32 @@ impl SynthLanguage for Math {
             rule_lifting: false,
         });
 
-        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
+        /* for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
             let var = egg::Symbol::from(letter(i));
             let id = egraph.add(Math::Var(var));
             egraph[id].data.cvec = item.clone();
+        } */
+
+        for (var, cvec) in vars_w_random_cvecs.iter() {
+            let id = egraph.add(Math::Var(var.clone()));
+            egraph[id].data.cvec = cvec.clone();
         }
+
+        for mut ce in ces {
+            ce.sort_by(|a, b| a.variable.cmp(&b.variable));
+            // println!("{:?}\n", ce);
+            for (i, (_var, cvec)) in vars_w_random_cvecs.iter_mut().sorted().enumerate() {
+                // println!("{}: {:?}, {:?}\n", i, var, cvec);
+                if i < ce.len() {
+                    // println!("{:?}\n\n", ce[i].clone().variable);
+                    cvec.push(Some(ce[i].clone().value));
+                } else {
+                    cvec.push(None);
+                }
+            }
+        }
+
+        // println!("{:?}", vars_w_random_cvecs);
 
         for n in &constants {
             egraph.add(Math::Num(n.clone()));
@@ -559,15 +603,16 @@ impl SynthLanguage for Math {
 
                         // testing for inequality rather than equality because it doesn't seem this
                         // function often results in actually FINDING a counterexample...
-                        if l.clone().unwrap() == r.clone().unwrap() {
+                        if l.clone().unwrap() != r.clone().unwrap() {
+                            let mut assignments : Vec<Assignment> = vec![];
                             for key in env.keys() {
                                 let value = env.get(key).unwrap()[i].clone().unwrap();
-                                // println!("{} = {}", key.to_string(), value);
                                 let value_to_fraction = Fraction::new(value.numer().clone(), value.denom().clone());
                                 let assignment = Assignment::new(key.to_string(), value_to_fraction);
-                                let to_string = serde_json::to_string(&assignment).unwrap();
-                                write!(file, "{}\n", to_string).ok();
+                                assignments.push(assignment);
                             }
+                            let to_string = serde_json::to_string(&assignments).unwrap();
+                            write!(file, "{}\n", to_string).ok();
                             // only need a single example
                             break;
                         }
