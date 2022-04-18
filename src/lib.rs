@@ -1251,9 +1251,14 @@ pub struct SynthParams {
     ///////////////////
     #[clap(long)]
     pub prior_rules: Option<String>,
-
     #[clap(long, conflicts_with = "iters")]
     pub workload: Option<String>,
+    #[clap(long)]
+    pub persistent_cvecs: bool,
+    #[clap(long)]
+    pub write_ces: bool,
+    #[clap(long, default_value = "10")]
+    pub num_ces: usize,
 }
 
 /// Derivability report.
