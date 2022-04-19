@@ -9,8 +9,8 @@ use ordered_float::OrderedFloat;
 use rand::Rng;
 use rand_pcg::Pcg64;
 use ruler::*;
-use std::io::Write;
-use std::fs::OpenOptions;
+// use std::fs::OpenOptions;
+// use std::io::Write;
 
 /// Ordered Floats as constants.
 pub type Constant = OrderedFloat<f64>;
@@ -210,32 +210,34 @@ impl SynthLanguage for Math {
         let lvec = Self::eval_pattern(lhs, &env, n);
         let rvec = Self::eval_pattern(rhs, &env, n);
 
-        let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open("counterexamples.txt")
-        .unwrap();
+        // let mut file = OpenOptions::new()
+        //    .write(true)
+        //    .append(true)
+        //    .open("counterexamples.txt")
+        //    .unwrap();
 
-        for (i, (l, r)) in lvec
-            .iter()
-            .zip(&rvec)
-            .enumerate() {
-        
+        /*
+        for (i, (l, r)) in lvec.iter().zip(&rvec).enumerate() {
             match (l, r) {
                 (Some(a), Some(b)) => {
                     if a.clone() != b.clone() {
                         write!(file, "Rule: {} = {}\n", lhs, rhs).ok();
                         write!(file, "Counterexample: {} = {}\n", a, b).ok();
                         for key in env.keys() {
-                            write!(file, "Assignment: {} = {:?}\n", key.clone(), env.get(key).unwrap()[i].clone().unwrap()).ok();
+                            write!(
+                                file,
+                                "Assignment: {} = {:?}\n",
+                                key.clone(),
+                                env.get(key).unwrap()[i].clone().unwrap()
+                            )
+                            .ok();
                         }
                         write!(file, "\n").ok();
                         // only need a single example
                         break;
                     }
                 }
-                (None, None) => {
-                }
+                (None, None) => {}
                 _ => {
                     match l {
                         None => {
@@ -246,7 +248,13 @@ impl SynthLanguage for Math {
                         }
                     }
                     for key in env.keys() {
-                        write!(file, "Assignment: {} = {:?}\n", key.clone(), env.get(key).unwrap()[i].clone().unwrap()).ok();
+                        write!(
+                            file,
+                            "Assignment: {} = {:?}\n",
+                            key.clone(),
+                            env.get(key).unwrap()[i].clone().unwrap()
+                        )
+                        .ok();
                     }
                     write!(file, "\n").ok();
                     // only need a single example
@@ -254,6 +262,7 @@ impl SynthLanguage for Math {
                 }
             }
         }
+        */
         ValidationResult::from(lvec == rvec)
     }
 }

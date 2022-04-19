@@ -1149,7 +1149,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "0")]
     pub seed: u64,
     /// How many random values to add to the cvecs
-    #[clap(long, default_value = "3")]
+    #[clap(long, default_value = "0")]
     pub n_samples: usize,
     /// Number of variables to add to the initial egraph
     #[clap(long, default_value = "3")]
@@ -1213,7 +1213,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "60")]
     pub eqsat_time_limit: u64,
     /// Controls the size of cvecs
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "5")]
     pub important_cvec_offsets: u32,
 
     //////////////////////////

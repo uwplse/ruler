@@ -215,7 +215,7 @@ impl SynthLanguage for Math {
             } else {
                 println!("Invalid rule: {} = {}", lhs, rhs);
             }
-            
+
             ValidationResult::from(lvec == rvec)
         }
     }
