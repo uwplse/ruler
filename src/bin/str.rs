@@ -263,7 +263,7 @@ impl SynthLanguage for Lang {
         {
             let int_var = Symbol::from(letter(i + synth.params.variables));
             let id = egraph.add(Lang::Var(int_var));
-            egraph[id].data.cvec = item.iter().cycle().cloned().take(cvec_len).collect();
+            egraph[id].data.cvec = item.iter().cycle().take(cvec_len).cloned().collect();
         }
 
         synth.egraph = egraph;
