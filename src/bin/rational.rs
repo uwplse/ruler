@@ -93,7 +93,6 @@ impl Fraction {
 }
 
 /// Return a non-zero constant.
-/*
 fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
     if d.is_zero() {
         None
@@ -101,7 +100,6 @@ fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
         Some(Ratio::new(n.clone(), d.clone()))
     }
 }
-*/
 
 fn sign(interval: &Interval<Constant>) -> Sign {
     match (&interval.low, &interval.high) {
@@ -337,29 +335,45 @@ impl SynthLanguage for Math {
             vec![]
         };
 
-        let file = File::open("counterexamples.txt");
-        assert!(file.is_ok());
-        let reader = BufReader::new(file.unwrap());
-
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
             .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
             .map(|s| s.parse().unwrap())
             .collect();
 
-        let mut vars_w_random_cvecs : HashMap<egg::Symbol, Vec<Option<Constant>>> = HashMap::new();
+        // mapping of variables to cvecs
+        let mut vars : HashMap<egg::Symbol, Vec<Option<Constant>>> = HashMap::new();
 
-        for i in 0..synth.params.variables {
-            let var = egg::Symbol::from(letter(i));
-            let svals: Vec<Constant> = sampler(&mut synth.rng, 8, 6, 3);
-            let mut vals: Vec<Option<Constant>> = vec![];
-            for v in svals {
-                vals.push(Some(v));
+        // if we are using any important cvec offsets we add them into the cvec here
+        if synth.params.important_cvec_offsets > 0 {
+            let mut consts: Vec<Option<Constant>> = vec![];
+    
+            for i in 0..synth.params.important_cvec_offsets {
+                consts.push(mk_constant(
+                    &i.to_bigint().unwrap(),
+                    &(1.to_bigint().unwrap()),
+                ));
+                consts.push(mk_constant(
+                    &(-i.to_bigint().unwrap()),
+                    &(1.to_bigint().unwrap()),
+                ));
             }
-            vars_w_random_cvecs.insert(var, vals);
+            consts.sort();
+            consts.dedup();
+            
+            let consts2 = self_product(&consts, synth.params.variables);
+            for (i, item) in consts2.iter().enumerate().take(synth.params.variables) {
+                let var = egg::Symbol::from(letter(i));
+                vars.insert(var, item.clone());
+            }
         }
 
-        if synth.params.persistent_cvecs {
+        // if we are adding counterexamples to the cvec, do that here (this is the persistent cvecs
+        // part)
+        if synth.params.num_ces > 0 {
+            let file = File::open("counterexamples.txt");
+            assert!(file.is_ok());
+            let reader = BufReader::new(file.unwrap());
             // deserialize from file
             let assns : Vec<Vec<Assignment>> = reader.lines().map(|l| serde_json::from_str(&l.unwrap()).unwrap()).collect();
             let mut ces : Vec<Vec<Counterexample>> = vec![];
@@ -379,9 +393,6 @@ impl SynthLanguage for Math {
             // we get rid of them here.
             ces.sort();
             ces.dedup();
-
-            // Generate random cvecs of length 3
-
             // add the ces into our randomly-generated cvecs, padding out with None where there
             // is a counterexample with no assignment to a given variable 
             // (e.g., ?a = 1/2, ?b = 3/4 -> a: Some(1/2), b: Some(3/4), c: None)
@@ -390,7 +401,7 @@ impl SynthLanguage for Math {
             // counterexamples (usually) and that gets out-of-hand fast.
             for mut ce in ces.drain(0..cmp::min(synth.params.num_ces, ces.len())) {
                 ce.sort_by(|a, b| a.variable.cmp(&b.variable));
-                for (i, (_var, cvec)) in vars_w_random_cvecs.iter_mut().sorted().enumerate() {
+                for (i, (_var, cvec)) in vars.iter_mut().sorted().enumerate() {
                     // println!("{}: {:?}, {:?}\n", i, _var, cvec);
                     if i < ce.len() {
                         // println!("{:?}\n\n", ce[i].clone().variable);
@@ -402,13 +413,27 @@ impl SynthLanguage for Math {
             }
         }
 
+        // if we are adding random assignments to the cvec, do that here
+        if synth.params.n_samples > 0 {
+            for i in 0..synth.params.variables {
+                let var = egg::Symbol::from(letter(i));
+                let svals: Vec<Constant> = sampler(&mut synth.rng, 8, 6, synth.params.n_samples);
+                let mut vals: Vec<Option<Constant>> = vec![];
+                for v in svals {
+                    vals.push(Some(v));
+                }
+                if vars.get(&var).is_some() {
+                    let mut old = vars.get(&var).unwrap().clone();
+                    old.append(&mut vals);
+                    vars.insert(var, old.clone());
+                } else {
+                    vars.insert(var, vals.clone());
+                }
+            }
+        }
+
         let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: if synth.params.persistent_cvecs {
-                3 + cmp::min(synth.params.num_ces, 
-                    vars_w_random_cvecs.get(&egg::Symbol::from(letter(0))).unwrap().len() - 3) // Yikes! Do this but better.
-            } else {
-                3
-            },
+            cvec_len: vars.get(&egg::Symbol::from(letter(0))).unwrap().len(),
             constant_fold: if synth.params.no_constant_fold {
                 ConstantFoldMethod::NoFold
             } else {
@@ -418,7 +443,7 @@ impl SynthLanguage for Math {
         });
 
         // add the variables and their cvecs into the egraph
-        for (var, cvec) in vars_w_random_cvecs.iter() {
+        for (var, cvec) in vars.iter() {
             let id = egraph.add(Math::Var(var.clone()));
             egraph[id].data.cvec = cvec.clone();
         }
@@ -426,7 +451,6 @@ impl SynthLanguage for Math {
         for n in &constants {
             egraph.add(Math::Num(n.clone()));
         }
-
         synth.egraph = egraph;
     }
 
@@ -563,6 +587,7 @@ impl SynthLanguage for Math {
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
 
+            // if we are writing cvecs to a file
             if synth.params.write_ces {
                 let mut file = OpenOptions::new()
                         .write(true)

@@ -226,6 +226,8 @@ mod test {
         SynthParams {
             seed: 0,
             n_samples: 2,
+            num_ces: 0,
+            write_ces: false,
             variables: 3,
             outfile: String::from("out.json"),
             no_constant_fold: true,
