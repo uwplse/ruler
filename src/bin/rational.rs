@@ -353,6 +353,11 @@ impl SynthLanguage for Math {
         // mapping of variables to cvecs
         let mut vars: HashMap<egg::Symbol, Vec<Option<Constant>>> = HashMap::new();
 
+        for i in 0..synth.params.variables {
+            let var = egg::Symbol::from(letter(i));
+            vars.insert(var, vec![]);
+        }
+
         // if we are using any important cvec offsets we add them into the cvec here
         if synth.params.important_cvec_offsets > 0 {
             let mut consts: Vec<Option<Constant>> = vec![];
@@ -433,19 +438,10 @@ impl SynthLanguage for Math {
 
         // if we are adding random assignments to the cvec, do that here
         if synth.params.n_samples > 0 {
-            for i in 0..synth.params.variables {
-                let var = egg::Symbol::from(letter(i));
+            for (_var, cvec) in vars.iter_mut().sorted() {
                 let svals: Vec<Constant> = sampler(&mut synth.rng, 8, 6, synth.params.n_samples);
-                let mut vals: Vec<Option<Constant>> = vec![];
                 for v in svals {
-                    vals.push(Some(v));
-                }
-                if vars.get(&var).is_some() {
-                    let mut old = vars.get(&var).unwrap().clone();
-                    old.append(&mut vals);
-                    vars.insert(var, old.clone());
-                } else {
-                    vars.insert(var, vals.clone());
+                    cvec.push(Some(v));
                 }
             }
         }
