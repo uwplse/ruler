@@ -25,7 +25,6 @@ use std::fs::OpenOptions;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
-use std::str::FromStr;
 use z3::ast::Ast;
 use z3::*;
 
@@ -52,52 +51,6 @@ define_language! {
         "recip" = Reciprocal(Id),
         Num(Constant),
         Var(egg::Symbol),
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct Assignment {
-    variable: String,
-    value: Fraction,
-}
-
-impl Assignment {
-    fn new(var: String, val: Fraction) -> Assignment {
-        Assignment {
-            variable: var,
-            value: val,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Counterexample {
-    variable: egg::Symbol,
-    value: Constant,
-}
-
-impl Counterexample {
-    fn new(var: egg::Symbol, val: Constant) -> Counterexample {
-        Counterexample {
-            variable: var,
-            value: val,
-        }
-    }
-}
-
-// Seems Ratio doesn't implement de/serialization, so I'm re-implementing it, basically.
-#[derive(Serialize, Deserialize, Clone)]
-struct Fraction {
-    numer: BigInt,
-    denom: BigInt,
-}
-
-impl Fraction {
-    fn new(num: BigInt, den: BigInt) -> Fraction {
-        Fraction {
-            numer: num,
-            denom: den,
-        }
     }
 }
 
@@ -389,29 +342,10 @@ impl SynthLanguage for Math {
             assert!(file.is_ok());
             let reader = BufReader::new(file.unwrap());
             // deserialize from file
-            let assns: Vec<Vec<Assignment>> = reader
+            let mut ces: Vec<Vec<Constant>> = reader
                 .lines()
                 .map(|l| serde_json::from_str(&l.unwrap()).unwrap())
                 .collect();
-            let mut ces: Vec<Vec<Counterexample>> = vec![];
-
-            for assn in assns {
-                let ce: Vec<Counterexample> = assn
-                    .iter()
-                    .map(|f| {
-                        Counterexample::new(
-                            egg::Symbol::from_str(&f.variable).unwrap(),
-                            Ratio::new(f.value.numer.clone(), f.value.denom.clone()) as Constant,
-                        )
-                    })
-                    .collect();
-
-                /* for element in ce.clone() {
-                    println!("{} = {}", element.variable.to_string(), element.value);
-                } */
-                ces.push(ce);
-            }
-
             // As one might expect, it's hard to avoid writing duplicate counterexamples to the file, so
             // we get rid of them here.
             ces.sort();
@@ -422,13 +356,12 @@ impl SynthLanguage for Math {
             //
             // Currently, just take the first 10 counterexamples, since each run generates new
             // counterexamples (usually) and that gets out-of-hand fast.
-            for mut ce in ces.drain(0..cmp::min(synth.params.num_ces, ces.len())) {
-                ce.sort_by(|a, b| a.variable.cmp(&b.variable));
+            for ce in ces.drain(0..cmp::min(synth.params.num_ces, ces.len())) {
                 for (i, (_var, cvec)) in vars.iter_mut().sorted().enumerate() {
                     // println!("{}: {:?}, {:?}\n", i, _var, cvec);
                     if i < ce.len() {
                         // println!("{:?}\n\n", ce[i].clone().variable);
-                        cvec.push(Some(ce[i].clone().value));
+                        cvec.push(Some(ce[i].clone()));
                     } else {
                         cvec.push(None);
                     }
@@ -613,16 +546,19 @@ impl SynthLanguage for Math {
                 for (i, (l, r)) in lvec.iter().zip(rvec.clone()).enumerate() {
                     // println!("{}: {} = {}", i, l.clone().unwrap(), r.clone().unwrap());
                     if l.clone().unwrap() != r.clone().unwrap() {
-                        let mut assignments: Vec<Assignment> = vec![];
+                        let mut keys_sorted: Vec<egg::Var> = vec![];
+                        // Since are no longer using structs, we want to preserve an ordering for the variables.
                         for key in env.keys() {
-                            let value = env.get(key).unwrap()[i].clone().unwrap();
-                            let value_to_fraction =
-                                Fraction::new(value.numer().clone(), value.denom().clone());
-                            let assignment = Assignment::new(key.to_string(), value_to_fraction);
-                            assignments.push(assignment);
+                            keys_sorted.push(key.clone());
+                        }
+                        keys_sorted.sort();
+
+                        let mut assignments: Vec<Constant> = vec![];
+                        for key in keys_sorted.iter() {
+                            assignments.push(env.get(key).unwrap()[i].clone().unwrap().clone());
                         }
                         let to_string = serde_json::to_string(&assignments).unwrap();
-                        writeln!(file, "{}\n", to_string).ok();
+                        writeln!(file, "{}", to_string).ok();
                         // only need a single example
                         break;
                     }
