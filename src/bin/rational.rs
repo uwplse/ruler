@@ -18,7 +18,6 @@ use num::{rational::Ratio, Signed, ToPrimitive, Zero};
 use rand::Rng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
-use std::cmp;
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -334,11 +333,9 @@ impl SynthLanguage for Math {
                 vars.insert(var, item.clone());
             }
         }
-
-        // if we are adding counterexamples to the cvec, do that here (this is the persistent cvecs
-        // part)
+        // if we are adding counterexamples to the cvec, do that here
         if synth.params.num_ces > 0 {
-            let file = File::open("counterexamples.txt");
+            let file = File::open("counterexamples.json");
             assert!(file.is_ok());
             let reader = BufReader::new(file.unwrap());
             // deserialize from file
@@ -346,21 +343,16 @@ impl SynthLanguage for Math {
                 .lines()
                 .map(|l| serde_json::from_str(&l.unwrap()).unwrap())
                 .collect();
-            // As one might expect, it's hard to avoid writing duplicate counterexamples to the file, so
-            // we get rid of them here.
-            ces.sort();
-            ces.dedup();
             // add the ces into our randomly-generated cvecs, padding out with None where there
             // is a counterexample with no assignment to a given variable
             // (e.g., ?a = 1/2, ?b = 3/4 -> a: Some(1/2), b: Some(3/4), c: None)
             //
             // Currently, just take the first 10 counterexamples, since each run generates new
             // counterexamples (usually) and that gets out-of-hand fast.
-            for ce in ces.drain(0..cmp::min(synth.params.num_ces, ces.len())) {
+            for ce in ces.drain(0..ces.len()) {
                 for (i, (_var, cvec)) in vars.iter_mut().sorted().enumerate() {
-                    // println!("{}: {:?}, {:?}\n", i, _var, cvec);
                     if i < ce.len() {
-                        // println!("{:?}\n\n", ce[i].clone().variable);
+                        // println!("From file: {} = {:?}", _var, ce[i].clone());
                         cvec.push(Some(ce[i].clone()));
                     } else {
                         cvec.push(None);
@@ -538,24 +530,19 @@ impl SynthLanguage for Math {
             // if we are writing cvecs to a file
             if synth.params.write_ces {
                 let mut file = OpenOptions::new()
-                    .write(true)
+                    .create(true)
                     .append(true)
-                    .open("counterexamples.txt")
+                    .open("counterexamples.json")
+                    .ok()
                     .unwrap();
 
                 for (i, (l, r)) in lvec.iter().zip(rvec.clone()).enumerate() {
-                    // println!("{}: {} = {}", i, l.clone().unwrap(), r.clone().unwrap());
                     if l.clone().unwrap() != r.clone().unwrap() {
-                        let mut keys_sorted: Vec<egg::Var> = vec![];
                         // Since are no longer using structs, we want to preserve an ordering for the variables.
-                        for key in env.keys() {
-                            keys_sorted.push(key.clone());
-                        }
-                        keys_sorted.sort();
-
                         let mut assignments: Vec<Constant> = vec![];
-                        for key in keys_sorted.iter() {
-                            assignments.push(env.get(key).unwrap()[i].clone().unwrap().clone());
+                        for (_key, val) in env.iter_mut().sorted() {
+                            // println!("To file: {} = {}", _key, val.clone()[i].clone().unwrap().clone());
+                            assignments.push(val.clone()[i].clone().unwrap().clone());
                         }
                         let to_string = serde_json::to_string(&assignments).unwrap();
                         writeln!(file, "{}", to_string).ok();

@@ -1213,7 +1213,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "60")]
     pub eqsat_time_limit: u64,
     /// Controls the size of cvecs
-    #[clap(long, default_value = "5")]
+    #[clap(long, default_value = "0")]
     pub important_cvec_offsets: u32,
 
     //////////////////////////
