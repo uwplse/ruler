@@ -7,6 +7,9 @@ It uses equality saturation in two novel ways to scale the rule synthesis:
 use std::io::Write;
 use clap::Parser;
 use std::fs::OpenOptions;
+use std::io::BufReader;
+use std::io::BufRead;
+use std::fs::File;
 use egg::*;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
@@ -62,16 +65,14 @@ pub enum ValidationResult<T> {
     Unknown,
 }
 
-/*
-impl From<bool> for ValidationResult {
+impl <T> From<bool> for ValidationResult<T> {
     fn from(b: bool) -> Self {
         match b {
             true => ValidationResult::Valid,
-            false => ValidationResult::Invalid(Self),
+            false => ValidationResult::Invalid,
         }
     }
 }
-*/
 
 /// Properties of cvecs in `Ruler`; currently onyl their length.
 /// cvecs are stored as [eclass analysis data](https://docs.rs/egg/0.6.0/egg/trait.Analysis.html).
@@ -383,6 +384,17 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         L::init_synth(&mut synth);
         synth.initial_egraph = synth.egraph.clone();
+
+        if params.num_ces > 0 {
+            let file = File::open("counterexamples.json");
+            assert!(file.is_ok());
+            let reader = BufReader::new(file.unwrap());
+            // deserialize from file
+            let mut ces : Vec<Vec<L>> = reader
+                .lines()
+                .map(|l| l.unwrap().parse::<Vec<L>>().unwrap())
+                .collect();
+        }
         synth
     }
 
@@ -1546,11 +1558,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let initial_len = new_eqs.len();
         let mut first_iter = true;
 
+        let mut ces = vec![];
         while !new_eqs.is_empty() {
             // best are last
             new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
-            let mut ces = vec![];
-
             // take step valid rules from the end of new_eqs
             let mut took = 0;
             if !first_iter {
@@ -1562,8 +1573,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                 let old = keepers.insert(name, eq);
                                 took += old.is_none() as usize;
                             }
-                            ValidationResult::InvalidWithFuzz(_) => {
-                                ces.push(valid);
+                            ValidationResult::InvalidWithFuzz(assignment) => {
+                                ces.push(assignment);
                                 bads.insert(name, eq);
                             }
                             _ => {
@@ -1580,15 +1591,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                 }
             }
-
-            let mut file = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("counterexamples.json")
-                    .ok()
-                    .unwrap();
-
-            writeln!(file, "{:?}", ces).ok();
 
             first_iter = false;
             if new_eqs.is_empty() {
@@ -1664,6 +1666,18 @@ impl<L: SynthLanguage> Synthesizer<L> {
             assert!(new_eqs.is_empty());
         }
 
+        if self.params.write_ces && ces.len() > 0 {
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("counterexamples.json")
+                .ok()
+                .unwrap();
+
+            for ce in ces {
+                writeln!(file, "{:#}", ce).ok();
+            }
+        }
         (keepers, bads)
     }
 
