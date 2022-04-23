@@ -4,7 +4,9 @@ It uses equality saturation in two novel ways to scale the rule synthesis:
    and 2. to minimize the candidate rule space by removing redundant rules based on rules
    currently in the ruleset.
 !*/
+use std::io::Write;
 use clap::Parser;
+use std::fs::OpenOptions;
 use egg::*;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
@@ -53,20 +55,23 @@ pub enum ConstantFoldMethod {
 
 /// Validation result
 #[derive(Debug, Clone)]
-pub enum ValidationResult {
+pub enum ValidationResult<T> {
     Valid,
     Invalid,
+    InvalidWithFuzz(Vec<T>),
     Unknown,
 }
 
+/*
 impl From<bool> for ValidationResult {
     fn from(b: bool) -> Self {
         match b {
             true => ValidationResult::Valid,
-            false => ValidationResult::Invalid,
+            false => ValidationResult::Invalid(Self),
         }
     }
 }
+*/
 
 /// Properties of cvecs in `Ruler`; currently onyl their length.
 /// cvecs are stored as [eclass analysis data](https://docs.rs/egg/0.6.0/egg/trait.Analysis.html).
@@ -298,7 +303,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
-    ) -> ValidationResult;
+    ) -> ValidationResult<Self>;
 
     /// helper functions to convert CVC4 rewrites to Ruler's rule syntax.
     fn convert_parse(s: &str) -> RecExpr<Self> {
@@ -1544,6 +1549,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         while !new_eqs.is_empty() {
             // best are last
             new_eqs.sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
+            let mut ces = vec![];
 
             // take step valid rules from the end of new_eqs
             let mut took = 0;
@@ -1555,6 +1561,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
                             ValidationResult::Valid => {
                                 let old = keepers.insert(name, eq);
                                 took += old.is_none() as usize;
+                            }
+                            ValidationResult::InvalidWithFuzz(_) => {
+                                ces.push(valid);
+                                bads.insert(name, eq);
                             }
                             _ => {
                                 bads.insert(name, eq);
@@ -1570,6 +1580,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                 }
             }
+
+            let mut file = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("counterexamples.json")
+                    .ok()
+                    .unwrap();
+
+            writeln!(file, "{:?}", ces).ok();
 
             first_iter = false;
             if new_eqs.is_empty() {

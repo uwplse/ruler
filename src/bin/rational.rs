@@ -20,10 +20,10 @@ use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::fs::OpenOptions;
+// use std::fs::OpenOptions;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::io::Write;
+// use std::io::Write;
 use z3::ast::Ast;
 use z3::*;
 
@@ -473,7 +473,7 @@ impl SynthLanguage for Math {
         synth: &mut Synthesizer<Self>,
         lhs: &egg::Pattern<Self>,
         rhs: &egg::Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);
@@ -527,31 +527,37 @@ impl SynthLanguage for Math {
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
 
+            let mut assignment = vec![];
             // if we are writing cvecs to a file
             if synth.params.write_ces {
+                /*
                 let mut file = OpenOptions::new()
                     .create(true)
                     .append(true)
                     .open("counterexamples.json")
                     .ok()
                     .unwrap();
-
+                */
                 for (i, (l, r)) in lvec.iter().zip(rvec.clone()).enumerate() {
                     if l.clone().unwrap() != r.clone().unwrap() {
                         // Since are no longer using structs, we want to preserve an ordering for the variables.
-                        let mut assignments: Vec<Constant> = vec![];
                         for (_key, val) in env.iter_mut().sorted() {
                             // println!("To file: {} = {}", _key, val.clone()[i].clone().unwrap().clone());
-                            assignments.push(val.clone()[i].clone().unwrap().clone());
+                            assignment.push(Math::Num(val.clone()[i].clone().unwrap().clone()));
                         }
-                        let to_string = serde_json::to_string(&assignments).unwrap();
-                        writeln!(file, "{}", to_string).ok();
+                        // let to_string = serde_json::to_string(&assignments).unwrap();
                         // only need a single example
                         break;
                     }
                 }
             }
-            ValidationResult::from(lvec == rvec)
+            if lvec == rvec {
+                ValidationResult::Valid
+            } else if synth.params.write_ces {
+                ValidationResult::InvalidWithFuzz(assignment)
+            } else {
+                ValidationResult::Invalid
+            }
         }
     }
 }
