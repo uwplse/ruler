@@ -30,7 +30,7 @@ impl Complex {
 
 impl<S: AsRef<str>> From<S> for Complex {
     fn from(s: S) -> Self {
-        let val = Symbol::from(s);
+        let val = Symbol::from(s.as_ref());
         Complex { val }
     }
 }
@@ -78,7 +78,7 @@ impl Real {
 
 impl<S: AsRef<str>> From<S> for Real {
     fn from(s: S) -> Self {
-        let val = Symbol::from(s);
+        let val = Symbol::from(s.as_ref());
         Real { val }
     }
 }
@@ -124,7 +124,7 @@ impl Variable {
 
 impl<S: AsRef<str>> From<S> for Variable {
     fn from(s: S) -> Self {
-        Variable(Symbol::from(s))
+        Variable(Symbol::from(s.as_ref()))
     }
 }
 
