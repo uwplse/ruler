@@ -386,7 +386,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         L::init_synth(&mut synth);
 
         if num_ces > 0 {
-            let file = File::open(synth.params.ces_file.to_string());
+            let file = File::open(&synth.params.ces_file);
             assert!(file.is_ok());
             let reader = BufReader::new(file.unwrap());
             // deserialize from file
@@ -1729,7 +1729,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let mut file = OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(self.params.ces_file.to_string())
+                .open(&self.params.ces_file)
                 .ok()
                 .unwrap();
             // this is a bit of a hacky solution where we establish the end of an assignment to all variables
