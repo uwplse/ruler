@@ -179,7 +179,7 @@ impl SynthLanguage for Math {
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         ValidationResult::Valid
     }
 }

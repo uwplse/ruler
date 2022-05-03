@@ -208,7 +208,7 @@ impl SynthLanguage for Math {
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         ValidationResult::Valid
     }
 }
@@ -228,6 +228,7 @@ mod test {
             n_samples: 2,
             num_ces: 0,
             write_ces: false,
+            ces_file: String::from("bool-counterexamples.txt"),
             variables: 3,
             outfile: String::from("out.json"),
             no_constant_fold: true,

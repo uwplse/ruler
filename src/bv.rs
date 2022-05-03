@@ -321,7 +321,7 @@ macro_rules! impl_bv {
                 synth: &mut Synthesizer<Self>,
                 lhs: &Pattern<Self>,
                 rhs: &Pattern<Self>
-            ) -> ValidationResult {
+            ) -> ValidationResult<Self> {
                 use z3::{*, ast::Ast};
 
                 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::BV<'a> {

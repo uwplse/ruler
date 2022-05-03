@@ -187,7 +187,7 @@ impl SynthLanguage for Math {
         synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         let n = synth.params.num_fuzz;
         let mut env = HashMap::default();
 

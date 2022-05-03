@@ -388,7 +388,7 @@ impl SynthLanguage for Math {
         _synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         let valid_pattern = |pat: &Pattern<Self>| {
             pat.ast.as_ref().iter().all(|n| match n {
                 ENodeOrVar::ENode(Math::Div([_, j])) => match pat.ast.index(*j) {
