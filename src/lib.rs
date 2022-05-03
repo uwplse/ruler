@@ -4,16 +4,17 @@ It uses equality saturation in two novel ways to scale the rule synthesis:
    and 2. to minimize the candidate rule space by removing redundant rules based on rules
    currently in the ruleset.
 !*/
-use std::io::Write;
 use clap::Parser;
-use std::fs::OpenOptions;
-use std::io::BufReader;
-use std::io::BufRead;
-use std::fs::File;
+use core::str::FromStr;
 use egg::*;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Write;
 use std::{
     borrow::{Borrow, Cow},
     fmt::{Debug, Display},
@@ -58,14 +59,14 @@ pub enum ConstantFoldMethod {
 
 /// Validation result
 #[derive(Debug, Clone)]
-pub enum ValidationResult<T> {
+pub enum ValidationResult<T: SynthLanguage> {
     Valid,
     Invalid,
-    InvalidWithFuzz(Vec<T>),
+    InvalidWithFuzz(Vec<<T as SynthLanguage>::Constant>),
     Unknown,
 }
 
-impl <T> From<bool> for ValidationResult<T> {
+impl<T: SynthLanguage> From<bool> for ValidationResult<T> {
     fn from(b: bool) -> Self {
         match b {
             true => ValidationResult::Valid,
@@ -101,7 +102,7 @@ impl Default for SynthAnalysis {
 /// `eval` implements an interpreter for the domain. It returns a `Cvec` of length `cvec_len`
 /// where each cvec element is computed using `eval`.
 pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
-    type Constant: Clone + Hash + Eq + Debug + Display + Ord + Sync + Send;
+    type Constant: Clone + Hash + Eq + Debug + Display + FromStr + Ord;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
     where
@@ -112,7 +113,6 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     fn is_var(&self) -> bool {
         self.to_var().is_some()
     }
-
     fn to_constant(&self) -> Option<&Self::Constant>;
     fn mk_constant(c: Self::Constant) -> Self;
     fn is_constant(&self) -> bool {
@@ -332,7 +332,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         match Command::parse() {
             Command::Synth(params) => {
                 let outfile = params.outfile.clone();
-                let syn = Synthesizer::<Self>::new(params);
+                let syn = Synthesizer::<Self>::new(*params);
                 let report = syn.run();
                 let file = std::fs::File::create(&outfile)
                     .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
@@ -360,6 +360,7 @@ pub struct Synthesizer<L: SynthLanguage> {
 impl<L: SynthLanguage> Synthesizer<L> {
     /// Initialize all the arguments of the [Synthesizer].
     pub fn new(params: SynthParams) -> Self {
+        let num_ces = params.num_ces;
         // add prior rules (if any) to old_eqs
         let mut olds: EqualityMap<L> = Default::default();
         if params.prior_rules.is_some() {
@@ -383,17 +384,72 @@ impl<L: SynthLanguage> Synthesizer<L> {
         };
 
         L::init_synth(&mut synth);
-        synth.initial_egraph = synth.egraph.clone();
 
-        if params.num_ces > 0 {
-            let file = File::open("counterexamples.json");
+        if num_ces > 0 {
+            let file = File::open(synth.params.ces_file.to_string());
             assert!(file.is_ok());
             let reader = BufReader::new(file.unwrap());
             // deserialize from file
-            let mut ces : Vec<Vec<L>> = reader
-                .lines()
-                .map(|l| l.unwrap().parse::<Vec<L>>().unwrap())
-                .collect();
+            let mut ces: Vec<Vec<<L as SynthLanguage>::Constant>> = vec![];
+            let mut count: usize = 0;
+            let mut lines = reader.lines();
+            let mut ce: Vec<<L as SynthLanguage>::Constant> = vec![];
+            // read & parse from file
+            while count < num_ces {
+                let line = lines.next().unwrap().ok().unwrap().clone();
+                if line == "*" {
+                    ces.push(ce.clone());
+                    ce = vec![];
+                    count += 1;
+                } else {
+                    let constant = line.parse().ok().unwrap();
+                    ce.push(constant);
+                }
+            }
+            let mut graph = synth.egraph.clone();
+            let mut vars = vec![];
+            let mut consts = vec![];
+            // this is a somewhat hacky solution, but basically we need to
+            // sort the variable e-classes because ordering is important
+            // if we want the assignments to go in the right spots. we get
+            // the variables, then sort them, then get their ids in the
+            // egraph. we also get the ids of the constants for later, as
+            // all cvecs must have a consistent length, including the const
+            // cvecs
+            for class in graph.classes_mut() {
+                if !class.data.exact {
+                    vars.push(class.nodes[0].clone());
+                } else {
+                    consts.push(class.id);
+                }
+            }
+            vars.sort();
+            let mut ids = vec![];
+            for var in vars.iter() {
+                let id = graph.lookup(var.clone());
+                ids.push(id.unwrap());
+            }
+            // add counterexamples
+            for ce in ces.iter() {
+                for i in 0..vars.len() {
+                    let egraph_id = ids.get(i).unwrap();
+                    if i < ce.len() {
+                        graph[*egraph_id].data.cvec.push(Some(ce[i].clone()));
+                    } else {
+                        graph[*egraph_id].data.cvec.push(None);
+                    }
+                }
+            }
+            // pad out the constant cvecs
+            for id in consts.iter() {
+                for _i in 0..num_ces {
+                    graph[*id].data.cvec.push(None);
+                }
+            }
+            graph.analysis.cvec_len += num_ces;
+            synth.initial_egraph = graph.clone();
+        } else {
+            synth.initial_egraph = synth.egraph.clone();
         }
         synth
     }
@@ -1174,6 +1230,9 @@ pub struct SynthParams {
     /// Output file name
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
+    /// Counterexamples file
+    #[clap(long, default_value = "counterexamples.txt")]
+    pub ces_file: String,
     /// Constant folding
     #[clap(long)]
     pub no_constant_fold: bool,
@@ -1308,7 +1367,7 @@ pub struct ConvertParams {
 #[derive(Parser)]
 #[clap(rename_all = "kebab-case")]
 pub enum Command {
-    Synth(SynthParams),
+    Synth(Box<SynthParams>),
     Derive(DeriveParams),
     ConvertSexp(ConvertParams),
 }
@@ -1666,16 +1725,21 @@ impl<L: SynthLanguage> Synthesizer<L> {
             assert!(new_eqs.is_empty());
         }
 
-        if self.params.write_ces && ces.len() > 0 {
+        if self.params.write_ces && !ces.is_empty() {
             let mut file = OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open("counterexamples.json")
+                .open(self.params.ces_file.to_string())
                 .ok()
                 .unwrap();
-
+            // this is a bit of a hacky solution where we establish the end of an assignment to all variables
+            // by writing a *. it would be better to serialize a vector of constants but idk how to deserialize
+            // that so this is what we are doing until i figure out how to do the other thing!!
             for ce in ces {
-                writeln!(file, "{:#}", ce).ok();
+                for constant in ce {
+                    writeln!(file, "{}", constant).ok();
+                }
+                writeln!(file, "*").ok();
             }
         }
         (keepers, bads)
