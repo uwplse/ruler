@@ -1317,7 +1317,7 @@ pub struct SynthParams {
     ///////////////////
     // for validation approach
     /// random testing based validation
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "100")]
     pub num_fuzz: usize,
     /// SMT based verification (uses Z3 for the current prototype)
     #[clap(long, conflicts_with = "num-fuzz")]
