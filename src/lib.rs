@@ -419,7 +419,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             })
             .with_node_limit(self.params.eqsat_node_limit * 2)
             .with_iter_limit(self.params.eqsat_iter_limit)
-            .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
+            // .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
         runner = if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
