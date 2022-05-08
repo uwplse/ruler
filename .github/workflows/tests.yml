@@ -87,17 +87,17 @@ jobs:
 
       - name: "Synthesize rational rules"
         run: |
-          cargo rational --iters 2 --variables 3 --use-smt --do-final-run --outfile out/rat.json
+          cargo rational --iters 2 --variables 3 --num-fuzz 100 --do-final-run --outfile out/rat.json
           cargo run --release --bin rational derive --ci out/rat.json tests/rat.json out/rat-derive.json
 
       - name: "Synthesize rational rules (EMA)"
         run: |
-          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --use-smt --do-final-run --outfile out/rat-ema.json
+          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --num-fuzz 100 --do-final-run --outfile out/rat-ema.json
           cargo run --release --bin rational derive --ci out/rat-ema.json tests/rat-ema.json out/rat-ema-derive.json
 
       - name: "Synthesize rational rules (EMA, no consts)"
         run: |
-          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --use-smt --do-final-run --outfile out/rat-ema-no-const.json
+          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --num-fuzz 100 --do-final-run --outfile out/rat-ema-no-const.json
           cargo run --release --bin rational derive --ci out/rat-ema-no-const.json tests/rat-ema-no-const.json out/rat-ema-no-const-derive.json
 
       - name: "Synthesize bv4 rules"
@@ -118,8 +118,8 @@ jobs:
       - name: "Synthesize bv2 rules from bool rules (rule lifting)"
         run: |
           cargo bool --iters 2 --variables 3 --outfile out/bool.json
-          cargo bv-bool --iters 2 --variables 3 --prior-rules out/bool.json --outfile out/bv2.json
-          cargo run --release --bin bv-bool derive --ci out/bv2.json tests/bv2.json out/bv2-derive.json
+          cargo bv-bool --iters 2 --variables 3 --prior-rules out/bool.json --outfile out/bv2-bool.json
+          cargo run --release --bin bv-bool derive --ci out/bv2-bool.json tests/bv2-bool.json out/bv2-derive.json
 
       # Need to filter out rational rules from real.json
       # - name: "Synthesize complex rules from real rules (rule lifting, no constants)"
