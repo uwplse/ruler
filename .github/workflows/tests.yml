@@ -115,7 +115,7 @@ jobs:
           cargo real-rat --iters 2 --variables 3 --no-constants-above-iter 1 --prior-rules out/rat.json --outfile out/real.json
           cargo run --release --bin real-rat derive --ci --new-eqs out/real.json tests/real.json out/real-derive.json
 
-      - name: "Synthesize bv2 rules from bool rules (rule lifting"
+      - name: "Synthesize bv2 rules from bool rules (rule lifting)"
         run: |
           cargo bool --iters 2 --variables 3 --outfile out/bool.json
           cargo bv-bool --iters 2 --variables 3 --prior-rules out/bool.json --outfile out/bv2.json

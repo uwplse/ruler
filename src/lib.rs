@@ -1343,7 +1343,7 @@ pub struct DeriveParams {
     in1: String,
     in2: String,
     out: String,
-    #[clap(long, default_value = "5")]
+    #[clap(long, default_value = "10")]
     iter_limit: usize,
     #[clap(long, default_value = "300000")]
     node_limit: usize,
