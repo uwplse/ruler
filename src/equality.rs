@@ -1,6 +1,6 @@
 use crate::*;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 /// Definition of an equality.
 #[derive(Clone, Serialize, Deserialize)]
@@ -20,6 +20,43 @@ struct SerializedEq {
     lhs: String,
     rhs: String,
     bidirectional: bool,
+}
+
+impl FromStr for SerializedEq {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((l, r)) = s.split_once("=>") {
+            Ok(Self {
+                lhs: l.into(),
+                rhs: r.into(),
+                bidirectional: false,
+            })
+        } else if let Some((r, l)) = s.split_once("<=") {
+            Ok(Self {
+                lhs: l.into(),
+                rhs: r.into(),
+                bidirectional: false,
+            })
+        } else if let Some((l, r)) = s.split_once("<=>") {
+            Ok(Self {
+                lhs: l.into(),
+                rhs: r.into(),
+                bidirectional: true,
+            })
+        } else {
+            Err(format!("Failed to split {}", s))
+        }
+    }
+}
+
+impl<L: SynthLanguage> FromStr for Equality<L> {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let ser_eq: SerializedEq = s.parse()?;
+        Ok(Self::from(ser_eq))
+    }
 }
 
 impl<L: SynthLanguage + 'static> From<SerializedEq> for Equality<L> {
@@ -77,6 +114,8 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         egraph: &mut EGraph<L, SynthAnalysis>,
         matched_id: Id,
         subst: &Subst,
+        _ast: Option<&PatternAst<L>>,
+        _sym: Symbol,
     ) -> Vec<Id> {
         if !egraph[matched_id].data.is_defined() {
             return vec![];
@@ -86,15 +125,14 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             return vec![];
         }
 
-        let ids = self.rhs.apply_one(egraph, matched_id, subst);
-        // assert_eq!(ids.len(), 1);
-        if ids.is_empty() {
-            return vec![];
-        }
-        let id = ids[0];
+        let id = apply_pat(self.rhs.ast.as_ref(), egraph, subst);
+
         if !egraph[id].data.is_defined() {
             return vec![];
         }
+
+        // now it's finally safe to union those things
+        egraph.union(id, matched_id);
 
         for (i, (a, b)) in egraph[matched_id]
             .data
@@ -120,16 +158,13 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             }
         }
 
-        ids
+        vec![id]
     }
 }
 
 impl<L: SynthLanguage> Equality<L> {
-    /// Create a new [Equality] from two [RecExprs](https://docs.rs/egg/0.6.0/egg/struct.RecExpr.html).
-    pub fn new<'a>(mut e1: &'a RecExpr<L>, mut e2: &'a RecExpr<L>) -> Option<Self> {
-        if e1 < e2 {
-            std::mem::swap(&mut e1, &mut e2);
-        }
+    /// Create a new [Equality] from two [RecExprs](https://docs.rs/egg/latest/egg/struct.RecExpr.html).
+    pub fn new<'a>(e1: &'a RecExpr<L>, e2: &'a RecExpr<L>) -> Option<Self> {
         let mut forward: (String, Pattern<L>, Pattern<L>, Option<Rewrite<L, _>>) = {
             let map = &mut HashMap::default();
             let lhs = L::generalize(e1, map);
@@ -198,4 +233,28 @@ impl<L: SynthLanguage> Equality<L> {
     pub fn score(&self) -> impl Ord + Debug {
         L::score(&self.lhs, &self.rhs)
     }
+}
+
+// copied from egg
+// we need a way to "apply" a pattern without causing any unions
+// as of egg 0.7, apply_one does the union, so we can't use that.
+fn apply_pat<L: Language, A: Analysis<L>>(
+    pat: &[ENodeOrVar<L>],
+    egraph: &mut EGraph<L, A>,
+    subst: &Subst,
+) -> Id {
+    let mut ids = vec![0.into(); pat.len()];
+
+    for (i, pat_node) in pat.iter().enumerate() {
+        let id = match pat_node {
+            ENodeOrVar::Var(w) => subst[*w],
+            ENodeOrVar::ENode(e) => {
+                let n = e.clone().map_children(|child| ids[usize::from(child)]);
+                egraph.add(n)
+            }
+        };
+        ids[i] = id;
+    }
+
+    *ids.last().unwrap()
 }

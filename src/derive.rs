@@ -104,10 +104,6 @@ fn one_way<L: SynthLanguage>(
             .with_expr(&l)
             .with_expr(&r)
             .with_iter_limit(params.iter_limit)
-            .with_node_limit(params.node_limit)
-            .with_time_limit(Duration::from_secs(params.time_limit))
-            // .with_node_limit(100_000)
-            // .with_time_limit(Duration::from_secs(10))
             .with_scheduler(egg::SimpleScheduler)
             .with_hook(|r| {
                 if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {

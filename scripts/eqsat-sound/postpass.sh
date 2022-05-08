@@ -176,7 +176,7 @@ if [ $DOMAIN == "rational" ]; then
       echo "$p" >> verify-rat.rkt
       echo "(printf \"~a \n\" num_unsound)" >> verify-rat.rkt
       echo "(close-output-port failed)" >> verify-rat.rkt
-      res=$(timeout -k $TIMEOUT $TIMEOUT $MYDIR/racket/bin/racket verify-rat.rkt)
+      res=$(timeout -k $TIMEOUT $TIMEOUT racket verify-rat.rkt)
       if [ $? -ne 0 ]; then
           ((UNKNOWN=UNKNOWN+1))
           echo "$p" > unknown.txt
@@ -197,7 +197,7 @@ elif [ $DOMAIN = "4" ] || [ $DOMAIN = "8" ] || [ $DOMAIN = "16" ] || [ $DOMAIN =
       echo ")"  >> verify-bv.rkt
       echo "(close-output-port failed)" >> verify-bv.rkt
       echo "(printf \"~a \n\" num_unsound)" >> verify-bv.rkt
-      res="$(timeout -k $TIMEOUT $TIMEOUT $MYDIR/racket/bin/racket verify-bv.rkt)"
+      res="$(timeout -k $TIMEOUT $TIMEOUT racket verify-bv.rkt)"
       if [ $? -ne 0 ]; then
           ((UNKNOWN=UNKNOWN+1))
           echo "$p" > unknown.txt
@@ -213,5 +213,4 @@ else
     echo "$2 is a bad domain" >&2
     exit 1
 fi
-
 echo "{\"unsound\": $UNSOUND, \"unknown\": $UNKNOWN}" > post_pass.json

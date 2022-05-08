@@ -108,6 +108,22 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         self.to_var().is_some()
     }
 
+    fn to_enode_or_var(self) -> ENodeOrVar<Self> {
+        match self.to_var() {
+            Some(var) => ENodeOrVar::Var(format!("?{}", var).parse().unwrap()),
+            None => ENodeOrVar::ENode(self),
+        }
+    }
+
+    fn to_pattern(expr: RecExpr<Self>) -> Pattern<Self> {
+        let nodes: Vec<ENodeOrVar<Self>> = expr
+            .as_ref()
+            .iter()
+            .map(|node| node.clone().to_enode_or_var())
+            .collect();
+        PatternAst::from(nodes).into()
+    }
+
     fn to_constant(&self) -> Option<&Self::Constant>;
     fn mk_constant(c: Self::Constant) -> Self;
     fn is_constant(&self) -> bool {
@@ -116,25 +132,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
 
     /// Generalize a pattern
     fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {
-        let nodes: Vec<_> = expr
-            .as_ref()
-            .iter()
-            .map(|n| match n.to_var() {
-                Some(sym) => {
-                    let var = if let Some(var) = map.get(&sym) {
-                        *var
-                    } else {
-                        let var = format!("?{}", letter(map.len())).parse().unwrap();
-                        map.insert(sym, var);
-                        var
-                    };
-                    ENodeOrVar::Var(var)
-                }
-                None => ENodeOrVar::ENode(n.clone()),
-            })
-            .collect();
-
-        Pattern::from(PatternAst::from(nodes))
+        let expr = Self::alpha_rename_with(expr, map);
+        Self::to_pattern(expr)
     }
 
     /// Instantiate a pattern
@@ -156,30 +155,26 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         RecExpr::from(nodes)
     }
 
+    fn alpha_rename_with(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> RecExpr<Self> {
+        let mut rename_node = |node: &Self| match node.to_var() {
+            Some(sym) => {
+                let len = map.len();
+                let var = map
+                    .entry(sym)
+                    .or_insert_with(|| format!("?{}", letter(len)).parse().unwrap());
+
+                let s = var.to_string();
+                Self::mk_var(s[1..].into())
+            }
+            None => node.clone(),
+        };
+        let root = rename_node(expr.as_ref().last().unwrap());
+        root.build_recexpr(|id| rename_node(&expr[id]))
+    }
+
     /// Applies alpha renaming to a recexpr
-    fn alpha_renaming(expr: &RecExpr<Self>) -> RecExpr<Self> {
-        let map = &mut HashMap::<Symbol, Var>::default();
-        let nodes: Vec<_> = expr
-            .as_ref()
-            .iter()
-            .map(|n| match n.to_var() {
-                Some(sym) => {
-                    let var = if let Some(var) = map.get(&sym) {
-                        *var
-                    } else {
-                        let var = format!("?{}", letter(map.len())).parse().unwrap();
-                        map.insert(sym, var);
-                        var
-                    };
-
-                    let s = var.to_string();
-                    Self::mk_var(s[1..].into())
-                }
-                None => n.clone(),
-            })
-            .collect();
-
-        RecExpr::from(nodes)
+    fn alpha_rename(expr: &RecExpr<Self>) -> RecExpr<Self> {
+        Self::alpha_rename_with(expr, &mut Default::default())
     }
 
     /// Heuristics for ranking rewrites based on number of variables,
@@ -422,9 +417,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     Ok(())
                 }
             })
-            .with_node_limit(self.params.eqsat_node_limit * 2)
             .with_iter_limit(self.params.eqsat_iter_limit)
-            .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
         runner = if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
@@ -674,9 +667,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         layer
             .iter()
             .filter_map(|node| {
-                let rec = node.to_recexpr(|id| self.egraph[id].data.simplest.as_ref());
+                let rec = node.join_recexprs(|id| self.egraph[id].data.simplest.as_ref());
                 if iter > self.params.ema_above_iter {
-                    let rec2 = L::alpha_renaming(&rec);
+                    let rec2 = L::alpha_rename(&rec);
                     let id = cp.add_expr(&rec2);
                     if usize::from(id) < max_id {
                         return None;
@@ -1348,7 +1341,7 @@ pub struct DeriveParams {
     in1: String,
     in2: String,
     out: String,
-    #[clap(long, default_value = "5")]
+    #[clap(long, default_value = "10")]
     iter_limit: usize,
     #[clap(long, default_value = "300000")]
     node_limit: usize,
@@ -1425,12 +1418,14 @@ pub struct Interval<T> {
     pub high: Option<T>, // None represents +inf
 }
 
-impl<T: Ord> Interval<T> {
+impl<T: Ord + Display> Interval<T> {
     pub fn new(low: Option<T>, high: Option<T>) -> Self {
         if let (Some(a), Some(b)) = (&low, &high) {
             assert!(
                 a.le(b),
-                "Invalid interval: low must be less than or equal to high"
+                "Invalid interval: low must be less than or equal to high\n{} >= {}",
+                a,
+                b
             );
         }
         Self { low, high }
@@ -1466,7 +1461,7 @@ impl<L: SynthLanguage> Signature<L> {
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
-    fn merge(&self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+    fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let mut merge_a = false;
         let mut merge_b = false;
         let cost_fn = |x: &RecExpr<L>| {
@@ -1820,4 +1815,32 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
             usize::max_value()
         }
     }
+}
+
+pub fn assert_eqs_same<L: SynthLanguage>(actual: &[Equality<L>], expected: &[Equality<L>]) {
+    let actual: HashSet<&str> = actual.iter().map(|eq| eq.name.as_ref()).collect();
+    let expected: HashSet<&str> = expected.iter().map(|eq| eq.name.as_ref()).collect();
+
+    let mut missing = String::new();
+    for rule in expected.difference(&actual) {
+        missing.push_str(&format!("  {}\n", rule));
+    }
+    let mut unexpected = String::new();
+    for rule in actual.difference(&expected) {
+        unexpected.push_str(&format!("  {}\n", rule));
+    }
+    if missing.len() + unexpected.len() > 0 {
+        panic!(
+            "Equalities aren't the same!\nMissing:\n{}Unexpected:\n{}",
+            missing, unexpected
+        )
+    }
+}
+
+pub fn assert_eqs_same_as_strs<L: SynthLanguage + FromOp>(
+    actual: &[Equality<L>],
+    expected: &[&str],
+) {
+    let expected: Vec<Equality<L>> = expected.iter().map(|a| a.parse().unwrap()).collect();
+    assert_eqs_same(actual, &expected)
 }
