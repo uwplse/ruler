@@ -417,9 +417,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     Ok(())
                 }
             })
-            .with_node_limit(self.params.eqsat_node_limit * 2)
             .with_iter_limit(self.params.eqsat_iter_limit)
-            // .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
         runner = if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
@@ -1317,7 +1315,7 @@ pub struct SynthParams {
     ///////////////////
     // for validation approach
     /// random testing based validation
-    #[clap(long, default_value = "100")]
+    #[clap(long, default_value = "0")]
     pub num_fuzz: usize,
     /// SMT based verification (uses Z3 for the current prototype)
     #[clap(long, conflicts_with = "num-fuzz")]
