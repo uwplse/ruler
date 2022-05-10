@@ -58,9 +58,8 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
     if params.new_eqs {
         pairs_1 = parse::<L>(&params.in1, &RuleType::New);
         pairs_2 = parse::<L>(&params.in2, &RuleType::New);
-
     }
-    
+
     println!("Using {} to derive {}", params.in1, params.in2);
     let (derivable, not_derivable) = one_way(&params, &pairs_1, &pairs_2);
 
