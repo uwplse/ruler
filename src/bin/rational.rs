@@ -570,7 +570,7 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
 // String representation of the model in the ValidationResult, then attempt
 // to parse it in lib. Since the z3 syntax is so different, I think this is
 // probably not worth the trouble...
-fn model_to_assignment(model: &mut String) -> Vec<Constant> {
+fn model_to_assignment(model: &mut str) -> Vec<Constant> {
     // get rid of the output of the model; we only care about the variable
     // assignments
     let mut assignments: Vec<&str> = model.split("/0").collect();
