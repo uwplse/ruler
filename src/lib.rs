@@ -605,7 +605,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let extract = Extractor::new(&self.egraph, AstSize);
 
         let compare = |cvec1: &CVec<L>, cvec2: &CVec<L>| -> bool {
-            for tup in cvec1.iter().zip(cvec2) {
+            for (i, tup) in cvec1.iter().zip(cvec2).enumerate() {
+                if self.params.num_ces > 0
+                    && i > self.egraph.analysis.cvec_len - self.params.num_ces
+                {
+                    log::info!("Counterexamples being used.");
+                }
+
                 match tup {
                     (Some(a), Some(b)) if a != b => return false,
                     _ => (),
