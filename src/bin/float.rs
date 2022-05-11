@@ -3,15 +3,11 @@ Experimental Float domain.
 This is a good example of how Ruler allows custom samplers for different domains.
 Validation is done using random testing.
 !*/
-
 use egg::*;
 use ordered_float::OrderedFloat;
 use rand::Rng;
 use rand_pcg::Pcg64;
 use ruler::*;
-// use std::fs::OpenOptions;
-// use std::io::Write;
-
 /// Ordered Floats as constants.
 pub type Constant = OrderedFloat<f64>;
 

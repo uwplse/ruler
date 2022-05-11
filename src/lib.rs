@@ -446,6 +446,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     graph[*id].data.cvec.push(None);
                 }
             }
+            // update cvec length
             graph.analysis.cvec_len += num_ces;
             synth.initial_egraph = graph.clone();
         } else {

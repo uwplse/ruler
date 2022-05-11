@@ -349,13 +349,11 @@ impl SynthLanguage for Math {
             },
             rule_lifting: false,
         });
-
         // add the variables and their cvecs into the egraph
         for (var, cvec) in vars.iter() {
             let id = egraph.add(Math::Var(*var));
             egraph[id].data.cvec = cvec.clone();
         }
-
         for n in &constants {
             egraph.add(Math::Num(n.clone()));
         }
@@ -445,7 +443,9 @@ impl SynthLanguage for Math {
     ) -> ValidationResult<Self> {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
+            // cfg.set_proof_generation(true);
             cfg.set_timeout_msec(1000);
+
             let ctx = z3::Context::new(&cfg);
             let solver = z3::Solver::new(&ctx);
             let (lexpr, mut lasses) = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
@@ -461,6 +461,8 @@ impl SynthLanguage for Math {
                 }
                 SatResult::Sat => {
                     println!("z3 validation: failed for {} => {}", lhs, rhs);
+                    let model = solver.get_model().unwrap();
+                    println!("Counterexample: {:?}", model);
                     ValidationResult::Invalid
                 }
                 SatResult::Unknown => {
@@ -503,7 +505,6 @@ impl SynthLanguage for Math {
                     if l.clone().unwrap() != r.clone().unwrap() {
                         // Since are no longer using structs, we want to preserve an ordering for the variables.
                         for (_key, val) in env.iter_mut().sorted() {
-                            // assignment.push(Math::Num(val.clone()[i].clone().unwrap().clone()));
                             assignment.push(val.clone()[i].clone().unwrap().clone());
                         }
                         // only need a single example
