@@ -461,9 +461,15 @@ impl SynthLanguage for Math {
                 }
                 SatResult::Sat => {
                     println!("z3 validation: failed for {} => {}", lhs, rhs);
-                    let model = solver.get_model().unwrap();
-                    println!("Counterexample: {:?}", model);
-                    ValidationResult::Invalid
+
+                    if synth.params.write_ces {
+                        let mut string_model = solver.get_model().unwrap().to_string();
+                        let mut consts: Vec<Constant> = model_to_assignment(&mut string_model);
+                        consts.reverse();
+                        ValidationResult::InvalidWithCes(consts)
+                    } else {
+                        ValidationResult::Invalid
+                    }
                 }
                 SatResult::Unknown => {
                     println!("z3 validation: unknown for {} => {}", lhs, rhs);
@@ -516,7 +522,7 @@ impl SynthLanguage for Math {
             if lvec == rvec {
                 ValidationResult::Valid
             } else if synth.params.write_ces {
-                ValidationResult::InvalidWithFuzz(assignment)
+                ValidationResult::InvalidWithCes(assignment)
             } else {
                 ValidationResult::Invalid
             }
@@ -551,6 +557,65 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
         }
     }
     ret
+}
+
+/// Convert a String representation of a z3 Model to a vector of constants
+// representing assignments to variables.
+
+// Some thoughts -- this is obviously highly domain-specific and cannot easily
+// be moved into lib, but hopefully this function serves as a helpful template
+// for deserializing from a String representation of a Model.
+
+// One thing that could potentially be done is: when using SMT, return the
+// String representation of the model in the ValidationResult, then attempt
+// to parse it in lib. Since the z3 syntax is so different, I think this is
+// probably not worth the trouble...
+fn model_to_assignment(model: &mut String) -> Vec<Constant> {
+    // get rid of the output of the model; we only care about the variable
+    // assignments
+    let mut assignments: Vec<&str> = model.split("/0").collect();
+    assignments = assignments[0].split('\n').collect();
+    // eliminate trailing empty string
+    let len = assignments.len();
+    assignments = assignments.drain(..len - 1).collect::<Vec<&str>>();
+    // initialize
+    let mut consts = vec![];
+    for assignment in assignments.iter() {
+        // this gets us a variable and its assignment
+        let var_and_rat: Vec<&str> = assignment.split("->").collect();
+        // only care about the assignment for our purposes
+        let mut rat = var_and_rat[1].trim().to_string();
+        // now we have to parse some s expressions
+        let braces: &[_] = &['(', ')'];
+        rat = rat.trim_matches(braces).to_string();
+        let mut first_char: char = rat.chars().next().unwrap();
+        let mut negative: f32 = 1.0;
+        while first_char == '/' || first_char == '-' {
+            if first_char == '-' {
+                negative *= -1.0;
+            }
+            rat = rat.drain(1..).collect::<String>();
+            rat = rat.trim().to_string();
+            rat = rat.trim_matches(braces).to_string();
+            first_char = rat.chars().next().unwrap();
+        }
+        let reals: Vec<&str> = rat.split(' ').collect();
+        let mut num: f32 = reals[0].parse::<f32>().ok().unwrap();
+        num *= negative;
+        if reals.len() == 1 {
+            consts.push(Constant::new(
+                num.to_bigint().unwrap(),
+                1.to_bigint().unwrap(),
+            ));
+        } else {
+            let denom: f32 = reals[1].parse::<f32>().ok().unwrap();
+            consts.push(Constant::new(
+                num.to_bigint().unwrap(),
+                denom.to_bigint().unwrap(),
+            ));
+        }
+    }
+    consts
 }
 
 /// Convert expressions to Z3's syntax for using SMT based rule verification.

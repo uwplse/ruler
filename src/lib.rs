@@ -62,7 +62,7 @@ pub enum ConstantFoldMethod {
 pub enum ValidationResult<T: SynthLanguage> {
     Valid,
     Invalid,
-    InvalidWithFuzz(Vec<<T as SynthLanguage>::Constant>),
+    InvalidWithCes(Vec<<T as SynthLanguage>::Constant>),
     Unknown,
 }
 
@@ -391,20 +391,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let reader = BufReader::new(file.unwrap());
             // deserialize from file
             let mut ces: Vec<Vec<<L as SynthLanguage>::Constant>> = vec![];
-            let mut count: usize = 0;
-            let mut lines = reader.lines();
-            let mut ce: Vec<<L as SynthLanguage>::Constant> = vec![];
+            // let mut ce: Vec<<L as SynthLanguage>::Constant> = vec![];
             // read & parse from file
-            while count < num_ces {
-                let line = lines.next().unwrap().ok().unwrap().clone();
-                if line == "*" {
-                    ces.push(ce.clone());
-                    ce = vec![];
-                    count += 1;
-                } else {
-                    let constant = line.parse().ok().unwrap();
-                    ce.push(constant);
+            for (i, line) in reader.lines().enumerate() {
+                if i >= num_ces {
+                    break;
                 }
+                let line = line.ok().unwrap().clone();
+                let mut ce_string: Vec<&str> = line.split(',').collect::<Vec<&str>>();
+                let mut ce = vec![];
+                for element in ce_string.iter_mut() {
+                    ce.push(element.parse().ok().unwrap());
+                }
+                ces.push(ce.clone());
             }
             let mut graph = synth.egraph.clone();
             let mut vars = vec![];
@@ -1633,7 +1632,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                                 let old = keepers.insert(name, eq);
                                 took += old.is_none() as usize;
                             }
-                            ValidationResult::InvalidWithFuzz(assignment) => {
+                            ValidationResult::InvalidWithCes(assignment) => {
                                 ces.push(assignment);
                                 bads.insert(name, eq);
                             }
@@ -1737,10 +1736,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
             // by writing a *. it would be better to serialize a vector of constants but idk how to deserialize
             // that so this is what we are doing until i figure out how to do the other thing!!
             for ce in ces {
-                for constant in ce {
-                    writeln!(file, "{}", constant).ok();
+                let mut assignment: String = "".to_string();
+                for (i, constant) in ce.iter().enumerate() {
+                    if i == ce.len() - 1 {
+                        assignment.push_str(&constant.to_string());
+                    } else {
+                        assignment.push_str(&constant.to_string());
+                        assignment.push(',');
+                    }
                 }
-                writeln!(file, "*").ok();
+                writeln!(file, "{}", assignment).ok();
             }
         }
         (keepers, bads)
