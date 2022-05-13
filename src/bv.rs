@@ -259,8 +259,8 @@ macro_rules! impl_bv {
                     rule_lifting: false,
                 });
 
-                // egraph.add(Math::Num(BV::ZERO));
-                // egraph.add(Math::Num(1.into()));
+                egraph.add(Math::Num(BV::ZERO));
+                egraph.add(Math::Num(1.into()));
                 // egraph.add(Math::Num(2.into()));
                 // egraph.add(Math::Num(BV::MIN));
                 // egraph.add(Math::Num(BV::MAX));

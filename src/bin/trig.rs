@@ -1,5 +1,5 @@
 /*!
-    Trigonometry from reals
+    Trigonometry from complex
 !*/
 
 use std::fmt;
@@ -8,57 +8,16 @@ use std::hash::Hash;
 use std::ops::*;
 use std::str::FromStr;
 
+use num::{
+    bigint::BigInt,
+    rational::{ParseRatioError, Ratio},
+    {Signed, Zero},
+};
+
 use egg::*;
 use ruler::*;
 
-// custom implementation of a complex value
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Complex(Symbol);
-
-impl Complex {
-    fn as_str(self) -> &'static str {
-        self.0.as_str()
-    }
-
-    fn is_real(self) -> bool {
-        !self.0.as_str().chars().any(|x| x == 'i')
-    }
-}
-
-impl<S: AsRef<str>> From<S> for Complex {
-    fn from(s: S) -> Self {
-        Complex(Symbol::from(s))
-    }
-}
-
-impl From<Complex> for &'static str {
-    fn from(s: Complex) -> Self {
-        s.as_str()
-    }
-}
-
-impl FromStr for Complex {
-    type Err = &'static str;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 1 && !s.starts_with('?') && s.ends_with('C') {
-            Ok(s.into())
-        } else {
-            Err("not complex")
-        }
-    }
-}
-
-impl Display for Complex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(self.as_str(), f)
-    }
-}
-
-impl Debug for Complex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(self.as_str(), f)
-    }
-}
+pub type Rational = Ratio<BigInt>;
 
 // custom implementation of real value
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -72,7 +31,7 @@ impl Real {
 
 impl<S: AsRef<str>> From<S> for Real {
     fn from(s: S) -> Self {
-        Real(Symbol::from(s))
+        Real(Symbol::from(s.as_ref()))
     }
 }
 
@@ -85,7 +44,7 @@ impl From<Real> for &'static str {
 impl FromStr for Real {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if !s.is_empty() && !s.starts_with('?') {
+        if !s.is_empty() && s.chars().all(|c| c.is_numeric() || c == '-' || c == '/') {
             Ok(s.into())
         } else {
             Err("not real")
@@ -117,7 +76,7 @@ impl Variable {
 
 impl<S: AsRef<str>> From<S> for Variable {
     fn from(s: S) -> Self {
-        Variable(Symbol::from(s))
+        Variable(Symbol::from(s.as_ref()))
     }
 }
 
@@ -152,73 +111,68 @@ impl Debug for Variable {
     }
 }
 
+fn is_zero(n: &Math) -> bool {
+    match n {
+        Math::RealConst(v) => *v == Real::from("0"),
+        _ => false,
+    }
+}
+
+fn real_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
+    r.as_str().parse()
+}
+
+fn extract_constant(nodes: &[Math]) -> Option<Real> {
+    for n in nodes {
+        if let Math::RealConst(v) = n {
+            return Some(*v);
+        }
+    }
+
+    None
+}
+
+fn trig_node(ns: &[Math], egraph: &EGraph<Math, SynthAnalysis>) -> bool {
+    ns.iter().any(|n| match n {
+        Math::Sin(_) | Math::Cos(_) | Math::Tan(_) | Math::Csc(_) | Math::Sec(_) | Math::Cot(_) => {
+            true
+        }
+        Math::Sqr(i) => trig_node(&egraph[*i].nodes, egraph),
+        _ => false,
+    })
+}
+
 define_language! {
     pub enum Math {
-        // complex
-        "~C" = CNeg(Id),
-        "+C" = CAdd([Id; 2]),
-        "-C" = CSub([Id; 2]),
-        "*C" = CMul([Id; 2]),
-        "/C" = CDiv([Id; 2]),
-        "cis" = Cis(Id),
-
-        // trig
+        // trig operators
         "sin" = Sin(Id),
         "cos" = Cos(Id),
+        "tan" = Tan(Id),
+        "csc" = Csc(Id),
+        "sec" = Sec(Id),
+        "cot" = Cot(Id),
+
+        // complex exponetial
+        "cis" = Cis(Id),
+
+        // arithmetic operators
         "~" = Neg(Id),
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
-        "Re" = Re(Id),
-        "Im" = Im(Id),
         "sqr" = Sqr(Id),
 
         // constants
-        ComplexConst(Complex),
+        "I" = Imag,
+        "PI" = Pi,
         RealConst(Real),
         Var(Variable),
     }
 }
 
-// For any Complex(_) ?a, applier adds (Re ?a) to the egraph for any ?a
-#[derive(Debug)]
-struct ComplexToRealApplier(&'static str);
-impl Applier<Math, SynthAnalysis> for ComplexToRealApplier {
-    fn apply_one(&self, egraph: &mut EGraph<Math, SynthAnalysis>, _: Id, subst: &Subst) -> Vec<Id> {
-        let id = subst[self.0.parse().unwrap()];
-        if egraph[id].data.is_allowed {
-            return vec![];
-        }
-
-        let found = egraph[id].iter().find_map(|n| match n {
-            Math::ComplexConst(c) => {
-                if c.is_real() {
-                    let s = c.as_str();
-                    Some(&s[..(s.len() - 1)])
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        });
-
-        if let Some(v) = found {
-            let re_id = egraph.add(Math::Re(id));
-            let cnst_id = egraph.add(Math::RealConst(Real::from(v)));
-            egraph.union(re_id, cnst_id);
-        }
-
-        vec![]
-    }
-}
-
-fn complex_const_symbol(s: &str) -> Complex {
-    Complex::from(s.to_owned() + "C")
-}
-
 impl SynthLanguage for Math {
-    type Constant = Real; // not used
+    type Constant = Real;
 
     // no evaluation needed
     fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
@@ -257,54 +211,56 @@ impl SynthLanguage for Math {
         matches!(self, Math::RealConst(_))
     }
 
-    /// Returns true if the node is in the current domain.
-    /// Useful for rule lifting.
     fn is_allowed(&self) -> bool {
         matches!(
             self,
             Math::Sin(_)
                 | Math::Cos(_)
-                | Math::Neg(_)
-                | Math::Add([_, _])
-                | Math::Sub([_, _])
-                | Math::Mul([_, _])
-                | Math::Div([_, _])
-                | Math::Re(_)
-                | Math::Im(_)
-                | Math::Sqr(_)
-                | Math::RealConst(_)
-                | Math::Var(_)
+                | Math::Tan(_)
+                | Math::Csc(_)
+                | Math::Sec(_)
+                | Math::Cot(_)
+                | Math::Pi
         )
     }
 
     fn is_extractable(&self) -> bool {
         matches!(
             self,
+            // Standard extractable nodes
             Math::Sin(_)
                 | Math::Cos(_)
+                | Math::Tan(_)
+                | Math::Neg(_)
                 | Math::Add(_)
                 | Math::Sub(_)
                 | Math::Mul(_)
                 | Math::Div(_)
                 | Math::RealConst(_)
+                | Math::Pi
                 | Math::Var(_)
+
+                // Interesting complex nodes
+                // | Math::Cis(_)
+                // | Math::Imag
+
+                // Reciprocal trig
+                | Math::Csc(_)
+                | Math::Sec(_)
+                | Math::Cot(_)
         )
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        // disabled constants (TODO: validate input)
-        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
+        // disabled operators (TODO: validate input)
+        let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
             s.split(' ').collect()
         } else {
             vec![]
         };
 
-        // this is for adding to the egraph, not used for cvec.
-        let constants: Vec<Complex> = ["2", "1", "0", "-1", "-2"]
-            .iter()
-            .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
-            .map(|s| complex_const_symbol(s))
-            .collect();
+        // predicate if disabled
+        let allowedp = |s: &str| !disabled_ops.iter().any(|x| x.eq(&s));
 
         let mut egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
@@ -316,80 +272,158 @@ impl SynthLanguage for Math {
             rule_lifting: true,
         });
 
-        // variables
-        for i in 0..synth.params.variables {
-            let var = Variable::from(letter(i));
-            egraph.add(Math::Var(var));
+        if synth.params.workload.is_none() {
+            // variables
+            for i in 0..synth.params.variables {
+                let var = Variable::from(letter(i));
+                egraph.add(Math::Var(var));
+            }
+
+            // constants
+            egraph.add(Math::RealConst(Real::from("-1")));
+            egraph.add(Math::RealConst(Real::from("0")));
+            egraph.add(Math::RealConst(Real::from("1")));
+
+            // constant values of sin, cosine, tangent
+            if allowedp("sin") {
+                egraph.add_expr(&"(sin 0)".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 6))".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 4))".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 3))".parse().unwrap());
+                egraph.add_expr(&"(sin (/ PI 2))".parse().unwrap());
+                egraph.add_expr(&"(sin PI)".parse().unwrap());
+                egraph.add_expr(&"(sin (* 2 PI))".parse().unwrap());
+            }
+
+            if allowedp("cos") {
+                egraph.add_expr(&"(cos 0)".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 6))".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 4))".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 3))".parse().unwrap());
+                egraph.add_expr(&"(cos (/ PI 2))".parse().unwrap());
+                egraph.add_expr(&"(cos PI)".parse().unwrap());
+                egraph.add_expr(&"(cos (* 2 PI))".parse().unwrap());
+            }
+
+            if allowedp("tan") {
+                egraph.add_expr(&"(tan 0)".parse().unwrap());
+                egraph.add_expr(&"(tan (/ PI 6))".parse().unwrap());
+                egraph.add_expr(&"(tan (/ PI 4))".parse().unwrap());
+                egraph.add_expr(&"(tan (/ PI 3))".parse().unwrap());
+                // egraph.add_expr(&"(tan (/ PI 2))".parse().unwrap());
+                egraph.add_expr(&"(tan PI)".parse().unwrap());
+                egraph.add_expr(&"(tan (* 2 PI))".parse().unwrap());
+            }
         }
 
-        // constants
-        for c in constants {
-            egraph.add(Math::ComplexConst(c));
-        }
-
-        // i * i = -1;
-        let i_id = egraph.add(Math::ComplexConst(complex_const_symbol("i")));
-        let i2_id = egraph.add(Math::CMul([i_id, i_id]));
-        let neg1_id = egraph.add(Math::ComplexConst(Complex::from("-1C")));
-        egraph.union(i2_id, neg1_id);
-
-        // 2i * 2i = -4;
-        let twoi_id = egraph.add(Math::ComplexConst(complex_const_symbol("2i")));
-        let twoi2_id = egraph.add(Math::CMul([twoi_id, twoi_id]));
-        let neg4_id = egraph.add(Math::ComplexConst(Complex::from("-4C")));
-        egraph.union(twoi2_id, neg4_id);
-
-        // rewrites
+        // rewrites and extra rewrites
         synth.lifting_rewrites = vec![
-            rewrite!("def-cos"; "(cos ?a)" <=> "(Re (/C (+C (cis ?a) (cis (~ ?a))) 2C))"),
-            rewrite!("def-sin"; "(sin ?a)" <=> "(Re (/C (-C (cis ?a) (cis (~ ?a))) 2iC))"),
-            rewrite!("def-cis-add"; "(cis (+ ?a ?b))" <=> "(*C (cis ?a) (cis ?b))"),
-            rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-            rewrite!("def-cos-sqr"; "(sqr (cos ?a))" <=>
-                     "(Re (/C (*C (+C (cis ?a) (cis (~ ?a))) (+C (cis ?a) (cis (~ ?a)))) 2C))"),
-            rewrite!("def-sin-sqr"; "(sqr (sin ?a))" <=>
-                     "(Re (/C (*C (-C (cis ?a) (cis (~ ?a))) (-C (cis ?a) (cis (~ ?a)))) 2iC))"),
-            vec![
-                rewrite!("def-add"; "(+ (Re ?a) (Re ?b))" => "(Re (+C ?a ?b))"),
-                rewrite!("def-mul"; "(* (Re ?a) (Re ?b))" => "(Re (*C ?a ?b))"),
-                rewrite!("cancel-cis-mul"; "(*C (cis ?a) (cis (~ ?a)))" => "1C"),
-                rewrite!("pure-real"; "?a" => { ComplexToRealApplier("?a") }),
-            ],
-        ]
-        .concat();
+            // definition of sine, cosine, tangent
+            rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
+            rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
+            rewrite!("def-tan"; "(tan ?a)" <=> "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"),
 
-        // duplicate rules for HL
-        for (_, eq) in &synth.old_eqs {
-            let l = eq.lhs.to_string();
-            let r = eq.rhs.to_string();
-            let ls: String = l.chars().filter(|c| *c != 'C').collect();
-            let rs: String = r.chars().filter(|c| *c != 'C').collect();
-            let lhs: RecExpr<Self> = ls.parse().unwrap();
-            let rhs: RecExpr<Self> = rs.parse().unwrap();
-            if let Some(e) = Equality::new(&lhs, &rhs) {
-                synth.all_eqs.insert(e.name.clone(), e);
+            // definition of cosecant, secant, cotangent
+            rewrite!("def-csc"; "(csc ?a)" <=> "(/ 1 (sin ?a))"),
+            rewrite!("def-sec"; "(sec ?a)" <=> "(/ 1 (cos ?a))"),
+            rewrite!("def-cot"; "(cot ?a)" <=> "(/ 1 (tan ?a))"),
+
+            // relating tangent to sine and cosine
+            rewrite!("def-tan-ratio"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
+
+            // // definition of cos(a) * cos(b)
+            // rewrite!("def-prod-cos"; "(* (cos ?a) (cos ?b))" <=>
+            //          "(/ (+ (* (cis ?a) (cis ?b))                   \
+            //                 (+ (* (cis ?a) (cis (~ ?b)))            \
+            //                    (+ (* (cis (~ ?a)) (cis ?b))         \
+            //                       (* (cis (~ ?a)) (cis (~ ?b))))))  \
+            //              4)"),
+            // // definition of sin(a) * sin(b)
+            // rewrite!("def-prod-sin"; "(* (sin ?a) (sin ?b))" <=>
+            //          "(~ (/ (+ (* (cis ?a) (cis ?b))                \
+            //                 (+ (~ (* (cis ?a) (cis (~ ?b))))        \
+            //                    (+ (~ (* (cis (~ ?a)) (cis ?b)))     \
+            //                       (* (cis (~ ?a)) (cis (~ ?b))))))  \
+            //                 4))"),
+            // // definition of sin(a) * cos(b)
+            // rewrite!("def-prod-sin-cos"; "(* (sin ?a) (cos ?b))" <=>
+            //                 "(/ (+ (* (cis ?a) (cis ?b))                        \
+            //                        (+ (* (cis ?a) (cis (~ ?b)))                 \
+            //                           (+ (~ (* (cis (~ ?a)) (cis ?b)))          \
+            //                              (~ (* (cis (~ ?a)) (cis (~ ?b)))))))   \
+            //                     (* 4 I))"),
+
+            // // definition of cos(a) * cos(b)
+            // rewrite!("def-prod-cos"; "(* (cos ?a) (cos ?b))" <=>
+            //          "(/ (+ (* (cis ?a) (cis ?b)) (+ (* (cis (~ ?a)) (cis (~ ?b))) \
+            //             (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4)"),
+            // // definition of sin(a) * sin(b)
+            // rewrite!("def-prod-sin"; "(* (sin ?a) (sin ?b))" <=>
+            //          "(~ (/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis (~ ?b))) \
+            //             (+ (* (cis ?a) (cis (~ ?b))) (* (cis (~ ?a)) (cis ?b))))) 4))"),
+            // // definition of cos(a) * sin(b)
+            // rewrite!("def-prod-cos-sin"; "(* (cos ?a) (sin ?b))" <=>
+            //          "(/ (+ (* (cis ?a) (cis ?b)) (- (* (cis (~ ?a)) (cis b)) \
+            //             (+ (* (cis (~ ?a)) (cis (~ ?b))) (* (cis ?a) (cis (~ ?b)))))) (* 4 I))"),
+
+            // definition of cos^2(a) and sin^2(a)
+            rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=>
+                     "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
+            rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=>
+                     "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
+
+            // definition of square
+            rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
+            vec![
+                // constant folding for PI
+                rewrite!("add-pi"; "(+ PI PI)" => "(* 2 PI)"),
+
+                // constant folding for cis
+                rewrite!("cis-0"; "(cis 0)" => "1"),
+                rewrite!("cis-pi"; "(cis (/ PI 2))" => "I"),
+
+                // cis identities
+                // rewrite!("inv-cis"; "(cis (~ ?a))" => "(/ 1 (cis ?a))"),
+                rewrite!("add-cis"; "(cis (+ ?a ?b))" => "(* (cis ?a) (cis ?b))"),
+                rewrite!("sub-cis"; "(cis (- ?a ?b))" => "(* (cis ?a) (cis (~ ?b)))"),
+                rewrite!("cancel-cis"; "(* (cis ?a) (cis (~ ?a)))" => "1"),
+
+                // definition of cis
+                rewrite!("square-i"; "(* I I)" => "-1"),
+            ],
+        ].concat();
+
+        let extra_rewrites = vec![
+            // reverse of cis identities above
+            ("(* (cis ?a) (cis ?b))", "(cis (+ ?a ?b))", false),
+            ("(* (cis ?a) (cis (~ ?b)))", "(cis (- ?a ?b))", false),
+        ];
+
+        for (l, r, bi) in extra_rewrites {
+            let lrec: RecExpr<Math> = l.parse().unwrap();
+            let rrec: RecExpr<Math> = r.parse().unwrap();
+            if let Some(mut e) = Equality::new(&lrec, &rrec) {
+                if !bi && e.rewrites.len() == 2 {
+                    e.rewrites.pop();
+                }
+
+                synth.old_eqs.insert(e.name.clone(), e.clone());
             }
         }
-
-        let extra_rewrites = vec![(
-            "(*C (+C ?a ?b) (+C ?c ?d))",
-            "(+C (*C ?a ?c) (+C (*C ?a ?d) (+C (*C ?b ?c) (*C ?b ?d))))",
-        )];
-
-        extra_rewrites.iter().for_each(|(l, r)| {
-            let lhs: RecExpr<Self> = l.parse().unwrap();
-            let rhs: RecExpr<Self> = r.parse().unwrap();
-            if let Some(e) = Equality::new(&lhs, &rhs) {
-                synth.all_eqs.insert(e.name.clone(), e);
-            }
-        });
 
         synth.egraph = egraph;
     }
 
     fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
-        let mut to_add = vec![];
+        // workload
+        if synth.params.workload.is_some() {
+            return vec![];
+        }
+
+        // disabled iters
+        if iter == 4 || iter == 6 {
+            return vec![];
+        }
 
         // disabled operators (TODO: validate input)
         let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
@@ -399,20 +433,36 @@ impl SynthLanguage for Math {
         };
 
         // predicate if disabled
-        let allowedp = |s| !disabled_ops.iter().any(|x| x.eq(&s));
+        let allowedp = |s: &str| !disabled_ops.iter().any(|x| x.eq(&s));
+
+        // predicate for enumerating arithmetic ops
+        let arithmetic = |ns: &Vec<Self>| {
+            ns.iter().all(|n| {
+                matches!(
+                    n,
+                    Math::Neg(_)
+                        | Math::Add(_)
+                        | Math::Sub(_)
+                        | Math::Mul(_)
+                        | Math::Div(_)
+                        | Math::Sqr(_)
+                        | Math::RealConst(_)
+                        | Math::Var(_)
+                ) && !matches!(n, Math::Imag)
+            })
+        };
 
         // maps ids to n_ops
+        let extract = Extractor::new(&synth.egraph, NumberOfOps);
         let ids: HashMap<Id, usize> = synth
             .ids()
             .map(|id| (id, extract.find_best_cost(id)))
             .collect();
 
+        let mut to_add = vec![];
         for i in synth.ids() {
             for j in synth.ids() {
-                if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.is_allowed
-                    || !synth.egraph[j].data.is_allowed
-                {
+                if ids[&i] + ids[&j] + 1 != iter {
                     continue;
                 }
 
@@ -424,32 +474,58 @@ impl SynthLanguage for Math {
                     continue;
                 };
 
-                if allowedp("+") {
-                    to_add.push(Math::Add([i, j]));
+                if iter <= 3 {
+                    // either both are trig or neither are trig
+                    if trig_node(&synth.egraph[i].nodes, &synth.egraph)
+                        == trig_node(&synth.egraph[j].nodes, &synth.egraph)
+                    {
+                        if allowedp("+") {
+                            to_add.push(Math::Add([i, j]));
+                        }
+
+                        if allowedp("-") {
+                            to_add.push(Math::Sub([i, j]));
+                        }
+
+                        if allowedp("*") {
+                            to_add.push(Math::Mul([i, j]));
+                        }
+                    }
+                } else if trig_node(&synth.egraph[i].nodes, &synth.egraph)
+                    && trig_node(&synth.egraph[j].nodes, &synth.egraph)
+                {
+                    if allowedp("+") {
+                        to_add.push(Math::Add([i, j]));
+                    }
+
+                    if allowedp("-") {
+                        to_add.push(Math::Sub([i, j]));
+                    }
                 }
-                // if allowedp("-") { to_add.push(Math::RSub([i, j])); }
-                if allowedp("*") {
-                    to_add.push(Math::Mul([i, j]));
-                }
-                // if allowedp("/") && !synth.egraph[j].nodes.iter().any(|x| is_zero(x)) {
-                //     to_add.push(Math::RDiv([i, j]));
-                // }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
-            {
+            if ids[&i] + 1 != iter || synth.egraph[i].data.exact {
                 continue;
             }
 
-            // if allowedp("~") { to_add.push(Math::RNeg(i)); }
-            if iter <= 2 {
+            if iter <= 2 && arithmetic(&synth.egraph[i].nodes) {
                 if allowedp("sin") {
                     to_add.push(Math::Sin(i));
                 }
                 if allowedp("cos") {
                     to_add.push(Math::Cos(i));
                 }
-                if allowedp("sqr") {
+                if allowedp("tan") {
+                    to_add.push(Math::Tan(i));
+                }
+            }
+
+            if iter == 2 {
+                if allowedp("~") && trig_node(&synth.egraph[i].nodes, &synth.egraph) {
+                    to_add.push(Math::Neg(i));
+                }
+
+                if allowedp("sqr") && trig_node(&synth.egraph[i].nodes, &synth.egraph) {
                     to_add.push(Math::Sqr(i));
                 }
             }
@@ -461,14 +537,159 @@ impl SynthLanguage for Math {
 
     fn validate(
         _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
     ) -> ValidationResult<Self> {
-        ValidationResult::Valid
+        let valid_pattern = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::ENode(Math::Div([_, j])) => match pat.ast.index(*j) {
+                    ENodeOrVar::Var(_) => true,
+                    ENodeOrVar::ENode(n) => !is_zero(n),
+                },
+                _ => true,
+            })
+        };
+
+        ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
+    }
+
+    fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        let contains_trig_node = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().any(|n| {
+                matches!(
+                    n,
+                    ENodeOrVar::ENode(Math::Sin(_))
+                        | ENodeOrVar::ENode(Math::Cos(_))
+                        | ENodeOrVar::ENode(Math::Tan(_))
+                        | ENodeOrVar::ENode(Math::Csc(_))
+                        | ENodeOrVar::ENode(Math::Sec(_))
+                        | ENodeOrVar::ENode(Math::Cot(_))
+                )
+            })
+        };
+
+        let pattern_is_extractable = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::Var(_) => true,
+                ENodeOrVar::ENode(n) => n.is_extractable(),
+            })
+        };
+
+        (contains_trig_node(lhs) || contains_trig_node(rhs))
+            && pattern_is_extractable(lhs)
+            && pattern_is_extractable(rhs)
+    }
+
+    fn is_valid_rewrite(
+        egraph: &EGraph<Self, SynthAnalysis>,
+        rhs: &Pattern<Self>,
+        subst: &Subst,
+    ) -> bool {
+        rhs.ast.as_ref().iter().all(|n| match n {
+            ENodeOrVar::ENode(Math::Div([_, j])) => match rhs.ast.index(*j) {
+                ENodeOrVar::Var(v) => !egraph[subst[*v]].iter().any(is_zero),
+                ENodeOrVar::ENode(n) => !is_zero(n),
+            },
+            _ => true,
+        })
     }
 
     // custom constant folder
-    fn constant_fold(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
+    fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if egraph[id]
+            .nodes
+            .iter()
+            .any(|x| matches!(x, Math::RealConst(_)))
+        {
+            return;
+        }
+
+        let mut to_add: Option<Math> = None;
+        for n in &egraph[id].nodes {
+            match n {
+                Math::Neg(i) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Ok(x) = real_to_rational(&v) {
+                            let r = Real::from((-x).to_string());
+                            to_add = Some(Self::mk_constant(r));
+                            break;
+                        }
+                    }
+                }
+                Math::Add([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x + y).to_string());
+                                    to_add = Some(Self::mk_constant(r));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Math::Sub([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x - y).to_string());
+                                    to_add = Some(Self::mk_constant(r));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Math::Mul([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x * y).to_string());
+                                    to_add = Some(Self::mk_constant(r));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Math::Div([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    if !y.is_zero() {
+                                        let r = Real::from((x / y).to_string());
+                                        to_add = Some(Self::mk_constant(r));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if let Some(v) = to_add {
+            // add (~ v) if v is negative
+            if let Math::RealConst(n) = v {
+                if let Ok(x) = real_to_rational(&n) {
+                    if x.is_negative() {
+                        let pos_id = egraph.add(Self::mk_constant(Real::from((-x).to_string())));
+                        let neg_id = egraph.add(Math::Neg(pos_id));
+                        egraph.union(neg_id, id);
+                    }
+                }
+            }
+
+            let cnst_id = egraph.add(v);
+            egraph.union(cnst_id, id);
+        }
+    }
 }
 
 /// Entry point.

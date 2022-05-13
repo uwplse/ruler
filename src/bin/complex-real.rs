@@ -30,7 +30,7 @@ impl Complex {
 
 impl<S: AsRef<str>> From<S> for Complex {
     fn from(s: S) -> Self {
-        let val = Symbol::from(s);
+        let val = Symbol::from(s.as_ref());
         Complex { val }
     }
 }
@@ -78,7 +78,7 @@ impl Real {
 
 impl<S: AsRef<str>> From<S> for Real {
     fn from(s: S) -> Self {
-        let val = Symbol::from(s);
+        let val = Symbol::from(s.as_ref());
         Real { val }
     }
 }
@@ -124,7 +124,7 @@ impl Variable {
 
 impl<S: AsRef<str>> From<S> for Variable {
     fn from(s: S) -> Self {
-        Variable(Symbol::from(s))
+        Variable(Symbol::from(s.as_ref()))
     }
 }
 
@@ -169,7 +169,7 @@ define_language! {
         "/R" = RDiv([Id; 2]),
         RealConst(Real),
 
-        // real domain
+        // complex domain
         "~C" = CNeg(Id),
         "+C" = CAdd([Id; 2]),
         "-C" = CSub([Id; 2]),
@@ -232,11 +232,15 @@ macro_rules! fold_real {
 //  Helper functions
 //
 
+fn allowed_nodes(nodes: &[Math]) -> bool {
+    nodes.iter().any(Math::is_allowed)
+}
+
 fn is_complex_str(
     s: &'static str,
 ) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
-    move |egraph, _, subst| egraph[subst[var]].data.is_allowed
+    move |egraph, _, subst| allowed_nodes(&egraph[subst[var]].nodes)
 }
 
 fn real_const_symbol(s: &str) -> Real {
@@ -406,6 +410,12 @@ impl SynthLanguage for Math {
             rule_lifting: true,
         });
 
+        let disabled_consts: Vec<&str> = if let Some(s) = &synth.params.disabled_consts {
+            s.split(' ').collect()
+        } else {
+            vec![]
+        };
+
         for i in 0..synth.params.variables {
             let var = egg::Symbol::from(letter(i));
             egraph.add(Math::Var(Variable(var)));
@@ -431,43 +441,49 @@ impl SynthLanguage for Math {
         egraph.union(re_pi, pi_2_pi_2);
 
         // zero constant
-        let cx_zero = egraph.add(Math::ComplexConst(complex_zero));
-        let zero_mk = egraph.add(Math::Cart([re_zero, re_zero]));
-        let zero_mk_re = egraph.add(Math::Re(cx_zero));
-        let zero_mk_im = egraph.add(Math::Im(cx_zero));
-        let zero_mk_abs = egraph.add(Math::Abs(cx_zero));
-        let zero_mk_arg = egraph.add(Math::Arg(cx_zero));
-        egraph.union(cx_zero, zero_mk);
-        egraph.union(zero_mk_re, re_zero);
-        egraph.union(zero_mk_im, re_zero);
-        egraph.union(zero_mk_abs, re_zero);
-        egraph.union(zero_mk_arg, re_zero);
+        if !disabled_consts.contains(&"0") {
+            let cx_zero = egraph.add(Math::ComplexConst(complex_zero));
+            let zero_mk = egraph.add(Math::Cart([re_zero, re_zero]));
+            let zero_mk_re = egraph.add(Math::Re(cx_zero));
+            let zero_mk_im = egraph.add(Math::Im(cx_zero));
+            let zero_mk_abs = egraph.add(Math::Abs(cx_zero));
+            let zero_mk_arg = egraph.add(Math::Arg(cx_zero));
+            egraph.union(cx_zero, zero_mk);
+            egraph.union(zero_mk_re, re_zero);
+            egraph.union(zero_mk_im, re_zero);
+            egraph.union(zero_mk_abs, re_zero);
+            egraph.union(zero_mk_arg, re_zero);
+        }
 
         // one constant
-        let cx_one = egraph.add(Math::ComplexConst(complex_one));
-        let one_mk = egraph.add(Math::Cart([re_one, re_zero]));
-        let one_mk_re = egraph.add(Math::Re(cx_one));
-        let one_mk_im = egraph.add(Math::Im(cx_one));
-        let one_mk_abs = egraph.add(Math::Abs(cx_one));
-        let one_mk_arg = egraph.add(Math::Arg(cx_one));
-        egraph.union(cx_one, one_mk);
-        egraph.union(one_mk_re, re_one);
-        egraph.union(one_mk_im, re_zero);
-        egraph.union(one_mk_abs, re_one);
-        egraph.union(one_mk_arg, re_zero);
+        if !disabled_consts.contains(&"1") {
+            let cx_one = egraph.add(Math::ComplexConst(complex_one));
+            let one_mk = egraph.add(Math::Cart([re_one, re_zero]));
+            let one_mk_re = egraph.add(Math::Re(cx_one));
+            let one_mk_im = egraph.add(Math::Im(cx_one));
+            let one_mk_abs = egraph.add(Math::Abs(cx_one));
+            let one_mk_arg = egraph.add(Math::Arg(cx_one));
+            egraph.union(cx_one, one_mk);
+            egraph.union(one_mk_re, re_one);
+            egraph.union(one_mk_im, re_zero);
+            egraph.union(one_mk_abs, re_one);
+            egraph.union(one_mk_arg, re_zero);
+        }
 
         // i constant
-        let cx_i = egraph.add(Math::ComplexConst(complex_i));
-        let i_mk = egraph.add(Math::Cart([re_zero, re_one]));
-        let i_mk_re = egraph.add(Math::Re(cx_i));
-        let i_mk_im = egraph.add(Math::Im(cx_i));
-        let i_mk_abs = egraph.add(Math::Abs(cx_i));
-        let i_mk_arg = egraph.add(Math::Arg(cx_i));
-        egraph.union(cx_i, i_mk);
-        egraph.union(i_mk_re, re_zero);
-        egraph.union(i_mk_im, re_one);
-        egraph.union(i_mk_abs, re_one);
-        egraph.union(i_mk_arg, re_pi_2);
+        if !disabled_consts.contains(&"i") {
+            let cx_i = egraph.add(Math::ComplexConst(complex_i));
+            let i_mk = egraph.add(Math::Cart([re_zero, re_one]));
+            let i_mk_re = egraph.add(Math::Re(cx_i));
+            let i_mk_im = egraph.add(Math::Im(cx_i));
+            let i_mk_abs = egraph.add(Math::Abs(cx_i));
+            let i_mk_arg = egraph.add(Math::Arg(cx_i));
+            egraph.union(cx_i, i_mk);
+            egraph.union(i_mk_re, re_zero);
+            egraph.union(i_mk_im, re_one);
+            egraph.union(i_mk_abs, re_one);
+            egraph.union(i_mk_arg, re_pi_2);
+        }
 
         synth.lifting_rewrites = vec![
             rewrite!("cartesian-form"; "?a" => "(Cart (Re ?a) (Im ?a))" if is_complex_str("?a")),
@@ -514,8 +530,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.is_allowed
-                    || !synth.egraph[j].data.is_allowed
+                    || !allowed_nodes(&synth.egraph[i].nodes)
+                    || !allowed_nodes(&synth.egraph[j].nodes)
                 {
                     continue;
                 }
@@ -537,7 +553,9 @@ impl SynthLanguage for Math {
                 }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
+            if ids[&i] + 1 != iter
+                || synth.egraph[i].data.exact
+                || !allowed_nodes(&synth.egraph[i].nodes)
             {
                 continue;
             }
@@ -600,7 +618,7 @@ impl SynthLanguage for Math {
 
     // Constant folding for complex numbers
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        if !egraph[id].data.is_allowed {
+        if !allowed_nodes(&egraph[id].nodes) {
             // lower domain
             if egraph[id].iter().any(|x| matches!(x, Math::RealConst(_))) {
                 // early exit if constant exists

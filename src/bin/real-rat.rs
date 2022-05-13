@@ -30,7 +30,7 @@ impl Real {
 
 impl<S: AsRef<str>> From<S> for Real {
     fn from(s: S) -> Self {
-        let val = Symbol::from(s);
+        let val = Symbol::from(s.as_ref());
         Real { val }
     }
 }
@@ -76,7 +76,7 @@ impl Variable {
 
 impl<S: AsRef<str>> From<S> for Variable {
     fn from(s: S) -> Self {
-        Variable(Symbol::from(s))
+        Variable(Symbol::from(s.as_ref()))
     }
 }
 
@@ -178,9 +178,13 @@ fn real_const_symbol(s: &str) -> Real {
     Real::from(s.to_owned() + "R")
 }
 
+fn allowed_nodes(nodes: &[Math]) -> bool {
+    nodes.iter().any(Math::is_allowed)
+}
+
 fn is_real_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
-    move |egraph, _, subst| egraph[subst[var]].data.is_allowed
+    move |egraph, _, subst| allowed_nodes(&egraph[subst[var]].nodes)
 }
 
 fn is_rational_zero(n: &Math) -> bool {
@@ -340,8 +344,8 @@ impl SynthLanguage for Math {
         for i in synth.ids() {
             for j in synth.ids() {
                 if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].data.is_allowed
-                    || !synth.egraph[j].data.is_allowed
+                    || !allowed_nodes(&synth.egraph[i].nodes)
+                    || !allowed_nodes(&synth.egraph[j].nodes)
                 {
                     continue;
                 }
@@ -370,7 +374,9 @@ impl SynthLanguage for Math {
                 }
             }
 
-            if ids[&i] + 1 != iter || synth.egraph[i].data.exact || !synth.egraph[i].data.is_allowed
+            if ids[&i] + 1 != iter
+                || synth.egraph[i].data.exact
+                || !allowed_nodes(&synth.egraph[i].nodes)
             {
                 continue;
             }
@@ -426,7 +432,7 @@ impl SynthLanguage for Math {
 
     // custom constant folder
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        if !egraph[id].data.is_allowed {
+        if !allowed_nodes(&egraph[id].nodes) {
             // lower domain
             if egraph[id].nodes.iter().any(|x| matches!(x, Math::Rat(_))) {
                 // early exit if constant exists
