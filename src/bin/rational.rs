@@ -34,7 +34,6 @@ enum Sign {
 
 define_language! {
     /// Define the operators for the domain.
-    // #[derive(Serialize, Deserialize)]
     pub enum Math {
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
@@ -292,6 +291,7 @@ impl SynthLanguage for Math {
             vec![]
         };
 
+        // this is for adding to the egraph, not used for cvec.
         let constants: Vec<Constant> = ["1", "0", "-1"]
             .iter()
             .filter(|s| !disabled_consts.iter().any(|x| x.eq(*s)))
@@ -443,9 +443,7 @@ impl SynthLanguage for Math {
     ) -> ValidationResult<Self> {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
-            // cfg.set_proof_generation(true);
             cfg.set_timeout_msec(1000);
-
             let ctx = z3::Context::new(&cfg);
             let solver = z3::Solver::new(&ctx);
             let (lexpr, mut lasses) = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
@@ -589,10 +587,10 @@ fn model_to_assignment(model: &mut str) -> Vec<Constant> {
         let braces: &[_] = &['(', ')'];
         rat = rat.trim_matches(braces).to_string();
         let mut first_char: char = rat.chars().next().unwrap();
-        let mut negative: f32 = 1.0;
+        let mut is_negative: bool = false;
         while first_char == '/' || first_char == '-' {
             if first_char == '-' {
-                negative *= -1.0;
+                is_negative = true;
             }
             rat = rat.drain(1..).collect::<String>();
             rat = rat.trim().to_string();
@@ -600,20 +598,17 @@ fn model_to_assignment(model: &mut str) -> Vec<Constant> {
             first_char = rat.chars().next().unwrap();
         }
         let reals: Vec<&str> = rat.split(' ').collect();
-        let mut num: f32 = reals[0].parse::<f32>().ok().unwrap();
-        num *= negative;
-        if reals.len() == 1 {
-            consts.push(Constant::new(
-                num.to_bigint().unwrap(),
-                1.to_bigint().unwrap(),
-            ));
+        let num: f32 = reals[0].parse::<f32>().ok().unwrap();
+        let num = if is_negative { num * -1.0 } else { num };
+        let denom = if reals.len() == 1 {
+            1.0
         } else {
-            let denom: f32 = reals[1].parse::<f32>().ok().unwrap();
-            consts.push(Constant::new(
-                num.to_bigint().unwrap(),
-                denom.to_bigint().unwrap(),
-            ));
-        }
+            reals[1].parse::<f32>().ok().unwrap()
+        };
+        consts.push(Constant::new(
+            num.to_bigint().unwrap(),
+            denom.to_bigint().unwrap(),
+        ));
     }
     consts
 }

@@ -391,7 +391,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let reader = BufReader::new(file.unwrap());
             // deserialize from file
             let mut ces: Vec<Vec<<L as SynthLanguage>::Constant>> = vec![];
-            // let mut ce: Vec<<L as SynthLanguage>::Constant> = vec![];
             // read & parse from file
             for (i, line) in reader.lines().enumerate() {
                 if i >= num_ces {
@@ -1295,7 +1294,7 @@ pub struct SynthParams {
     #[clap(long, default_value = "60")]
     pub eqsat_time_limit: u64,
     /// Controls the size of cvecs
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "5")]
     pub important_cvec_offsets: u32,
 
     //////////////////////////
