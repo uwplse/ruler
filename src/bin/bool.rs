@@ -244,6 +244,7 @@ mod test {
             disabled_ops: None,
             disabled_consts: None,
             filtered_consts: None,
+            keep_all: false,
             eqsat_node_limit: 300000,
             eqsat_iter_limit: 2,
             eqsat_time_limit: 60,
@@ -262,67 +263,58 @@ mod test {
 
     #[test]
     fn iter1_rules() {
+        let _ = env_logger::try_init();
         let syn = ruler::Synthesizer::<Math>::new(get_params(1));
         let report = syn.run();
-        let expected = vec![
-            "(& ?a ?b) <=> (& ?b ?a)",
-            "(| ?a ?b) <=> (| ?b ?a)",
-            "(^ ?a ?b) <=> (^ ?b ?a)",
-            "?a <=> (| ?a ?a)",
-            "?a <=> (& ?a ?a)",
-            "(^ ?a ?a) => false",
-            "?a <=> (& true ?a)",
-            "?a <=> (| false ?a)",
-            "?a <=> (^ false ?a)",
-            "(~ ?a) <=> (^ true ?a)",
-            "(& false ?a) => false",
-            "(| true ?a) => true",
-        ];
-        assert_eq!(report.num_rules, expected.len());
-        report.all_eqs.iter().for_each(|rule| {
-            assert!(
-                expected.contains(&rule.to_string().as_str()),
-                "Unexpected Rule: {}",
-                &rule.to_string()
-            )
-        });
+        assert_eqs_same_as_strs(
+            &report.all_eqs,
+            &[
+                "(& ?a ?b) <=> (& ?b ?a)",
+                "(| ?a ?b) <=> (| ?b ?a)",
+                "(^ ?a ?b) <=> (^ ?b ?a)",
+                "?a <=> (| ?a ?a)",
+                "?a <=> (& ?a ?a)",
+                "(^ ?a ?a) => false",
+                "?a <=> (& true ?a)",
+                "?a <=> (| false ?a)",
+                "?a <=> (^ false ?a)",
+                "(~ ?a) <=> (^ true ?a)",
+                "(& false ?a) => false",
+                "(| true ?a) => true",
+            ],
+        );
     }
 
     #[test]
     fn iter2_rules() {
+        let _ = env_logger::try_init();
         let syn = ruler::Synthesizer::<Math>::new(get_params(2));
         let report = syn.run();
-        let expected = vec![
-            "(& ?a (& ?b ?c)) <=> (& ?c (& ?a ?b))",
-            "(^ ?a (^ ?b ?c)) <=> (^ ?c (^ ?a ?b))",
-            "(| ?a (| ?b ?c)) <=> (| ?c (| ?a ?b))",
-            "(& ?a ?b) <=> (& ?b ?a)",
-            "(| ?a ?b) <=> (| ?b ?a)",
-            "(^ ?a ?b) <=> (^ ?b ?a)",
-            "(& ?a (| ?a ?b)) => ?a",
-            "(| ?a (& ?a ?b)) => ?a",
-            "(| ?a ?b) <=> (| ?b (^ ?a ?b))",
-            "(& ?a (~ ?b)) <=> (& ?a (^ ?a ?b))",
-            "(^ ?a (& ?a ?b)) <=> (& ?a (~ ?b))",
-            "(^ ?a (| ?a ?b)) <=> (& ?b (~ ?a))",
-            "?a <=> (~ (~ ?a))",
-            "?a <=> (| ?a ?a)",
-            "?a <=> (& ?a ?a)",
-            "(^ ?a ?a) => false",
-            "?a <=> (& true ?a)",
-            "?a <=> (| false ?a)",
-            "?a <=> (^ false ?a)",
-            "(~ ?a) <=> (^ true ?a)",
-            "(& false ?a) => false",
-            "(| true ?a) => true",
-        ];
-        assert_eq!(report.num_rules, expected.len());
-        report.all_eqs.iter().for_each(|rule| {
-            assert!(
-                expected.contains(&rule.to_string().as_str()),
-                "Unexpected Rule: {}",
-                &rule.to_string()
-            )
-        });
+        assert_eqs_same_as_strs(
+            &report.all_eqs,
+            &[
+                "(^ ?c (^ ?b ?a)) <=> (^ ?b (^ ?a ?c))",
+                "(& ?c (& ?b ?a)) <=> (& ?a (& ?b ?c))",
+                "(| ?c (| ?b ?a)) <=> (| ?b (| ?a ?c))",
+                "(& ?b ?a) <=> (& ?a ?b)",
+                "(| ?b ?a) <=> (| ?a ?b)",
+                "(^ ?b ?a) <=> (^ ?a ?b)",
+                "(& ?b (| ?b ?a)) => ?b",
+                "(| ?b (& ?b ?a)) => ?b",
+                "(| ?b ?a) <=> (| ?a (^ ?b ?a))",
+                "(^ ?a (& ?b ?a)) <=> (& ?a (~ ?b))",
+                "(& ?b (~ ?a)) <=> (& ?b (^ ?a ?b))",
+                "(^ ?b (| ?b ?a)) <=> (& ?a (~ ?b))",
+                "?a <=> (| ?a ?a)",
+                "?a <=> (& ?a ?a)",
+                "(^ ?a ?a) => false",
+                "?a <=> (& true ?a)",
+                "?a <=> (| false ?a)",
+                "?a <=> (^ false ?a)",
+                "(~ ?a) <=> (^ true ?a)",
+                "(& false ?a) => false",
+                "(| true ?a) => true",
+            ],
+        );
     }
 }
