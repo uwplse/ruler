@@ -192,7 +192,7 @@ impl SynthLanguage for Lang {
         }
     }
 
-    fn mk_constant(c: Self::Constant) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &EGraph<Self, SynthAnalysis>) -> Self {
         Lang::Lit(c)
     }
 
