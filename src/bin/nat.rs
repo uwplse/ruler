@@ -7,6 +7,7 @@ define_language! {
     "Z" = Z,
     "S" = S(Id),
     "+" = Add([Id; 2]),
+    "*" = Mul([Id; 2]),
     Var(egg::Symbol),
   }
 }
@@ -38,6 +39,7 @@ impl SynthLanguage for Nat {
             Nat::Z => vec![Some(0); cvec_len],
             Nat::S(x) => map!(v, x => Some(*x + 1)),
             Nat::Add([a, b]) => map!(v, a, b => Some(*a + *b)),
+            Nat::Mul([a, b]) => map!(v, a, b => Some(*a * *b)),
             Nat::Var(_) => vec![],
         }
     }
@@ -65,6 +67,21 @@ impl SynthLanguage for Nat {
 
                 let high = match (x_int.high, y_int.high) {
                     (Some(a), Some(b)) => Some(a + b),
+                    (_, _) => None,
+                };
+                Interval::new(low, high)
+            }
+            Nat::Mul([x, y]) => {
+                let x_int = egraph[*x].data.interval.clone();
+                let y_int = egraph[*y].data.interval.clone();
+
+                let low = match (x_int.low, y_int.low) {
+                    (Some(a), Some(b)) => Some(a * b),
+                    (_, _) => panic!("There shouldn't be infinite lower bounds for Nats"),
+                };
+
+                let high = match (x_int.high, y_int.high) {
+                    (Some(a), Some(b)) => Some(a * b),
                     (_, _) => None,
                 };
                 Interval::new(low, high)
