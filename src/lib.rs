@@ -623,14 +623,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let compare = |cvec1: &CVec<L>, cvec2: &CVec<L>| -> bool {
             for (i, tup) in cvec1.iter().zip(cvec2).enumerate() {
-                if self.params.num_ces > 0
-                    && i > self.egraph.analysis.cvec_len - self.params.num_ces
-                {
-                    log::info!("Counterexamples being used.");
-                }
-
                 match tup {
-                    (Some(a), Some(b)) if a != b => return false,
+                    (Some(a), Some(b)) if a != b => {
+                        if self.params.num_ces > 0 && i >= self.params.n_samples {
+                            log::warn!("Tuple #{}: counterexamples being used.", i);
+                        }
+                        return false;
+                    }
                     _ => (),
                 }
             }
