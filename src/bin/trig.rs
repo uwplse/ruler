@@ -202,7 +202,7 @@ impl SynthLanguage for Math {
         }
     }
 
-    fn mk_constant(c: Self::Constant, _egraph: &EGraph<Self, SynthAnalysis>) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::RealConst(c)
     }
 
@@ -679,8 +679,10 @@ impl SynthLanguage for Math {
             if let Math::RealConst(n) = v {
                 if let Ok(x) = real_to_rational(&n) {
                     if x.is_negative() {
-                        let pos_id =
-                            egraph.add(Self::mk_constant(Real::from((-x).to_string()), egraph));
+                        let pos_id = egraph.add(Self::mk_constant(
+                            Real::from((-x).to_string()),
+                            &mut egraph.clone(),
+                        ));
                         let neg_id = egraph.add(Math::Neg(pos_id));
                         egraph.union(neg_id, id);
                     }

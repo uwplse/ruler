@@ -124,7 +124,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     }
 
     fn to_constant(&self) -> Option<&Self::Constant>;
-    fn mk_constant(c: Self::Constant, _egraph: &EGraph<Self, SynthAnalysis>) -> Self;
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self;
     fn is_constant(&self) -> bool {
         self.to_constant().is_some()
     }

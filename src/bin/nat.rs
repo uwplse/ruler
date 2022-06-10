@@ -110,11 +110,11 @@ impl SynthLanguage for Nat {
         }
     }
 
-    fn mk_constant(c: Self::Constant, egraph: &EGraph<Self, SynthAnalysis>) -> Self {
+    fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         match c {
             0 => Nat::Z,
             _ => {
-                let pred = Self::mk_constant_id(c - 1, &mut egraph.clone());
+                let pred = Self::mk_constant_id(c - 1, egraph);
                 Nat::S(pred)
             }
         }

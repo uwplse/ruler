@@ -140,7 +140,7 @@ impl SynthLanguage for Math {
         }
     }
 
-    fn mk_constant(c: Self::Constant, _egraph: &EGraph<Self, SynthAnalysis>) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::Lit(c)
     }
 
