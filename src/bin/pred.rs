@@ -5,7 +5,8 @@ use ruler::*;
 
 define_language! {
   pub enum Pred {
-    Lit(Constant),
+    Bool(bool),
+    Int(usize),
     Var(egg::Symbol),
     "<" = Le([Id;2]),
     "<=" = Leq([Id;2]),
@@ -71,7 +72,8 @@ impl SynthLanguage for Pred {
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
+            Pred::Bool(b) => vec![Some(Constant::Bool(*b)); cvec_len],
+            Pred::Int(i) => vec![Some(Constant::Int(*i)); cvec_len],
 
             Pred::Le([x, y]) => map!(v, x, y => {
                 let x = x.to_int().unwrap();
@@ -140,11 +142,14 @@ impl SynthLanguage for Pred {
     }
 
     fn is_constant(&self) -> bool {
-        matches!(self, Pred::Lit(_))
+        matches!(self, Pred::Bool(_) | Pred::Int(_))
     }
 
     fn mk_constant(c: Self::Constant) -> Self {
-        Pred::Lit(c)
+        match c {
+            Constant::Bool(b) => Pred::Bool(b),
+            Constant::Int(i) => Pred::Int(i),
+        }
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
