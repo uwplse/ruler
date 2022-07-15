@@ -351,19 +351,10 @@ impl SynthLanguage for Math {
         Math::Var(Variable(sym))
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::ComplexConst(n) = self {
-            Some(n)
-        } else {
-            None
-        }
-    }
-
     fn mk_constant(c: Self::Constant) -> Self {
         Math::ComplexConst(c)
     }
 
-    // override default behavior
     fn is_constant(&self) -> bool {
         matches!(self, Math::ComplexConst(_))
     }

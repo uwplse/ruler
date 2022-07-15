@@ -139,11 +139,8 @@ impl SynthLanguage for Pred {
         Pred::Var(sym)
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        match self {
-            Pred::Lit(c) => Some(c),
-            _ => None,
-        }
+    fn is_constant(&self) -> bool {
+        matches!(self, Pred::Lit(_))
     }
 
     fn mk_constant(c: Self::Constant) -> Self {

@@ -212,12 +212,8 @@ macro_rules! impl_bv {
                 Math::Var(sym)
             }
 
-            fn to_constant(&self) -> Option<&Self::Constant> {
-                if let Math::Num(n) = self {
-                    Some(n)
-                } else {
-                    None
-                }
+            fn is_constant(&self) -> bool {
+                matches!(self, Math::Num(_))
             }
 
             fn mk_constant(c: Self::Constant) -> Self {

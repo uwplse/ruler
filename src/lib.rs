@@ -123,11 +123,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         PatternAst::from(nodes).into()
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant>;
     fn mk_constant(c: Self::Constant) -> Self;
-    fn is_constant(&self) -> bool {
-        self.to_constant().is_some()
-    }
+    fn is_constant(&self) -> bool;
 
     /// Generalize a pattern
     fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {
