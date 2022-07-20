@@ -1819,11 +1819,11 @@ pub fn assert_eqs_same<L: SynthLanguage>(actual: &[Equality<L>], expected: &[Equ
 
     let mut missing = String::new();
     for rule in expected.difference(&actual) {
-        let _ = write!(&mut missing, "  {}\n", rule);
+        let _ = writeln!(&mut missing, "  {}", rule);
     }
     let mut unexpected = String::new();
     for rule in actual.difference(&expected) {
-        let _ = write!(&mut unexpected, "  {}\n", rule);
+        let _ = writeln!(&mut unexpected, "  {}", rule);
     }
     if missing.len() + unexpected.len() > 0 {
         panic!(
