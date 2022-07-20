@@ -208,7 +208,7 @@ pub fn sampler(rng: &mut Pcg64, num_samples: usize) -> Vec<Constant> {
     for _ in 0..num_samples {
         let flip = rng.gen::<bool>();
         if flip {
-            ret.push(Constant::Int(rng.gen::<usize>() % 100));
+            ret.push(Constant::Int(rng.gen::<usize>() % 10));
         } else {
             ret.push(Constant::Int(rng.gen::<usize>()));
         }
