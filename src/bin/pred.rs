@@ -1,12 +1,13 @@
-use std::fmt;
+use std::{fmt, hash::Hash};
 
 use egg::*;
+use rand::Rng;
+use rand_pcg::Pcg64;
 use ruler::*;
 
 define_language! {
   pub enum Pred {
-    Bool(bool),
-    Int(usize),
+    Lit(Constant),
     Var(egg::Symbol),
     "<" = Le([Id;2]),
     "<=" = Leq([Id;2]),
@@ -39,27 +40,28 @@ impl fmt::Display for Constant {
 impl std::str::FromStr for Constant {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match usize::from_str(s) {
-            Ok(i) => Ok(Self::Int(i)),
-            Err(_) => Ok(Self::Bool(false)),
+        if let Ok(i) = usize::from_str(s) {
+            Ok(Self::Int(i))
+        } else if let Ok(b) = bool::from_str(s) {
+            Ok(Self::Bool(b))
+        } else {
+            Err(())
         }
     }
 }
 
 impl Constant {
     fn to_int(&self) -> Option<usize> {
-        if let &Constant::Int(n) = self {
-            Some(n)
-        } else {
-            None
+        match self {
+            Constant::Int(n) => Some(*n),
+            Constant::Bool(_) => None,
         }
     }
 
     fn to_bool(&self) -> Option<bool> {
-        if let &Constant::Bool(b) = self {
-            Some(b)
-        } else {
-            None
+        match self {
+            Constant::Bool(b) => Some(*b),
+            Constant::Int(_) => None,
         }
     }
 }
@@ -72,9 +74,7 @@ impl SynthLanguage for Pred {
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Pred::Bool(b) => vec![Some(Constant::Bool(*b)); cvec_len],
-            Pred::Int(i) => vec![Some(Constant::Int(*i)); cvec_len],
-
+            Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Le([x, y]) => map!(v, x, y => {
                 let x = x.to_int().unwrap();
                 let y = y.to_int().unwrap();
@@ -106,23 +106,23 @@ impl SynthLanguage for Pred {
                 Some(Constant::Bool(x != y))
             }),
             Pred::Not(x) => map!(v,x => {
-              let x = x.to_bool().unwrap();
-              Some(Constant::Bool(!x))
+                let x = x.to_bool().unwrap();
+                Some(Constant::Bool(!x))
             }),
             Pred::And([x, y]) => map!(v,x,y => {
-              let x = x.to_bool().unwrap();
-              let y = y.to_bool().unwrap();
-              Some(Constant::Bool(x & y))
+                let x = x.to_bool().unwrap();
+                let y = y.to_bool().unwrap();
+                Some(Constant::Bool(x & y))
             }),
             Pred::Or([x, y]) => map!(v,x,y => {
-              let x = x.to_bool().unwrap();
-              let y = y.to_bool().unwrap();
-              Some(Constant::Bool(x | y))
+                let x = x.to_bool().unwrap();
+                let y = y.to_bool().unwrap();
+                Some(Constant::Bool(x | y))
             }),
             Pred::Xor([x, y]) => map!(v,x,y => {
-              let x = x.to_bool().unwrap();
-              let y = y.to_bool().unwrap();
-              Some(Constant::Bool(x ^ y))
+                let x = x.to_bool().unwrap();
+                let y = y.to_bool().unwrap();
+                Some(Constant::Bool(x ^ y))
             }),
 
             Pred::Var(_) => vec![],
@@ -142,22 +142,36 @@ impl SynthLanguage for Pred {
     }
 
     fn is_constant(&self) -> bool {
-        matches!(self, Pred::Bool(_) | Pred::Int(_))
+        matches!(self, Pred::Lit(_))
     }
 
     fn mk_constant(c: Self::Constant) -> Self {
-        match c {
-            Constant::Bool(b) => Pred::Bool(b),
-            Constant::Int(i) => Pred::Int(i),
-        }
+        Pred::Lit(c)
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        todo!()
+        let mut egraph: EGraph<Pred, SynthAnalysis> = EGraph::new(SynthAnalysis {
+            cvec_len: 10,
+            constant_fold: ConstantFoldMethod::NoFold,
+            rule_lifting: false,
+        });
+
+        for i in 0..synth.params.variables {
+            let var = Symbol::from(letter(i));
+            let id = egraph.add(Pred::Var(var));
+            let mut vals = vec![];
+            let rng = &mut synth.rng;
+            for _ in 0..10 {
+                vals.push(Some(Constant::Int(rng.gen::<usize>())));
+            }
+            egraph[id].data.cvec = vals.clone();
+        }
+
+        synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        todo!()
+    fn make_layer(_synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
+        vec![]
     }
 
     fn validate(
@@ -165,8 +179,41 @@ impl SynthLanguage for Pred {
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> ValidationResult {
-        todo!()
+        let n = synth.params.num_fuzz;
+        let mut env = HashMap::default();
+
+        for var in lhs.vars() {
+            env.insert(var, vec![]);
+        }
+
+        for var in rhs.vars() {
+            env.insert(var, vec![]);
+        }
+
+        for cvec in env.values_mut() {
+            cvec.reserve(n);
+            for s in sampler(&mut synth.rng, n) {
+                cvec.push(Some(s));
+            }
+        }
+
+        let lvec = Self::eval_pattern(lhs, &env, n);
+        let rvec = Self::eval_pattern(rhs, &env, n);
+        ValidationResult::from(lvec == rvec)
     }
+}
+
+pub fn sampler(rng: &mut Pcg64, num_samples: usize) -> Vec<Constant> {
+    let mut ret = vec![];
+    for _ in 0..num_samples {
+        let flip = rng.gen::<bool>();
+        if flip {
+            ret.push(Constant::Int(rng.gen::<usize>() % 100));
+        } else {
+            ret.push(Constant::Int(rng.gen::<usize>()));
+        }
+    }
+    ret
 }
 
 fn main() {
