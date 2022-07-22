@@ -194,19 +194,10 @@ impl SynthLanguage for Math {
         Math::Var(Variable::from(sym.as_str()))
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::RealConst(n) = self {
-            Some(n)
-        } else {
-            None
-        }
-    }
-
     fn mk_constant(c: Self::Constant) -> Self {
         Math::RealConst(c)
     }
 
-    // override default behavior
     fn is_constant(&self) -> bool {
         matches!(self, Math::RealConst(_))
     }

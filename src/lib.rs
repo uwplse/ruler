@@ -11,7 +11,7 @@ use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
-    fmt::{Debug, Display},
+    fmt::{Debug, Display, Write},
     hash::{BuildHasherDefault, Hash},
     sync::Arc,
     time::{Duration, Instant},
@@ -123,11 +123,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         PatternAst::from(nodes).into()
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant>;
     fn mk_constant(c: Self::Constant) -> Self;
-    fn is_constant(&self) -> bool {
-        self.to_constant().is_some()
-    }
+    fn is_constant(&self) -> bool;
 
     /// Generalize a pattern
     fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {
@@ -1822,11 +1819,11 @@ pub fn assert_eqs_same<L: SynthLanguage>(actual: &[Equality<L>], expected: &[Equ
 
     let mut missing = String::new();
     for rule in expected.difference(&actual) {
-        missing.push_str(&format!("  {}\n", rule));
+        let _ = writeln!(&mut missing, "  {}", rule);
     }
     let mut unexpected = String::new();
     for rule in actual.difference(&expected) {
-        unexpected.push_str(&format!("  {}\n", rule));
+        let _ = writeln!(&mut unexpected, "  {}", rule);
     }
     if missing.len() + unexpected.len() > 0 {
         panic!(

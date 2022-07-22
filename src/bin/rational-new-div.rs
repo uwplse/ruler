@@ -105,12 +105,8 @@ impl SynthLanguage for Math {
         Math::Var(sym)
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::Num(n) = self {
-            Some(n)
-        } else {
-            None
-        }
+    fn is_constant(&self) -> bool {
+        matches!(self, Math::Num(_))
     }
 
     fn mk_constant(c: Self::Constant) -> Self {
@@ -290,7 +286,7 @@ pub fn sampler(rng: &mut Pcg64, b1: u64, b2: u64, num_samples: usize) -> Vec<Rat
 }
 
 /// Convert expressions to Z3's syntax for using SMT based rule verification.
-#[allow(unused_mut, mutable_borrow_reservation_conflict)] // please remove if changing this
+#[allow(unused_mut)] // please remove if changing this
 fn egg_to_z3<'a>(
     ctx: &'a z3::Context,
     expr: &[Math],

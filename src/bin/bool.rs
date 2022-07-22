@@ -132,12 +132,8 @@ impl SynthLanguage for Math {
         Math::Var(sym)
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::Lit(n) = self {
-            Some(n)
-        } else {
-            None
-        }
+    fn is_constant(&self) -> bool {
+        matches!(self, Math::Lit(_))
     }
 
     fn mk_constant(c: Self::Constant) -> Self {

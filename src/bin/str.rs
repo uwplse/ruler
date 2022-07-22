@@ -184,12 +184,8 @@ impl SynthLanguage for Lang {
         Lang::Var(sym)
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Lang::Lit(n) = self {
-            Some(n)
-        } else {
-            None
-        }
+    fn is_constant(&self) -> bool {
+        matches!(self, Lang::Lit(_))
     }
 
     fn mk_constant(c: Self::Constant) -> Self {
