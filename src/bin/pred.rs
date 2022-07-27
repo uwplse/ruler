@@ -15,7 +15,7 @@ define_language! {
     ">=" = Geq([Id;2]),
     "==" = Eq([Id;2]),
     "!=" = Neq([Id;2]),
-    "!" = Not(Id),
+    "~" = Not(Id),
     "&" = And([Id;2]),
     "|" = Or([Id;2]),
     "^" = Xor([Id;2]),
