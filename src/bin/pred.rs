@@ -75,55 +75,34 @@ impl SynthLanguage for Pred {
     {
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
-            Pred::Le([x, y]) => map!(v, x, y => {
-                let x = x.to_int().unwrap();
-                let y = y.to_int().unwrap();
-                Some(Constant::Bool(x < y))
-            }),
-            Pred::Leq([x, y]) => map!(v, x, y => {
-                let x = x.to_int().unwrap();
-                let y = y.to_int().unwrap();
-                Some(Constant::Bool(x <= y))
-            }),
-            Pred::Ge([x, y]) => map!(v, x, y => {
-                let x = x.to_int().unwrap();
-                let y = y.to_int().unwrap();
-                Some(Constant::Bool(x > y))
-            }),
-            Pred::Geq([x, y]) => map!(v, x, y => {
-                let x = x.to_int().unwrap();
-                let y = y.to_int().unwrap();
-                Some(Constant::Bool(x >= y))
-            }),
-            Pred::Eq([x, y]) => map!(v, x, y => {
-                let x = x.to_int().unwrap();
-                let y = y.to_int().unwrap();
-                Some(Constant::Bool(x == y))
-            }),
-            Pred::Neq([x, y]) => map!(v, x, y => {
-                let x = x.to_int().unwrap();
-                let y = y.to_int().unwrap();
-                Some(Constant::Bool(x != y))
-            }),
-            Pred::Not(x) => map!(v,x => {
-                let x = x.to_bool().unwrap();
-                Some(Constant::Bool(!x))
-            }),
-            Pred::And([x, y]) => map!(v,x,y => {
-                let x = x.to_bool().unwrap();
-                let y = y.to_bool().unwrap();
-                Some(Constant::Bool(x & y))
-            }),
-            Pred::Or([x, y]) => map!(v,x,y => {
-                let x = x.to_bool().unwrap();
-                let y = y.to_bool().unwrap();
-                Some(Constant::Bool(x | y))
-            }),
-            Pred::Xor([x, y]) => map!(v,x,y => {
-                let x = x.to_bool().unwrap();
-                let y = y.to_bool().unwrap();
-                Some(Constant::Bool(x ^ y))
-            }),
+            Pred::Le([x, y]) => {
+                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x < y)))
+            }
+            Pred::Leq([x, y]) => {
+                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x <= y)))
+            }
+            Pred::Ge([x, y]) => {
+                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x > y)))
+            }
+            Pred::Geq([x, y]) => {
+                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x >= y)))
+            }
+            Pred::Eq([x, y]) => {
+                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x == y)))
+            }
+            Pred::Neq([x, y]) => {
+                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x != y)))
+            }
+            Pred::Not(x) => map!(v, x => x.to_bool().map(|x|Constant::Bool(!x))),
+            Pred::And([x, y]) => {
+                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x & y)))
+            }
+            Pred::Or([x, y]) => {
+                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x | y)))
+            }
+            Pred::Xor([x, y]) => {
+                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x ^ y)))
+            }
 
             Pred::Var(_) => vec![],
         }
