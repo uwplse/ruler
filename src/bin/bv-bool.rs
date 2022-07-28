@@ -47,9 +47,25 @@ fn extract_bool_constant(nodes: &[Math]) -> Option<bool> {
     None
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Top,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Top")
+    }
+}
+
 // BV-bool language
 impl SynthLanguage for Math {
     type Constant = BV<2>;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Top
+    }
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         let s = s

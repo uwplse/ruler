@@ -66,8 +66,35 @@ impl Constant {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Bool,
+    Int,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Bool => write!(f, "Bool"),
+            Type::Int => write!(f, "Int"),
+        }
+    }
+}
+
 impl SynthLanguage for Pred {
     type Constant = Constant;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        match self {
+            Pred::Lit(c) => match c {
+                Constant::Bool(_) => Type::Bool,
+                Constant::Int(_) => Type::Int,
+            },
+            Pred::Var(_) => Type::Int,
+            _ => Type::Bool,
+        }
+    }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
@@ -76,32 +103,32 @@ impl SynthLanguage for Pred {
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Le([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x < y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() < y.to_int().unwrap())))
             }
             Pred::Leq([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x <= y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() <= y.to_int().unwrap())))
             }
             Pred::Ge([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x > y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() > y.to_int().unwrap())))
             }
             Pred::Geq([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x >= y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() >= y.to_int().unwrap())))
             }
             Pred::Eq([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x == y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() == y.to_int().unwrap())))
             }
             Pred::Neq([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x != y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() != y.to_int().unwrap())))
             }
-            Pred::Not(x) => map!(v, x => x.to_bool().map(|x|Constant::Bool(!x))),
+            Pred::Not(x) => map!(v, x => Some(Constant::Bool(!x.to_bool().unwrap()))),
             Pred::And([x, y]) => {
-                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x & y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() & y.to_bool().unwrap())))
             }
             Pred::Or([x, y]) => {
-                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x | y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() | y.to_bool().unwrap())))
             }
             Pred::Xor([x, y]) => {
-                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x ^ y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() ^ y.to_bool().unwrap())))
             }
 
             Pred::Var(_) => vec![],

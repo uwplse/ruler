@@ -21,8 +21,24 @@ define_language! {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Top,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Top")
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = bool;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Top
+    }
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         let s = s
