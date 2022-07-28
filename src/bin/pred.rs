@@ -5,21 +5,133 @@ use rand::Rng;
 use rand_pcg::Pcg64;
 use ruler::*;
 
-define_language! {
-  pub enum Pred {
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub enum Pred {
     Lit(Constant),
     Var(egg::Symbol),
-    "<" = Le([Id;2]),
-    "<=" = Leq([Id;2]),
-    ">" = Ge([Id;2]),
-    ">=" = Geq([Id;2]),
-    "==" = Eq([Id;2]),
-    "!=" = Neq([Id;2]),
-    "~" = Not(Id),
-    "&" = And([Id;2]),
-    "|" = Or([Id;2]),
-    "^" = Xor([Id;2]),
-  }
+    Le([Id; 2]),
+    Leq([Id; 2]),
+    Ge([Id; 2]),
+    Geq([Id; 2]),
+    Eq([Id; 2]),
+    Neq([Id; 2]),
+    Not(Id),
+    And([Id; 2]),
+    Or([Id; 2]),
+    Xor([Id; 2]),
+}
+impl Language for Pred {
+    #[inline(always)]
+    fn matches(&self, other: &Self) -> bool {
+        ::std::mem::discriminant(self) == ::std::mem::discriminant(other)
+            && match (self, other) {
+                (Pred::Lit(data1), Pred::Lit(data2)) => data1 == data2,
+                (Pred::Var(data1), Pred::Var(data2)) => data1 == data2,
+                (Pred::Not(l), Pred::Not(r)) => {
+                    LanguageChildren::len(l) == LanguageChildren::len(r)
+                }
+                (Pred::Le(l), Pred::Le(r))
+                | (Pred::Leq(l), Pred::Leq(r))
+                | (Pred::Ge(l), Pred::Ge(r))
+                | (Pred::Geq(l), Pred::Geq(r))
+                | (Pred::Eq(l), Pred::Eq(r))
+                | (Pred::Neq(l), Pred::Neq(r))
+                | (Pred::And(l), Pred::And(r))
+                | (Pred::Or(l), Pred::Or(r))
+                | (Pred::Xor(l), Pred::Xor(r)) => {
+                    LanguageChildren::len(l) == LanguageChildren::len(r)
+                }
+                _ => false,
+            }
+    }
+    fn children(&self) -> &[Id] {
+        match self {
+            Pred::Lit(_data) => &[],
+            Pred::Var(_data) => &[],
+            Pred::Not(ids) => LanguageChildren::as_slice(ids),
+            Pred::Le(ids)
+            | Pred::Leq(ids)
+            | Pred::Ge(ids)
+            | Pred::Geq(ids)
+            | Pred::Eq(ids)
+            | Pred::Neq(ids)
+            | Pred::And(ids)
+            | Pred::Or(ids)
+            | Pred::Xor(ids) => LanguageChildren::as_slice(ids),
+        }
+    }
+    fn children_mut(&mut self) -> &mut [Id] {
+        match self {
+            Pred::Lit(_data) => &mut [],
+            Pred::Var(_data) => &mut [],
+            Pred::Not(ids) => LanguageChildren::as_mut_slice(ids),
+            Pred::Le(ids)
+            | Pred::Leq(ids)
+            | Pred::Ge(ids)
+            | Pred::Geq(ids)
+            | Pred::Eq(ids)
+            | Pred::Neq(ids)
+            | Pred::And(ids)
+            | Pred::Or(ids)
+            | Pred::Xor(ids) => LanguageChildren::as_mut_slice(ids),
+        }
+    }
+}
+impl ::std::fmt::Display for Pred {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match (self, f) {
+            (Pred::Lit(data), f) => ::std::fmt::Display::fmt(data, f),
+            (Pred::Var(data), f) => ::std::fmt::Display::fmt(data, f),
+            (Pred::Le(..), f) => f.write_str("<"),
+            (Pred::Leq(..), f) => f.write_str("<="),
+            (Pred::Ge(..), f) => f.write_str(">"),
+            (Pred::Geq(..), f) => f.write_str(">="),
+            (Pred::Eq(..), f) => f.write_str("=="),
+            (Pred::Neq(..), f) => f.write_str("!="),
+            (Pred::Not(..), f) => f.write_str("~"),
+            (Pred::And(..), f) => f.write_str("&"),
+            (Pred::Or(..), f) => f.write_str("|"),
+            (Pred::Xor(..), f) => f.write_str("^"),
+        }
+    }
+}
+impl FromOp for Pred {
+    type Error = FromOpError;
+    fn from_op(
+        op: &str,
+        children: ::std::vec::Vec<Id>,
+    ) -> ::std::result::Result<Self, Self::Error> {
+        if children.len() == 0 {
+            if op.parse::<Constant>().is_ok() {
+                Ok(Pred::Lit(op.parse().unwrap()))
+            } else if op.parse::<egg::Symbol>().is_ok() {
+                Ok(Pred::Var(op.parse().unwrap()))
+            } else {
+                Err(FromOpError::new(op, children))
+            }
+        } else if children.len() == 1 {
+            if op == "~" {
+                Ok(Pred::Not(<Id as LanguageChildren>::from_vec(children)))
+            } else {
+                Err(FromOpError::new(op, children))
+            }
+        } else if children.len() == 2 {
+            match op {
+                "<" => Ok(Pred::Le(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                "<=" => Ok(Pred::Leq(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                ">" => Ok(Pred::Ge(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                ">=" => Ok(Pred::Geq(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                "==" => Ok(Pred::Eq(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                "!=" => Ok(Pred::Neq(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                "&" => Ok(Pred::And(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                "|" => Ok(Pred::Or(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                "^" => Ok(Pred::Xor(<[Id; 2] as LanguageChildren>::from_vec(children))),
+                _ => Err(FromOpError::new(op, children)),
+            }
+        } else {
+            Err(FromOpError::new(op, children))
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
