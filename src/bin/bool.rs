@@ -23,12 +23,12 @@ define_language! {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Type {
-    Top,
+    Bool,
 }
 
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Top")
+        write!(f, "b")
     }
 }
 
@@ -37,7 +37,7 @@ impl SynthLanguage for Math {
     type Type = Type;
 
     fn get_type(&self) -> Self::Type {
-        Type::Top
+        Type::Bool
     }
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
