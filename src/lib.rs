@@ -159,7 +159,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
             Some(sym) => {
                 let len = map.len();
                 let var = map.entry(sym).or_insert_with(|| {
-                    format!("?{}_{}", node.get_type(), letter(len))
+                    format!("?{}{}", node.get_type(), letter(len))
                         .parse()
                         .unwrap()
                 });

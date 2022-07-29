@@ -15,7 +15,7 @@ pub struct BVar(egg::Symbol);
 
 impl Display for BVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "b_")
+        write!(f, "b")
     }
 }
 
@@ -23,7 +23,7 @@ impl FromStr for BVar {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("b_") {
+        if s.starts_with("b") {
             Ok(BVar(Symbol::from(s)))
         } else {
             Err(())
@@ -37,7 +37,7 @@ pub struct IVar(egg::Symbol);
 
 impl Display for IVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "i_")
+        write!(f, "i")
     }
 }
 
@@ -45,7 +45,7 @@ impl FromStr for IVar {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("i_") {
+        if s.starts_with("i") {
             Ok(IVar(Symbol::from(s)))
         } else {
             Err(())
@@ -194,9 +194,9 @@ impl SynthLanguage for Pred {
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {
-        if sym.as_str().starts_with("b_") {
+        if sym.as_str().starts_with("b") {
             Pred::BVar(BVar(sym))
-        } else if sym.as_str().starts_with("i_") {
+        } else if sym.as_str().starts_with("i") {
             Pred::IVar(IVar(sym))
         } else {
             panic!("invalid variable: {}", sym)
@@ -219,7 +219,7 @@ impl SynthLanguage for Pred {
         });
 
         for i in 0..synth.params.variables {
-            let var = Symbol::from("i_".to_owned() + letter(i));
+            let var = Symbol::from("i".to_owned() + letter(i));
             let id = egraph.add(Pred::IVar(IVar(var)));
             let mut vals = vec![];
             let rng = &mut synth.rng;

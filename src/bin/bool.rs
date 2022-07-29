@@ -177,7 +177,7 @@ impl SynthLanguage for Math {
         egraph.add(Math::Lit(true));
 
         for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
-            let var = Symbol::from(letter(i));
+            let var = Symbol::from("b".to_owned() + letter(i));
             let id = egraph.add(Math::Var(var));
             egraph[id].data.cvec = item.clone();
         }
