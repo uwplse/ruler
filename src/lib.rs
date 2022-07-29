@@ -158,9 +158,11 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         let mut rename_node = |node: &Self| match node.to_var() {
             Some(sym) => {
                 let len = map.len();
-                let var = map
-                    .entry(sym)
-                    .or_insert_with(|| format!("?{}", letter(len)).parse().unwrap());
+                let var = map.entry(sym).or_insert_with(|| {
+                    format!("?{}_{}", node.get_type(), letter(len))
+                        .parse()
+                        .unwrap()
+                });
 
                 let s = var.to_string();
                 Self::mk_var(s[1..].into())

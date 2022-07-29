@@ -8,7 +8,8 @@ use ruler::*;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub enum Pred {
     Lit(Constant),
-    Var(egg::Symbol),
+    BVar(egg::Symbol),
+    IVar(egg::Symbol),
     Le([Id; 2]),
     Leq([Id; 2]),
     Ge([Id; 2]),
@@ -26,7 +27,8 @@ impl Language for Pred {
         ::std::mem::discriminant(self) == ::std::mem::discriminant(other)
             && match (self, other) {
                 (Pred::Lit(data1), Pred::Lit(data2)) => data1 == data2,
-                (Pred::Var(data1), Pred::Var(data2)) => data1 == data2,
+                (Pred::BVar(data1), Pred::BVar(data2)) => data1 == data2,
+                (Pred::IVar(data1), Pred::IVar(data2)) => data1 == data2,
                 (Pred::Not(l), Pred::Not(r)) => {
                     LanguageChildren::len(l) == LanguageChildren::len(r)
                 }
@@ -47,7 +49,8 @@ impl Language for Pred {
     fn children(&self) -> &[Id] {
         match self {
             Pred::Lit(_data) => &[],
-            Pred::Var(_data) => &[],
+            Pred::BVar(_data) => &[],
+            Pred::IVar(_data) => &[],
             Pred::Not(ids) => LanguageChildren::as_slice(ids),
             Pred::Le(ids)
             | Pred::Leq(ids)
@@ -63,7 +66,8 @@ impl Language for Pred {
     fn children_mut(&mut self) -> &mut [Id] {
         match self {
             Pred::Lit(_data) => &mut [],
-            Pred::Var(_data) => &mut [],
+            Pred::BVar(_data) => &mut [],
+            Pred::IVar(_data) => &mut [],
             Pred::Not(ids) => LanguageChildren::as_mut_slice(ids),
             Pred::Le(ids)
             | Pred::Leq(ids)
@@ -81,7 +85,8 @@ impl ::std::fmt::Display for Pred {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         match (self, f) {
             (Pred::Lit(data), f) => ::std::fmt::Display::fmt(data, f),
-            (Pred::Var(data), f) => ::std::fmt::Display::fmt(data, f),
+            (Pred::BVar(data), f) => ::std::fmt::Display::fmt(data, f),
+            (Pred::IVar(data), f) => ::std::fmt::Display::fmt(data, f),
             (Pred::Le(..), f) => f.write_str("<"),
             (Pred::Leq(..), f) => f.write_str("<="),
             (Pred::Ge(..), f) => f.write_str(">"),
@@ -105,7 +110,13 @@ impl FromOp for Pred {
             if op.parse::<Constant>().is_ok() {
                 Ok(Pred::Lit(op.parse().unwrap()))
             } else if op.parse::<egg::Symbol>().is_ok() {
-                Ok(Pred::Var(op.parse().unwrap()))
+                if op.starts_with("b_") {
+                    Ok(Pred::BVar(op.parse().unwrap()))
+                } else if op.starts_with("i_") {
+                    Ok(Pred::IVar(op.parse().unwrap()))
+                } else {
+                    Err(FromOpError::new(op, children))
+                }
             } else {
                 Err(FromOpError::new(op, children))
             }
@@ -187,8 +198,8 @@ pub enum Type {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Type::Bool => write!(f, "Bool"),
-            Type::Int => write!(f, "Int"),
+            Type::Bool => write!(f, "b"),
+            Type::Int => write!(f, "i"),
         }
     }
 }
@@ -203,7 +214,7 @@ impl SynthLanguage for Pred {
                 Constant::Bool(_) => Type::Bool,
                 Constant::Int(_) => Type::Int,
             },
-            Pred::Var(_) => Type::Int,
+            Pred::IVar(_) => Type::Int,
             _ => Type::Bool,
         }
     }
@@ -243,20 +254,27 @@ impl SynthLanguage for Pred {
                 map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() ^ y.to_bool().unwrap())))
             }
 
-            Pred::Var(_) => vec![],
+            Pred::BVar(_) => vec![],
+            Pred::IVar(_) => vec![],
         }
     }
 
     fn to_var(&self) -> Option<Symbol> {
-        if let Pred::Var(sym) = self {
-            Some(*sym)
-        } else {
-            None
+        match self {
+            Pred::BVar(sym) => Some(*sym),
+            Pred::IVar(sym) => Some(*sym),
+            _ => None,
         }
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {
-        Pred::Var(sym)
+        if sym.as_str().starts_with("b_") {
+            Pred::BVar(sym)
+        } else if sym.as_str().starts_with("i_") {
+            Pred::IVar(sym)
+        } else {
+            panic!("invalid variable: {}", sym)
+        }
     }
 
     fn is_constant(&self) -> bool {
@@ -275,8 +293,8 @@ impl SynthLanguage for Pred {
         });
 
         for i in 0..synth.params.variables {
-            let var = Symbol::from(letter(i));
-            let id = egraph.add(Pred::Var(var));
+            let var = Symbol::from("i_".to_owned() + letter(i));
+            let id = egraph.add(Pred::IVar(var));
             let mut vals = vec![];
             let rng = &mut synth.rng;
             for _ in 0..10 {
