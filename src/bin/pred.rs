@@ -168,7 +168,7 @@ impl SynthLanguage for Pred {
                     match (x,y) {
                         (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x == y)),
                         (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x == y)),
-                        _ => None
+                        _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
                     }
                 })
             }
@@ -177,7 +177,7 @@ impl SynthLanguage for Pred {
                     match (x,y) {
                         (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x != y)),
                         (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x != y)),
-                        _ => None
+                        _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
                     }
                 })
             }
@@ -231,14 +231,18 @@ impl SynthLanguage for Pred {
         });
 
         for i in 0..synth.params.variables {
-            let var = Symbol::from("i".to_owned() + letter(i));
-            let id = egraph.add(Pred::IVar(IVar(var)));
-            let mut vals = vec![];
             let rng = &mut synth.rng;
+            let mut i_vals = vec![];
+            let mut b_vals = vec![];
+            let i_id = egraph.add(Pred::IVar(IVar(Symbol::from("i".to_owned() + letter(i)))));
+            let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
             for _ in 0..10 {
-                vals.push(Some(Constant::Int(rng.gen::<usize>())));
+                i_vals.push(Some(Constant::Int(rng.gen::<usize>())));
+                b_vals.push(Some(Constant::Bool(rng.gen::<bool>())));
             }
-            egraph[id].data.cvec = vals.clone();
+
+            egraph[i_id].data.cvec = i_vals.clone();
+            egraph[b_id].data.cvec = b_vals.clone();
         }
 
         synth.egraph = egraph;
