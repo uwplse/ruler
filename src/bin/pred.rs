@@ -23,7 +23,7 @@ impl FromStr for BVar {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("b") {
+        if s.starts_with('b') {
             Ok(BVar(Symbol::from(s)))
         } else {
             Err(())
@@ -45,7 +45,7 @@ impl FromStr for IVar {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("i") {
+        if s.starts_with('i') {
             Ok(IVar(Symbol::from(s)))
         } else {
             Err(())
@@ -206,9 +206,9 @@ impl SynthLanguage for Pred {
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {
-        if sym.as_str().starts_with("b") {
+        if sym.as_str().starts_with('b') {
             Pred::BVar(BVar(sym))
-        } else if sym.as_str().starts_with("i") {
+        } else if sym.as_str().starts_with('i') {
             Pred::IVar(IVar(sym))
         } else {
             panic!("invalid variable: {}", sym)

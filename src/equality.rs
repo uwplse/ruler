@@ -125,11 +125,9 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             return vec![];
         }
 
-        if let Some(enode_or_var) = self.rhs.ast.as_ref().last() {
-            if let ENodeOrVar::ENode(x) = enode_or_var {
-                if x.get_type() != egraph[matched_id].data.class_type {
-                    return vec![];
-                }
+        if let Some(ENodeOrVar::ENode(x)) = self.rhs.ast.as_ref().last() {
+            if x.get_type() != egraph[matched_id].data.class_type {
+                return vec![];
             }
         }
 
