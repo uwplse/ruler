@@ -164,10 +164,22 @@ impl SynthLanguage for Pred {
                 map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() >= y.to_int().unwrap())))
             }
             Pred::Eq([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() == y.to_int().unwrap())))
+                map!(v, x, y => {
+                    match (x,y) {
+                        (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x == y)),
+                        (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x == y)),
+                        _ => None
+                    }
+                })
             }
             Pred::Neq([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() != y.to_int().unwrap())))
+                map!(v, x, y => {
+                    match (x,y) {
+                        (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x != y)),
+                        (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x != y)),
+                        _ => None
+                    }
+                })
             }
             Pred::Not(x) => map!(v, x => Some(Constant::Bool(!x.to_bool().unwrap()))),
             Pred::And([x, y]) => {
