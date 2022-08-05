@@ -199,8 +199,7 @@ impl SynthLanguage for Pred {
 
     fn to_var(&self) -> Option<Symbol> {
         match self {
-            Pred::BVar(BVar(sym)) => Some(*sym),
-            Pred::IVar(IVar(sym)) => Some(*sym),
+            Pred::BVar(BVar(sym)) | Pred::IVar(IVar(sym)) => Some(*sym),
             _ => None,
         }
     }
