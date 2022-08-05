@@ -96,6 +96,9 @@ impl Default for SynthAnalysis {
 /// where each cvec element is computed using `eval`.
 pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
+    type Type: Clone + Hash + Eq + Debug + Display + Ord;
+
+    fn get_type(&self) -> Self::Type;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
     where
@@ -155,9 +158,11 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         let mut rename_node = |node: &Self| match node.to_var() {
             Some(sym) => {
                 let len = map.len();
-                let var = map
-                    .entry(sym)
-                    .or_insert_with(|| format!("?{}", letter(len)).parse().unwrap());
+                let var = map.entry(sym).or_insert_with(|| {
+                    format!("?{}{}", node.get_type(), letter(len))
+                        .parse()
+                        .unwrap()
+                });
 
                 let s = var.to_string();
                 Self::mk_var(s[1..].into())
@@ -1445,6 +1450,7 @@ pub struct Signature<L: SynthLanguage> {
     pub exact: bool,
     pub is_extractable: bool,
     pub interval: Interval<L::Constant>,
+    pub class_type: L::Type,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -1538,6 +1544,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         let get_cvec = |i: &Id| &egraph[*i].data.cvec;
         let get_simplest = |i: &Id| &egraph[*i].data.simplest;
         Signature {
+            class_type: enode.get_type(),
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
             simplest: if enode.is_var() || enode.is_constant() {
                 let mut rec = RecExpr::<L>::default();

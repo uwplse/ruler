@@ -64,6 +64,17 @@ impl std::str::FromStr for Constant {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Top,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
 define_language! {
     /// Defines operators for Strings.
     pub enum Lang {
@@ -89,6 +100,11 @@ fn concat(a: &[u8], b: &[u8]) -> SmallStr {
 
 impl SynthLanguage for Lang {
     type Constant = Constant;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Top
+    }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where

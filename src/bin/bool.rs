@@ -21,8 +21,24 @@ define_language! {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Bool,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "b")
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = bool;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Bool
+    }
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         let s = s
@@ -161,7 +177,7 @@ impl SynthLanguage for Math {
         egraph.add(Math::Lit(true));
 
         for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
-            let var = Symbol::from(letter(i));
+            let var = Symbol::from("b".to_owned() + letter(i));
             let id = egraph.add(Math::Var(var));
             egraph[id].data.cvec = item.clone();
         }

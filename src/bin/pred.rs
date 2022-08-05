@@ -1,14 +1,63 @@
-use std::{fmt, hash::Hash};
+use std::{
+    fmt::{self, Display},
+    hash::Hash,
+    str::FromStr,
+};
 
 use egg::*;
 use rand::Rng;
 use rand_pcg::Pcg64;
 use ruler::*;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+
+pub struct BVar(egg::Symbol);
+
+impl Display for BVar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "b")
+    }
+}
+
+impl FromStr for BVar {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with('b') {
+            Ok(BVar(Symbol::from(s)))
+        } else {
+            Err(())
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+
+pub struct IVar(egg::Symbol);
+
+impl Display for IVar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "i")
+    }
+}
+
+impl FromStr for IVar {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with('i') {
+            Ok(IVar(Symbol::from(s)))
+        } else {
+            Err(())
+        }
+    }
+}
+
 define_language! {
   pub enum Pred {
     Lit(Constant),
-    Var(egg::Symbol),
+    BVar(BVar),
+    IVar(IVar),
     "<" = Le([Id;2]),
     "<=" = Leq([Id;2]),
     ">" = Ge([Id;2]),
@@ -66,8 +115,35 @@ impl Constant {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Bool,
+    Int,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Bool => write!(f, "b"),
+            Type::Int => write!(f, "i"),
+        }
+    }
+}
+
 impl SynthLanguage for Pred {
     type Constant = Constant;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        match self {
+            Pred::Lit(c) => match c {
+                Constant::Bool(_) => Type::Bool,
+                Constant::Int(_) => Type::Int,
+            },
+            Pred::IVar(_) => Type::Int,
+            _ => Type::Bool,
+        }
+    }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
@@ -76,23 +152,23 @@ impl SynthLanguage for Pred {
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Le([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x < y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() < y.to_int().unwrap())))
             }
             Pred::Leq([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x <= y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() <= y.to_int().unwrap())))
             }
             Pred::Ge([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x > y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() > y.to_int().unwrap())))
             }
             Pred::Geq([x, y]) => {
-                map!(v, x, y => x.to_int().zip(y.to_int()).map(|(x,y)|Constant::Bool(x >= y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() >= y.to_int().unwrap())))
             }
             Pred::Eq([x, y]) => {
                 map!(v, x, y => {
                     match (x,y) {
                         (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x == y)),
                         (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x == y)),
-                        _ => None
+                        _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
                     }
                 })
             }
@@ -101,35 +177,41 @@ impl SynthLanguage for Pred {
                     match (x,y) {
                         (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x != y)),
                         (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x != y)),
-                        _ => None
+                        _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
                     }
                 })
             }
-            Pred::Not(x) => map!(v, x => x.to_bool().map(|x|Constant::Bool(!x))),
+            Pred::Not(x) => map!(v, x => Some(Constant::Bool(!x.to_bool().unwrap()))),
             Pred::And([x, y]) => {
-                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x & y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() & y.to_bool().unwrap())))
             }
             Pred::Or([x, y]) => {
-                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x | y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() | y.to_bool().unwrap())))
             }
             Pred::Xor([x, y]) => {
-                map!(v, x, y => x.to_bool().zip(y.to_bool()).map(|(x,y)|Constant::Bool(x ^ y)))
+                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() ^ y.to_bool().unwrap())))
             }
 
-            Pred::Var(_) => vec![],
+            Pred::BVar(_) => vec![],
+            Pred::IVar(_) => vec![],
         }
     }
 
     fn to_var(&self) -> Option<Symbol> {
-        if let Pred::Var(sym) = self {
-            Some(*sym)
-        } else {
-            None
+        match self {
+            Pred::BVar(BVar(sym)) | Pred::IVar(IVar(sym)) => Some(*sym),
+            _ => None,
         }
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {
-        Pred::Var(sym)
+        if sym.as_str().starts_with('b') {
+            Pred::BVar(BVar(sym))
+        } else if sym.as_str().starts_with('i') {
+            Pred::IVar(IVar(sym))
+        } else {
+            panic!("invalid variable: {}", sym)
+        }
     }
 
     fn is_constant(&self) -> bool {
@@ -148,14 +230,18 @@ impl SynthLanguage for Pred {
         });
 
         for i in 0..synth.params.variables {
-            let var = Symbol::from(letter(i));
-            let id = egraph.add(Pred::Var(var));
-            let mut vals = vec![];
             let rng = &mut synth.rng;
+            let mut i_vals = vec![];
+            let mut b_vals = vec![];
+            let i_id = egraph.add(Pred::IVar(IVar(Symbol::from("i".to_owned() + letter(i)))));
+            let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
             for _ in 0..10 {
-                vals.push(Some(Constant::Int(rng.gen::<usize>())));
+                i_vals.push(Some(Constant::Int(rng.gen::<usize>())));
+                b_vals.push(Some(Constant::Bool(rng.gen::<bool>())));
             }
-            egraph[id].data.cvec = vals.clone();
+
+            egraph[i_id].data.cvec = i_vals.clone();
+            egraph[b_id].data.cvec = b_vals.clone();
         }
 
         synth.egraph = egraph;

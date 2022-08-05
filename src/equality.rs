@@ -125,6 +125,12 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
             return vec![];
         }
 
+        if let Some(ENodeOrVar::ENode(x)) = self.rhs.ast.as_ref().last() {
+            if x.get_type() != egraph[matched_id].data.class_type {
+                return vec![];
+            }
+        }
+
         let id = apply_pat(self.rhs.ast.as_ref(), egraph, subst);
 
         if !egraph[id].data.is_defined() {
