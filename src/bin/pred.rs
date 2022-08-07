@@ -266,7 +266,9 @@ impl SynthLanguage for Pred {
             let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
             let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
             match (lexpr, rexpr) {
-                (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => solver.assert(&z3::ast::Bool::not(&lb._eq(&rb))),
+                (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
+                    solver.assert(&z3::ast::Bool::not(&lb._eq(&rb)))
+                }
                 (Z3::Z3Int(li), Z3::Z3Int(ri)) => solver.assert(&z3::ast::Bool::not(&li._eq(&ri))),
                 _ => return ValidationResult::Invalid,
             };
@@ -352,22 +354,22 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
             Pred::Lt([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
                 let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::lt(&lexpr, &rexpr)))
+                buf.push(Z3::Z3Bool(z3::ast::Int::lt(lexpr, rexpr)))
             }
             Pred::Leq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
                 let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::le(&lexpr, &rexpr)))
+                buf.push(Z3::Z3Bool(z3::ast::Int::le(lexpr, rexpr)))
             }
             Pred::Gt([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
                 let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::gt(&lexpr, &rexpr)))
+                buf.push(Z3::Z3Bool(z3::ast::Int::gt(lexpr, rexpr)))
             }
             Pred::Geq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
                 let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::ge(&lexpr, &rexpr)))
+                buf.push(Z3::Z3Bool(z3::ast::Int::ge(lexpr, rexpr)))
             }
             Pred::Eq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].clone();
@@ -392,9 +394,9 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
                     (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
                         buf.push(Z3::Z3Bool(z3::ast::Bool::not(&z3::ast::Bool::_eq(lb, rb))))
                     }
-                    (Z3::Z3Int(li), Z3::Z3Int(ri)) => {
-                        buf.push(Z3::Z3Bool(z3::ast::Bool::not(&z3::ast::Int::_eq(li, ri).not())))
-                    }
+                    (Z3::Z3Int(li), Z3::Z3Int(ri)) => buf.push(Z3::Z3Bool(z3::ast::Bool::not(
+                        &z3::ast::Int::_eq(li, ri).not(),
+                    ))),
                     (Z3::Z3Bool(_), Z3::Z3Int(_)) | (Z3::Z3Int(_), Z3::Z3Bool(_)) => panic!(
                         "Rule candidate seems to have different 
                     type of lhs and rhs."
@@ -408,17 +410,17 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
             Pred::And([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].get_z3bool().unwrap();
                 let rexpr = &buf[usize::from(*b)].get_z3bool().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Bool::and(ctx, &[&lexpr, &rexpr])))
+                buf.push(Z3::Z3Bool(z3::ast::Bool::and(ctx, &[lexpr, rexpr])))
             }
             Pred::Or([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].get_z3bool().unwrap();
                 let rexpr = &buf[usize::from(*b)].get_z3bool().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Bool::or(ctx, &[&lexpr, &rexpr])))
+                buf.push(Z3::Z3Bool(z3::ast::Bool::or(ctx, &[lexpr, rexpr])))
             }
             Pred::Xor([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].get_z3bool().unwrap();
                 let rexpr = &buf[usize::from(*b)].get_z3bool().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Bool::xor(&lexpr, &rexpr)))
+                buf.push(Z3::Z3Bool(z3::ast::Bool::xor(lexpr, rexpr)))
             }
         }
     }
