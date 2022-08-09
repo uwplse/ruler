@@ -227,7 +227,7 @@ impl SynthLanguage for Pred {
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let cvec_len = 300;
         let mut egraph: EGraph<Pred, SynthAnalysis> = EGraph::new(SynthAnalysis {
-            cvec_len: cvec_len,
+            cvec_len,
             constant_fold: ConstantFoldMethod::CvecMatching,
             rule_lifting: false,
         });
