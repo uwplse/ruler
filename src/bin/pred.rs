@@ -1,12 +1,16 @@
 use std::{
     fmt::{self, Display},
     hash::Hash,
-    ops::Not,
     str::FromStr,
 };
 
 use egg::*;
-use rand::Rng;
+use num::rational::Ratio;
+use num::{
+    bigint::{BigInt, RandBigInt, Sign, ToBigInt},
+    ToPrimitive,
+};
+use rand::{seq::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use ruler::*;
 use z3::{ast::Ast, SatResult};
@@ -35,20 +39,20 @@ impl FromStr for BVar {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 
-pub struct IVar(egg::Symbol);
+pub struct NVar(egg::Symbol);
 
-impl Display for IVar {
+impl Display for NVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "i")
+        write!(f, "n")
     }
 }
 
-impl FromStr for IVar {
+impl FromStr for NVar {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with('i') {
-            Ok(IVar(Symbol::from(s)))
+        if s.starts_with('n') {
+            Ok(NVar(Symbol::from(s)))
         } else {
             Err(())
         }
@@ -59,7 +63,7 @@ define_language! {
   pub enum Pred {
     Lit(Constant),
     BVar(BVar),
-    IVar(IVar),
+    NVar(NVar),
     "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
     ">" = Gt([Id;2]),
@@ -76,14 +80,14 @@ define_language! {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Constant {
     Bool(bool),
-    Int(i64),
+    Num(Ratio<BigInt>),
 }
 
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Constant::Bool(b) => b.fmt(f),
-            Constant::Int(i) => i.fmt(f),
+            Constant::Num(i) => i.fmt(f),
         }
     }
 }
@@ -91,8 +95,8 @@ impl fmt::Display for Constant {
 impl std::str::FromStr for Constant {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(i) = i64::from_str(s) {
-            Ok(Self::Int(i))
+        if let Ok(i) = Ratio::<BigInt>::from_str(s) {
+            Ok(Self::Num(i))
         } else if let Ok(b) = bool::from_str(s) {
             Ok(Self::Bool(b))
         } else {
@@ -102,9 +106,9 @@ impl std::str::FromStr for Constant {
 }
 
 impl Constant {
-    fn to_int(&self) -> Option<i64> {
+    fn to_num(&self) -> Option<Ratio<BigInt>> {
         match self {
-            Constant::Int(n) => Some(*n),
+            Constant::Num(n) => Some(n.clone()),
             Constant::Bool(_) => None,
         }
     }
@@ -112,7 +116,7 @@ impl Constant {
     fn to_bool(&self) -> Option<bool> {
         match self {
             Constant::Bool(b) => Some(*b),
-            Constant::Int(_) => None,
+            Constant::Num(_) => None,
         }
     }
 }
@@ -120,14 +124,14 @@ impl Constant {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Type {
     Bool,
-    Int,
+    Num,
 }
 
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::Bool => write!(f, "b"),
-            Type::Int => write!(f, "i"),
+            Type::Num => write!(f, "n"),
         }
     }
 }
@@ -140,9 +144,9 @@ impl SynthLanguage for Pred {
         match self {
             Pred::Lit(c) => match c {
                 Constant::Bool(_) => Type::Bool,
-                Constant::Int(_) => Type::Int,
+                Constant::Num(_) => Type::Num,
             },
-            Pred::IVar(_) => Type::Int,
+            Pred::NVar(_) => Type::Num,
             _ => Type::Bool,
         }
     }
@@ -154,22 +158,22 @@ impl SynthLanguage for Pred {
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Lt([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() < y.to_int().unwrap())))
+                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() < y.to_num().unwrap())))
             }
             Pred::Leq([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() <= y.to_int().unwrap())))
+                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() <= y.to_num().unwrap())))
             }
             Pred::Gt([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() > y.to_int().unwrap())))
+                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() > y.to_num().unwrap())))
             }
             Pred::Geq([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_int().unwrap() >= y.to_int().unwrap())))
+                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() >= y.to_num().unwrap())))
             }
             Pred::Eq([x, y]) => {
                 map!(v, x, y => {
                     match (x,y) {
                         (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x == y)),
-                        (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x == y)),
+                        (Constant::Num(x), Constant::Num(y)) => Some(Constant::Bool(x == y)),
                         _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
                     }
                 })
@@ -178,7 +182,7 @@ impl SynthLanguage for Pred {
                 map!(v, x, y => {
                     match (x,y) {
                         (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x != y)),
-                        (Constant::Int(x), Constant::Int(y)) => Some(Constant::Bool(x != y)),
+                        (Constant::Num(x), Constant::Num(y)) => Some(Constant::Bool(x != y)),
                         _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
                     }
                 })
@@ -195,13 +199,13 @@ impl SynthLanguage for Pred {
             }
 
             Pred::BVar(_) => vec![],
-            Pred::IVar(_) => vec![],
+            Pred::NVar(_) => vec![],
         }
     }
 
     fn to_var(&self) -> Option<Symbol> {
         match self {
-            Pred::BVar(BVar(sym)) | Pred::IVar(IVar(sym)) => Some(*sym),
+            Pred::BVar(BVar(sym)) | Pred::NVar(NVar(sym)) => Some(*sym),
             _ => None,
         }
     }
@@ -209,8 +213,8 @@ impl SynthLanguage for Pred {
     fn mk_var(sym: egg::Symbol) -> Self {
         if sym.as_str().starts_with('b') {
             Pred::BVar(BVar(sym))
-        } else if sym.as_str().starts_with('i') {
-            Pred::IVar(IVar(sym))
+        } else if sym.as_str().starts_with('n') {
+            Pred::NVar(NVar(sym))
         } else {
             panic!("invalid variable: {}", sym)
         }
@@ -225,24 +229,31 @@ impl SynthLanguage for Pred {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
+        let cvec_len = 300;
         let mut egraph: EGraph<Pred, SynthAnalysis> = EGraph::new(SynthAnalysis {
-            cvec_len: 10,
-            constant_fold: ConstantFoldMethod::NoFold,
+            cvec_len,
+            constant_fold: ConstantFoldMethod::CvecMatching,
             rule_lifting: false,
         });
 
         for i in 0..synth.params.variables {
             let rng = &mut synth.rng;
-            let mut i_vals = vec![];
+
+            let mut samples = vec![];
+            samples.append(&mut sampler(rng, 8, 6, cvec_len / 3));
+            samples.append(&mut sampler(rng, 6, 8, cvec_len / 3));
+            samples.append(&mut sampler(rng, 4, 1, cvec_len / 3));
+            samples.shuffle(rng);
+
+            let n_vals: Vec<Option<Constant>> = samples.iter().map(|x| Some(x.clone())).collect();
             let mut b_vals = vec![];
-            let i_id = egraph.add(Pred::IVar(IVar(Symbol::from("i".to_owned() + letter(i)))));
+            let n_id = egraph.add(Pred::NVar(NVar(Symbol::from("n".to_owned() + letter(i)))));
             let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
             for _ in 0..10 {
-                i_vals.push(Some(Constant::Int(rng.gen::<i64>())));
                 b_vals.push(Some(Constant::Bool(rng.gen::<bool>())));
             }
 
-            egraph[i_id].data.cvec = i_vals.clone();
+            egraph[n_id].data.cvec = n_vals.clone();
             egraph[b_id].data.cvec = b_vals.clone();
         }
 
@@ -267,9 +278,11 @@ impl SynthLanguage for Pred {
             let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
             match (lexpr, rexpr) {
                 (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
-                    solver.assert(&z3::ast::Bool::not(&lb._eq(&rb)))
+                    solver.assert(&lb._eq(&rb).not())
                 }
-                (Z3::Z3Int(li), Z3::Z3Int(ri)) => solver.assert(&z3::ast::Bool::not(&li._eq(&ri))),
+                (Z3::Z3Real(ln), Z3::Z3Real(rn)) => {
+                    solver.assert(&ln._eq(&rn).not())
+                }
                 _ => return ValidationResult::Invalid,
             };
             match solver.check() {
@@ -293,9 +306,14 @@ impl SynthLanguage for Pred {
             }
 
             for cvec in env.values_mut() {
-                cvec.reserve(n);
-                for s in sampler(&mut synth.rng, n) {
-                    cvec.push(Some(s));
+                cvec.reserve(n * 3);
+                let mut vals = vec![];
+                vals.append(&mut sampler(&mut synth.rng, 8, 6, n));
+                vals.append(&mut sampler(&mut synth.rng, 6, 8, n));
+                vals.append(&mut sampler(&mut synth.rng, 3, 1, n));
+                vals.shuffle(&mut synth.rng);
+                for v in vals {
+                    cvec.push(Some(v));
                 }
             }
 
@@ -306,15 +324,23 @@ impl SynthLanguage for Pred {
     }
 }
 
-pub fn sampler(rng: &mut Pcg64, num_samples: usize) -> Vec<Constant> {
+pub fn gen_pos(rng: &mut Pcg64, bits: u64) -> BigInt {
+    let mut res: BigInt;
+    loop {
+        res = BigInt::from_biguint(Sign::Plus, rng.gen_biguint(bits));
+        if res != 0.to_bigint().unwrap() {
+            break;
+        }
+    }
+    res
+}
+
+pub fn sampler(rng: &mut Pcg64, num: u64, denom: u64, num_samples: usize) -> Vec<Constant> {
     let mut ret = vec![];
     for _ in 0..num_samples {
-        let flip = rng.gen::<bool>();
-        if flip {
-            ret.push(Constant::Int(rng.gen::<i64>() % 10));
-        } else {
-            ret.push(Constant::Int(rng.gen::<i64>()));
-        }
+        let num = gen_pos(rng, num);
+        let denom = gen_pos(rng, denom);
+        ret.push(Constant::Num(Ratio::new(num, denom)));
     }
     ret
 }
@@ -322,21 +348,21 @@ pub fn sampler(rng: &mut Pcg64, num_samples: usize) -> Vec<Constant> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Z3<'a> {
     Z3Bool(z3::ast::Bool<'a>),
-    Z3Int(z3::ast::Int<'a>),
+    Z3Real(z3::ast::Real<'a>),
 }
 
 impl<'a> Z3<'a> {
     fn get_z3bool(&self) -> Option<z3::ast::Bool<'a>> {
         match self {
             Z3::Z3Bool(b) => Some(b.clone()),
-            Z3::Z3Int(_) => None,
+            Z3::Z3Real(_) => None,
         }
     }
 
-    fn get_z3int(&self) -> Option<z3::ast::Int<'a>> {
+    fn get_z3rat(&self) -> Option<z3::ast::Real<'a>> {
         match self {
             Z3::Z3Bool(_) => None,
-            Z3::Z3Int(i) => Some(i.clone()),
+            Z3::Z3Real(i) => Some(i.clone()),
         }
     }
 }
@@ -347,29 +373,33 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
         match node {
             Pred::Lit(lit) => match lit {
                 Constant::Bool(b) => buf.push(Z3::Z3Bool(z3::ast::Bool::from_bool(ctx, *b))),
-                Constant::Int(i) => buf.push(Z3::Z3Int(z3::ast::Int::from_i64(ctx, *i))),
+                Constant::Num(n) => buf.push(Z3::Z3Real(z3::ast::Real::from_real(
+                    ctx,
+                    (n.numer()).to_i32().unwrap(),
+                    (n.denom()).to_i32().unwrap(),
+                ))),
             },
             Pred::BVar(bv) => buf.push(Z3::Z3Bool(z3::ast::Bool::new_const(ctx, bv.to_string()))),
-            Pred::IVar(iv) => buf.push(Z3::Z3Int(z3::ast::Int::new_const(ctx, iv.to_string()))),
+            Pred::NVar(nv) => buf.push(Z3::Z3Real(z3::ast::Real::new_const(ctx, nv.to_string()))),
             Pred::Lt([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::lt(lexpr, rexpr)))
+                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
+                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
+                buf.push(Z3::Z3Bool(z3::ast::Real::lt(lexpr, rexpr)))
             }
             Pred::Leq([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::le(lexpr, rexpr)))
+                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
+                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
+                buf.push(Z3::Z3Bool(z3::ast::Real::le(lexpr, rexpr)))
             }
             Pred::Gt([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::gt(lexpr, rexpr)))
+                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
+                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
+                buf.push(Z3::Z3Bool(z3::ast::Real::gt(lexpr, rexpr)))
             }
             Pred::Geq([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3int().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3int().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Int::ge(lexpr, rexpr)))
+                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
+                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
+                buf.push(Z3::Z3Bool(z3::ast::Real::ge(lexpr, rexpr)))
             }
             Pred::Eq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].clone();
@@ -378,10 +408,10 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
                     (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
                         buf.push(Z3::Z3Bool(z3::ast::Bool::_eq(lb, rb)))
                     }
-                    (Z3::Z3Int(li), Z3::Z3Int(ri)) => {
-                        buf.push(Z3::Z3Bool(z3::ast::Int::_eq(li, ri)))
+                    (Z3::Z3Real(ln), Z3::Z3Real(rn)) => {
+                        buf.push(Z3::Z3Bool(z3::ast::Real::_eq(ln, rn)))
                     }
-                    (Z3::Z3Bool(_), Z3::Z3Int(_)) | (Z3::Z3Int(_), Z3::Z3Bool(_)) => panic!(
+                    (Z3::Z3Bool(_), Z3::Z3Real(_)) | (Z3::Z3Real(_), Z3::Z3Bool(_)) => panic!(
                         "Rule candidate seems to have different 
                     type of lhs and rhs."
                     ),
@@ -391,13 +421,13 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
                 let lexpr = &buf[usize::from(*a)].clone();
                 let rexpr = &buf[usize::from(*b)].clone();
                 match (lexpr, rexpr) {
-                    (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
-                        buf.push(Z3::Z3Bool(z3::ast::Bool::not(&z3::ast::Bool::_eq(lb, rb))))
-                    }
-                    (Z3::Z3Int(li), Z3::Z3Int(ri)) => buf.push(Z3::Z3Bool(z3::ast::Bool::not(
-                        &z3::ast::Int::_eq(li, ri).not(),
+                    (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => buf.push(Z3::Z3Bool(z3::ast::Bool::not(
+                        &z3::ast::Bool::_eq(lb, rb)
                     ))),
-                    (Z3::Z3Bool(_), Z3::Z3Int(_)) | (Z3::Z3Int(_), Z3::Z3Bool(_)) => panic!(
+                    (Z3::Z3Real(ln), Z3::Z3Real(rn)) => buf.push(Z3::Z3Bool(z3::ast::Bool::not(
+                        &z3::ast::Real::_eq(ln, rn),
+                    ))),
+                    (Z3::Z3Bool(_), Z3::Z3Real(_)) | (Z3::Z3Real(_), Z3::Z3Bool(_)) => panic!(
                         "Rule candidate seems to have different 
                     type of lhs and rhs."
                     ),
