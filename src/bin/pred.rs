@@ -5,11 +5,11 @@ use std::{
 };
 
 use egg::*;
-use num::{rational::Ratio, Zero};
 use num::{
     bigint::{BigInt, RandBigInt, Sign, ToBigInt},
     ToPrimitive,
 };
+use num::{rational::Ratio, Zero};
 use rand::{seq::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use ruler::*;
@@ -238,18 +238,17 @@ impl SynthLanguage for Pred {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-
         let rng = &mut synth.rng;
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
             consts.push(mk_constant(
                 &i.to_bigint().unwrap(),
-                &((i as u32).to_bigint().unwrap()),
+                &((1_u32).to_bigint().unwrap()),
             ));
             consts.push(mk_constant(
                 &(-i.to_bigint().unwrap()),
-                &((1 as u32).to_bigint().unwrap()),
+                &((1_u32).to_bigint().unwrap()),
             ));
         }
 
@@ -307,7 +306,7 @@ impl SynthLanguage for Pred {
                 SatResult::Sat => {
                     println!("z3 validation: failed for {} => {}", lhs, rhs);
                     ValidationResult::Invalid
-                },
+                }
                 SatResult::Unknown => {
                     synth.smt_unknown += 1;
                     ValidationResult::Unknown
