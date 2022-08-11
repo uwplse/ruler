@@ -5,7 +5,7 @@ use std::{
 };
 
 use egg::*;
-use num::rational::Ratio;
+use num::{rational::Ratio, Zero};
 use num::{
     bigint::{BigInt, RandBigInt, Sign, ToBigInt},
     ToPrimitive,
@@ -75,6 +75,15 @@ define_language! {
     "|" = Or([Id;2]),
     "^" = Xor([Id;2]),
   }
+}
+
+/// Return a non-zero constant.
+fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
+    if d.is_zero() {
+        None
+    } else {
+        Some(Constant::Num(Ratio::new(n.clone(), d.clone())))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -229,34 +238,42 @@ impl SynthLanguage for Pred {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        let cvec_len = 300;
+
+        let rng = &mut synth.rng;
+        let mut consts: Vec<Option<Constant>> = vec![];
+
+        for i in 0..synth.params.important_cvec_offsets {
+            consts.push(mk_constant(
+                &i.to_bigint().unwrap(),
+                &((i as u32).to_bigint().unwrap()),
+            ));
+            consts.push(mk_constant(
+                &(-i.to_bigint().unwrap()),
+                &((1 as u32).to_bigint().unwrap()),
+            ));
+        }
+
+        consts.sort();
+        consts.dedup();
+
+        let consts = self_product(&consts, synth.params.variables);
+
+        let cvec_len = consts.len();
         let mut egraph: EGraph<Pred, SynthAnalysis> = EGraph::new(SynthAnalysis {
             cvec_len,
             constant_fold: ConstantFoldMethod::CvecMatching,
             rule_lifting: false,
         });
-
-        for i in 0..synth.params.variables {
-            let rng = &mut synth.rng;
-
-            let mut samples = vec![];
-            samples.append(&mut sampler(rng, 8, 6, cvec_len / 3));
-            samples.append(&mut sampler(rng, 6, 8, cvec_len / 3));
-            samples.append(&mut sampler(rng, 4, 1, cvec_len / 3));
-            samples.shuffle(rng);
-
-            let n_vals: Vec<Option<Constant>> = samples.iter().map(|x| Some(x.clone())).collect();
-            let mut b_vals = vec![];
+        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
             let n_id = egraph.add(Pred::NVar(NVar(Symbol::from("n".to_owned() + letter(i)))));
             let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
+            let mut b_vals = vec![];
             for _ in 0..cvec_len {
                 b_vals.push(Some(Constant::Bool(rng.gen::<bool>())));
             }
-
-            egraph[n_id].data.cvec = n_vals.clone();
+            egraph[n_id].data.cvec = item.clone();
             egraph[b_id].data.cvec = b_vals.clone();
         }
-
         synth.egraph = egraph;
     }
 
@@ -277,13 +294,20 @@ impl SynthLanguage for Pred {
             let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
             let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
             match (lexpr, rexpr) {
-                (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => solver.assert(&z3::ast::Bool::not(&lb._eq(&rb))),
-                (Z3::Z3Real(ln), Z3::Z3Real(rn)) => solver.assert(&z3::ast::Bool::not(&ln._eq(&rn))),
+                (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
+                    solver.assert(&z3::ast::Bool::not(&lb._eq(&rb)))
+                }
+                (Z3::Z3Real(ln), Z3::Z3Real(rn)) => {
+                    solver.assert(&z3::ast::Bool::not(&ln._eq(&rn)))
+                }
                 _ => return ValidationResult::Invalid,
             };
             match solver.check() {
                 SatResult::Unsat => ValidationResult::Valid,
-                SatResult::Sat => ValidationResult::Invalid,
+                SatResult::Sat => {
+                    println!("z3 validation: failed for {} => {}", lhs, rhs);
+                    ValidationResult::Invalid
+                },
                 SatResult::Unknown => {
                     synth.smt_unknown += 1;
                     ValidationResult::Unknown
@@ -365,7 +389,7 @@ impl<'a> Z3<'a> {
     fn get_z3rat(&self) -> Option<z3::ast::Real<'a>> {
         match self {
             Z3::Z3Bool(_) => None,
-            Z3::Z3Real(i) => Some(i.clone()),
+            Z3::Z3Real(n) => Some(n.clone()),
         }
     }
 }

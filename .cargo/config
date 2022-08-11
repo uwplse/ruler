@@ -3,7 +3,7 @@ rational = ["run", "--quiet", "--release", "--bin", "rational", "--", "synth", "
 float =    ["run", "--quiet", "--release", "--bin", "float",    "--", "synth", "--num-fuzz", "1000000"]
 bool =     ["run", "--quiet", "--release", "--bin", "bool",     "--", "synth", "--no-conditionals"]
 str =      ["run", "--quiet", "--release", "--bin", "str",      "--", "synth", "--no-conditionals"]
-pred =     ["run", "--quiet", "--release", "--bin", "pred",     "--", "synth", "--no-conditionals", "--use-smt"]
+pred =     ["run", "--quiet", "--release", "--bin", "pred",     "--", "synth", "--no-conditionals", "--use-smt", "--important-cvec-offsets", "2"]
 
 bv4 =      ["run", "--quiet", "--release", "--bin", "bv4",  "--", "synth", "--complete-cvec", "--no-conditionals"]
 bv4c1 =    ["run", "--quiet", "--release", "--bin", "bv4",  "--", "synth", "--complete-cvec", "--no-conditionals", "--no-constants-above-iter=1"]
