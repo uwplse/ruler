@@ -249,7 +249,7 @@ impl SynthLanguage for Pred {
             let mut b_vals = vec![];
             let n_id = egraph.add(Pred::NVar(NVar(Symbol::from("n".to_owned() + letter(i)))));
             let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
-            for _ in 0..10 {
+            for _ in 0..cvec_len {
                 b_vals.push(Some(Constant::Bool(rng.gen::<bool>())));
             }
 
@@ -305,18 +305,25 @@ impl SynthLanguage for Pred {
                 env.insert(var, vec![]);
             }
 
-            for cvec in env.values_mut() {
+            for (var, cvec) in env.iter_mut() {
                 cvec.reserve(n * 3);
                 let mut vals = vec![];
-                vals.append(&mut sampler(&mut synth.rng, 8, 6, n));
-                vals.append(&mut sampler(&mut synth.rng, 6, 8, n));
-                vals.append(&mut sampler(&mut synth.rng, 3, 1, n));
+                if var.to_string().starts_with("?b") {
+                    for _ in 0..(n * 3) {
+                        vals.push(Constant::Bool(synth.rng.gen::<bool>()));
+                    }
+                }
+                if var.to_string().starts_with("?n") {
+                    vals.append(&mut sampler(&mut synth.rng, 8, 6, n));
+                    vals.append(&mut sampler(&mut synth.rng, 6, 8, n));
+                    vals.append(&mut sampler(&mut synth.rng, 3, 1, n));
+                }
+
                 vals.shuffle(&mut synth.rng);
                 for v in vals {
                     cvec.push(Some(v));
                 }
             }
-
             let lvec = Self::eval_pattern(lhs, &env, n);
             let rvec = Self::eval_pattern(rhs, &env, n);
             ValidationResult::from(lvec == rvec)
