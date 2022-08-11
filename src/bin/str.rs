@@ -80,13 +80,6 @@ impl std::str::FromStr for Constant {
 }
 
 impl Constant {
-    fn to_smallstr(&self) -> Option<SmallString<[u8; 24]>> {
-        match self {
-            Constant::Str(s) => Some(s.clone()),
-            Constant::Num(_) => None,
-        }
-    }
-
     fn to_str(&self) -> Option<&str> {
         match self {
             Constant::Str(s) => Some(s.as_str()),
@@ -179,7 +172,7 @@ impl SynthLanguage for Lang {
                 Some(Constant::Str(SmallString::from_str(&out)))
             }),
             Lang::At([a, i]) => map!(v, a, i => {
-                let a = a.to_smallstr().unwrap();
+                let a = a.to_str().unwrap();
                 let i = i.to_num().unwrap();
                 if i < 0 || i > (a.len() as _) {
                     Some(Constant::Str(SmallString::default()))
@@ -189,7 +182,7 @@ impl SynthLanguage for Lang {
                 }
             }),
             Lang::SubStr([a, i, len]) => map!(v, a, i, len => {
-                let a = a.to_smallstr().unwrap();
+                let a = a.to_str().unwrap();
                 let n = a.len() as usize;
                 let i = i.to_num().unwrap() as usize;
                 let len = len.to_num().unwrap() as usize;
@@ -209,7 +202,7 @@ impl SynthLanguage for Lang {
                 Some(Constant::Num(i))
             }),
             Lang::Len(s) => {
-                map!(v, s => Some(Constant::Num(s.to_smallstr().unwrap().len() as i64)))
+                map!(v, s => Some(Constant::Num(s.to_str().unwrap().len() as i64)))
             }
             Lang::IndexOf([s, t, i]) => map!(v, s, t, i => {
                 let s = s.to_str().unwrap();
