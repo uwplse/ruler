@@ -277,8 +277,8 @@ impl SynthLanguage for Pred {
             let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
             let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
             match (lexpr, rexpr) {
-                (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => solver.assert(&lb._eq(&rb).not()),
-                (Z3::Z3Real(ln), Z3::Z3Real(rn)) => solver.assert(&ln._eq(&rn).not()),
+                (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => solver.assert(&z3::ast::Bool::not(&lb._eq(&rb))),
+                (Z3::Z3Real(ln), Z3::Z3Real(rn)) => solver.assert(&z3::ast::Bool::not(&ln._eq(&rn))),
                 _ => return ValidationResult::Invalid,
             };
             match solver.check() {
@@ -430,7 +430,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
                     (Z3::Z3Real(ln), Z3::Z3Real(rn)) => {
                         buf.push(Z3::Z3Bool(z3::ast::Bool::not(&z3::ast::Real::_eq(ln, rn))))
                     }
-                    (Z3::Z3Bool(_), Z3::Z3Real(_)) | (Z3::Z3Real(_), Z3::Z3Bool(_)) => panic!(
+                    _ => panic!(
                         "Rule candidate seems to have different 
                     type of lhs and rhs."
                     ),
