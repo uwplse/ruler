@@ -174,7 +174,7 @@ impl SynthLanguage for Lang {
             Lang::At([a, i]) => map!(v, a, i => {
                 let a = a.to_str().unwrap();
                 let i = i.to_num().unwrap();
-                if i < 0 || i > (a.len() as _) {
+                if i < 0 || i >= (a.len() as _) {
                     Some(Constant::Str(SmallString::default()))
                 } else {
                     let i = i as usize;
