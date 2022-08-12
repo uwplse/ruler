@@ -7,7 +7,10 @@ SHELL=/usr/bin/env bash
 all:
 
 rust-src=$(shell find ../../src/ -type f)
-cvc4=./cvc4-1.8-x86_64-linux-opt \
+
+# check for the hardcoded programs that are in the VM
+xsv=$(shell command -v ./xsv || command -v xsv)
+cvc4=$(shell command -v ./cvc4-1.8-x86_64-linux-opt || command -v cvc4) \
   --sygus-rr-synth              \
   --sygus-rr-synth-check        \
   --no-sygus-sym-break          \
@@ -98,11 +101,11 @@ latex-report: $(diffs)
 
 .PHONY: report
 report: $(diffs)
-	python3 compare.py $^ | ./xsv table
+	python3 compare.py $^ | $(xsv) table
 
 .PHONY: report-no-consts
 report-no-consts: $(diffs-no-consts)
-	python3 compare.py $^ | ./xsv table
+	python3 compare.py $^ | $(xsv) table
 
 .PHONY: latex-report-no-consts
 latex-report-no-consts: $(diffs-no-consts)
