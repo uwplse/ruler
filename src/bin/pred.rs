@@ -238,39 +238,38 @@ impl SynthLanguage for Pred {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        let rng = &mut synth.rng;
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
             consts.push(mk_constant(
                 &i.to_bigint().unwrap(),
-                &((1_u32).to_bigint().unwrap()),
+                &(1_u32.to_bigint().unwrap()),
             ));
             consts.push(mk_constant(
                 &(-i.to_bigint().unwrap()),
-                &((1_u32).to_bigint().unwrap()),
+                &(1_u32.to_bigint().unwrap()),
             ));
         }
 
         consts.sort();
         consts.dedup();
 
-        let consts = self_product(&consts, synth.params.variables);
+        let cs = self_product(&consts, synth.params.variables);
+        let cvec_len = cs[0].len();
 
-        let cvec_len = consts.len();
         let mut egraph: EGraph<Pred, SynthAnalysis> = EGraph::new(SynthAnalysis {
             cvec_len,
             constant_fold: ConstantFoldMethod::CvecMatching,
             rule_lifting: false,
         });
-        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
+        for (i, n_vals) in cs.iter().enumerate().take(synth.params.variables) {
             let n_id = egraph.add(Pred::NVar(NVar(Symbol::from("n".to_owned() + letter(i)))));
             let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
             let mut b_vals = vec![];
             for _ in 0..cvec_len {
-                b_vals.push(Some(Constant::Bool(rng.gen::<bool>())));
+                b_vals.push(Some(Constant::Bool(synth.rng.gen::<bool>())));
             }
-            egraph[n_id].data.cvec = item.clone();
+            egraph[n_id].data.cvec = n_vals.clone();
             egraph[b_id].data.cvec = b_vals.clone();
         }
         synth.egraph = egraph;
@@ -304,7 +303,7 @@ impl SynthLanguage for Pred {
             match solver.check() {
                 SatResult::Unsat => ValidationResult::Valid,
                 SatResult::Sat => {
-                    println!("z3 validation: failed for {} => {}", lhs, rhs);
+                    // println!("z3 validation: failed for {} => {}", lhs, rhs);
                     ValidationResult::Invalid
                 }
                 SatResult::Unknown => {
@@ -393,6 +392,30 @@ impl<'a> Z3<'a> {
     }
 }
 
+#[macro_export]
+macro_rules! pushbuf {
+    ($bu:ident, $ct:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type:ident) => {
+        $bu.push(Z3::Z3Bool(z3::ast::$type::$op(
+            $ct,
+            &[
+                &$bu[usize::from(*$a)].$get().unwrap(),
+                &$bu[usize::from(*$b)].$get().unwrap(),
+            ],
+        )))
+    };
+    ($bu:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type:ident) => {
+        $bu.push(Z3::Z3Bool(z3::ast::$type::$op(
+            &$bu[usize::from(*$a)].$get().unwrap(),
+            &$bu[usize::from(*$b)].$get().unwrap(),
+        )))
+    };
+    ($bu:ident, $a:ident, $op:ident, $get:ident, $type:ident) => {
+        $bu.push(Z3::Z3Bool(z3::ast::$type::$op(
+            &$bu[usize::from(*$a)].$get().unwrap(),
+        )))
+    };
+}
+
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
     let mut buf: Vec<Z3> = vec![];
     for node in expr.as_ref().iter() {
@@ -407,26 +430,14 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
             },
             Pred::BVar(bv) => buf.push(Z3::Z3Bool(z3::ast::Bool::new_const(ctx, bv.to_string()))),
             Pred::NVar(nv) => buf.push(Z3::Z3Real(z3::ast::Real::new_const(ctx, nv.to_string()))),
-            Pred::Lt([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Real::lt(lexpr, rexpr)))
-            }
-            Pred::Leq([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Real::le(lexpr, rexpr)))
-            }
-            Pred::Gt([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Real::gt(lexpr, rexpr)))
-            }
-            Pred::Geq([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3rat().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3rat().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Real::ge(lexpr, rexpr)))
-            }
+            Pred::Lt([a, b]) => pushbuf!(buf, a, b, lt, get_z3rat, Real),
+            Pred::Leq([a, b]) => pushbuf!(buf, a, b, le, get_z3rat, Real),
+            Pred::Gt([a, b]) => pushbuf!(buf, a, b, gt, get_z3rat, Real),
+            Pred::Geq([a, b]) => pushbuf!(buf, a, b, ge, get_z3rat, Real),
+            Pred::And([a, b]) => pushbuf!(buf, ctx, a, b, and, get_z3bool, Bool),
+            Pred::Or([a, b]) => pushbuf!(buf, ctx, a, b, or, get_z3bool, Bool),
+            Pred::Xor([a, b]) => pushbuf!(buf, a, b, xor, get_z3bool, Bool),
+            Pred::Not(a) => pushbuf!(buf, a, not, get_z3bool, Bool),
             Pred::Eq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].clone();
                 let rexpr = &buf[usize::from(*b)].clone();
@@ -458,25 +469,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
                     type of lhs and rhs."
                     ),
                 }
-            }
-            Pred::Not(a) => {
-                let lexpr = &buf[usize::from(*a)].get_z3bool().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Bool::not(lexpr)))
-            }
-            Pred::And([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3bool().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3bool().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Bool::and(ctx, &[lexpr, rexpr])))
-            }
-            Pred::Or([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3bool().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3bool().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Bool::or(ctx, &[lexpr, rexpr])))
-            }
-            Pred::Xor([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].get_z3bool().unwrap();
-                let rexpr = &buf[usize::from(*b)].get_z3bool().unwrap();
-                buf.push(Z3::Z3Bool(z3::ast::Bool::xor(lexpr, rexpr)))
             }
         }
     }
