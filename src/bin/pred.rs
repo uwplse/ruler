@@ -70,6 +70,9 @@ define_language! {
     "&" = And([Id;2]),
     "|" = Or([Id;2]),
     "^" = Xor([Id;2]),
+    "+" = Add([Id; 2]),
+    "-" = Sub([Id; 2]),
+    "*" = Mul([Id; 2]),
   }
 }
 
@@ -142,7 +145,7 @@ impl SynthLanguage for Pred {
                 Constant::Bool(_) => Type::Bool,
                 Constant::Num(_) => Type::Num,
             },
-            Pred::NVar(_) => Type::Num,
+            Pred::NVar(_) | Pred::Add(_) | Pred::Sub(_) | Pred::Mul(_) => Type::Num,
             _ => Type::Bool,
         }
     }
@@ -192,6 +195,15 @@ impl SynthLanguage for Pred {
             }
             Pred::Xor([x, y]) => {
                 map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() ^ y.to_bool().unwrap())))
+            }
+            Pred::Add([x, y]) => {
+                map!(v, x, y => Some(Constant::Num(x.to_num().unwrap() + y.to_num().unwrap())))
+            }
+            Pred::Sub([x, y]) => {
+                map!(v, x, y => Some(Constant::Num(x.to_num().unwrap() - y.to_num().unwrap())))
+            }
+            Pred::Mul([x, y]) => {
+                map!(v, x, y => Some(Constant::Num(x.to_num().unwrap() * y.to_num().unwrap())))
             }
 
             Pred::BVar(_) => vec![],
