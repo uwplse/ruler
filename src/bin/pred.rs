@@ -402,8 +402,8 @@ impl<'a> Z3<'a> {
 
 #[macro_export]
 macro_rules! pushbuf {
-    ($bu:ident, $ct:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type:ident) => {
-        $bu.push(Z3::Z3Bool(z3::ast::$type::$op(
+    ($bu:ident, $ct:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type1:ident, $type2:ident) => {
+        $bu.push(Z3::$type1(z3::ast::$type2::$op(
             $ct,
             &[
                 &$bu[usize::from(*$a)].$get().unwrap(),
@@ -442,9 +442,12 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
             Pred::Leq([a, b]) => pushbuf!(buf, a, b, le, get_z3real, Real),
             Pred::Gt([a, b]) => pushbuf!(buf, a, b, gt, get_z3real, Real),
             Pred::Geq([a, b]) => pushbuf!(buf, a, b, ge, get_z3real, Real),
-            Pred::And([a, b]) => pushbuf!(buf, ctx, a, b, and, get_z3bool, Bool),
-            Pred::Or([a, b]) => pushbuf!(buf, ctx, a, b, or, get_z3bool, Bool),
+            Pred::And([a, b]) => pushbuf!(buf, ctx, a, b, and, get_z3bool, Z3Bool, Bool),
+            Pred::Or([a, b]) => pushbuf!(buf, ctx, a, b, or, get_z3bool, Z3Bool, Bool),
             Pred::Xor([a, b]) => pushbuf!(buf, a, b, xor, get_z3bool, Bool),
+            Pred::Add([a, b]) => pushbuf!(buf, ctx, a, b, add, get_z3real, Z3Real, Real),
+            Pred::Sub([a, b]) => pushbuf!(buf, ctx, a, b, sub, get_z3real, Z3Real, Real),
+            Pred::Mul([a, b]) => pushbuf!(buf, ctx, a, b, mul, get_z3real, Z3Real, Real),
             Pred::Not(a) => pushbuf!(buf, a, not, get_z3bool, Bool),
             Pred::Eq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].clone();
