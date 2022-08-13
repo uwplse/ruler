@@ -5,11 +5,11 @@ use std::{
 };
 
 use egg::*;
+use num::rational::Ratio;
 use num::{
     bigint::{BigInt, RandBigInt, Sign, ToBigInt},
     ToPrimitive,
 };
-use num::{rational::Ratio, Zero};
 use rand::{seq::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use ruler::*;
@@ -75,15 +75,6 @@ define_language! {
     "|" = Or([Id;2]),
     "^" = Xor([Id;2]),
   }
-}
-
-/// Return a non-zero constant.
-fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
-    if d.is_zero() {
-        None
-    } else {
-        Some(Constant::Num(Ratio::new(n.clone(), d.clone())))
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -241,14 +232,14 @@ impl SynthLanguage for Pred {
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
-            consts.push(mk_constant(
+            consts.push(Some(Constant::Num(mk_constant(
                 &i.to_bigint().unwrap(),
                 &(1_u32.to_bigint().unwrap()),
-            ));
-            consts.push(mk_constant(
+            ))));
+            consts.push(Some(Constant::Num(mk_constant(
                 &(-i.to_bigint().unwrap()),
                 &(1_u32.to_bigint().unwrap()),
-            ));
+            ))));
         }
 
         consts.sort();
@@ -262,16 +253,21 @@ impl SynthLanguage for Pred {
             constant_fold: ConstantFoldMethod::CvecMatching,
             rule_lifting: false,
         });
+
         for (i, n_vals) in cs.iter().enumerate().take(synth.params.variables) {
             let n_id = egraph.add(Pred::NVar(NVar(Symbol::from("n".to_owned() + letter(i)))));
+            egraph[n_id].data.cvec = n_vals.clone();
+        }
+
+        for i in 0..synth.params.variables {
             let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
             let mut b_vals = vec![];
             for _ in 0..cvec_len {
                 b_vals.push(Some(Constant::Bool(synth.rng.gen::<bool>())));
             }
-            egraph[n_id].data.cvec = n_vals.clone();
             egraph[b_id].data.cvec = b_vals.clone();
         }
+
         synth.egraph = egraph;
     }
 
@@ -384,7 +380,7 @@ impl<'a> Z3<'a> {
         }
     }
 
-    fn get_z3rat(&self) -> Option<z3::ast::Real<'a>> {
+    fn get_z3real(&self) -> Option<z3::ast::Real<'a>> {
         match self {
             Z3::Z3Bool(_) => None,
             Z3::Z3Real(n) => Some(n.clone()),
@@ -430,10 +426,10 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
             },
             Pred::BVar(bv) => buf.push(Z3::Z3Bool(z3::ast::Bool::new_const(ctx, bv.to_string()))),
             Pred::NVar(nv) => buf.push(Z3::Z3Real(z3::ast::Real::new_const(ctx, nv.to_string()))),
-            Pred::Lt([a, b]) => pushbuf!(buf, a, b, lt, get_z3rat, Real),
-            Pred::Leq([a, b]) => pushbuf!(buf, a, b, le, get_z3rat, Real),
-            Pred::Gt([a, b]) => pushbuf!(buf, a, b, gt, get_z3rat, Real),
-            Pred::Geq([a, b]) => pushbuf!(buf, a, b, ge, get_z3rat, Real),
+            Pred::Lt([a, b]) => pushbuf!(buf, a, b, lt, get_z3real, Real),
+            Pred::Leq([a, b]) => pushbuf!(buf, a, b, le, get_z3real, Real),
+            Pred::Gt([a, b]) => pushbuf!(buf, a, b, gt, get_z3real, Real),
+            Pred::Geq([a, b]) => pushbuf!(buf, a, b, ge, get_z3real, Real),
             Pred::And([a, b]) => pushbuf!(buf, ctx, a, b, and, get_z3bool, Bool),
             Pred::Or([a, b]) => pushbuf!(buf, ctx, a, b, or, get_z3bool, Bool),
             Pred::Xor([a, b]) => pushbuf!(buf, a, b, xor, get_z3bool, Bool),
