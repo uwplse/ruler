@@ -45,15 +45,6 @@ define_language! {
     }
 }
 
-/// Return a non-zero constant.
-fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
-    if d.is_zero() {
-        None
-    } else {
-        Some(Ratio::new(n.clone(), d.clone()))
-    }
-}
-
 fn sign(interval: &Interval<Constant>) -> Sign {
     match (&interval.low, &interval.high) {
         (None, None) => Sign::ContainsZero,
@@ -310,14 +301,14 @@ impl SynthLanguage for Math {
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
-            consts.push(mk_constant(
+            consts.push(Some(mk_constant(
                 &i.to_bigint().unwrap(),
                 &(1.to_bigint().unwrap()),
-            ));
-            consts.push(mk_constant(
+            )));
+            consts.push(Some(mk_constant(
                 &(-i.to_bigint().unwrap()),
                 &(1.to_bigint().unwrap()),
-            ));
+            )));
         }
 
         consts.sort();

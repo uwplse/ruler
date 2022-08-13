@@ -5,11 +5,15 @@ use std::{
 };
 
 use egg::*;
-use num::bigint::{BigInt, RandBigInt, Sign, ToBigInt};
 use num::rational::Ratio;
+use num::{
+    bigint::{BigInt, RandBigInt, Sign, ToBigInt},
+    ToPrimitive,
+};
 use rand::{seq::SliceRandom, Rng};
 use rand_pcg::Pcg64;
 use ruler::*;
+use z3::{ast::Ast, SatResult};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 
@@ -60,9 +64,9 @@ define_language! {
     Lit(Constant),
     BVar(BVar),
     NVar(NVar),
-    "<" = Le([Id;2]),
+    "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
-    ">" = Ge([Id;2]),
+    ">" = Gt([Id;2]),
     ">=" = Geq([Id;2]),
     "==" = Eq([Id;2]),
     "!=" = Neq([Id;2]),
@@ -156,13 +160,13 @@ impl SynthLanguage for Pred {
     {
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
-            Pred::Le([x, y]) => {
+            Pred::Lt([x, y]) => {
                 map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() < y.to_num().unwrap())))
             }
             Pred::Leq([x, y]) => {
                 map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() <= y.to_num().unwrap())))
             }
-            Pred::Ge([x, y]) => {
+            Pred::Gt([x, y]) => {
                 map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() > y.to_num().unwrap())))
             }
             Pred::Geq([x, y]) => {
@@ -237,31 +241,42 @@ impl SynthLanguage for Pred {
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        let cvec_len = 300;
+        let mut consts: Vec<Option<Constant>> = vec![];
+
+        for i in 0..synth.params.important_cvec_offsets {
+            consts.push(Some(Constant::Num(mk_constant(
+                &i.to_bigint().unwrap(),
+                &(1_u32.to_bigint().unwrap()),
+            ))));
+            consts.push(Some(Constant::Num(mk_constant(
+                &(-i.to_bigint().unwrap()),
+                &(1_u32.to_bigint().unwrap()),
+            ))));
+        }
+
+        consts.sort();
+        consts.dedup();
+
+        let cs = self_product(&consts, synth.params.variables);
+        let cvec_len = cs[0].len();
+
         let mut egraph: EGraph<Pred, SynthAnalysis> = EGraph::new(SynthAnalysis {
             cvec_len,
             constant_fold: ConstantFoldMethod::CvecMatching,
             rule_lifting: false,
         });
 
-        for i in 0..synth.params.variables {
-            let rng = &mut synth.rng;
-
-            let mut samples = vec![];
-            samples.append(&mut sampler(rng, 8, 6, cvec_len / 3));
-            samples.append(&mut sampler(rng, 6, 8, cvec_len / 3));
-            samples.append(&mut sampler(rng, 4, 1, cvec_len / 3));
-            samples.shuffle(rng);
-
-            let n_vals: Vec<Option<Constant>> = samples.iter().map(|x| Some(x.clone())).collect();
-            let mut b_vals = vec![];
+        for (i, n_vals) in cs.iter().enumerate().take(synth.params.variables) {
             let n_id = egraph.add(Pred::NVar(NVar(Symbol::from("n".to_owned() + letter(i)))));
-            let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
-            for _ in 0..cvec_len {
-                b_vals.push(Some(Constant::Bool(rng.gen::<bool>())));
-            }
-
             egraph[n_id].data.cvec = n_vals.clone();
+        }
+
+        for i in 0..synth.params.variables {
+            let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
+            let mut b_vals = vec![];
+            for _ in 0..cvec_len {
+                b_vals.push(Some(Constant::Bool(synth.rng.gen::<bool>())));
+            }
             egraph[b_id].data.cvec = b_vals.clone();
         }
 
@@ -277,40 +292,68 @@ impl SynthLanguage for Pred {
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
     ) -> ValidationResult {
-        let n = synth.params.num_fuzz;
-        let mut env = HashMap::default();
-
-        for var in lhs.vars() {
-            env.insert(var, vec![]);
-        }
-
-        for var in rhs.vars() {
-            env.insert(var, vec![]);
-        }
-
-        for (var, cvec) in env.iter_mut() {
-            cvec.reserve(n * 3);
-            let mut vals = vec![];
-            if var.to_string().starts_with("?b") {
-                for _ in 0..(n * 3) {
-                    vals.push(Constant::Bool(synth.rng.gen::<bool>()));
+        if synth.params.use_smt {
+            let mut cfg = z3::Config::new();
+            cfg.set_timeout_msec(1000);
+            let ctx = z3::Context::new(&cfg);
+            let solver = z3::Solver::new(&ctx);
+            let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+            let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+            match (lexpr, rexpr) {
+                (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
+                    solver.assert(&z3::ast::Bool::not(&lb._eq(&rb)))
+                }
+                (Z3::Z3Real(ln), Z3::Z3Real(rn)) => {
+                    solver.assert(&z3::ast::Bool::not(&ln._eq(&rn)))
+                }
+                _ => return ValidationResult::Invalid,
+            };
+            match solver.check() {
+                SatResult::Unsat => ValidationResult::Valid,
+                SatResult::Sat => {
+                    // println!("z3 validation: failed for {} => {}", lhs, rhs);
+                    ValidationResult::Invalid
+                }
+                SatResult::Unknown => {
+                    synth.smt_unknown += 1;
+                    ValidationResult::Unknown
                 }
             }
-            if var.to_string().starts_with("?n") {
-                vals.append(&mut sampler(&mut synth.rng, 8, 6, n));
-                vals.append(&mut sampler(&mut synth.rng, 6, 8, n));
-                vals.append(&mut sampler(&mut synth.rng, 3, 1, n));
+        } else {
+            let n = synth.params.num_fuzz;
+            let mut env = HashMap::default();
+
+            for var in lhs.vars() {
+                env.insert(var, vec![]);
             }
 
-            vals.shuffle(&mut synth.rng);
-            for v in vals {
-                cvec.push(Some(v));
+            for var in rhs.vars() {
+                env.insert(var, vec![]);
             }
+
+            for (var, cvec) in env.iter_mut() {
+                cvec.reserve(n * 3);
+                let mut vals = vec![];
+                if var.to_string().starts_with("?b") {
+                    for _ in 0..(n * 3) {
+                        vals.push(Constant::Bool(synth.rng.gen::<bool>()));
+                    }
+                }
+                if var.to_string().starts_with("?n") {
+                    vals.append(&mut sampler(&mut synth.rng, 8, 6, n));
+                    vals.append(&mut sampler(&mut synth.rng, 6, 8, n));
+                    vals.append(&mut sampler(&mut synth.rng, 3, 1, n));
+                }
+
+                vals.shuffle(&mut synth.rng);
+                for v in vals {
+                    cvec.push(Some(v));
+                }
+            }
+            let lvec = Self::eval_pattern(lhs, &env, n);
+            let rvec = Self::eval_pattern(rhs, &env, n);
+            ValidationResult::from(lvec == rvec)
         }
-
-        let lvec = Self::eval_pattern(lhs, &env, n);
-        let rvec = Self::eval_pattern(rhs, &env, n);
-        ValidationResult::from(lvec == rvec)
     }
 }
 
@@ -333,6 +376,111 @@ pub fn sampler(rng: &mut Pcg64, num: u64, denom: u64, num_samples: usize) -> Vec
         ret.push(Constant::Num(Ratio::new(num, denom)));
     }
     ret
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Z3<'a> {
+    Z3Bool(z3::ast::Bool<'a>),
+    Z3Real(z3::ast::Real<'a>),
+}
+
+impl<'a> Z3<'a> {
+    fn get_z3bool(&self) -> Option<z3::ast::Bool<'a>> {
+        match self {
+            Z3::Z3Bool(b) => Some(b.clone()),
+            Z3::Z3Real(_) => None,
+        }
+    }
+
+    fn get_z3real(&self) -> Option<z3::ast::Real<'a>> {
+        match self {
+            Z3::Z3Bool(_) => None,
+            Z3::Z3Real(n) => Some(n.clone()),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! pushbuf {
+    ($bu:ident, $ct:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type:ident) => {
+        $bu.push(Z3::Z3Bool(z3::ast::$type::$op(
+            $ct,
+            &[
+                &$bu[usize::from(*$a)].$get().unwrap(),
+                &$bu[usize::from(*$b)].$get().unwrap(),
+            ],
+        )))
+    };
+    ($bu:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type:ident) => {
+        $bu.push(Z3::Z3Bool(z3::ast::$type::$op(
+            &$bu[usize::from(*$a)].$get().unwrap(),
+            &$bu[usize::from(*$b)].$get().unwrap(),
+        )))
+    };
+    ($bu:ident, $a:ident, $op:ident, $get:ident, $type:ident) => {
+        $bu.push(Z3::Z3Bool(z3::ast::$type::$op(
+            &$bu[usize::from(*$a)].$get().unwrap(),
+        )))
+    };
+}
+
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> Z3<'a> {
+    let mut buf: Vec<Z3> = vec![];
+    for node in expr.as_ref().iter() {
+        match node {
+            Pred::Lit(lit) => match lit {
+                Constant::Bool(b) => buf.push(Z3::Z3Bool(z3::ast::Bool::from_bool(ctx, *b))),
+                Constant::Num(n) => buf.push(Z3::Z3Real(z3::ast::Real::from_real(
+                    ctx,
+                    (n.numer()).to_i32().unwrap(),
+                    (n.denom()).to_i32().unwrap(),
+                ))),
+            },
+            Pred::BVar(bv) => buf.push(Z3::Z3Bool(z3::ast::Bool::new_const(ctx, bv.to_string()))),
+            Pred::NVar(nv) => buf.push(Z3::Z3Real(z3::ast::Real::new_const(ctx, nv.to_string()))),
+            Pred::Lt([a, b]) => pushbuf!(buf, a, b, lt, get_z3real, Real),
+            Pred::Leq([a, b]) => pushbuf!(buf, a, b, le, get_z3real, Real),
+            Pred::Gt([a, b]) => pushbuf!(buf, a, b, gt, get_z3real, Real),
+            Pred::Geq([a, b]) => pushbuf!(buf, a, b, ge, get_z3real, Real),
+            Pred::And([a, b]) => pushbuf!(buf, ctx, a, b, and, get_z3bool, Bool),
+            Pred::Or([a, b]) => pushbuf!(buf, ctx, a, b, or, get_z3bool, Bool),
+            Pred::Xor([a, b]) => pushbuf!(buf, a, b, xor, get_z3bool, Bool),
+            Pred::Not(a) => pushbuf!(buf, a, not, get_z3bool, Bool),
+            Pred::Eq([a, b]) => {
+                let lexpr = &buf[usize::from(*a)].clone();
+                let rexpr = &buf[usize::from(*b)].clone();
+                match (lexpr, rexpr) {
+                    (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
+                        buf.push(Z3::Z3Bool(z3::ast::Bool::_eq(lb, rb)))
+                    }
+                    (Z3::Z3Real(ln), Z3::Z3Real(rn)) => {
+                        buf.push(Z3::Z3Bool(z3::ast::Real::_eq(ln, rn)))
+                    }
+                    (Z3::Z3Bool(_), Z3::Z3Real(_)) | (Z3::Z3Real(_), Z3::Z3Bool(_)) => panic!(
+                        "Rule candidate seems to have different 
+                    type of lhs and rhs."
+                    ),
+                }
+            }
+            Pred::Neq([a, b]) => {
+                let lexpr = &buf[usize::from(*a)].clone();
+                let rexpr = &buf[usize::from(*b)].clone();
+                match (lexpr, rexpr) {
+                    (Z3::Z3Bool(lb), Z3::Z3Bool(rb)) => {
+                        buf.push(Z3::Z3Bool(z3::ast::Bool::not(&z3::ast::Bool::_eq(lb, rb))))
+                    }
+                    (Z3::Z3Real(ln), Z3::Z3Real(rn)) => {
+                        buf.push(Z3::Z3Bool(z3::ast::Bool::not(&z3::ast::Real::_eq(ln, rn))))
+                    }
+                    _ => panic!(
+                        "Rule candidate seems to have different 
+                    type of lhs and rhs."
+                    ),
+                }
+            }
+        }
+    }
+    buf.pop().unwrap()
 }
 
 fn main() {
