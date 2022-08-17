@@ -16,6 +16,7 @@ define_language! {
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
         "^" = Xor([Id; 2]),
+        "=>" = Implies([Id; 2]),
         Lit(bool),
         Var(egg::Symbol),
     }
@@ -59,6 +60,7 @@ impl SynthLanguage for Math {
             Math::And([a, b]) => map!(v, a, b => Some(*a & *b)),
             Math::Or([a, b]) => map!(v, a, b => Some(*a | *b)),
             Math::Xor([a, b]) => map!(v, a, b => Some(*a ^ *b)),
+            Math::Implies([a, b]) => map!(v, a, b => Some(!(*a) || *b)),
 
             Math::Lit(n) => vec![Some(*n); cvec_len],
             Math::Var(_) => vec![],
@@ -125,6 +127,21 @@ impl SynthLanguage for Math {
                         } else {
                             interval = Interval::new(Some(false), Some(true))
                         }
+                    }
+                }
+            }
+            Math::Implies([x, y]) => {
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = egraph[*x].data.interval.clone()
+                {
+                    if let Interval {
+                        low: Some(c),
+                        high: Some(d),
+                    } = egraph[*y].data.interval.clone()
+                    {
+                        interval = Interval::new(Some(!b || c), Some(!a || d))
                     }
                 }
             }
@@ -202,6 +219,7 @@ impl SynthLanguage for Math {
                 }
                 to_add.push(Math::And([i, j]));
                 to_add.push(Math::Or([i, j]));
+                to_add.push(Math::Implies([i, j]));
                 if !synth.params.no_xor {
                     to_add.push(Math::Xor([i, j]));
                 }

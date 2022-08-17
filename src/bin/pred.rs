@@ -77,6 +77,7 @@ define_language! {
     "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
+    "=>" = Implies([Id; 2]),
   }
 }
 
@@ -208,6 +209,9 @@ impl SynthLanguage for Pred {
             }
             Pred::Mul([x, y]) => {
                 map!(v, x, y => Some(Constant::Num(x.to_num().unwrap() * y.to_num().unwrap())))
+            }
+            Pred::Implies([x, y]) => {
+                map!(v, x, y => Some(Constant::Bool(!x.to_bool().unwrap() || y.to_bool().unwrap())))
             }
 
             Pred::BVar(_) => vec![],
@@ -452,6 +456,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> RulerZ3<'a> {
             Pred::Mul([a, b]) => pushbuf!(buf, ctx, a, b, mul, get_z3real, Real),
             Pred::And([a, b]) => pushbuf!(buf, ctx, a, b, and, get_z3bool, Bool),
             Pred::Or([a, b]) => pushbuf!(buf, ctx, a, b, or, get_z3bool, Bool),
+            Pred::Implies([a, b]) => pushbuf!(buf, a, b, implies, get_z3bool, Bool),
             Pred::Not(a) => pushbuf!(buf, a, not, get_z3bool, Bool),
             Pred::Eq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)].clone();
