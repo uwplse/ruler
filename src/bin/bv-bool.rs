@@ -15,6 +15,7 @@ define_language! {
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
         "^" = Xor([Id; 2]),
+        "->" = Implies([Id; 2]),
         Lit(bool),
 
         // bitvector domain
