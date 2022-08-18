@@ -77,7 +77,7 @@ define_language! {
     "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
-    "=>" = Implies([Id; 2]),
+    "->" = Implies([Id; 2]),
   }
 }
 
