@@ -46,8 +46,8 @@ impl SynthLanguage for Nat {
         todo!()
     }
 
-    fn mk_constant(c: Self::Constant) -> Self {
         todo!()
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
     }
 
     fn is_constant(&self) -> bool {
