@@ -19,6 +19,23 @@ define_language! {
     }
 }
 
+impl Pos {
+    fn mk_constant_id(c: usize, egraph: &mut EGraph<Self, SynthAnalysis>) -> Id {
+        match c {
+            0 => egraph.add(Pos::Z),
+            1 => egraph.add(Pos::XH),
+            c if c % 2 == 0 => {
+                let pred = Self::mk_constant_id(c / 2, egraph);
+                egraph.add(Pos::XO(pred))
+            }
+            _ => {
+                let pred = Self::mk_constant_id((c - 1) / 2, egraph);
+                egraph.add(Pos::XI(pred))
+            }
+        }
+    }
+}
+
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "")
@@ -36,46 +53,94 @@ impl SynthLanguage for Pos {
     type Type = Type;
 
     fn get_type(&self) -> Self::Type {
-        todo!()
+        Type::Pos
     }
 
-    fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
+    fn eval<'a, F>(&'a self, _cvec_len: usize, _f: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
-        todo!()
+        // No eval needed for rule lifting
+        vec![]
     }
 
     fn to_var(&self) -> Option<Symbol> {
-        todo!()
+        if let Pos::Var(sym) = self {
+            Some(*sym)
+        } else {
+            None
+        }
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {
-        todo!()
+        Pos::Var(sym)
     }
 
     fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
-        todo!()
+        match c {
+            0 => Pos::Z,
+            1 => Pos::XH,
+            c if c % 2 == 0 => Pos::XO(Self::mk_constant_id(c / 2, egraph)),
+            _ => Pos::XI(Self::mk_constant_id((c - 1) / 2, egraph)),
+        }
     }
 
     fn is_constant(&self) -> bool {
-        todo!()
+        match self {
+            Pos::Z | Pos::XH => true,
+            _ => false,
+        }
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        todo!()
+        let mut egraph: EGraph<Pos, SynthAnalysis> = EGraph::new(SynthAnalysis {
+            cvec_len: 0,
+            constant_fold: ConstantFoldMethod::IntervalAnalysis,
+            rule_lifting: true,
+        });
+
+        egraph.add(Pos::Z);
+        egraph.add(Pos::XH);
+
+        synth.lifting_rewrites = vec![
+            rewrite!("def-xh"; "XH" <=> "(S Z)"),
+            rewrite!("def-xo"; "(XO ?a)" <=> "(+ ?a ?a)"),
+            rewrite!("def-xi"; "(XI ?a)" <=> "(+ ?a (+ ?a (S Z)))"),
+        ]
+        .concat();
+
+        synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        todo!()
+    fn make_layer(_synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
+        vec![]
     }
 
     fn validate(
-        synth: &mut Synthesizer<Self>,
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
+        _synth: &mut Synthesizer<Self>,
+        _lhs: &Pattern<Self>,
+        _rhs: &Pattern<Self>,
     ) -> ValidationResult {
-        todo!()
+        ValidationResult::Valid
+    }
+
+    fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        let contains_nat_node = |pat: &Pattern<Self>| {
+            pat.ast
+                .as_ref()
+                .iter()
+                .any(|n| matches!(n, ENodeOrVar::ENode(Pos::Z) | ENodeOrVar::ENode(Pos::S(_))))
+        };
+        let is_extractable = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::Var(_) => true,
+                ENodeOrVar::ENode(n) => n.is_extractable(),
+            })
+        };
+
+        is_extractable(lhs)
+            && is_extractable(rhs)
+            && !(contains_nat_node(lhs) || contains_nat_node(rhs))
     }
 }
 
