@@ -120,16 +120,13 @@ impl SynthLanguage for Nat {
     }
 
     fn is_constant(&self) -> bool {
-        match self {
-            Nat::Z => true,
-            _ => false,
-        }
+        matches!(self, Nat::Z)
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let cvec_len = 10;
         let mut egraph: EGraph<Nat, SynthAnalysis> = EGraph::new(SynthAnalysis {
-            cvec_len: cvec_len,
+            cvec_len,
             constant_fold: ConstantFoldMethod::IntervalAnalysis,
             rule_lifting: false,
         });

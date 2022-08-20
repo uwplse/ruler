@@ -86,10 +86,7 @@ impl SynthLanguage for Pos {
     }
 
     fn is_constant(&self) -> bool {
-        match self {
-            Pos::Z | Pos::XH => true,
-            _ => false,
-        }
+        matches!(self, Pos::Z | Pos::XH)
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
