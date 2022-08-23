@@ -126,6 +126,11 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         PatternAst::from(nodes).into()
     }
 
+    /**
+     * Most domains don't need a reference to the egraph to make a constant node.
+     * However, Pos and Nat represent numbers recursively, so adding a new constant
+     * requires adding multiple nodes to the egraph.
+     */
     fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self;
     fn is_constant(&self) -> bool;
 

@@ -1,3 +1,11 @@
+/**
+ * Pos is a datatype representing the strictly positive integers in a binary way.
+ * XH represents 1
+ * XO and XI represent adding a new least significant digit
+ * That is, (XO n) represents 2n and (XI n) represents 2n + 1
+ * Example: 6 is represented as (XO (XI XH))
+ * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
+ */
 use egg::*;
 use ruler::*;
 
