@@ -126,7 +126,12 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         PatternAst::from(nodes).into()
     }
 
-    fn mk_constant(c: Self::Constant) -> Self;
+    /**
+     * Most domains don't need a reference to the egraph to make a constant node.
+     * However, Pos and Nat represent numbers recursively, so adding a new constant
+     * requires adding multiple nodes to the egraph.
+     */
+    fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self;
     fn is_constant(&self) -> bool;
 
     /// Generalize a pattern
@@ -1581,7 +1586,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 if sig.exact {
                     let first = sig.cvec.iter().find_map(|x| x.as_ref());
                     if let Some(first) = first {
-                        let enode = L::mk_constant(first.clone());
+                        let enode = L::mk_constant(first.clone(), egraph);
                         let added = egraph.add(enode);
                         egraph.union(id, added);
                     }
@@ -1595,7 +1600,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 } = interval
                 {
                     if a == b {
-                        let enode = L::mk_constant(a.clone());
+                        let enode = L::mk_constant(a.clone(), egraph);
                         let added = egraph.add(enode);
                         egraph.union(id, added);
                     }

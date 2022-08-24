@@ -248,7 +248,7 @@ impl SynthLanguage for Lang {
         matches!(self, Lang::Lit(_))
     }
 
-    fn mk_constant(c: Self::Constant) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Lang::Lit(c)
     }
 

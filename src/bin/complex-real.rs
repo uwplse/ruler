@@ -367,7 +367,7 @@ impl SynthLanguage for Math {
         Math::Var(Variable(sym))
     }
 
-    fn mk_constant(c: Self::Constant) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::ComplexConst(c)
     }
 
