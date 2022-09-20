@@ -929,7 +929,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             stop_reason
         );
 
-        // todo: assert saturated
         let mut candidates: EqualityMap<L> = EqualityMap::default();
         for ids in found_unions.values() {
             for id1 in ids.clone() {
@@ -979,11 +978,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                             }
                         }
                     }
-                    self.egraph.union(id1, id2);
                 }
             }
         }
-        self.egraph.rebuild();
         let len_before = candidates.len();
         candidates.retain(|_, v| L::is_allowed_rewrite(&v.lhs, &v.rhs));
         println!("filtered out {} candidates", len_before - candidates.len());
@@ -991,7 +988,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let (eqs, _) = self.choose_eqs(candidates);
         self.new_eqs.extend(eqs.clone());
         self.all_eqs.extend(eqs);
-        self.egraph.rebuild();
 
         let mut all_eqs: Vec<Equality<L>> =
             self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
