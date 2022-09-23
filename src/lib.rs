@@ -482,7 +482,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         for ids in found_unions.values() {
             for win in ids.windows(2) {
-                println!("{}, {}", win[0], win[1]);
                 self.egraph.union(win[0], win[1]);
             }
         }
@@ -872,18 +871,63 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     fn run_rule_lifting(mut self) -> Report<L> {
         let timer = Instant::now();
-
-        // 1. Add workload terms to egraph
-        let terms = if let Some(filename) = &self.params.workload {
-            self.enumerate_workload(filename)
+        if let Some(filename) = &self.params.workload {
+            let terms = self.enumerate_workload(filename);
+            for chunk in terms.chunks(self.params.node_chunk_size) {
+                self.run_chunk_rule_lifting(chunk);
+            }
         } else {
-            vec![]
-        };
-        log::info!("Adding {} terms to egraph", terms.len());
-        Synthesizer::add_chunk(&mut self.egraph, &terms);
+            let iters = self.params.iters.expect("Either iters or workload is required");
+            for iter in 1..=iters {
+                let layer = self.enumerate_layer(iter);
+                for chunk in layer.chunks(self.params.node_chunk_size) {
+                    self.run_chunk_rule_lifting(chunk);
+                }
+            }
+        }
+
+        let time = timer.elapsed().as_secs_f64();
+
+        let mut all_eqs: Vec<Equality<L>> =
+            self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        all_eqs.sort_by_key(|eq| eq.score());
+        all_eqs.reverse();
+        let mut new_eqs: Vec<Equality<L>> =
+            self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        new_eqs.sort_by_key(|eq| eq.score());
+        new_eqs.reverse();
+        let mut old_eqs: Vec<Equality<L>> =
+            self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
+        old_eqs.sort_by_key(|eq| eq.score());
+        old_eqs.reverse();
+
+        for eq in &new_eqs {
+            println!("  {:?}   {}", eq.score(), eq);
+        }
+        println!(
+            "Learned {} rules in {:?} using {} old rules.",
+            new_eqs.len(),
+            time,
+            old_eqs.len()
+        );
+
+
+        Report {
+            params: self.params,
+            time,
+            num_rules: new_eqs.len(),
+            all_eqs,
+            new_eqs,
+            old_eqs,
+            smt_unknown: self.smt_unknown,
+        }
+    }
+
+    fn run_chunk_rule_lifting(&mut self, chunk: &[RecExpr<L>]) {
+        log::info!("Adding {} terms to egraph", chunk.len());
+        Synthesizer::add_chunk(&mut self.egraph, chunk);
 
         // 2. Partition rules into "allowed" and "forbidden"
-        assert!(self.new_eqs.is_empty());
         let mut allowed: EqualityMap<L> = EqualityMap::default();
         let mut forbidden: EqualityMap<L> = EqualityMap::default();
         for (name, eq) in self.old_eqs.clone() {
@@ -939,7 +983,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
                             if let ValidationResult::Valid =
-                                L::validate(&mut self, &eq.lhs, &eq.rhs)
+                                L::validate(self, &eq.lhs, &eq.rhs)
                             {
                                 if !candidates.contains_key(&eq.name) {
                                     candidates.insert(eq.name.clone(), eq);
@@ -970,7 +1014,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
                             if let ValidationResult::Valid =
-                                L::validate(&mut self, &eq.lhs, &eq.rhs)
+                                L::validate(self, &eq.lhs, &eq.rhs)
                             {
                                 if !candidates.contains_key(&eq.name) {
                                     candidates.insert(eq.name.clone(), eq);
@@ -981,48 +1025,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             }
         }
-        let len_before = candidates.len();
         candidates.retain(|_, v| L::is_allowed_rewrite(&v.lhs, &v.rhs));
-        println!("filtered out {} candidates", len_before - candidates.len());
 
         let (eqs, _) = self.choose_eqs(candidates);
         self.new_eqs.extend(eqs.clone());
         self.all_eqs.extend(eqs);
-
-        let mut all_eqs: Vec<Equality<L>> =
-            self.all_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
-        all_eqs.sort_by_key(|eq| eq.score());
-        all_eqs.reverse();
-        let mut new_eqs: Vec<Equality<L>> =
-            self.new_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
-        new_eqs.sort_by_key(|eq| eq.score());
-        new_eqs.reverse();
-        let mut old_eqs: Vec<Equality<L>> =
-            self.old_eqs.clone().into_iter().map(|(_, eq)| eq).collect();
-        old_eqs.sort_by_key(|eq| eq.score());
-        old_eqs.reverse();
-
-        let time = timer.elapsed().as_secs_f64();
-
-        for eq in &new_eqs {
-            println!("  {:?}   {}", eq.score(), eq);
-        }
-        println!(
-            "Learned {} rules in {:?} using {} old rules.",
-            new_eqs.len(),
-            time,
-            old_eqs.len()
-        );
-
-        Report {
-            params: self.params,
-            time,
-            num_rules: new_eqs.len(),
-            all_eqs,
-            new_eqs,
-            old_eqs,
-            smt_unknown: self.smt_unknown,
-        }
+        self.egraph.rebuild();
     }
 
     /// Top level function for rule synthesis.
