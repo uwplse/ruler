@@ -232,11 +232,7 @@ impl SynthLanguage for Math {
     }
 
     fn is_extractable(&self) -> bool {
-        !matches!(
-            self,
-            Math::Imag |
-            Math::Cis(_),
-        )
+        !matches!(self, Math::Imag | Math::Cis(_),)
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
