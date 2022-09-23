@@ -932,7 +932,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // 2. Partition rules into "allowed" and "forbidden"
         let mut allowed: EqualityMap<L> = EqualityMap::default();
         let mut forbidden: EqualityMap<L> = EqualityMap::default();
-        for (name, eq) in self.old_eqs.clone() {
+        for (name, eq) in self.all_eqs.clone() {
             if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
                 allowed.insert(name, eq);
             } else {
