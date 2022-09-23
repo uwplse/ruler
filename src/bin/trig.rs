@@ -232,29 +232,10 @@ impl SynthLanguage for Math {
     }
 
     fn is_extractable(&self) -> bool {
-        matches!(
+        !matches!(
             self,
-            // Standard extractable nodes
-            Math::Sin(_)
-                | Math::Cos(_)
-                | Math::Tan(_)
-                | Math::Neg(_)
-                | Math::Add(_)
-                | Math::Sub(_)
-                | Math::Mul(_)
-                | Math::Div(_)
-                | Math::RealConst(_)
-                | Math::Pi
-                | Math::Var(_)
-
-                // Interesting complex nodes
-                // | Math::Cis(_)
-                // | Math::Imag
-
-                // Reciprocal trig
-                | Math::Csc(_)
-                | Math::Sec(_)
-                | Math::Cot(_)
+            Math::Imag |
+            Math::Cis(_),
         )
     }
 
