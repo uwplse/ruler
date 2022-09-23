@@ -877,7 +877,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 self.run_chunk_rule_lifting(chunk);
             }
         } else {
-            let iters = self.params.iters.expect("Either iters or workload is required");
+            let iters = self
+                .params
+                .iters
+                .expect("Either iters or workload is required");
             for iter in 1..=iters {
                 let layer = self.enumerate_layer(iter);
                 for chunk in layer.chunks(self.params.node_chunk_size) {
@@ -910,7 +913,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             time,
             old_eqs.len()
         );
-
 
         Report {
             params: self.params,
@@ -982,9 +984,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     let (_, e2) = extract.find_best(id2);
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
-                            if let ValidationResult::Valid =
-                                L::validate(self, &eq.lhs, &eq.rhs)
-                            {
+                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
                                 if !candidates.contains_key(&eq.name) {
                                     candidates.insert(eq.name.clone(), eq);
                                 }
@@ -1013,9 +1013,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     let (_, e2) = extract.find_best(id2);
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
-                            if let ValidationResult::Valid =
-                                L::validate(self, &eq.lhs, &eq.rhs)
-                            {
+                            if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
                                 if !candidates.contains_key(&eq.name) {
                                     candidates.insert(eq.name.clone(), eq);
                                 }
