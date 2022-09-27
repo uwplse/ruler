@@ -216,11 +216,11 @@ mod tests {
                 .insert(eq.to_string().into(), eq.parse().unwrap());
         }
 
-        let left = "(+ a (+ b c))".parse().unwrap();
-        let right = "(+ (+ a b) c)".parse().unwrap();
+        let left = "(+ a b)".parse().unwrap();
+        let right = "(+ b a)".parse().unwrap();
         println!("Goal: {left} = {right}");
-        let var = "a".into();
+        let vars = &["a".into(), "b".into()];
 
-        assert!(synth.prove_by_induction(&left, &right, var));
+        assert!(synth.prove_by_induction(&left, &right, vars));
     }
 }

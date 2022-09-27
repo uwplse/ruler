@@ -6,6 +6,7 @@ It uses equality saturation in two novel ways to scale the rule synthesis:
 !*/
 use clap::Parser;
 use egg::*;
+use itertools::Itertools;
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
@@ -1216,76 +1217,125 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
     }
 
-    pub fn prove_by_induction(&self, left: &RecExpr<L>, right: &RecExpr<L>, var: Symbol) -> bool {
-        let var_node = L::mk_var(var);
-        assert!(left.as_ref().contains(&var_node) || right.as_ref().contains(&var_node));
-
+    pub fn prove_by_induction(
+        &self,
+        left: &RecExpr<L>,
+        right: &RecExpr<L>,
+        vars: &[Symbol],
+    ) -> bool {
         let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
-        let arms = var_node
-            .induction_principle(&mut runner.egraph)
-            .expect("Must have an induction principle");
-        let ty = var_node.get_type();
-        let mut ids = vec![0xffff.into(); left.as_ref().len().max(right.as_ref().len())];
-        // Apply the pattern to the egraph, replacing var with the given id
-        let mut apply =
-            |egraph: &mut EGraph<L, SynthAnalysis>, term: &RecExpr<L>, id_for_var: Id| {
-                for (i, pat_node) in term.as_ref().iter().enumerate() {
-                    let id = match pat_node.to_var() {
-                        Some(v) if v == var => id_for_var,
-                        _ => {
-                            let n = pat_node
-                                .clone()
-                                .map_children(|child| ids[usize::from(child)]);
-                            egraph.add(n)
-                        }
-                    };
-                    ids[i] = id;
+        let mut var_ctors: IndexMap<Symbol, Vec<L>> = Default::default();
+        let mut induction_hypotheses: Vec<Rewrite<L, SynthAnalysis>> = vec![];
+
+        // used to make induction hypotheses from the goals
+        // grounds `replace_var` with `with_node`, and quantifies the rest
+        let mk_pat = |term: &[L], replace_var: Symbol, with_node: &L| {
+            let pat_nodes = term.iter().map(|node| {
+                if let Some(v) = node.to_var() {
+                    if v == replace_var {
+                        ENodeOrVar::ENode(with_node.clone())
+                    } else {
+                        ENodeOrVar::Var(format!("?{v}").parse().unwrap())
+                    }
+                } else {
+                    ENodeOrVar::ENode(node.clone())
                 }
-                ids[term.as_ref().len() - 1]
-            };
+            });
+            Pattern::new(PatternAst::from(pat_nodes.collect::<Vec<_>>()))
+        };
 
-        // runner = runner.run(
-        //     self.all_eqs
-        //         .values()
-        //         .flat_map(|eq| &eq.rewrites)
-        //         .chain(&eq.rewrites),
-        // );
-        // runner = self.mk_cvec_less_runner(runner.egraph);
+        for &var in vars {
+            assert!(!var_ctors.contains_key(&var));
+            let var_node = L::mk_var(var);
+            let ty = var_node.get_type();
+            assert!(left.as_ref().contains(&var_node) || right.as_ref().contains(&var_node));
+            let ctors = var_node
+                .induction_principle(&mut runner.egraph)
+                .expect("Must have an induction principle");
 
-        let mut obligations = vec![];
-        // TODO: should we clone here?? or use a new egraph?
-        for node in &arms {
-            let id = runner.egraph.add(node.clone());
-            let l = apply(&mut runner.egraph, left, id);
-            let r = apply(&mut runner.egraph, right, id);
-
-            let ext = Extractor::new(&runner.egraph, AstSize);
-            let term_id = ext.find_best(id).1;
-            let terml = ext.find_best(l).1;
-            let termr = ext.find_best(r).1;
-            println!("Proving by induction on {var} = {term_id}");
-            println!("to show {} = {}", terml, termr);
-
-            obligations.push((l, r));
-            for &child in node.children() {
-                if runner.egraph[child].nodes[0].get_type() == ty {
-                    let child_l = apply(&mut runner.egraph, left, child);
-                    let child_r = apply(&mut runner.egraph, right, child);
-                    runner.egraph.union(child_l, child_r);
+            for ctor in &ctors {
+                for &child in ctor.children() {
+                    if runner.egraph[child].nodes[0].get_type() == ty {
+                        let child_node = runner.egraph[child].nodes[0].clone();
+                        assert!(child_node.is_var());
+                        let l = mk_pat(left.as_ref(), var, &child_node);
+                        let r = mk_pat(right.as_ref(), var, &child_node);
+                        let name = format!("IH{}", induction_hypotheses.len());
+                        if let Ok(rw) = Rewrite::new(format!("{name}-l"), l.clone(), r.clone()) {
+                            induction_hypotheses.push(rw);
+                        }
+                        if let Ok(rw) = Rewrite::new(format!("{name}-r"), r, l) {
+                            induction_hypotheses.push(rw);
+                        }
+                    }
                 }
             }
+
+            var_ctors.insert(var, ctors);
+        }
+
+        let mut ids = vec![0xffff.into(); left.as_ref().len().max(right.as_ref().len())];
+        // Apply the pattern to the egraph, replacing var with the given id
+        let mut apply = |egraph: &mut EGraph<L, SynthAnalysis>,
+                         term: &RecExpr<L>,
+                         mapping: &HashMap<Symbol, Id>| {
+            for (i, pat_node) in term.as_ref().iter().enumerate() {
+                let id = match pat_node.to_var() {
+                    Some(v) if mapping.contains_key(&v) => mapping[&v],
+                    _ => {
+                        let n = pat_node
+                            .clone()
+                            .map_children(|child| ids[usize::from(child)]);
+                        egraph.add(n)
+                    }
+                };
+                ids[i] = id;
+            }
+            ids[term.as_ref().len() - 1]
+        };
+
+        let mut subst = HashMap::<Symbol, Id>::default();
+        let mut obligations = vec![];
+        let ctors_iter = var_ctors.values().multi_cartesian_product();
+        for ctors in ctors_iter.clone() {
+            for (&var, &ctor) in vars.iter().zip(&ctors) {
+                let id = runner.egraph.add(ctor.clone());
+                subst.insert(var, id);
+            }
+
+            let l = apply(&mut runner.egraph, left, &subst);
+            let r = apply(&mut runner.egraph, right, &subst);
+
+            let ext = Extractor::new(&runner.egraph, AstSize);
+            let terml = ext.find_best(l).1;
+            let termr = ext.find_best(r).1;
+            println!("to show {} = {}", terml, termr);
+
+            for (&var, &id) in subst.iter() {
+                let term_id = ext.find_best(id).1;
+                println!("Proving by induction on {var} = {term_id}");
+            }
+
+            obligations.push((l, r));
         }
         runner.egraph.rebuild();
 
-        let rws = self.all_eqs.values().flat_map(|eq| &eq.rewrites);
+        let rws = self
+            .all_eqs
+            .values()
+            .flat_map(|eq| &eq.rewrites)
+            .chain(&induction_hypotheses);
         let runner = runner.run(rws);
 
-        for ((l, r), arm) in obligations.iter().zip(arms) {
+        for ((l, r), variants) in obligations.iter().zip(ctors_iter) {
             if runner.egraph.find(*l) != runner.egraph.find(*r) {
                 let ext = Extractor::new(&runner.egraph, AstSize);
                 let terml = ext.find_best(*l).1;
                 let termr = ext.find_best(*r).1;
-                println!("Failed to prove {arm:?} arm\n {terml}\n!=\n{termr}");
+                println!("Failed to prove {variants:?} arm\n {terml}\n!=\n{termr}");
+                for ih in &induction_hypotheses {
+                    println!("  using {ih:?}")
+                }
                 return false;
             }
         }
