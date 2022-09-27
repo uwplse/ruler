@@ -1,32 +1,32 @@
 [package]
+authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washington.edu>"]
+edition = "2021"
 name = "ruler"
 version = "0.1.0"
-authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washington.edu>"]
-edition = "2018"
 
 [dependencies]
-clap = { version = "3.0.7", features = ["derive"] }
-log = "0.4"
-env_logger = { version = "0.7", default-features = false }
-rand_pcg = "0.2"
-rand = { version = "0.7", default-features = false, features = ["std"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-indexmap = "1"
-num = "0.3"
-num-bigint = { version = "0.3", features = ["rand"] }
-ordered-float = "2.0.0"
-libm = "0.2.1"
+clap = {version = "3.0.7", features = ["derive"]}
+env_logger = {version = "0.7", default-features = false}
 float-cmp = "0.8.0"
-lazy_static = "1.4.0"
+indexmap = "1"
 itertools = "0.9.0"
+lazy_static = "1.4.0"
+libm = "0.2.1"
+log = "0.4"
+num = "0.3"
+num-bigint = {version = "0.3", features = ["rand"]}
+ordered-float = "2.0.0"
+rand = {version = "0.7", default-features = false, features = ["std"]}
+rand_pcg = "0.2"
+serde = {version = "1", features = ["derive"]}
+serde_json = "1"
 # fixed = "1.9.0"
 z3 = "0.10.0"
 #z3 = {version = "0.10.0", features = ["static-link-z3"]}
-rustc-hash = "1"
-symbolic_expressions = "5"
 rayon = "1"
+rustc-hash = "1"
 smallstr = "0.3"
+symbolic_expressions = "5"
 
 [dependencies.egg]
 version = "0.8"

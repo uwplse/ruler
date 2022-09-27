@@ -44,15 +44,24 @@ impl SynthLanguage for Nat {
         Type::Nat
     }
 
+    fn induction_principle(&self, egraph: &mut EGraph<Self, SynthAnalysis>) -> Option<Vec<Self>> {
+        if let Self::Var(var) = self {
+            let x = egraph.add(Nat::Var(format!("{var}-S.0").into()));
+            Some(vec![Nat::Z, Nat::S(x)])
+        } else {
+            None
+        }
+    }
+
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
             Nat::Z => vec![Some(0); cvec_len],
-            Nat::S(x) => map!(v, x => Some(*x + 1)),
-            Nat::Add([a, b]) => map!(v, a, b => Some(*a + *b)),
-            Nat::Mul([a, b]) => map!(v, a, b => Some(*a * *b)),
+            Nat::S(x) => map!(v, x => Some(x.checked_add(1).unwrap())),
+            Nat::Add([a, b]) => map!(v, a, b => Some(a.checked_add(*b).unwrap())),
+            Nat::Mul([a, b]) => map!(v, a, b => Some(a.checked_mul(*b).unwrap())),
             Nat::Var(_) => vec![],
         }
     }
@@ -180,4 +189,38 @@ impl SynthLanguage for Nat {
 
 fn main() {
     Nat::main()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn test_nat() {
+        env_logger::init();
+        let args: &[String] = &[];
+        let mut params = SynthParams::parse_from(args);
+        params.eqsat_iter_limit = 5;
+        params.no_constant_fold = true;
+        let mut synth = Synthesizer::<Nat>::new(params);
+        synth.egraph = EGraph::new(SynthAnalysis {
+            cvec_len: 0,
+            constant_fold: ConstantFoldMethod::NoFold,
+            rule_lifting: false,
+        });
+        let eqs = ["(+ Z n) <=> n", "(+ (S x) n) <=> (S (+ x n))"];
+        for eq in eqs.iter() {
+            synth
+                .all_eqs
+                .insert(eq.to_string().into(), eq.parse().unwrap());
+        }
+
+        let left = "(+ a (+ b c))".parse().unwrap();
+        let right = "(+ (+ a b) c)".parse().unwrap();
+        println!("Goal: {left} = {right}");
+        let var = "a".into();
+
+        assert!(synth.prove_by_induction(&left, &right, var));
+    }
 }

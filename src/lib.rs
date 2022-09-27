@@ -26,6 +26,19 @@ mod util;
 /// Faster hashMap implementation used in rustc
 pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
 
+#[macro_export]
+macro_rules! hashmap {
+    (@count $k:expr, $($ks:expr,)*) => { 1 + $crate::hashmap!(@count $($ks,)*); };
+    (@count $k:expr,) => { 1 };
+    (@count) => { 0 };
+    ($($key:expr => $val:expr),* $(,)?) => {{
+        let len = $crate::hashmap!(@count $($key,)*);
+        let mut map = $crate::HashMap::with_capacity_and_hasher(len, Default::default());
+        $(map.insert($key, $val);)*
+        map
+    }};
+}
+
 /// Faster hashSet implementation used in rustc
 pub type HashSet<K> = rustc_hash::FxHashSet<K>;
 
@@ -99,6 +112,10 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     type Type: Clone + Hash + Eq + Debug + Display + Ord;
 
     fn get_type(&self) -> Self::Type;
+
+    fn induction_principle(&self, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Option<Vec<Self>> {
+        None
+    }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
     where
@@ -1198,6 +1215,82 @@ impl<L: SynthLanguage> Synthesizer<L> {
             self.run_cvec_synth()
         }
     }
+
+    pub fn prove_by_induction(&self, left: &RecExpr<L>, right: &RecExpr<L>, var: Symbol) -> bool {
+        let var_node = L::mk_var(var);
+        assert!(left.as_ref().contains(&var_node) || right.as_ref().contains(&var_node));
+
+        let mut runner = self.mk_cvec_less_runner(self.egraph.clone());
+        let arms = var_node
+            .induction_principle(&mut runner.egraph)
+            .expect("Must have an induction principle");
+        let ty = var_node.get_type();
+        let mut ids = vec![0xffff.into(); left.as_ref().len().max(right.as_ref().len())];
+        // Apply the pattern to the egraph, replacing var with the given id
+        let mut apply =
+            |egraph: &mut EGraph<L, SynthAnalysis>, term: &RecExpr<L>, id_for_var: Id| {
+                for (i, pat_node) in term.as_ref().iter().enumerate() {
+                    let id = match pat_node.to_var() {
+                        Some(v) if v == var => id_for_var,
+                        _ => {
+                            let n = pat_node
+                                .clone()
+                                .map_children(|child| ids[usize::from(child)]);
+                            egraph.add(n)
+                        }
+                    };
+                    ids[i] = id;
+                }
+                ids[term.as_ref().len() - 1]
+            };
+
+        // runner = runner.run(
+        //     self.all_eqs
+        //         .values()
+        //         .flat_map(|eq| &eq.rewrites)
+        //         .chain(&eq.rewrites),
+        // );
+        // runner = self.mk_cvec_less_runner(runner.egraph);
+
+        let mut obligations = vec![];
+        // TODO: should we clone here?? or use a new egraph?
+        for node in &arms {
+            let id = runner.egraph.add(node.clone());
+            let l = apply(&mut runner.egraph, left, id);
+            let r = apply(&mut runner.egraph, right, id);
+
+            let ext = Extractor::new(&runner.egraph, AstSize);
+            let term_id = ext.find_best(id).1;
+            let terml = ext.find_best(l).1;
+            let termr = ext.find_best(r).1;
+            println!("Proving by induction on {var} = {term_id}");
+            println!("to show {} = {}", terml, termr);
+
+            obligations.push((l, r));
+            for &child in node.children() {
+                if runner.egraph[child].nodes[0].get_type() == ty {
+                    let child_l = apply(&mut runner.egraph, left, child);
+                    let child_r = apply(&mut runner.egraph, right, child);
+                    runner.egraph.union(child_l, child_r);
+                }
+            }
+        }
+        runner.egraph.rebuild();
+
+        let rws = self.all_eqs.values().flat_map(|eq| &eq.rewrites);
+        let runner = runner.run(rws);
+
+        for ((l, r), arm) in obligations.iter().zip(arms) {
+            if runner.egraph.find(*l) != runner.egraph.find(*r) {
+                let ext = Extractor::new(&runner.egraph, AstSize);
+                let terml = ext.find_best(*l).1;
+                let termr = ext.find_best(*r).1;
+                println!("Failed to prove {arm:?} arm\n {terml}\n!=\n{termr}");
+                return false;
+            }
+        }
+        true
+    }
 }
 
 /// Reports for each run of Ruler.
@@ -1469,6 +1562,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
     fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+        // println!("Merging\n  {:?}\n  {:?}", to, from);
         let mut merge_a = false;
         let mut merge_b = false;
         let cost_fn = |x: &RecExpr<L>| {
