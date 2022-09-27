@@ -132,6 +132,9 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
         }
 
         let id = apply_pat(self.rhs.ast.as_ref(), egraph, subst);
+        if id == matched_id {
+            return vec![];
+        }
 
         if !egraph[id].data.is_defined() {
             return vec![];
