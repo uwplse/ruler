@@ -271,7 +271,7 @@ fn is_real_zero(n: &Math) -> bool {
 
 fn symbol_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
     let s = r.as_str();
-    (&s[..(s.len() - 1)]).parse()
+    (s[..(s.len() - 1)]).parse()
 }
 
 fn fold_real_neg(v: &Real) -> Option<Real> {
