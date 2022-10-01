@@ -301,7 +301,6 @@ impl SynthLanguage for Math {
             .map(|s| s.parse().unwrap())
             .collect();
 
-<<<<<<< HEAD
         // mapping of variables to cvecs
         let mut vars: HashMap<egg::Symbol, Vec<Option<Constant>>> = HashMap::new();
 
@@ -315,14 +314,14 @@ impl SynthLanguage for Math {
             let mut consts: Vec<Option<Constant>> = vec![];
 
             for i in 0..synth.params.important_cvec_offsets {
-                consts.push(mk_constant(
+                consts.push(Some(mk_constant(
                     &i.to_bigint().unwrap(),
                     &(1.to_bigint().unwrap()),
-                ));
-                consts.push(mk_constant(
+                )));
+                consts.push(Some(mk_constant(
                     &(-i.to_bigint().unwrap()),
                     &(1.to_bigint().unwrap()),
-                ));
+                )));
             }
             consts.sort();
             consts.dedup();
@@ -332,19 +331,6 @@ impl SynthLanguage for Math {
                 let var = egg::Symbol::from(letter(i));
                 vars.insert(var, item.clone());
             }
-=======
-        let mut consts: Vec<Option<Constant>> = vec![];
-
-        for i in 0..synth.params.important_cvec_offsets {
-            consts.push(Some(mk_constant(
-                &i.to_bigint().unwrap(),
-                &(1.to_bigint().unwrap()),
-            )));
-            consts.push(Some(mk_constant(
-                &(-i.to_bigint().unwrap()),
-                &(1.to_bigint().unwrap()),
-            )));
->>>>>>> 10794e76ed93eac409cabdab9902f8806093e9d5
         }
 
         // if we are adding random assignments to the cvec, do that here

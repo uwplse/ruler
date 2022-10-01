@@ -17,7 +17,7 @@ use std::io::BufReader;
 use std::io::Write;
 use std::{
     borrow::{Borrow, Cow},
-    fmt::{Debug, Display, Write},
+    fmt::{Debug, Display, Write as OtherWrite},
     hash::{BuildHasherDefault, Hash},
     sync::Arc,
     time::{Duration, Instant},
@@ -102,14 +102,10 @@ impl Default for SynthAnalysis {
 /// `eval` implements an interpreter for the domain. It returns a `Cvec` of length `cvec_len`
 /// where each cvec element is computed using `eval`.
 pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
-<<<<<<< HEAD
     type Constant: Clone + Hash + Eq + Debug + Display + FromStr + Ord;
-=======
-    type Constant: Clone + Hash + Eq + Debug + Display + Ord;
     type Type: Clone + Hash + Eq + Debug + Display + Ord;
 
     fn get_type(&self) -> Self::Type;
->>>>>>> 10794e76ed93eac409cabdab9902f8806093e9d5
 
     fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
     where
