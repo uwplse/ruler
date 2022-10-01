@@ -154,8 +154,24 @@ macro_rules! impl_bv {
             }
         }
 
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum Type {
+            Top,
+        }
+
+        impl std::fmt::Display for Type {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "")
+            }
+        }
+
         impl SynthLanguage for Math {
             type Constant = BV;
+            type Type = Type;
+
+            fn get_type(&self) -> Self::Type {
+                Type::Top
+            }
 
             /// Converting CVC4's rewrites to Ruler's BV grammar syntax.
             fn convert_parse(s: &str) -> RecExpr<Self> {
@@ -212,15 +228,11 @@ macro_rules! impl_bv {
                 Math::Var(sym)
             }
 
-            fn to_constant(&self) -> Option<&Self::Constant> {
-                if let Math::Num(n) = self {
-                    Some(n)
-                } else {
-                    None
-                }
+            fn is_constant(&self) -> bool {
+                matches!(self, Math::Num(_))
             }
 
-            fn mk_constant(c: Self::Constant) -> Self {
+            fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
                 Math::Num(c)
             }
 

@@ -15,6 +15,7 @@ define_language! {
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
         "^" = Xor([Id; 2]),
+        "->" = Implies([Id; 2]),
         Lit(bool),
 
         // bitvector domain
@@ -47,9 +48,25 @@ fn extract_bool_constant(nodes: &[Math]) -> Option<bool> {
     None
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Top,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
 // BV-bool language
 impl SynthLanguage for Math {
     type Constant = BV<2>;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Top
+    }
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         let s = s
@@ -80,15 +97,11 @@ impl SynthLanguage for Math {
         Math::Var(sym)
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::Num(n) = self {
-            Some(n)
-        } else {
-            None
-        }
+    fn is_constant(&self) -> bool {
+        matches!(self, Math::Num(_))
     }
 
-    fn mk_constant(c: Self::Constant) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::Num(c)
     }
 

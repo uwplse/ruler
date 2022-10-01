@@ -16,13 +16,30 @@ define_language! {
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
         "^" = Xor([Id; 2]),
+        "->" = Implies([Id; 2]),
         Lit(bool),
         Var(egg::Symbol),
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Bool,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "b")
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = bool;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Bool
+    }
 
     fn convert_parse(s: &str) -> RecExpr<Self> {
         let s = s
@@ -43,6 +60,7 @@ impl SynthLanguage for Math {
             Math::And([a, b]) => map!(v, a, b => Some(*a & *b)),
             Math::Or([a, b]) => map!(v, a, b => Some(*a | *b)),
             Math::Xor([a, b]) => map!(v, a, b => Some(*a ^ *b)),
+            Math::Implies([a, b]) => map!(v, a, b => Some(!(*a) || *b)),
 
             Math::Lit(n) => vec![Some(*n); cvec_len],
             Math::Var(_) => vec![],
@@ -112,6 +130,21 @@ impl SynthLanguage for Math {
                     }
                 }
             }
+            Math::Implies([x, y]) => {
+                if let Interval {
+                    low: Some(a),
+                    high: Some(b),
+                } = egraph[*x].data.interval.clone()
+                {
+                    if let Interval {
+                        low: Some(c),
+                        high: Some(d),
+                    } = egraph[*y].data.interval.clone()
+                    {
+                        interval = Interval::new(Some(!b || c), Some(!a || d))
+                    }
+                }
+            }
         };
         if interval.low == None || interval.high == None {
             panic!("There shouldn't be infinite intervals for bool.");
@@ -132,15 +165,11 @@ impl SynthLanguage for Math {
         Math::Var(sym)
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::Lit(n) = self {
-            Some(n)
-        } else {
-            None
-        }
+    fn is_constant(&self) -> bool {
+        matches!(self, Math::Lit(_))
     }
 
-    fn mk_constant(c: Self::Constant) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::Lit(c)
     }
 
@@ -165,7 +194,7 @@ impl SynthLanguage for Math {
         egraph.add(Math::Lit(true));
 
         for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
-            let var = Symbol::from(letter(i));
+            let var = Symbol::from("b".to_owned() + letter(i));
             let id = egraph.add(Math::Var(var));
             egraph[id].data.cvec = item.clone();
         }
@@ -190,6 +219,7 @@ impl SynthLanguage for Math {
                 }
                 to_add.push(Math::And([i, j]));
                 to_add.push(Math::Or([i, j]));
+                to_add.push(Math::Implies([i, j]));
                 if !synth.params.no_xor {
                     to_add.push(Math::Xor([i, j]));
                 }
@@ -269,18 +299,23 @@ mod test {
         assert_eqs_same_as_strs(
             &report.all_eqs,
             &[
-                "(& ?a ?b) <=> (& ?b ?a)",
-                "(| ?a ?b) <=> (| ?b ?a)",
-                "(^ ?a ?b) <=> (^ ?b ?a)",
-                "?a <=> (| ?a ?a)",
-                "?a <=> (& ?a ?a)",
-                "(^ ?a ?a) => false",
-                "?a <=> (& true ?a)",
-                "?a <=> (| false ?a)",
-                "?a <=> (^ false ?a)",
-                "(~ ?a) <=> (^ true ?a)",
-                "(& false ?a) => false",
-                "(| true ?a) => true",
+                "(& ?ba ?bb) <=> (& ?bb ?ba)",
+                "(| ?ba ?bb) <=> (| ?bb ?ba)",
+                "(^ ?ba ?bb) <=> (^ ?bb ?ba)",
+                "?ba <=> (| ?ba ?ba)",
+                "?ba <=> (& ?ba ?ba)",
+                "(^ ?ba ?ba) => false",
+                "?ba <=> (& true ?ba)",
+                "?ba <=> (| false ?ba)",
+                "?ba <=> (^ false ?ba)",
+                "(~ ?ba) <=> (^ true ?ba)",
+                "(& false ?ba) => false",
+                "(| true ?ba) => true",
+                "(-> false ?ba) => true",
+                "?ba <=> (-> true ?ba)",
+                "(-> ?ba ?ba) => true",
+                "(~ ?ba) <=> (-> ?ba false)",
+                "(-> ?ba true) => true",
             ],
         );
     }
@@ -293,27 +328,45 @@ mod test {
         assert_eqs_same_as_strs(
             &report.all_eqs,
             &[
-                "(^ ?c (^ ?b ?a)) <=> (^ ?b (^ ?a ?c))",
-                "(& ?c (& ?b ?a)) <=> (& ?a (& ?b ?c))",
-                "(| ?c (| ?b ?a)) <=> (| ?b (| ?a ?c))",
-                "(& ?b ?a) <=> (& ?a ?b)",
-                "(| ?b ?a) <=> (| ?a ?b)",
-                "(^ ?b ?a) <=> (^ ?a ?b)",
-                "(& ?b (| ?b ?a)) => ?b",
-                "(| ?b (& ?b ?a)) => ?b",
-                "(| ?b ?a) <=> (| ?a (^ ?b ?a))",
-                "(^ ?a (& ?b ?a)) <=> (& ?a (~ ?b))",
-                "(& ?b (~ ?a)) <=> (& ?b (^ ?a ?b))",
-                "(^ ?b (| ?b ?a)) <=> (& ?a (~ ?b))",
-                "?a <=> (| ?a ?a)",
-                "?a <=> (& ?a ?a)",
-                "(^ ?a ?a) => false",
-                "?a <=> (& true ?a)",
-                "?a <=> (| false ?a)",
-                "?a <=> (^ false ?a)",
-                "(~ ?a) <=> (^ true ?a)",
-                "(& false ?a) => false",
-                "(| true ?a) => true",
+                "?ba <=> (-> true ?ba)",
+                "?ba <=> (| false ?ba)",
+                "?ba <=> (& true ?ba)",
+                "(| ?bb ?ba) <=> (-> (-> ?bb ?ba) ?ba)",
+                "(-> ?ba ?ba) => true",
+                "(-> ?bc (-> ?bb ?ba)) <=> (-> ?bb (-> ?bc ?ba))",
+                "(| ?bc (-> ?bb ?ba)) <=> (-> ?bb (| ?ba ?bc))",
+                "(& ?bb ?ba) <=> (& ?ba (-> ?ba ?bb))",
+                "(| true ?ba) => true",
+                "(^ ?bc (^ ?bb ?ba)) <=> (^ ?bb (^ ?ba ?bc))",
+                "(& ?bc (& ?bb ?ba)) <=> (& ?ba (& ?bb ?bc))",
+                "(-> (-> ?ba ?bb) ?ba) => ?ba",
+                "(-> ?bb ?ba) <=> (-> (^ ?ba ?bb) ?ba)",
+                "(| ?bc (| ?bb ?ba)) <=> (| ?bb (| ?ba ?bc))",
+                "?ba <=> (& ?ba ?ba)",
+                "(^ ?bb ?ba) <=> (^ ?ba ?bb)",
+                "(~ (-> ?bb ?ba)) <=> (^ ?ba (| ?ba ?bb))",
+                "(| ?bb ?ba) <=> (| ?ba ?bb)",
+                "(-> ?bc (-> ?bb ?ba)) <=> (-> (& ?bc ?bb) ?ba)",
+                "?ba <=> (^ false ?ba)",
+                "(& ?bb ?ba) <=> (& ?ba ?bb)",
+                "(& false ?ba) => false",
+                "(^ ?ba ?ba) => false",
+                "(-> false ?ba) => true",
+                "(~ ?ba) <=> (^ true ?ba)",
+                "(~ (-> ?bb ?ba)) <=> (& ?bb (~ ?ba))",
+                "(| ?bb ?ba) <=> (-> (~ ?ba) ?bb)",
+                "?ba <=> (| ?ba ?ba)",
+                "(& ?bb (| ?bb ?ba)) => ?bb",
+                "(~ ?ba) <=> (-> ?ba false)",
+                "(^ ?ba (~ ?ba)) => true",
+                "(-> ?bb (~ ?ba)) <=> (-> ?bb (^ ?bb ?ba))",
+                "(~ (-> ?bb ?ba)) <=> (^ ?bb (& ?ba ?bb))",
+                "(| (~ ?bb) ?ba) <=> (-> ?bb ?ba)",
+                "(-> ?bb ?ba) <=> (-> ?bb (& ?ba ?bb))",
+                "(-> ?ba true) => true",
+                "(^ ?bb (-> ?bb ?ba)) <=> (-> ?ba (~ ?bb))",
+                "(| ?bb (& ?bb ?ba)) => ?bb",
+                "(& ?ba (-> ?bb ?ba)) => ?ba",
             ],
         );
     }

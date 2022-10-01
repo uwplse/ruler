@@ -25,7 +25,7 @@ z3 = "0.10.0"
 rustc-hash = "1"
 symbolic_expressions = "5"
 rayon = "1"
-smallvec = { version = "1.6", features = ["union", "const_generics"] }
+smallstr = "0.3"
 
 [dependencies.egg]
 version = "0.8"

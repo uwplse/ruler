@@ -5,19 +5,13 @@ use std::sync::Mutex;
 
 type Pair<L> = (RecExpr<L>, RecExpr<L>);
 
-pub enum RuleType {
-    All,
-    New,
-    Old,
-}
-
-pub fn parse<L: SynthLanguage>(filename: &str, rtype: RuleType) -> Vec<Pair<L>> {
+pub fn parse<L: SynthLanguage>(filename: &str, only_new: bool) -> Vec<Pair<L>> {
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
-    let eqs = match rtype {
-        RuleType::All => &report.all_eqs,
-        RuleType::New => &report.new_eqs,
-        RuleType::Old => &report.old_eqs,
+    let eqs = if only_new {
+        &report.new_eqs
+    } else {
+        &report.all_eqs
     };
 
     eqs.iter()
@@ -28,13 +22,8 @@ pub fn parse<L: SynthLanguage>(filename: &str, rtype: RuleType) -> Vec<Pair<L>> 
 /// Performs a one-way derivability test and exits with code -1
 /// if the left ruleset cannot derive the right ruleset
 pub fn derive_ci<L: SynthLanguage>(params: DeriveParams) {
-    let rtype = if params.new_eqs {
-        RuleType::New
-    } else {
-        RuleType::All
-    };
-    let pairs1 = parse::<L>(&params.in1, RuleType::All);
-    let pairs2 = parse::<L>(&params.in2, rtype);
+    let pairs1 = parse::<L>(&params.in1, params.only_new);
+    let pairs2 = parse::<L>(&params.in2, params.only_new);
 
     println!("Running derive tool in CI mode");
     println!("Using {} to derive {}", params.in1, params.in2);
@@ -52,25 +41,14 @@ pub fn derive_ci<L: SynthLanguage>(params: DeriveParams) {
 
 /// Perform derivability test between two rulesets.
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
-    let all_eqs_1 = parse::<L>(&params.in1, RuleType::All);
-    let pairs_1 = if params.new_eqs {
-        parse::<L>(&params.in1, RuleType::New)
-    } else {
-        all_eqs_1.clone()
-    };
-
-    let all_eqs_2 = parse::<L>(&params.in2, RuleType::All);
-    let pairs_2 = if params.new_eqs {
-        parse::<L>(&params.in2, RuleType::New)
-    } else {
-        all_eqs_2.clone()
-    };
+    let pairs_1 = parse::<L>(&params.in1, params.only_new);
+    let pairs_2 = parse::<L>(&params.in2, params.only_new);
 
     println!("Using {} to derive {}", params.in1, params.in2);
-    let (derivable, not_derivable) = one_way(&params, &all_eqs_1, &pairs_2);
+    let (derivable, not_derivable) = one_way(&params, &pairs_1, &pairs_2);
 
     println!("\nUsing {} to derive {}", params.in2, params.in1);
-    let (rev_derivable, rev_not_derivable) = one_way(&params, &all_eqs_2, &pairs_1);
+    let (rev_derivable, rev_not_derivable) = one_way(&params, &pairs_2, &pairs_1);
 
     let json = serde_json::json!({
         "files": [params.in1, params.in2],

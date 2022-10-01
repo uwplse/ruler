@@ -48,15 +48,6 @@ define_language! {
     }
 }
 
-/// Return a non-zero constant.
-fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
-    if d.is_zero() {
-        None
-    } else {
-        Some(Ratio::new(n.clone(), d.clone()))
-    }
-}
-
 fn sign(interval: &Interval<Constant>) -> Sign {
     match (&interval.low, &interval.high) {
         (None, None) => Sign::ContainsZero,
@@ -183,8 +174,24 @@ fn recip(interval: Interval<Constant>) -> Interval<Constant> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Top,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = Constant;
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Top
+    }
 
     /// Interpreter for rationals.
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
@@ -270,15 +277,11 @@ impl SynthLanguage for Math {
         Math::Var(sym)
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::Num(n) = self {
-            Some(n)
-        } else {
-            None
-        }
+    fn is_constant(&self) -> bool {
+        matches!(self, Math::Num(_))
     }
 
-    fn mk_constant(c: Self::Constant) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::Num(c)
     }
 
@@ -298,6 +301,7 @@ impl SynthLanguage for Math {
             .map(|s| s.parse().unwrap())
             .collect();
 
+<<<<<<< HEAD
         // mapping of variables to cvecs
         let mut vars: HashMap<egg::Symbol, Vec<Option<Constant>>> = HashMap::new();
 
@@ -328,6 +332,19 @@ impl SynthLanguage for Math {
                 let var = egg::Symbol::from(letter(i));
                 vars.insert(var, item.clone());
             }
+=======
+        let mut consts: Vec<Option<Constant>> = vec![];
+
+        for i in 0..synth.params.important_cvec_offsets {
+            consts.push(Some(mk_constant(
+                &i.to_bigint().unwrap(),
+                &(1.to_bigint().unwrap()),
+            )));
+            consts.push(Some(mk_constant(
+                &(-i.to_bigint().unwrap()),
+                &(1.to_bigint().unwrap()),
+            )));
+>>>>>>> 10794e76ed93eac409cabdab9902f8806093e9d5
         }
 
         // if we are adding random assignments to the cvec, do that here

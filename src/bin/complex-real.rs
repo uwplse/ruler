@@ -271,7 +271,7 @@ fn is_real_zero(n: &Math) -> bool {
 
 fn symbol_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
     let s = r.as_str();
-    (&s[..(s.len() - 1)]).parse()
+    (s[..(s.len() - 1)]).parse()
 }
 
 fn fold_real_neg(v: &Real) -> Option<Real> {
@@ -328,8 +328,24 @@ fn fold_real_div(v1: &Real, v2: &Real) -> Option<Real> {
 //  Ruler implementation
 //
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Type {
+    Top,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
 impl SynthLanguage for Math {
     type Constant = Complex; // not used
+    type Type = Type;
+
+    fn get_type(&self) -> Self::Type {
+        Type::Top
+    }
 
     // no evaluation needed
     fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
@@ -351,19 +367,10 @@ impl SynthLanguage for Math {
         Math::Var(Variable(sym))
     }
 
-    fn to_constant(&self) -> Option<&Self::Constant> {
-        if let Math::ComplexConst(n) = self {
-            Some(n)
-        } else {
-            None
-        }
-    }
-
-    fn mk_constant(c: Self::Constant) -> Self {
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::ComplexConst(c)
     }
 
-    // override default behavior
     fn is_constant(&self) -> bool {
         matches!(self, Math::ComplexConst(_))
     }
