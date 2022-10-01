@@ -295,7 +295,7 @@ impl SynthLanguage for Pred {
         synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         if synth.params.use_smt {
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);

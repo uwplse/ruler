@@ -125,7 +125,7 @@ impl SynthLanguage for Pos {
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
         _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         ValidationResult::Valid
     }
 

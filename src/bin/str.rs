@@ -365,17 +365,10 @@ impl SynthLanguage for Lang {
     }
 
     fn validate(
-<<<<<<< HEAD
-        _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> ValidationResult<Self> {
-        ValidationResult::Valid
-=======
         synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    ) -> ValidationResult<Self> {
         let n = synth.params.num_fuzz;
         let mut env: HashMap<Var, Vec<Option<Constant>>> = HashMap::default();
 
@@ -432,7 +425,6 @@ pub fn int_sampler(rng: &mut Pcg64, num_samples: usize) -> Vec<Constant> {
             // generate i32s so they can be added or subtracted without overflow
             ret.push(Constant::Num(rng.gen::<i32>().into()));
         }
->>>>>>> 10794e76ed93eac409cabdab9902f8806093e9d5
     }
     ret
 }
