@@ -951,9 +951,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
         let rewrites = allowed.values().flat_map(|eq| &eq.rewrites).collect();
         let (_, found_unions, _) = self.run_rewrites_with_unions(rewrites, runner);
-        for (canonical_id, other_ids) in found_unions {
-            for id in other_ids {
-                self.egraph.union(canonical_id, id);
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                self.egraph.union(win[0], win[1]);
             }
         }
         self.egraph.rebuild();
@@ -1025,9 +1025,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             }
         }
-        for (canonical_id, other_ids) in found_unions {
-            for id in other_ids {
-                self.egraph.union(canonical_id, id);
+        for ids in found_unions.values() {
+            for win in ids.windows(2) {
+                self.egraph.union(win[0], win[1]);
             }
         }
         self.egraph.rebuild();
