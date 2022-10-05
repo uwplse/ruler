@@ -1005,10 +1005,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .chain(self.lifting_rewrites.iter())
             .collect();
         let (_, found_unions, _) = self.run_rewrites_with_unions(rewrites, runner);
+        let clone = self.egraph.clone();
+        let extract = Extractor::new(&clone, AstSize);
         for ids in found_unions.values() {
             for id1 in ids.clone() {
                 for id2 in ids.clone() {
-                    let extract = Extractor::new(&self.egraph, AstSize);
                     let (_, e1) = extract.find_best(id1);
                     let (_, e2) = extract.find_best(id2);
                     if let Some(eq) = Equality::new(&e1, &e2) {
@@ -1023,6 +1024,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             }
         }
+        for (canonical_id, other_ids) in found_unions {
+            for id in other_ids {
+                self.egraph.union(canonical_id, id);
+            }
+        }
+        self.egraph.rebuild();
         candidates.retain(|_, v| L::is_allowed_rewrite(&v.lhs, &v.rhs));
 
         let (eqs, _) = self.choose_eqs(candidates);
