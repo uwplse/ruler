@@ -976,10 +976,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         );
 
         let mut candidates: EqualityMap<L> = EqualityMap::default();
+        let clone = self.egraph.clone();
+        let extract = Extractor::new(&clone, AstSize);
         for ids in found_unions.values() {
             for id1 in ids.clone() {
                 for id2 in ids.clone() {
-                    let extract = Extractor::new(&self.egraph, AstSize);
                     let (_, e1) = extract.find_best(id1);
                     let (_, e2) = extract.find_best(id2);
                     if let Some(eq) = Equality::new(&e1, &e2) {
