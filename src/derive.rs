@@ -92,6 +92,7 @@ fn one_way<L: SynthLanguage>(
             })
             .run(eqs.iter().flat_map(|eq| &eq.rewrites));
 
+        
         let l_id = runner.egraph.find(runner.roots[0]);
         let r_id = runner.egraph.find(runner.roots[1]);
 
