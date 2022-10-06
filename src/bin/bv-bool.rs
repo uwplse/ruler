@@ -228,7 +228,6 @@ impl SynthLanguage for Math {
         ValidationResult::Valid
     }
 
-    
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
         if egraph[id].nodes.iter().any(|n| matches!(n, Math::Num(_))) {
             return;
