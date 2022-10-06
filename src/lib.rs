@@ -999,7 +999,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         // 5. Run forbidden + lifting rules
         log::info!("Running forbidden rules");
-        let runner = self.mk_cvec_less_runner(self.egraph.clone());
+        let runner = self
+            .mk_cvec_less_runner(self.egraph.clone())
+            .with_node_limit(usize::MAX);
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = forbidden
             .values()
             .flat_map(|eq| &eq.rewrites)
