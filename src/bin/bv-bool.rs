@@ -52,13 +52,11 @@ fn extract_bool_constant(nodes: &[Math]) -> Option<bool> {
 pub enum Type {
     Top,
 }
-
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "")
     }
 }
-
 // BV-bool language
 impl SynthLanguage for Math {
     type Constant = BV<2>;
@@ -230,6 +228,7 @@ impl SynthLanguage for Math {
         ValidationResult::Valid
     }
 
+    
     fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
         if egraph[id].nodes.iter().any(|n| matches!(n, Math::Num(_))) {
             return;
