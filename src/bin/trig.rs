@@ -232,44 +232,11 @@ impl SynthLanguage for Math {
     }
 
     fn is_extractable(&self) -> bool {
-        matches!(
-            self,
-            // Standard extractable nodes
-            Math::Sin(_)
-                | Math::Cos(_)
-                | Math::Tan(_)
-                | Math::Neg(_)
-                | Math::Add(_)
-                | Math::Sub(_)
-                | Math::Mul(_)
-                | Math::Div(_)
-                | Math::RealConst(_)
-                | Math::Pi
-                | Math::Var(_)
-
-                // Interesting complex nodes
-                // | Math::Cis(_)
-                // | Math::Imag
-
-                // Reciprocal trig
-                | Math::Csc(_)
-                | Math::Sec(_)
-                | Math::Cot(_)
-        )
+        !matches!(self, Math::Imag | Math::Cis(_),)
     }
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
-        // disabled operators (TODO: validate input)
-        let disabled_ops: Vec<&str> = if let Some(s) = &synth.params.disabled_ops {
-            s.split(' ').collect()
-        } else {
-            vec![]
-        };
-
-        // predicate if disabled
-        let allowedp = |s: &str| !disabled_ops.iter().any(|x| x.eq(&s));
-
-        let mut egraph = EGraph::new(SynthAnalysis {
+        let egraph = EGraph::new(SynthAnalysis {
             cvec_len: 0,
             constant_fold: if synth.params.no_constant_fold {
                 ConstantFoldMethod::NoFold
@@ -278,50 +245,6 @@ impl SynthLanguage for Math {
             },
             rule_lifting: true,
         });
-
-        if synth.params.workload.is_none() {
-            // variables
-            for i in 0..synth.params.variables {
-                let var = Variable::from(letter(i));
-                egraph.add(Math::Var(var));
-            }
-
-            // constants
-            egraph.add(Math::RealConst(Real::from("-1")));
-            egraph.add(Math::RealConst(Real::from("0")));
-            egraph.add(Math::RealConst(Real::from("1")));
-
-            // constant values of sin, cosine, tangent
-            if allowedp("sin") {
-                egraph.add_expr(&"(sin 0)".parse().unwrap());
-                egraph.add_expr(&"(sin (/ PI 6))".parse().unwrap());
-                egraph.add_expr(&"(sin (/ PI 4))".parse().unwrap());
-                egraph.add_expr(&"(sin (/ PI 3))".parse().unwrap());
-                egraph.add_expr(&"(sin (/ PI 2))".parse().unwrap());
-                egraph.add_expr(&"(sin PI)".parse().unwrap());
-                egraph.add_expr(&"(sin (* 2 PI))".parse().unwrap());
-            }
-
-            if allowedp("cos") {
-                egraph.add_expr(&"(cos 0)".parse().unwrap());
-                egraph.add_expr(&"(cos (/ PI 6))".parse().unwrap());
-                egraph.add_expr(&"(cos (/ PI 4))".parse().unwrap());
-                egraph.add_expr(&"(cos (/ PI 3))".parse().unwrap());
-                egraph.add_expr(&"(cos (/ PI 2))".parse().unwrap());
-                egraph.add_expr(&"(cos PI)".parse().unwrap());
-                egraph.add_expr(&"(cos (* 2 PI))".parse().unwrap());
-            }
-
-            if allowedp("tan") {
-                egraph.add_expr(&"(tan 0)".parse().unwrap());
-                egraph.add_expr(&"(tan (/ PI 6))".parse().unwrap());
-                egraph.add_expr(&"(tan (/ PI 4))".parse().unwrap());
-                egraph.add_expr(&"(tan (/ PI 3))".parse().unwrap());
-                // egraph.add_expr(&"(tan (/ PI 2))".parse().unwrap());
-                egraph.add_expr(&"(tan PI)".parse().unwrap());
-                egraph.add_expr(&"(tan (* 2 PI))".parse().unwrap());
-            }
-        }
 
         // rewrites and extra rewrites
         synth.lifting_rewrites = vec![
@@ -417,7 +340,6 @@ impl SynthLanguage for Math {
                 synth.old_eqs.insert(e.name.clone(), e.clone());
             }
         }
-
         synth.egraph = egraph;
     }
 
