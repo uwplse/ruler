@@ -926,6 +926,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn run_chunk_rule_lifting(&mut self, chunk: &[RecExpr<L>]) {
+        // 1. Add terms to egraph
         log::info!("Adding {} terms to egraph", chunk.len());
         Synthesizer::add_chunk(&mut self.egraph, chunk);
 
@@ -947,6 +948,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         );
 
         // 3. Run allowed rules
+        // Don't add terms to the egraph (run on a clone)
+        // Merges are not rule candidates because they are derivable
+        // from existing allowed rules.
         log::info!("Running allowed rules");
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
         let rewrites = allowed.values().flat_map(|eq| &eq.rewrites).collect();
@@ -959,6 +963,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph.rebuild();
 
         // 4. Run lifting rules
+        // Important to fully saturate the egraph
+        // No need for a clone because we want to add new terms to the egraph
+        // Merges are rule candidates
         log::info!("Running lifting rules");
         let runner = self
             .mk_cvec_less_runner(self.egraph.clone())
@@ -998,6 +1005,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph = new_egraph;
 
         // 5. Run forbidden + lifting rules
+        // Don't add terms to the egraph (run on a clone)
+        // Merges are rule candidates
         log::info!("Running forbidden rules");
         let runner = self
             .mk_cvec_less_runner(self.egraph.clone())
