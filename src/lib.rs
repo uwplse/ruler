@@ -411,37 +411,28 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     /// Create a [runner](https://docs.rs/egg/0.6.0/egg/struct.Runner.html).
     fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
-        let node_limit = self.params.eqsat_node_limit;
-
         let mut runner = Runner::default()
-            .with_node_limit(usize::MAX)
-            .with_hook(move |r| {
-                let size = r.egraph.total_number_of_nodes();
-                if size > node_limit {
-                    Err(format!("Node limit: {}", size))
-                } else {
-                    Ok(())
-                }
-            })
+            .with_node_limit(self.params.eqsat_node_limit)
             .with_iter_limit(self.params.eqsat_iter_limit)
+            .with_time_limit(Duration::from_secs(self.params.eqsat_time_limit))
             .with_scheduler(SimpleScheduler);
-        runner = if self.params.no_conditionals {
+
+        if self.params.no_conditionals {
             egraph.analysis.cvec_len = 0;
             for c in egraph.classes_mut() {
                 c.data.cvec.truncate(0);
             }
-            runner.with_egraph(egraph).with_hook(|r| {
+            runner = runner.with_hook(|r| {
                 for c in r.egraph.classes_mut() {
-                    if c.nodes.iter().any(|n| n.is_constant()) {
+                    if c.nodes.iter().any(|n: &L| n.is_constant()) {
                         c.nodes.retain(|n| n.is_constant());
                     }
                 }
                 Ok(())
             })
-        } else {
-            runner.with_egraph(egraph)
-        };
-        runner
+        }
+
+        runner.with_egraph(egraph)
     }
 
     fn mk_cvec_less_runner(
