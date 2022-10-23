@@ -9,12 +9,12 @@ use serde::Serialize;
 // General bitvector implementation
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct BV<const N: u32>(pub Inner);
+pub struct BV<const N: Inner>(pub Inner);
 
-type Inner = u32;
-const INNER_N: u32 = 32;
+type Inner = u128;
+const INNER_N: Inner = (core::mem::size_of::<Inner>() * 8) as Inner;
 
-impl<const N: u32> BV<N> {
+impl<const N: Inner> BV<N> {
     pub const ZERO: Self = Self(0);
     pub const ALL_ONES: Self = Self((!(0)) >> (INNER_N - N));
     pub const NEG_ONE: Self = Self::ALL_ONES;
@@ -58,7 +58,7 @@ impl<const N: u32> BV<N> {
     }
 }
 
-impl<const N: u32> Not for BV<N> {
+impl<const N: Inner> Not for BV<N> {
     type Output = Self;
 
     fn not(self) -> Self::Output {
@@ -66,7 +66,7 @@ impl<const N: u32> Not for BV<N> {
     }
 }
 
-impl<const N: u32> BitAnd for BV<N> {
+impl<const N: Inner> BitAnd for BV<N> {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
@@ -74,7 +74,7 @@ impl<const N: u32> BitAnd for BV<N> {
     }
 }
 
-impl<const N: u32> BitOr for BV<N> {
+impl<const N: Inner> BitOr for BV<N> {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
@@ -82,7 +82,7 @@ impl<const N: u32> BitOr for BV<N> {
     }
 }
 
-impl<const N: u32> BitXor for BV<N> {
+impl<const N: Inner> BitXor for BV<N> {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
@@ -90,26 +90,26 @@ impl<const N: u32> BitXor for BV<N> {
     }
 }
 
-impl<const N: u32> fmt::Debug for BV<N> {
+impl<const N: Inner> fmt::Debug for BV<N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.0, f)
     }
 }
 
-impl<const N: u32> fmt::Display for BV<N> {
+impl<const N: Inner> fmt::Display for BV<N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.0, f)
     }
 }
 
-impl<const N: u32> Distribution<BV<N>> for rand::distributions::Standard {
+impl<const N: Inner> Distribution<BV<N>> for rand::distributions::Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> BV<N> {
         let inner: Inner = rng.gen();
         inner.into()
     }
 }
 
-impl<const N: u32> std::str::FromStr for BV<N> {
+impl<const N: Inner> std::str::FromStr for BV<N> {
     type Err = std::num::ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some(stripped) = s.strip_prefix("#b") {
@@ -120,9 +120,9 @@ impl<const N: u32> std::str::FromStr for BV<N> {
     }
 }
 
-impl<const N: u32> From<Inner> for BV<N> {
-    fn from(t: Inner) -> Self {
-        Self::new(t)
+impl<const N: Inner> From<Inner> for BV<N> {
+    fn from(v: Inner) -> Self {
+        Self::new(v)
     }
 }
 
