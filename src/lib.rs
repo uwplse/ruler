@@ -984,12 +984,15 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let mut candidates: EqualityMap<L> = EqualityMap::default();
         let clone = self.egraph.clone();
-        let extract = Extractor::new(&clone, AstSize);
+        let extract = Extractor::new(&clone, ExtractableAstSize);
         for ids in found_unions.values() {
             for id1 in ids.clone() {
                 for id2 in ids.clone() {
-                    let (_, e1) = extract.find_best(id1);
-                    let (_, e2) = extract.find_best(id2);
+                    let (c1, e1) = extract.find_best(id1);
+                    let (c2, e2) = extract.find_best(id2);
+                    if c1 == usize::MAX || c2 == usize::MAX {
+                        continue;
+                    }
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
                             if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
@@ -1015,15 +1018,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .values()
             .flat_map(|eq| &eq.rewrites)
             .chain(self.lifting_rewrites.iter())
+            .chain(allowed.values().flat_map(|eq| &eq.rewrites))
             .collect();
         let (_, found_unions, _) = self.run_rewrites_with_unions(rewrites, runner);
         let clone = self.egraph.clone();
-        let extract = Extractor::new(&clone, AstSize);
+        let extract = Extractor::new(&clone, ExtractableAstSize);
         for ids in found_unions.values() {
             for id1 in ids.clone() {
                 for id2 in ids.clone() {
-                    let (_, e1) = extract.find_best(id1);
-                    let (_, e2) = extract.find_best(id2);
+                    let (c1, e1) = extract.find_best(id1);
+                    let (c2, e2) = extract.find_best(id2);
+                    if c1 == usize::MAX || c2 == usize::MAX {
+                        continue;
+                    }
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
                             if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
@@ -1042,7 +1049,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
         self.egraph.rebuild();
-        candidates.retain(|_, v| L::is_allowed_rewrite(&v.lhs, &v.rhs));
+
+        assert!(candidates
+            .iter()
+            .all(|(_, v)| L::is_allowed_rewrite(&v.lhs, &v.rhs)),);
 
         let (eqs, _) = self.choose_eqs(candidates);
         self.new_eqs.extend(eqs.clone());
