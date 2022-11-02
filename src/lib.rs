@@ -1007,18 +1007,18 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
         self.egraph = new_egraph;
 
-        // 5. Run forbidden + lifting rules
+        // 5. Run all rules
         // Don't add terms to the egraph (run on a clone)
         // Merges are rule candidates
-        log::info!("Running forbidden rules");
+        log::info!("Running all rules");
         let runner = self
             .mk_cvec_less_runner(self.egraph.clone())
             .with_node_limit(usize::MAX);
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = forbidden
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
+            .all_eqs
             .values()
             .flat_map(|eq| &eq.rewrites)
             .chain(self.lifting_rewrites.iter())
-            .chain(allowed.values().flat_map(|eq| &eq.rewrites))
             .collect();
         let (_, found_unions, _) = self.run_rewrites_with_unions(rewrites, runner);
         let clone = self.egraph.clone();
