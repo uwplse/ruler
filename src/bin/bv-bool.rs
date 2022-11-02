@@ -1,10 +1,8 @@
 /*!
     2 bit implementation of Bitvectors.
 !*/
-
 use egg::*;
 use ruler::*;
-
 use std::ops::*;
 
 define_language! {

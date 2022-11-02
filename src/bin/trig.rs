@@ -482,33 +482,6 @@ impl SynthLanguage for Math {
         ValidationResult::from(valid_pattern(lhs) && valid_pattern(rhs))
     }
 
-    fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
-        let contains_trig_node = |pat: &Pattern<Self>| {
-            pat.ast.as_ref().iter().any(|n| {
-                matches!(
-                    n,
-                    ENodeOrVar::ENode(Math::Sin(_))
-                        | ENodeOrVar::ENode(Math::Cos(_))
-                        | ENodeOrVar::ENode(Math::Tan(_))
-                        | ENodeOrVar::ENode(Math::Csc(_))
-                        | ENodeOrVar::ENode(Math::Sec(_))
-                        | ENodeOrVar::ENode(Math::Cot(_))
-                )
-            })
-        };
-
-        let pattern_is_extractable = |pat: &Pattern<Self>| {
-            pat.ast.as_ref().iter().all(|n| match n {
-                ENodeOrVar::Var(_) => true,
-                ENodeOrVar::ENode(n) => n.is_extractable(),
-            })
-        };
-
-        (contains_trig_node(lhs) || contains_trig_node(rhs))
-            && pattern_is_extractable(lhs)
-            && pattern_is_extractable(rhs)
-    }
-
     fn is_valid_rewrite(
         egraph: &EGraph<Self, SynthAnalysis>,
         rhs: &Pattern<Self>,
