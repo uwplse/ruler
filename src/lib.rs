@@ -930,28 +930,17 @@ impl<L: SynthLanguage> Synthesizer<L> {
         log::info!("Adding {} terms to egraph", chunk.len());
         Synthesizer::add_chunk(&mut self.egraph, chunk);
 
-        // 2. Partition rules into "allowed" and "forbidden"
-        let mut allowed: EqualityMap<L> = EqualityMap::default();
-        let mut forbidden: EqualityMap<L> = EqualityMap::default();
-        for (name, eq) in self.all_eqs.clone() {
-            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
-                allowed.insert(name, eq);
-            } else {
-                forbidden.insert(name, eq);
-            }
-        }
-        log::info!(
-            "Partitioned {} rules into {} allowed and {} forbidden",
-            self.old_eqs.len(),
-            allowed.len(),
-            forbidden.len()
-        );
-
-        // 3. Run allowed rules
+        // 2. Run allowed rules
         // Don't add terms to the egraph (run on a clone)
         // Merges are not rule candidates because they are derivable
         // from existing allowed rules.
         log::info!("Running allowed rules");
+        let mut allowed: EqualityMap<L> = EqualityMap::default();
+        for (name, eq) in self.all_eqs.clone() {
+            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
+                allowed.insert(name, eq);
+            }
+        }
         let runner = self.mk_cvec_less_runner(self.egraph.clone());
         let rewrites = allowed.values().flat_map(|eq| &eq.rewrites).collect();
         let (_, found_unions, _) = self.run_rewrites_with_unions(rewrites, runner);
@@ -962,7 +951,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
         self.egraph.rebuild();
 
-        // 4. Run lifting rules
+        // 3. Run lifting rules
         // Important to fully saturate the egraph
         // No need for a clone because we want to add new terms to the egraph
         // Merges are rule candidates
@@ -1007,7 +996,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
         self.egraph = new_egraph;
 
-        // 5. Run all rules
+        // 4. Run all rules
         // Don't add terms to the egraph (run on a clone)
         // Merges are rule candidates
         log::info!("Running all rules");
