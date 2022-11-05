@@ -169,13 +169,10 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
 
 impl<L: SynthLanguage> Equality<L> {
     fn from_serialized_eq(ser: SerializedEq) -> Self {
-        let mut l_pat: Pattern<L> = ser.lhs.parse().unwrap();
-        let mut r_pat: Pattern<L> = ser.rhs.parse().unwrap();
+        let l_pat: Pattern<L> = ser.lhs.parse().unwrap();
+        let r_pat: Pattern<L> = ser.rhs.parse().unwrap();
         let l_recexpr = L::instantiate(&l_pat);
         let r_recexpr = L::instantiate(&r_pat);
-        let map = &mut HashMap::default();
-        l_pat = L::generalize(&l_recexpr, map);
-        r_pat = L::generalize(&r_recexpr, map);
 
         if !ser.bidirectional {
             let name = format!("{} => {}", l_pat, r_pat);
