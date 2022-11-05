@@ -26,7 +26,13 @@ impl FromStr for SerializedEq {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some((l, r)) = s.split_once("=>") {
+        if let Some((l, r)) = s.split_once("<=>") {
+            Ok(Self {
+                lhs: l.into(),
+                rhs: r.into(),
+                bidirectional: true,
+            })
+        } else if let Some((l, r)) = s.split_once("=>") {
             Ok(Self {
                 lhs: l.into(),
                 rhs: r.into(),
@@ -37,12 +43,6 @@ impl FromStr for SerializedEq {
                 lhs: l.into(),
                 rhs: r.into(),
                 bidirectional: false,
-            })
-        } else if let Some((l, r)) = s.split_once("<=>") {
-            Ok(Self {
-                lhs: l.into(),
-                rhs: r.into(),
-                bidirectional: true,
             })
         } else {
             Err(format!("Failed to split {}", s))
@@ -61,7 +61,7 @@ impl<L: SynthLanguage> FromStr for Equality<L> {
 
 impl<L: SynthLanguage + 'static> From<SerializedEq> for Equality<L> {
     fn from(ser: SerializedEq) -> Self {
-        Self::from_serialize_eq(ser)
+        Self::from_serialized_eq(ser)
     }
 }
 
@@ -168,14 +168,14 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
 }
 
 impl<L: SynthLanguage> Equality<L> {
-    fn from_serialize_eq(ser: SerializedEq) -> Self {
+    fn from_serialized_eq(ser: SerializedEq) -> Self {
         let l_pat: Pattern<L> = ser.lhs.parse().unwrap();
         let r_pat: Pattern<L> = ser.rhs.parse().unwrap();
         let l_recexpr = L::instantiate(&l_pat);
         let r_recexpr = L::instantiate(&r_pat);
 
         if !ser.bidirectional {
-            let name = format!("{} => {}", l_recexpr, r_recexpr);
+            let name = format!("{} => {}", l_pat, r_pat);
             let defined_rhs = NotUndefined {
                 name: name.clone(),
                 rhs: r_pat.clone(),
