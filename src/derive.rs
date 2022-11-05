@@ -66,8 +66,8 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
 /// Check the derivability of rules in test using the rules in src
 fn one_way<L: SynthLanguage>(
     params: &DeriveParams,
-    src: &Vec<Equality<L>>,
-    test: &Vec<Equality<L>>,
+    src: &[Equality<L>],
+    test: &[Equality<L>],
 ) -> (Vec<Pair<L>>, Vec<Pair<L>>) {
     let results = Mutex::new((vec![], vec![]));
     let test = test.to_vec();
