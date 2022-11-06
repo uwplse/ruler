@@ -378,8 +378,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
         // add prior rules (if any) to old_eqs
         let mut olds: EqualityMap<L> = Default::default();
         if params.prior_rules.is_some() {
-            for eq in derive::parse::<L>(params.prior_rules.as_ref().unwrap(), false) {
-                olds.insert(eq.name.clone(), eq);
+            for (l, r) in derive::parse::<L>(params.prior_rules.as_ref().unwrap(), false) {
+                if let Some(e) = Equality::new(&l, &r) {
+                    olds.insert(e.name.clone(), e);
+                }
             }
         }
 

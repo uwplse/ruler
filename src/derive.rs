@@ -5,14 +5,18 @@ use std::sync::Mutex;
 
 type Pair<L> = (RecExpr<L>, RecExpr<L>);
 
-pub fn parse<L: SynthLanguage>(filename: &str, only_new: bool) -> Vec<Equality<L>> {
+pub fn parse<L: SynthLanguage>(filename: &str, only_new: bool) -> Vec<Pair<L>> {
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
-    if only_new {
-        report.new_eqs
+    let eqs = if only_new {
+        &report.new_eqs
     } else {
-        report.all_eqs
-    }
+        &report.all_eqs
+    };
+
+    eqs.iter()
+        .map(|eq| (L::instantiate(&eq.lhs), L::instantiate(&eq.rhs)))
+        .collect()
 }
 
 /// Performs a one-way derivability test and exits with code -1
@@ -66,14 +70,14 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
 /// Check the derivability of rules in test using the rules in src
 fn one_way<L: SynthLanguage>(
     params: &DeriveParams,
-    src: &[Equality<L>],
-    test: &[Equality<L>],
+    src: &[Pair<L>],
+    test: &[Pair<L>],
 ) -> (Vec<Pair<L>>, Vec<Pair<L>>) {
+    let eqs: Vec<Equality<L>> = src.iter().flat_map(|(l, r)| Equality::new(l, r)).collect();
+
     let results = Mutex::new((vec![], vec![]));
     let test = test.to_vec();
-    test.into_par_iter().for_each(|eq| {
-        let l = L::instantiate(&eq.lhs);
-        let r = L::instantiate(&eq.rhs);
+    test.into_par_iter().for_each(|(l, r)| {
         let runner = Runner::default()
             .with_expr(&l)
             .with_expr(&r)
@@ -86,7 +90,7 @@ fn one_way<L: SynthLanguage>(
                     Ok(())
                 }
             })
-            .run(src.iter().flat_map(|eq| &eq.rewrites));
+            .run(eqs.iter().flat_map(|eq| &eq.rewrites));
 
         let l_id = runner.egraph.find(runner.roots[0]);
         let r_id = runner.egraph.find(runner.roots[1]);
