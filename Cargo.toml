@@ -29,7 +29,7 @@ rayon = "1"
 smallstr = "0.3"
 
 [dependencies.egg]
-version = "0.8"
+version = "0.9"
 # git = "https://github.com/egraphs-good/egg"
 # rev = "8d68c8768cc18c2eae97f970e2b4162324cee787"   # 0.7-dev before proofs
 # rev = "484fd6eec831a4078455ac47ef1172ede1b03dbf" # send sync
