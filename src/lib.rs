@@ -521,7 +521,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let not_all_nones = self
             .ids()
-            .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v == &None));
+            .filter(|id| !&self.egraph[*id].data.cvec.iter().all(|v| v.is_none()));
         for id in not_all_nones {
             let class = &self.egraph[id];
             let cvec = vec![class.data.cvec[0].clone()];
@@ -1431,7 +1431,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
                 let mut nodes: Vec<L> = vec![];
                 let mut map: HashMap<Id, Id> = HashMap::default();
                 enode.for_each(|id| {
-                    if map.get(&id) == None {
+                    if map.get(&id).is_none() {
                         let s = get_simplest(&id);
                         let i = nodes.len();
                         for n in s.as_ref() {

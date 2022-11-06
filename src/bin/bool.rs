@@ -146,7 +146,7 @@ impl SynthLanguage for Math {
                 }
             }
         };
-        if interval.low == None || interval.high == None {
+        if interval.low.is_none() || interval.high.is_none() {
             panic!("There shouldn't be infinite intervals for bool.");
         } else {
             interval

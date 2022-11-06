@@ -26,7 +26,13 @@ impl FromStr for SerializedEq {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some((l, r)) = s.split_once("=>") {
+        if let Some((l, r)) = s.split_once("<=>") {
+            Ok(Self {
+                lhs: l.into(),
+                rhs: r.into(),
+                bidirectional: true,
+            })
+        } else if let Some((l, r)) = s.split_once("=>") {
             Ok(Self {
                 lhs: l.into(),
                 rhs: r.into(),
@@ -37,12 +43,6 @@ impl FromStr for SerializedEq {
                 lhs: l.into(),
                 rhs: r.into(),
                 bidirectional: false,
-            })
-        } else if let Some((l, r)) = s.split_once("<=>") {
-            Ok(Self {
-                lhs: l.into(),
-                rhs: r.into(),
-                bidirectional: true,
             })
         } else {
             Err(format!("Failed to split {}", s))
@@ -61,11 +61,7 @@ impl<L: SynthLanguage> FromStr for Equality<L> {
 
 impl<L: SynthLanguage + 'static> From<SerializedEq> for Equality<L> {
     fn from(ser: SerializedEq) -> Self {
-        let lhs: Pattern<L> = ser.lhs.parse().unwrap();
-        let rhs: Pattern<L> = ser.rhs.parse().unwrap();
-        let lhs = L::instantiate(&lhs);
-        let rhs = L::instantiate(&rhs);
-        Self::new(&lhs, &rhs).unwrap()
+        Self::from_serialized_eq(ser)
     }
 }
 
@@ -172,6 +168,31 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for NotUndefined<L> {
 }
 
 impl<L: SynthLanguage> Equality<L> {
+    fn from_serialized_eq(ser: SerializedEq) -> Self {
+        let l_pat: Pattern<L> = ser.lhs.parse().unwrap();
+        let r_pat: Pattern<L> = ser.rhs.parse().unwrap();
+        let l_recexpr = L::instantiate(&l_pat);
+        let r_recexpr = L::instantiate(&r_pat);
+
+        if !ser.bidirectional {
+            let name = format!("{} => {}", l_pat, r_pat);
+            let defined_rhs = NotUndefined {
+                name: name.clone(),
+                rhs: r_pat.clone(),
+            };
+            let rw = Rewrite::new(name.clone(), l_pat.clone(), defined_rhs).unwrap();
+            Self {
+                name: name.into(),
+                lhs: l_pat,
+                ids: None,
+                rhs: r_pat,
+                rewrites: vec![rw],
+            }
+        } else {
+            Self::new(&l_recexpr, &r_recexpr).unwrap()
+        }
+    }
+
     /// Create a new [Equality] from two [RecExprs](https://docs.rs/egg/latest/egg/struct.RecExpr.html).
     pub fn new<'a>(e1: &'a RecExpr<L>, e2: &'a RecExpr<L>) -> Option<Self> {
         let mut forward: (String, Pattern<L>, Pattern<L>, Option<Rewrite<L, _>>) = {
