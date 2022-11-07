@@ -119,7 +119,7 @@ impl SynthLanguage for Pred {
             Pred::Mul([x, y]) => map!(v, x, y => Some(x * y)),
             Pred::Div([x, y]) => map!(v, x, y => {
                 if y.is_zero() {
-                    None
+                    Some(zero.clone())
                 } else {
                     Some(x / y)
                 }
@@ -318,10 +318,16 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Real<'a> {
                 ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
-            Pred::Div([a, b]) => buf.push(z3::ast::Real::div(
-                &buf[usize::from(*a)],
-                &buf[usize::from(*b)],
-            )),
+            Pred::Div([a, b]) => {
+                let l = &buf[usize::from(*a)].clone();
+                let r = &buf[usize::from(*b)].clone();
+                let r_zero = r._eq(&zero);
+                buf.push(z3::ast::Bool::ite(
+                    &r_zero,
+                    &zero,
+                    &z3::ast::Real::div(l, r),
+                ))
+            }
             Pred::Min([a, b]) => {
                 let l = &buf[usize::from(*a)].clone();
                 let r = &buf[usize::from(*b)].clone();
