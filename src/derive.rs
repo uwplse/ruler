@@ -55,7 +55,7 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
         "reverse": {
             "derivable": pairs_to_eqs(&rev_derivable),
             "not_derivable": pairs_to_eqs(&rev_not_derivable),
-        }
+        },
     });
 
     let file =
