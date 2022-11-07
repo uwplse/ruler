@@ -1,239 +1,152 @@
-use std::{
-    fmt::{self, Display},
-    hash::Hash,
-    str::FromStr,
-};
+use std::hash::Hash;
 
 use egg::*;
+use num::bigint::{BigInt, RandBigInt, Sign, ToBigInt};
 use num::rational::Ratio;
-use num::{
-    bigint::{BigInt, RandBigInt, Sign, ToBigInt},
-    ToPrimitive,
-};
-use rand::{seq::SliceRandom, Rng};
+use num::{ToPrimitive, Zero};
+
 use rand_pcg::Pcg64;
 use ruler::*;
-use z3::{ast::Ast, SatResult};
+use z3::ast::Ast;
+use z3::SatResult;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-
-pub struct BVar(egg::Symbol);
-
-impl Display for BVar {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "b")
-    }
-}
-
-impl FromStr for BVar {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with('b') {
-            Ok(BVar(Symbol::from(s)))
-        } else {
-            Err(())
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-
-pub struct NVar(egg::Symbol);
-
-impl Display for NVar {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "n")
-    }
-}
-
-impl FromStr for NVar {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with('n') {
-            Ok(NVar(Symbol::from(s)))
-        } else {
-            Err(())
-        }
-    }
-}
+type Constant = Ratio<BigInt>;
 
 define_language! {
   pub enum Pred {
     Lit(Constant),
-    BVar(BVar),
-    NVar(NVar),
     "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
     ">" = Gt([Id;2]),
     ">=" = Geq([Id;2]),
     "==" = Eq([Id;2]),
     "!=" = Neq([Id;2]),
-    "~" = Not(Id),
-    "&" = And([Id;2]),
-    "|" = Or([Id;2]),
+    "->" = Implies([Id; 2]),
+    "!" = Not(Id),
+    "-" = Neg(Id),
+    "&&" = And([Id;2]),
+    "||" = Or([Id;2]),
     "^" = Xor([Id;2]),
     "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
-    "->" = Implies([Id; 2]),
+    "/" = Div([Id; 2]),
+    "min" = Min([Id; 2]),
+    "max" = Max([Id; 2]),
+    "select" = Select([Id; 3]),
+    Var(Symbol),
   }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Constant {
-    Bool(bool),
-    Num(Ratio<BigInt>),
-}
-
-impl fmt::Display for Constant {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Constant::Bool(b) => b.fmt(f),
-            Constant::Num(i) => i.fmt(f),
-        }
-    }
-}
-
-impl std::str::FromStr for Constant {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(i) = Ratio::<BigInt>::from_str(s) {
-            Ok(Self::Num(i))
-        } else if let Ok(b) = bool::from_str(s) {
-            Ok(Self::Bool(b))
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl Constant {
-    fn to_num(&self) -> Option<Ratio<BigInt>> {
-        match self {
-            Constant::Num(n) => Some(n.clone()),
-            Constant::Bool(_) => None,
-        }
-    }
-
-    fn to_bool(&self) -> Option<bool> {
-        match self {
-            Constant::Bool(b) => Some(*b),
-            Constant::Num(_) => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Type {
-    Bool,
-    Num,
+    Top,
 }
 
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Type::Bool => write!(f, "b"),
-            Type::Num => write!(f, "n"),
-        }
+        write!(f, "")
     }
 }
 
 impl SynthLanguage for Pred {
-    type Constant = Constant;
+    type Constant = Ratio<BigInt>;
     type Type = Type;
 
     fn get_type(&self) -> Self::Type {
-        match self {
-            Pred::Lit(c) => match c {
-                Constant::Bool(_) => Type::Bool,
-                Constant::Num(_) => Type::Num,
-            },
-            Pred::NVar(_) | Pred::Add(_) | Pred::Sub(_) | Pred::Mul(_) => Type::Num,
-            _ => Type::Bool,
-        }
+        Type::Top
     }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
+        let one = Ratio::new(1.to_bigint().unwrap(), 1.to_bigint().unwrap());
+        let zero = Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap());
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Lt([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() < y.to_num().unwrap())))
+                map!(v, x, y => if x < y { Some(one.clone()) } else { Some(zero.clone()) })
             }
             Pred::Leq([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() <= y.to_num().unwrap())))
+                map!(v, x, y => if x <= y { Some(one.clone()) } else { Some(zero.clone()) })
             }
             Pred::Gt([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() > y.to_num().unwrap())))
+                map!(v, x, y => if x > y { Some(one.clone()) } else { Some(zero.clone()) })
             }
             Pred::Geq([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_num().unwrap() >= y.to_num().unwrap())))
+                map!(v, x, y => if x >= y { Some(one.clone()) } else { Some(zero.clone()) })
             }
             Pred::Eq([x, y]) => {
-                map!(v, x, y => {
-                    match (x,y) {
-                        (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x == y)),
-                        (Constant::Num(x), Constant::Num(y)) => Some(Constant::Bool(x == y)),
-                        _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
-                    }
-                })
+                map!(v, x, y => if x == y { Some(one.clone()) } else { Some(zero.clone()) })
             }
             Pred::Neq([x, y]) => {
+                map!(v, x, y => if x != y { Some(one.clone()) } else { Some(zero.clone()) })
+            }
+            Pred::Not(x) => {
+                map!(v, x => if x.clone() == zero { Some(one.clone()) } else { Some(zero.clone()) })
+            }
+            Pred::And([x, y]) => {
                 map!(v, x, y => {
-                    match (x,y) {
-                        (Constant::Bool(x), Constant::Bool(y)) => Some(Constant::Bool(x != y)),
-                        (Constant::Num(x), Constant::Num(y)) => Some(Constant::Bool(x != y)),
-                        _ => panic!("Cannot compare Bool and Int: {} {}", x, y)
-                    }
+                    let xbool = x.clone() != zero;
+                    let ybool = y.clone() != zero;
+                    if xbool && ybool { Some(one.clone()) } else { Some(zero.clone()) }
                 })
             }
-            Pred::Not(x) => map!(v, x => Some(Constant::Bool(!x.to_bool().unwrap()))),
-            Pred::And([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() & y.to_bool().unwrap())))
-            }
             Pred::Or([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() | y.to_bool().unwrap())))
+                map!(v, x, y => {
+                    let xbool = x.clone() != zero;
+                    let ybool = y.clone() != zero;
+                    if xbool || ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                })
             }
             Pred::Xor([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(x.to_bool().unwrap() ^ y.to_bool().unwrap())))
-            }
-            Pred::Add([x, y]) => {
-                map!(v, x, y => Some(Constant::Num(x.to_num().unwrap() + y.to_num().unwrap())))
-            }
-            Pred::Sub([x, y]) => {
-                map!(v, x, y => Some(Constant::Num(x.to_num().unwrap() - y.to_num().unwrap())))
-            }
-            Pred::Mul([x, y]) => {
-                map!(v, x, y => Some(Constant::Num(x.to_num().unwrap() * y.to_num().unwrap())))
+                map!(v, x, y => {
+                    let xbool = x.clone() != zero;
+                    let ybool = y.clone() != zero;
+                    if xbool ^ ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                })
             }
             Pred::Implies([x, y]) => {
-                map!(v, x, y => Some(Constant::Bool(!x.to_bool().unwrap() || y.to_bool().unwrap())))
+                map!(v, x, y => {
+                    let xbool = x.clone() != zero;
+                    let ybool = y.clone() != zero;
+                    if !xbool || ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                })
             }
-
-            Pred::BVar(_) => vec![],
-            Pred::NVar(_) => vec![],
+            Pred::Add([x, y]) => map!(v, x, y => Some(x + y)),
+            Pred::Sub([x, y]) => map!(v, x, y => Some(x - y)),
+            Pred::Mul([x, y]) => map!(v, x, y => Some(x * y)),
+            Pred::Div([x, y]) => map!(v, x, y => {
+                if y.is_zero() {
+                    Some(zero.clone())
+                } else {
+                    Some(x / y)
+                }
+            }),
+            Pred::Var(_) => vec![],
+            Pred::Neg(x) => map!(v, x => Some(-x)),
+            Pred::Min([x, y]) => map!(v,x,y => Some(x.min(y).clone())),
+            Pred::Max([x, y]) => map!(v,x,y => Some(x.max(y).clone())),
+            Pred::Select([x, y, z]) => {
+                map!(v,x,y,z => {
+                    let xbool = x.clone() != zero;
+                    if xbool { Some(y.clone()) } else { Some(z.clone()) }
+                })
+            }
         }
     }
 
     fn to_var(&self) -> Option<Symbol> {
-        match self {
-            Pred::BVar(BVar(sym)) | Pred::NVar(NVar(sym)) => Some(*sym),
-            _ => None,
+        if let Pred::Var(sym) = self {
+            Some(*sym)
+        } else {
+            None
         }
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {
-        if sym.as_str().starts_with('b') {
-            Pred::BVar(BVar(sym))
-        } else if sym.as_str().starts_with('n') {
-            Pred::NVar(NVar(sym))
-        } else {
-            panic!("invalid variable: {}", sym)
-        }
+        Pred::Var(sym)
     }
 
     fn is_constant(&self) -> bool {
@@ -248,14 +161,14 @@ impl SynthLanguage for Pred {
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
-            consts.push(Some(Constant::Num(mk_constant(
+            consts.push(Some(mk_constant(
                 &i.to_bigint().unwrap(),
                 &(1_u32.to_bigint().unwrap()),
-            ))));
-            consts.push(Some(Constant::Num(mk_constant(
+            )));
+            consts.push(Some(mk_constant(
                 &(-i.to_bigint().unwrap()),
                 &(1_u32.to_bigint().unwrap()),
-            ))));
+            )));
         }
 
         consts.sort();
@@ -266,29 +179,66 @@ impl SynthLanguage for Pred {
 
         let mut egraph: EGraph<Pred, SynthAnalysis> = EGraph::new(SynthAnalysis {
             cvec_len,
-            constant_fold: ConstantFoldMethod::CvecMatching,
+            constant_fold: ConstantFoldMethod::NoFold,
             rule_lifting: false,
         });
 
         for (i, n_vals) in cs.iter().enumerate().take(synth.params.variables) {
-            let n_id = egraph.add(Pred::NVar(NVar(Symbol::from("n".to_owned() + letter(i)))));
+            let n_id = egraph.add(Pred::Var(Symbol::from(letter(i))));
             egraph[n_id].data.cvec = n_vals.clone();
-        }
-
-        for i in 0..synth.params.variables {
-            let b_id = egraph.add(Pred::BVar(BVar(Symbol::from("b".to_owned() + letter(i)))));
-            let mut b_vals = vec![];
-            for _ in 0..cvec_len {
-                b_vals.push(Some(Constant::Bool(synth.rng.gen::<bool>())));
-            }
-            egraph[b_id].data.cvec = b_vals.clone();
         }
 
         synth.egraph = egraph;
     }
 
-    fn make_layer(_synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
-        vec![]
+    fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
+        let extract = Extractor::new(&synth.egraph, NumberOfOps);
+
+        // maps ids to n_ops
+        let ids: HashMap<Id, usize> = synth
+            .ids()
+            .map(|id| (id, extract.find_best_cost(id)))
+            .collect();
+
+        let mut to_add = vec![];
+        for i in synth.ids() {
+            for j in synth.ids() {
+                for k in synth.ids() {
+                    if ids[&i] + ids[&j] + ids[&k] + 1 != iter {
+                        continue;
+                    }
+                    to_add.push(Pred::Select([i, j, k]));
+                }
+                if ids[&i] + ids[&j] + 1 != iter {
+                    continue;
+                }
+                to_add.push(Pred::Lt([i, j]));
+                to_add.push(Pred::Leq([i, j]));
+                to_add.push(Pred::Gt([i, j]));
+                to_add.push(Pred::Geq([i, j]));
+                to_add.push(Pred::Eq([i, j]));
+                to_add.push(Pred::Neq([i, j]));
+                to_add.push(Pred::Implies([i, j]));
+                to_add.push(Pred::And([i, j]));
+                to_add.push(Pred::Or([i, j]));
+                to_add.push(Pred::Xor([i, j]));
+                to_add.push(Pred::Add([i, j]));
+                to_add.push(Pred::Sub([i, j]));
+                to_add.push(Pred::Mul([i, j]));
+                to_add.push(Pred::Min([i, j]));
+                to_add.push(Pred::Max([i, j]));
+            }
+
+            if ids[&i] + 1 != iter {
+                continue;
+            }
+            to_add.push(Pred::Not(i));
+            to_add.push(Pred::Neg(i));
+        }
+
+        log::info!("Made a layer of {} enodes", to_add.len());
+        println!("Made a layer of {} enodes", to_add.len());
+        to_add
     }
 
     fn validate(
@@ -303,15 +253,7 @@ impl SynthLanguage for Pred {
             let solver = z3::Solver::new(&ctx);
             let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
             let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-            match (lexpr, rexpr) {
-                (RulerZ3::Bool(lb), RulerZ3::Bool(rb)) => {
-                    solver.assert(&z3::ast::Bool::not(&lb._eq(&rb)))
-                }
-                (RulerZ3::Real(ln), RulerZ3::Real(rn)) => {
-                    solver.assert(&z3::ast::Bool::not(&ln._eq(&rn)))
-                }
-                _ => return ValidationResult::Invalid,
-            };
+            solver.assert(&lexpr._eq(&rexpr).not());
             match solver.check() {
                 SatResult::Unsat => ValidationResult::Valid,
                 SatResult::Sat => {
@@ -319,44 +261,13 @@ impl SynthLanguage for Pred {
                     ValidationResult::Invalid
                 }
                 SatResult::Unknown => {
+                    // println!("z3 validation: unknown for {} => {}", lhs, rhs)
                     synth.smt_unknown += 1;
                     ValidationResult::Unknown
                 }
             }
         } else {
-            let n = synth.params.num_fuzz;
-            let mut env = HashMap::default();
-
-            for var in lhs.vars() {
-                env.insert(var, vec![]);
-            }
-
-            for var in rhs.vars() {
-                env.insert(var, vec![]);
-            }
-
-            for (var, cvec) in env.iter_mut() {
-                cvec.reserve(n * 3);
-                let mut vals = vec![];
-                if var.to_string().starts_with("?b") {
-                    for _ in 0..(n * 3) {
-                        vals.push(Constant::Bool(synth.rng.gen::<bool>()));
-                    }
-                }
-                if var.to_string().starts_with("?n") {
-                    vals.append(&mut sampler(&mut synth.rng, 8, 6, n));
-                    vals.append(&mut sampler(&mut synth.rng, 6, 8, n));
-                    vals.append(&mut sampler(&mut synth.rng, 3, 1, n));
-                }
-
-                vals.shuffle(&mut synth.rng);
-                for v in vals {
-                    cvec.push(Some(v));
-                }
-            }
-            let lvec = Self::eval_pattern(lhs, &env, n);
-            let rvec = Self::eval_pattern(rhs, &env, n);
-            ValidationResult::from(lvec == rvec)
+            ValidationResult::Invalid
         }
     }
 }
@@ -377,120 +288,142 @@ pub fn sampler(rng: &mut Pcg64, num: u64, denom: u64, num_samples: usize) -> Vec
     for _ in 0..num_samples {
         let num = gen_pos(rng, num);
         let denom = gen_pos(rng, denom);
-        ret.push(Constant::Num(Ratio::new(num, denom)));
+        ret.push(Ratio::new(num, denom));
     }
     ret
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum RulerZ3<'a> {
-    Bool(z3::ast::Bool<'a>),
-    Real(z3::ast::Real<'a>),
-}
-
-impl<'a> RulerZ3<'a> {
-    fn get_z3bool(&self) -> Option<z3::ast::Bool<'a>> {
-        match self {
-            RulerZ3::Bool(b) => Some(b.clone()),
-            RulerZ3::Real(_) => None,
-        }
-    }
-
-    fn get_z3real(&self) -> Option<z3::ast::Real<'a>> {
-        match self {
-            RulerZ3::Bool(_) => None,
-            RulerZ3::Real(n) => Some(n.clone()),
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! pushbuf {
-    ($bu:ident, $ct:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type:ident) => {
-        $bu.push(RulerZ3::$type(z3::ast::$type::$op(
-            $ct,
-            &[
-                &$bu[usize::from(*$a)].$get().unwrap(),
-                &$bu[usize::from(*$b)].$get().unwrap(),
-            ],
-        )))
-    };
-    ($bu:ident, $a:ident, $b:ident, $op:ident, $get:ident, $type:ident) => {
-        $bu.push(RulerZ3::Bool(z3::ast::$type::$op(
-            &$bu[usize::from(*$a)].$get().unwrap(),
-            &$bu[usize::from(*$b)].$get().unwrap(),
-        )))
-    };
-    ($bu:ident, $a:ident, $op:ident, $get:ident, $type:ident) => {
-        $bu.push(RulerZ3::Bool(z3::ast::$type::$op(
-            &$bu[usize::from(*$a)].$get().unwrap(),
-        )))
-    };
-}
-
-fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> RulerZ3<'a> {
-    let mut buf: Vec<RulerZ3> = vec![];
+/// Convert expressions to Z3's syntax for using SMT based rule verification.
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Real<'a> {
+    let mut buf: Vec<z3::ast::Real> = vec![];
+    let zero = z3::ast::Real::from_real(ctx, 0, 1);
+    let one = z3::ast::Real::from_real(ctx, 1, 1);
     for node in expr.as_ref().iter() {
         match node {
-            Pred::Lit(lit) => match lit {
-                Constant::Bool(b) => buf.push(RulerZ3::Bool(z3::ast::Bool::from_bool(ctx, *b))),
-                Constant::Num(n) => buf.push(RulerZ3::Real(z3::ast::Real::from_real(
-                    ctx,
-                    (n.numer()).to_i32().unwrap(),
-                    (n.denom()).to_i32().unwrap(),
-                ))),
-            },
-            Pred::BVar(bv) => {
-                buf.push(RulerZ3::Bool(z3::ast::Bool::new_const(ctx, bv.to_string())))
+            Pred::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
+            Pred::Lit(c) => buf.push(z3::ast::Real::from_real(
+                ctx,
+                (c.numer()).to_i32().unwrap(),
+                (c.denom()).to_i32().unwrap(),
+            )),
+            Pred::Add([a, b]) => buf.push(z3::ast::Real::add(
+                ctx,
+                &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
+            )),
+            Pred::Sub([a, b]) => buf.push(z3::ast::Real::sub(
+                ctx,
+                &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
+            )),
+            Pred::Mul([a, b]) => buf.push(z3::ast::Real::mul(
+                ctx,
+                &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
+            )),
+            Pred::Div([a, b]) => {
+                let l = &buf[usize::from(*a)].clone();
+                let r = &buf[usize::from(*b)].clone();
+                let r_zero = r._eq(&zero);
+                buf.push(z3::ast::Bool::ite(
+                    &r_zero,
+                    &zero,
+                    &z3::ast::Real::div(l, r),
+                ))
             }
-            Pred::NVar(nv) => {
-                buf.push(RulerZ3::Real(z3::ast::Real::new_const(ctx, nv.to_string())))
+            Pred::Min([a, b]) => {
+                let l = &buf[usize::from(*a)].clone();
+                let r = &buf[usize::from(*b)].clone();
+                buf.push(z3::ast::Bool::ite(&z3::ast::Real::le(l, r), l, r));
             }
-            Pred::Lt([a, b]) => pushbuf!(buf, a, b, lt, get_z3real, Real),
-            Pred::Gt([a, b]) => pushbuf!(buf, a, b, gt, get_z3real, Real),
-            Pred::Leq([a, b]) => pushbuf!(buf, a, b, le, get_z3real, Real),
-            Pred::Geq([a, b]) => pushbuf!(buf, a, b, ge, get_z3real, Real),
-            Pred::Xor([a, b]) => pushbuf!(buf, a, b, xor, get_z3bool, Bool),
-            Pred::Add([a, b]) => pushbuf!(buf, ctx, a, b, add, get_z3real, Real),
-            Pred::Sub([a, b]) => pushbuf!(buf, ctx, a, b, sub, get_z3real, Real),
-            Pred::Mul([a, b]) => pushbuf!(buf, ctx, a, b, mul, get_z3real, Real),
-            Pred::And([a, b]) => pushbuf!(buf, ctx, a, b, and, get_z3bool, Bool),
-            Pred::Or([a, b]) => pushbuf!(buf, ctx, a, b, or, get_z3bool, Bool),
-            Pred::Implies([a, b]) => pushbuf!(buf, a, b, implies, get_z3bool, Bool),
-            Pred::Not(a) => pushbuf!(buf, a, not, get_z3bool, Bool),
+            Pred::Max([a, b]) => {
+                let l = &buf[usize::from(*a)].clone();
+                let r = &buf[usize::from(*b)].clone();
+                buf.push(z3::ast::Bool::ite(&z3::ast::Real::le(l, r), r, l));
+            }
+            Pred::Neg(a) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)])),
+            Pred::Lt([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                buf.push(z3::ast::Bool::ite(&z3::ast::Real::lt(l, r), &one, &zero))
+            }
+            Pred::Gt([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                buf.push(z3::ast::Bool::ite(&z3::ast::Real::gt(l, r), &one, &zero))
+            }
+            Pred::Leq([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                buf.push(z3::ast::Bool::ite(&z3::ast::Real::le(l, r), &one, &zero))
+            }
+            Pred::Geq([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                buf.push(z3::ast::Bool::ite(&z3::ast::Real::ge(l, r), &one, &zero))
+            }
+            Pred::Xor([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                let l_not_zero = z3::ast::Bool::not(&l._eq(&zero));
+                let r_not_zero = z3::ast::Bool::not(&r._eq(&zero));
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Bool::xor(&l_not_zero, &r_not_zero),
+                    &one,
+                    &zero,
+                ))
+            }
+            Pred::And([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                let l_not_zero = z3::ast::Bool::not(&l._eq(&zero));
+                let r_not_zero = z3::ast::Bool::not(&r._eq(&zero));
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Bool::and(ctx, &[&l_not_zero, &r_not_zero]),
+                    &one,
+                    &zero,
+                ))
+            }
+            Pred::Or([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                let l_not_zero = z3::ast::Bool::not(&l._eq(&zero));
+                let r_not_zero = z3::ast::Bool::not(&r._eq(&zero));
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Bool::or(ctx, &[&l_not_zero, &r_not_zero]),
+                    &one,
+                    &zero,
+                ))
+            }
+            Pred::Not(a) => {
+                let a_expr = &buf[usize::from(*a)];
+                let a_is_zero = &a_expr._eq(&zero);
+                buf.push(z3::ast::Bool::ite(a_is_zero, &one, &zero))
+            }
+            Pred::Implies([a, b]) => {
+                let l = &buf[usize::from(*a)];
+                let r = &buf[usize::from(*b)];
+                let l_not_zero = z3::ast::Bool::not(&l._eq(&zero));
+                let r_not_zero = z3::ast::Bool::not(&r._eq(&zero));
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Bool::implies(&l_not_zero, &r_not_zero),
+                    &one,
+                    &zero,
+                ))
+            }
             Pred::Eq([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].clone();
-                let rexpr = &buf[usize::from(*b)].clone();
-                match (lexpr, rexpr) {
-                    (RulerZ3::Bool(lb), RulerZ3::Bool(rb)) => {
-                        buf.push(RulerZ3::Bool(z3::ast::Bool::_eq(lb, rb)))
-                    }
-                    (RulerZ3::Real(ln), RulerZ3::Real(rn)) => {
-                        buf.push(RulerZ3::Bool(z3::ast::Real::_eq(ln, rn)))
-                    }
-                    (RulerZ3::Bool(_), RulerZ3::Real(_)) | (RulerZ3::Real(_), RulerZ3::Bool(_)) => {
-                        panic!(
-                            "Rule candidate seems to have different 
-                    type of lhs and rhs."
-                        )
-                    }
-                }
+                let lexpr = &buf[usize::from(*a)];
+                let rexpr = &buf[usize::from(*b)];
+                buf.push(z3::ast::Bool::ite(&lexpr._eq(rexpr), &one, &zero))
             }
             Pred::Neq([a, b]) => {
-                let lexpr = &buf[usize::from(*a)].clone();
-                let rexpr = &buf[usize::from(*b)].clone();
-                match (lexpr, rexpr) {
-                    (RulerZ3::Bool(lb), RulerZ3::Bool(rb)) => buf.push(RulerZ3::Bool(
-                        z3::ast::Bool::not(&z3::ast::Bool::_eq(lb, rb)),
-                    )),
-                    (RulerZ3::Real(ln), RulerZ3::Real(rn)) => buf.push(RulerZ3::Bool(
-                        z3::ast::Bool::not(&z3::ast::Real::_eq(ln, rn)),
-                    )),
-                    _ => panic!(
-                        "Rule candidate seems to have different 
-                    type of lhs and rhs."
-                    ),
-                }
+                let lexpr = &buf[usize::from(*a)];
+                let rexpr = &buf[usize::from(*b)];
+                buf.push(z3::ast::Bool::ite(&lexpr._eq(rexpr), &zero, &one))
+            }
+            Pred::Select([a, b, c]) => {
+                let a_expr = &buf[usize::from(*a)];
+                let b_expr = &buf[usize::from(*b)];
+                let c_expr = &buf[usize::from(*c)];
+                let a_cond_bool = z3::ast::Bool::not(&a_expr._eq(&zero));
+                buf.push(z3::ast::Bool::ite(&a_cond_bool, b_expr, c_expr))
             }
         }
     }
