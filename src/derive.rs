@@ -137,22 +137,13 @@ fn one_way<L: SynthLanguage>(
         let mut l_id;
         let mut r_id;
 
-        for i in 0..params.iter_limit {
-            // println!("{}", i);
+        for _ in 0..params.iter_limit {
             // Sat
             runner = mk_runner(params, runner.egraph, &l, &r)
                 .with_node_limit(usize::MAX)
                 .with_time_limit(Duration::from_secs(30))
                 .with_iter_limit(100)
                 .run(&sat);
-
-            // println!("{:?}", runner.stop_reason.unwrap());
-            match runner.stop_reason.clone().unwrap() {
-                StopReason::IterationLimit(_)
-                | StopReason::NodeLimit(_)
-                | StopReason::TimeLimit(_) => println!("{:?}", runner.stop_reason.unwrap()),
-                _ => (),
-            }
 
             l_id = runner.egraph.find(runner.roots[0]);
             r_id = runner.egraph.find(runner.roots[1]);
@@ -165,8 +156,6 @@ fn one_way<L: SynthLanguage>(
             runner = mk_runner(params, runner.egraph, &l, &r)
                 .with_iter_limit(1)
                 .run(&other);
-
-            // println!("{:?}", runner.stop_reason.unwrap());
 
             l_id = runner.egraph.find(runner.roots[0]);
             r_id = runner.egraph.find(runner.roots[1]);
