@@ -5,18 +5,14 @@ use std::sync::Mutex;
 
 type Pair<L> = (RecExpr<L>, RecExpr<L>);
 
-pub fn parse<L: SynthLanguage>(filename: &str, only_new: bool) -> Vec<Pair<L>> {
+pub fn parse<L: SynthLanguage>(filename: &str, only_new: bool) -> Vec<Equality<L>> {
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
     let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
-    let eqs = if only_new {
-        &report.new_eqs
+    if only_new {
+        report.new_eqs
     } else {
-        &report.all_eqs
-    };
-
-    eqs.iter()
-        .map(|eq| (L::instantiate(&eq.lhs), L::instantiate(&eq.rhs)))
-        .collect()
+        report.all_eqs
+    }
 }
 
 /// Performs a one-way derivability test and exits with code -1
@@ -41,14 +37,14 @@ pub fn derive_ci<L: SynthLanguage>(params: DeriveParams) {
 
 /// Perform derivability test between two rulesets.
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
-    let pairs_1 = parse::<L>(&params.in1, params.only_new);
-    let pairs_2 = parse::<L>(&params.in2, params.only_new);
+    let eqs_1 = parse::<L>(&params.in1, params.only_new);
+    let eqs_2 = parse::<L>(&params.in2, params.only_new);
 
     println!("Using {} to derive {}", params.in1, params.in2);
-    let (derivable, not_derivable) = one_way(&params, &pairs_1, &pairs_2);
+    let (derivable, not_derivable) = one_way(&params, &eqs_1, &eqs_2);
 
     println!("\nUsing {} to derive {}", params.in2, params.in1);
-    let (rev_derivable, rev_not_derivable) = one_way(&params, &pairs_2, &pairs_1);
+    let (rev_derivable, rev_not_derivable) = one_way(&params, &eqs_2, &eqs_1);
 
     let json = serde_json::json!({
         "files": [params.in1, params.in2],
@@ -70,14 +66,14 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
 /// Check the derivability of rules in test using the rules in src
 fn one_way<L: SynthLanguage>(
     params: &DeriveParams,
-    src: &[Pair<L>],
-    test: &[Pair<L>],
+    src: &[Equality<L>],
+    test: &[Equality<L>],
 ) -> (Vec<Pair<L>>, Vec<Pair<L>>) {
-    let eqs: Vec<Equality<L>> = src.iter().flat_map(|(l, r)| Equality::new(l, r)).collect();
-
     let results = Mutex::new((vec![], vec![]));
     let test = test.to_vec();
-    test.into_par_iter().for_each(|(l, r)| {
+    test.into_par_iter().for_each(|eq| {
+        let l = L::instantiate(&eq.lhs);
+        let r = L::instantiate(&eq.rhs);
         let runner = Runner::default()
             .with_expr(&l)
             .with_expr(&r)
@@ -90,7 +86,7 @@ fn one_way<L: SynthLanguage>(
                     Ok(())
                 }
             })
-            .run(eqs.iter().flat_map(|eq| &eq.rewrites));
+            .run(src.iter().flat_map(|eq| &eq.rewrites));
 
         let l_id = runner.egraph.find(runner.roots[0]);
         let r_id = runner.egraph.find(runner.roots[1]);
