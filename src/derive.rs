@@ -43,8 +43,8 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
     println!("Using {} to derive {}", params.in1, params.in2);
     let (derivable, not_derivable) = one_way(&params, &eqs_1, &eqs_2);
 
-    // println!("\nUsing {} to derive {}", params.in2, params.in1);
-    // let (rev_derivable, rev_not_derivable) = one_way(&params, &eqs_2, &eqs_1);
+    println!("\nUsing {} to derive {}", params.in2, params.in1);
+    let (rev_derivable, rev_not_derivable) = one_way(&params, &eqs_2, &eqs_1);
 
     let json = serde_json::json!({
         "files": [params.in1, params.in2],
@@ -52,6 +52,10 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
             "derivable": pairs_to_eqs(&derivable),
             "not_derivable": pairs_to_eqs(&not_derivable),
         },
+        "reverse": {
+            "derivable": pairs_to_eqs(&rev_derivable),
+            "not_derivable": pairs_to_eqs(&rev_not_derivable),
+        }
     });
 
     let file =
@@ -60,6 +64,9 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
 }
 
 fn is_saturating<L: SynthLanguage>(lhs: &Pattern<L>, rhs: &Pattern<L>) -> bool {
+    // TODO
+    // 1. Ignore constants
+    // 2. If RHS is strictly smaller than LHS
     let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
     let l_id = egraph.add_expr(&L::instantiate(lhs));
 
