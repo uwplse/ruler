@@ -2,15 +2,14 @@ use std::hash::Hash;
 
 use egg::*;
 use num::bigint::{BigInt, RandBigInt, Sign, ToBigInt};
-use num::rational::Ratio;
-use num::{ToPrimitive, Zero};
+use num::{Integer, ToPrimitive, Zero};
 
 use rand_pcg::Pcg64;
 use ruler::*;
 use z3::ast::Ast;
 use z3::SatResult;
 
-type Constant = Ratio<BigInt>;
+type Constant = BigInt;
 
 define_language! {
   pub enum Pred {
@@ -46,7 +45,7 @@ impl std::fmt::Display for Type {
 }
 
 impl SynthLanguage for Pred {
-    type Constant = Ratio<BigInt>;
+    type Constant = BigInt;
     type Type = Type;
 
     fn get_type(&self) -> Self::Type {
@@ -57,8 +56,8 @@ impl SynthLanguage for Pred {
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
-        let one = Ratio::new(1.to_bigint().unwrap(), 1.to_bigint().unwrap());
-        let zero = Ratio::new(0.to_bigint().unwrap(), 1.to_bigint().unwrap());
+        let one = 1.to_bigint().unwrap();
+        let zero = 0.to_bigint().unwrap();
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Lt([x, y]) => {
@@ -97,7 +96,7 @@ impl SynthLanguage for Pred {
                 if y.is_zero() {
                     Some(zero.clone())
                 } else {
-                    Some(x / y)
+                    Some(x.div_floor(y))
                 }
             }),
             Pred::Var(_) => vec![],
@@ -137,14 +136,8 @@ impl SynthLanguage for Pred {
         let mut consts: Vec<Option<Constant>> = vec![];
 
         for i in 0..synth.params.important_cvec_offsets {
-            consts.push(Some(mk_constant(
-                &i.to_bigint().unwrap(),
-                &(1_u32.to_bigint().unwrap()),
-            )));
-            consts.push(Some(mk_constant(
-                &(-i.to_bigint().unwrap()),
-                &(1_u32.to_bigint().unwrap()),
-            )));
+            consts.push(Some(i.to_bigint().unwrap()));
+            consts.push(Some(-i.to_bigint().unwrap()));
         }
 
         consts.sort();
@@ -255,38 +248,24 @@ pub fn gen_pos(rng: &mut Pcg64, bits: u64) -> BigInt {
     res
 }
 
-pub fn sampler(rng: &mut Pcg64, num: u64, denom: u64, num_samples: usize) -> Vec<Constant> {
-    let mut ret = vec![];
-    for _ in 0..num_samples {
-        let num = gen_pos(rng, num);
-        let denom = gen_pos(rng, denom);
-        ret.push(Ratio::new(num, denom));
-    }
-    ret
-}
-
 /// Convert expressions to Z3's syntax for using SMT based rule verification.
-fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Real<'a> {
-    let mut buf: Vec<z3::ast::Real> = vec![];
-    let zero = z3::ast::Real::from_real(ctx, 0, 1);
-    let one = z3::ast::Real::from_real(ctx, 1, 1);
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
+    let mut buf: Vec<z3::ast::Int> = vec![];
+    let zero = z3::ast::Int::from_i64(ctx, 0);
+    let one = z3::ast::Int::from_i64(ctx, 1);
     for node in expr.as_ref().iter() {
         match node {
-            Pred::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
-            Pred::Lit(c) => buf.push(z3::ast::Real::from_real(
-                ctx,
-                (c.numer()).to_i32().unwrap(),
-                (c.denom()).to_i32().unwrap(),
-            )),
-            Pred::Add([a, b]) => buf.push(z3::ast::Real::add(
+            Pred::Var(v) => buf.push(z3::ast::Int::new_const(ctx, v.to_string())),
+            Pred::Lit(c) => buf.push(z3::ast::Int::from_i64(ctx, c.to_i64().unwrap())),
+            Pred::Add([a, b]) => buf.push(z3::ast::Int::add(
                 ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
-            Pred::Sub([a, b]) => buf.push(z3::ast::Real::sub(
+            Pred::Sub([a, b]) => buf.push(z3::ast::Int::sub(
                 ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
-            Pred::Mul([a, b]) => buf.push(z3::ast::Real::mul(
+            Pred::Mul([a, b]) => buf.push(z3::ast::Int::mul(
                 ctx,
                 &[&buf[usize::from(*a)], &buf[usize::from(*b)]],
             )),
@@ -294,32 +273,28 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Real<'a> {
                 let l = &buf[usize::from(*a)].clone();
                 let r = &buf[usize::from(*b)].clone();
                 let r_zero = r._eq(&zero);
-                buf.push(z3::ast::Bool::ite(
-                    &r_zero,
-                    &zero,
-                    &z3::ast::Real::div(l, r),
-                ))
+                buf.push(z3::ast::Bool::ite(&r_zero, &zero, &z3::ast::Int::div(l, r)))
             }
             Pred::Min([a, b]) => {
                 let l = &buf[usize::from(*a)].clone();
                 let r = &buf[usize::from(*b)].clone();
-                buf.push(z3::ast::Bool::ite(&z3::ast::Real::le(l, r), l, r));
+                buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), l, r));
             }
             Pred::Max([a, b]) => {
                 let l = &buf[usize::from(*a)].clone();
                 let r = &buf[usize::from(*b)].clone();
-                buf.push(z3::ast::Bool::ite(&z3::ast::Real::le(l, r), r, l));
+                buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), r, l));
             }
-            Pred::Neg(a) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*a)])),
+            Pred::Neg(a) => buf.push(z3::ast::Int::unary_minus(&buf[usize::from(*a)])),
             Pred::Lt([a, b]) => {
                 let l = &buf[usize::from(*a)];
                 let r = &buf[usize::from(*b)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Real::lt(l, r), &one, &zero))
+                buf.push(z3::ast::Bool::ite(&z3::ast::Int::lt(l, r), &one, &zero))
             }
             Pred::Leq([a, b]) => {
                 let l = &buf[usize::from(*a)];
                 let r = &buf[usize::from(*b)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Real::le(l, r), &one, &zero))
+                buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), &one, &zero))
             }
             Pred::And([a, b]) => {
                 let l = &buf[usize::from(*a)];
