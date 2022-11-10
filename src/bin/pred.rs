@@ -17,16 +17,12 @@ define_language! {
     Lit(Constant),
     "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
-    ">" = Gt([Id;2]),
-    ">=" = Geq([Id;2]),
     "==" = Eq([Id;2]),
     "!=" = Neq([Id;2]),
-    "->" = Implies([Id; 2]),
     "!" = Not(Id),
     "-" = Neg(Id),
     "&&" = And([Id;2]),
     "||" = Or([Id;2]),
-    "^" = Xor([Id;2]),
     "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
@@ -71,12 +67,6 @@ impl SynthLanguage for Pred {
             Pred::Leq([x, y]) => {
                 map!(v, x, y => if x <= y { Some(one.clone()) } else { Some(zero.clone()) })
             }
-            Pred::Gt([x, y]) => {
-                map!(v, x, y => if x > y { Some(one.clone()) } else { Some(zero.clone()) })
-            }
-            Pred::Geq([x, y]) => {
-                map!(v, x, y => if x >= y { Some(one.clone()) } else { Some(zero.clone()) })
-            }
             Pred::Eq([x, y]) => {
                 map!(v, x, y => if x == y { Some(one.clone()) } else { Some(zero.clone()) })
             }
@@ -98,20 +88,6 @@ impl SynthLanguage for Pred {
                     let xbool = x.clone() != zero;
                     let ybool = y.clone() != zero;
                     if xbool || ybool { Some(one.clone()) } else { Some(zero.clone()) }
-                })
-            }
-            Pred::Xor([x, y]) => {
-                map!(v, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if xbool ^ ybool { Some(one.clone()) } else { Some(zero.clone()) }
-                })
-            }
-            Pred::Implies([x, y]) => {
-                map!(v, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if !xbool || ybool { Some(one.clone()) } else { Some(zero.clone()) }
                 })
             }
             Pred::Add([x, y]) => map!(v, x, y => Some(x + y)),
@@ -214,14 +190,10 @@ impl SynthLanguage for Pred {
                 }
                 to_add.push(Pred::Lt([i, j]));
                 to_add.push(Pred::Leq([i, j]));
-                to_add.push(Pred::Gt([i, j]));
-                to_add.push(Pred::Geq([i, j]));
                 to_add.push(Pred::Eq([i, j]));
                 to_add.push(Pred::Neq([i, j]));
-                to_add.push(Pred::Implies([i, j]));
                 to_add.push(Pred::And([i, j]));
                 to_add.push(Pred::Or([i, j]));
-                to_add.push(Pred::Xor([i, j]));
                 to_add.push(Pred::Add([i, j]));
                 to_add.push(Pred::Sub([i, j]));
                 to_add.push(Pred::Mul([i, j]));
@@ -344,31 +316,10 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Real<'a> {
                 let r = &buf[usize::from(*b)];
                 buf.push(z3::ast::Bool::ite(&z3::ast::Real::lt(l, r), &one, &zero))
             }
-            Pred::Gt([a, b]) => {
-                let l = &buf[usize::from(*a)];
-                let r = &buf[usize::from(*b)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Real::gt(l, r), &one, &zero))
-            }
             Pred::Leq([a, b]) => {
                 let l = &buf[usize::from(*a)];
                 let r = &buf[usize::from(*b)];
                 buf.push(z3::ast::Bool::ite(&z3::ast::Real::le(l, r), &one, &zero))
-            }
-            Pred::Geq([a, b]) => {
-                let l = &buf[usize::from(*a)];
-                let r = &buf[usize::from(*b)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Real::ge(l, r), &one, &zero))
-            }
-            Pred::Xor([a, b]) => {
-                let l = &buf[usize::from(*a)];
-                let r = &buf[usize::from(*b)];
-                let l_not_zero = z3::ast::Bool::not(&l._eq(&zero));
-                let r_not_zero = z3::ast::Bool::not(&r._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Bool::xor(&l_not_zero, &r_not_zero),
-                    &one,
-                    &zero,
-                ))
             }
             Pred::And([a, b]) => {
                 let l = &buf[usize::from(*a)];
@@ -396,17 +347,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Real<'a> {
                 let a_expr = &buf[usize::from(*a)];
                 let a_is_zero = &a_expr._eq(&zero);
                 buf.push(z3::ast::Bool::ite(a_is_zero, &one, &zero))
-            }
-            Pred::Implies([a, b]) => {
-                let l = &buf[usize::from(*a)];
-                let r = &buf[usize::from(*b)];
-                let l_not_zero = z3::ast::Bool::not(&l._eq(&zero));
-                let r_not_zero = z3::ast::Bool::not(&r._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Bool::implies(&l_not_zero, &r_not_zero),
-                    &one,
-                    &zero,
-                ))
             }
             Pred::Eq([a, b]) => {
                 let lexpr = &buf[usize::from(*a)];
