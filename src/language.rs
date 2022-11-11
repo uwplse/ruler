@@ -1,0 +1,102 @@
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
+
+use crate::*;
+
+#[derive(Clone)]
+pub struct SynthAnalysis {
+    pub cvec_len: usize,
+}
+
+impl Default for SynthAnalysis {
+    fn default() -> Self {
+        Self { cvec_len: 10 }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Signature<L: SynthLanguage> {
+    pub cvec: CVec<L>,
+}
+
+impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
+    type Data = Signature<L>;
+
+    fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
+        let get_cvec = |id: &Id| &egraph[*id].data.cvec;
+        Signature {
+            cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
+        }
+    }
+
+    fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+        if !to.cvec.is_empty() && !from.cvec.is_empty() {
+            for i in 0..to.cvec.len() {
+                match (to.cvec[i].clone(), from.cvec[i].clone()) {
+                    (None, Some(_)) => to.cvec[i] = from.cvec[i].clone(),
+                    (Some(x), Some(y)) => assert_eq!(x, y, "cvecs do not match!!"),
+                    _ => (),
+                }
+            }
+        }
+
+        DidMerge(true, true)
+    }
+}
+
+pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
+
+pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
+    type Constant: Clone + Hash + Eq + Debug + Display + Ord;
+
+    fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
+    where
+        F: FnMut(&'a Id) -> &'a CVec<Self>;
+
+    fn mk_var(sym: egg::Symbol) -> Self;
+
+    fn instantiate(pattern: &Pattern<Self>) -> RecExpr<Self> {
+        let nodes: Vec<_> = pattern
+            .ast
+            .as_ref()
+            .iter()
+            .map(|n| match n {
+                ENodeOrVar::ENode(n) => n.clone(),
+                ENodeOrVar::Var(v) => {
+                    let s = v.to_string();
+                    assert!(s.starts_with("?"));
+                    Self::mk_var(s[1..].into())
+                }
+            })
+            .collect();
+
+        RecExpr::from(nodes)
+    }
+
+    fn score(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> [i32; 5] {
+        [0, 0, 0, 0, 0]
+    }
+
+    fn init_synth(synth: &mut Synthesizer<Self>);
+
+    fn validate(
+        synth: &mut Synthesizer<Self>,
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+    ) -> ValidationResult;
+
+    fn run_synth() {
+        match Command::parse() {
+            Command::Synth(params) => {
+                let outfile = params.outfile.clone();
+                let syn = Synthesizer::<Self>::new(params);
+                let report = syn.run();
+                let file = std::fs::File::create(&outfile)
+                    .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
+                serde_json::to_writer_pretty(file, &report).expect("failed to write json");
+            }
+        }
+    }
+}
