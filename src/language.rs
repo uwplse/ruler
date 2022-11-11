@@ -21,6 +21,12 @@ pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
 }
 
+impl<L: SynthLanguage> Signature<L> {
+    pub fn is_defined(&self) -> bool {
+        self.cvec.is_empty() || self.cvec.iter().any(|v| v.is_some())
+    }
+}
+
 impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
@@ -55,7 +61,37 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
 
+    fn to_var(&self) -> Option<Symbol>;
     fn mk_var(sym: egg::Symbol) -> Self;
+
+    fn to_enode_or_var(self) -> ENodeOrVar<Self> {
+        match self.to_var() {
+            Some(var) => ENodeOrVar::Var(format!("?{}", var).parse().unwrap()),
+            None => ENodeOrVar::ENode(self),
+        }
+    }
+
+    fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {
+        let mut rename_node = |node: &Self| match node.to_var() {
+            Some(sym) => {
+                let len = map.len();
+                let var = map
+                    .entry(sym)
+                    .or_insert_with(|| format!("?{}", letter(len)).parse().unwrap());
+                let s = var.to_string();
+                Self::mk_var(s[1..].into())
+            }
+            None => node.clone(),
+        };
+        let root = rename_node(expr.as_ref().last().unwrap());
+        let expr = root.build_recexpr(|id| rename_node(&expr[id]));
+        let nodes: Vec<ENodeOrVar<Self>> = expr
+            .as_ref()
+            .iter()
+            .map(|node| node.clone().to_enode_or_var())
+            .collect();
+        PatternAst::from(nodes).into()
+    }
 
     fn instantiate(pattern: &Pattern<Self>) -> RecExpr<Self> {
         let nodes: Vec<_> = pattern

@@ -25,6 +25,23 @@ impl<L: SynthLanguage> Equality<L> {
             rewrite: Rewrite::new(name, l_pat, r_pat).unwrap(),
         }
     }
+
+    pub fn new(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
+        let map = &mut HashMap::default();
+        let lhs = L::generalize(e1, map);
+        let rhs = L::generalize(e2, map);
+        let name = format!("{} ==> {}", lhs, rhs);
+        let rewrite = Rewrite::new(name.clone(), lhs.clone(), rhs.clone()).ok();
+        match rewrite {
+            Some(rw) => Some(Equality {
+                name: name.into(),
+                lhs: lhs,
+                rhs: rhs,
+                rewrite: rw,
+            }),
+            None => None,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]

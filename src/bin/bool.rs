@@ -89,6 +89,13 @@ impl SynthLanguage for Bool {
         Bool::Var(sym)
     }
 
+    fn to_var(&self) -> Option<Symbol> {
+        match self {
+            Bool::Var(v) => Some(*v),
+            _ => None,
+        }
+    }
+
     fn init_synth(synth: &mut Synthesizer<Self>) {
         todo!()
     }

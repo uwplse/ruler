@@ -13,9 +13,11 @@ use std::{
 
 pub use equality::*;
 pub use language::*;
+pub use util::*;
 
 mod equality;
 mod language;
+mod util;
 
 /// Validation result
 #[derive(Debug, Clone)]
@@ -109,6 +111,32 @@ impl<L: SynthLanguage> Synthesizer<L> {
         runner.egraph
     }
 
+    fn cvec_match(&self) -> EqualityMap<L> {
+        let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
+
+        for class in self.egraph.classes() {
+            if class.data.is_defined() {
+                by_cvec.entry(&class.data.cvec).or_default().push(class.id);
+            }
+        }
+
+        println!("{} unique cvecs", by_cvec.len());
+
+        let mut candidates = EqualityMap::default();
+        let extract = Extractor::new(&self.egraph, AstSize);
+        for ids in by_cvec.values() {
+            let mut terms_ids: Vec<_> = ids.iter().map(|&id| (extract.find_best(id), id)).collect();
+            terms_ids.sort_by_key(|x| x.0 .0); // sort by cost
+            let ((c1, e1), id1) = terms_ids.remove(0);
+            for ((c2, e2), id2) in terms_ids {
+                if let Some(eq) = Equality::new(&e1, &e2) {
+                    candidates.insert(eq.name.clone(), eq);
+                }
+            }
+        }
+        candidates
+    }
+
     pub fn run(mut self) -> Report<L> {
         println!("run");
         let t = Instant::now();
@@ -133,6 +161,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let eqs = self.prior_rws.clone();
 
         self.run_rewrites(eqs.values().map(|eq| &eq.rewrite).collect());
+
+        let candidates = self.cvec_match();
+        println!("{} candidates", candidates.len());
 
         println!("done");
 
