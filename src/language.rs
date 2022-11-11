@@ -61,6 +61,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
 
+    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>);
+
     fn to_var(&self) -> Option<Symbol>;
     fn mk_var(sym: egg::Symbol) -> Self;
 

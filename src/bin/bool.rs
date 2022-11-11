@@ -1,4 +1,5 @@
 use egg::*;
+use rand::Rng;
 use ruler::*;
 use std::ops::*;
 use SynthLanguage;
@@ -83,6 +84,26 @@ impl SynthLanguage for Bool {
             Bool::Lit(c) => vec![Some(*c); cvec_len],
             Bool::Var(_) => vec![],
         }
+    }
+
+    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+        println!("initializing vars: {:?}", vars);
+        let mut initialize_cvec = || {
+            let mut vals = vec![];
+            for _ in 0..synth.egraph.analysis.cvec_len {
+                vals.push(Some(synth.rng.gen::<bool>()));
+            }
+            vals
+        };
+
+        let mut egraph = EGraph::new(SynthAnalysis { cvec_len: 10 });
+
+        for v in vars {
+            let id = egraph.add(Bool::Var(Symbol::from(v)));
+            egraph[id].data.cvec = initialize_cvec();
+        }
+
+        synth.egraph = egraph;
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {

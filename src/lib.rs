@@ -1,6 +1,8 @@
 use clap::Parser;
 use egg::*;
 
+use rand::SeedableRng;
+use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
@@ -29,6 +31,8 @@ pub enum ValidationResult {
 
 /// Faster hashMap implementation used in rustc
 pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
+/// Faster hashSet implementation used in rustc
+pub type HashSet<K> = rustc_hash::FxHashSet<K>;
 /// IndexMap data implementation used in rustc
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
 
@@ -36,6 +40,7 @@ pub type EqualityMap<L> = IndexMap<Arc<str>, Equality<L>>;
 
 pub struct Synthesizer<L: SynthLanguage> {
     pub params: SynthParams,
+    pub rng: Pcg64,
     pub egraph: EGraph<L, SynthAnalysis>,
     pub prior_rws: EqualityMap<L>,
     pub new_rws: EqualityMap<L>,
@@ -48,20 +53,28 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         Self {
             params,
+            rng: Pcg64::seed_from_u64(0), // TODO- parameterize?
             egraph: Default::default(),
             prior_rws: priors,
             new_rws: Default::default(),
         }
     }
 
-    fn enumerate_workload(&self, filename: &str) -> Vec<RecExpr<L>> {
+    fn enumerate_workload(&self, filename: &str) -> (Vec<RecExpr<L>>, Vec<String>) {
         let infile = File::open(filename).expect("can't open file");
         let reader = BufReader::new(infile);
         let mut terms = vec![];
+        let mut vars: HashSet<String> = HashSet::default();
         for line in BufRead::lines(reader) {
-            terms.push(line.unwrap().parse().unwrap());
+            let expr: RecExpr<L> = line.unwrap().parse().unwrap();
+            for node in expr.as_ref() {
+                if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
+                    vars.extend(vec![v.to_string()]);
+                }
+            }
+            terms.push(expr);
         }
-        terms
+        (terms, vars.into_iter().collect())
     }
 
     fn add_workload(egraph: &mut EGraph<L, SynthAnalysis>, exprs: &[RecExpr<L>]) {
@@ -141,16 +154,16 @@ impl<L: SynthLanguage> Synthesizer<L> {
         println!("run");
         let t = Instant::now();
 
-        let filename = self.params.workload.clone().expect("workload is required");
-        let workload = self.enumerate_workload(&filename);
-        println!("enumerated {} terms", workload.len());
-
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.new_rws.len();
         println!("{} prior rules", num_rules);
         let mut new_rws: Vec<Equality<L>> =
             self.new_rws.clone().into_iter().map(|(_, eq)| eq).collect();
 
+        let filename = self.params.workload.clone().expect("workload is required");
+        let (workload, vars) = self.enumerate_workload(&filename);
+        println!("enumerated {} terms", workload.len());
+        L::initialize_vars(&mut self, vars);
         Synthesizer::add_workload(&mut self.egraph, &workload);
 
         println!(
@@ -164,6 +177,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let candidates = self.cvec_match();
         println!("{} candidates", candidates.len());
+        for v in candidates.values() {
+            println!("{} => {}", v.lhs, v.rhs);
+        }
 
         println!("done");
 
