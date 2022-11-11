@@ -23,7 +23,11 @@ pub enum ValidationResult {
     Unknown,
 }
 
+/// Faster hashMap implementation used in rustc
+pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
+/// IndexMap data implementation used in rustc
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
+
 pub type EqualityMap<L> = IndexMap<Arc<str>, Equality<L>>;
 
 #[derive(Clone)]
@@ -46,11 +50,24 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
-        todo!()
+        let get_cvec = |id: &Id| &egraph[*id].data.cvec;
+        Signature {
+            cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
+        }
     }
 
-    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
-        todo!()
+    fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+        if !to.cvec.is_empty() && !from.cvec.is_empty() {
+            for i in 0..to.cvec.len() {
+                match (to.cvec[i].clone(), from.cvec[i].clone()) {
+                    (None, Some(_)) => to.cvec[i] = from.cvec[i].clone(),
+                    (Some(x), Some(y)) => assert_eq!(x, y, "cvecs do not match!!"),
+                    _ => (),
+                }
+            }
+        }
+
+        DidMerge(true, true)
     }
 }
 
@@ -83,7 +100,9 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         RecExpr::from(nodes)
     }
 
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5];
+    fn score(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> [i32; 5] {
+        [0, 0, 0, 0, 0]
+    }
 
     fn init_synth(synth: &mut Synthesizer<Self>);
 
@@ -137,20 +156,79 @@ impl<L: SynthLanguage> Synthesizer<L> {
         terms
     }
 
+    fn add_workload(egraph: &mut EGraph<L, SynthAnalysis>, exprs: &[RecExpr<L>]) {
+        for expr in exprs {
+            egraph.add_expr(expr);
+        }
+    }
+
+    fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
+        Runner::default().with_egraph(egraph)
+    }
+
+    fn run_rewrites(
+        &mut self,
+        rewrites: Vec<&Rewrite<L, SynthAnalysis>>,
+    ) -> EGraph<L, SynthAnalysis> {
+        println!("run_rewrites");
+        let starting_ids = self.egraph.classes().map(|c| c.id);
+
+        let mut runner = self.mk_runner(self.egraph.clone());
+        runner = runner.run(rewrites.clone());
+
+        println!(
+            "Done running {} rewrites. Stop reason: {:?}",
+            rewrites.len(),
+            runner.stop_reason.unwrap()
+        );
+
+        println!("New egraph size: {}", runner.egraph.number_of_classes());
+        let mut found_unions = HashMap::default();
+        for id in starting_ids {
+            let new_id = runner.egraph.find(id);
+            found_unions
+                .entry(new_id)
+                .or_insert_with(Vec::default)
+                .push(id);
+        }
+        for ids in found_unions.values() {
+            if ids.len() > 1 {
+                let first = ids[0];
+                for id in &ids[1..] {
+                    self.egraph.union(first, *id);
+                }
+            }
+        }
+        runner.egraph.rebuild();
+        runner.egraph
+    }
+
     pub fn run(mut self) -> Report<L> {
+        println!("run");
         let t = Instant::now();
 
-        if let Some(filename) = &self.params.workload {
-            let terms = self.enumerate_workload(filename);
-            // self.run_cvec_synth(terms);
-        } else {
-            panic!("No workload");
-        }
+        let filename = self.params.workload.clone().expect("workload is required");
+        let workload = self.enumerate_workload(&filename);
+        println!("enumerated {} terms", workload.len());
 
         let time = t.elapsed().as_secs_f64();
         let num_rules = self.new_rws.len();
+        println!("{} prior rules", num_rules);
         let mut new_rws: Vec<Equality<L>> =
             self.new_rws.clone().into_iter().map(|(_, eq)| eq).collect();
+
+        Synthesizer::add_workload(&mut self.egraph, &workload);
+
+        println!(
+            "Added workload to egraph. {} eclasses",
+            self.egraph.number_of_classes()
+        );
+
+        let eqs = self.prior_rws.clone();
+
+        self.run_rewrites(eqs.values().map(|eq| &eq.rewrite).collect());
+
+        println!("done");
 
         Report {
             params: self.params,
