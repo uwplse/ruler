@@ -16,7 +16,7 @@ pub struct Equality<L: SynthLanguage> {
 impl<L: SynthLanguage> Equality<L> {
     fn from_serialized_eq(ser: SerializedEq) -> Self {
         let l_pat: Pattern<L> = ser.lhs.parse().unwrap();
-        let r_pat: Pattern<L> = ser.lhs.parse().unwrap();
+        let r_pat: Pattern<L> = ser.rhs.parse().unwrap();
         let name = format!("{} ==> {}", l_pat, r_pat);
         Self {
             name: name.clone().into(),
@@ -44,7 +44,7 @@ impl<L: SynthLanguage> Equality<L> {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Debug, Deserialize)]
 struct SerializedEq {
     lhs: String,
     rhs: String,

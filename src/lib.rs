@@ -10,7 +10,7 @@ use std::{
     hash::BuildHasherDefault,
     io::{BufRead, BufReader},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 pub use equality::*;
@@ -49,7 +49,16 @@ pub struct Synthesizer<L: SynthLanguage> {
 impl<L: SynthLanguage> Synthesizer<L> {
     fn new(params: SynthParams) -> Self {
         let mut priors: EqualityMap<L> = Default::default();
-        // TODO: parse prior rules
+        if let Some(filename) = params.prior_rules.clone() {
+            let file =
+                File::open(&filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
+            let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
+            for eq in report.rewrites {
+                println!("{}", eq.name);
+                priors.insert(eq.name.clone(), eq);
+            }
+        }
+        println!("Parsed {} prior rules", priors.len());
 
         Self {
             params,
@@ -84,14 +93,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
-        Runner::default().with_egraph(egraph)
+        Runner::default()
+            .with_scheduler(SimpleScheduler)
+            .with_node_limit(1000)
+            .with_iter_limit(2)
+            .with_time_limit(Duration::from_secs(2))
+            .with_egraph(egraph)
     }
 
     fn run_rewrites(
         &mut self,
         rewrites: Vec<&Rewrite<L, SynthAnalysis>>,
     ) -> EGraph<L, SynthAnalysis> {
-        println!("run_rewrites");
+        println!("running {} rewrites", rewrites.len());
         let starting_ids = self.egraph.classes().map(|c| c.id);
 
         let mut runner = self.mk_runner(self.egraph.clone());
@@ -155,10 +169,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let t = Instant::now();
 
         let time = t.elapsed().as_secs_f64();
-        let num_rules = self.new_rws.len();
-        println!("{} prior rules", num_rules);
-        let mut new_rws: Vec<Equality<L>> =
-            self.new_rws.clone().into_iter().map(|(_, eq)| eq).collect();
 
         let filename = self.params.workload.clone().expect("workload is required");
         let (workload, vars) = self.enumerate_workload(&filename);
@@ -177,11 +187,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let candidates = self.cvec_match();
         println!("{} candidates", candidates.len());
+
         for v in candidates.values() {
             println!("{} => {}", v.lhs, v.rhs);
         }
 
-        println!("done");
+        let new_rws = vec![];
+        let num_rules = self.prior_rws.len() + self.new_rws.len();
 
         Report {
             params: self.params,
@@ -227,4 +239,10 @@ pub struct Report<L: SynthLanguage> {
     pub num_rules: usize,
     pub prior_rws: Vec<Equality<L>>,
     pub new_rws: Vec<Equality<L>>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "L: SynthLanguage")]
+struct SlimReport<L: SynthLanguage> {
+    rewrites: Vec<Equality<L>>,
 }
