@@ -93,7 +93,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
     }
 
-    fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
+    fn mk_runner(&self, egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
         Runner::default()
             .with_scheduler(SimpleScheduler)
             .with_node_limit(usize::MAX)
@@ -169,6 +169,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
         candidates
     }
 
+    fn choose_eqs(&mut self, candidates: EqualityMap<L>) -> EqualityMap<L> {
+        candidates
+    }
+
     pub fn run(mut self) -> Report<L> {
         let t = Instant::now();
 
@@ -200,20 +204,21 @@ impl<L: SynthLanguage> Synthesizer<L> {
             println!("{} => {}", v.lhs, v.rhs);
         }
 
-        let new_rws = vec![];
+        self.new_rws = self.choose_eqs(candidates);
         let num_rules = self.prior_rws.len() + self.new_rws.len();
+
+        println!(
+            "Learned {} new rewrites using {} prior rewrites",
+            self.new_rws.len(),
+            self.prior_rws.len()
+        );
 
         Report {
             params: self.params,
             time,
             num_rules,
-            prior_rws: self
-                .prior_rws
-                .clone()
-                .into_iter()
-                .map(|(_, eq)| eq)
-                .collect(),
-            new_rws,
+            prior_rws: self.prior_rws.into_iter().map(|(_, eq)| eq).collect(),
+            new_rws: self.new_rws.into_iter().map(|(_, eq)| eq).collect(),
         }
     }
 }

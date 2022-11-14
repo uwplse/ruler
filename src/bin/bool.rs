@@ -1,5 +1,4 @@
 use egg::*;
-use rand::Rng;
 use ruler::*;
 use std::ops::*;
 use SynthLanguage;
@@ -114,10 +113,6 @@ impl SynthLanguage for Bool {
             Bool::Var(v) => Some(*v),
             _ => None,
         }
-    }
-
-    fn init_synth(synth: &mut Synthesizer<Self>) {
-        todo!()
     }
 
     fn validate(

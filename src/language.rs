@@ -128,8 +128,6 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         [0, 0, 0, 0, 0]
     }
 
-    fn init_synth(synth: &mut Synthesizer<Self>);
-
     fn validate(
         synth: &mut Synthesizer<Self>,
         lhs: &Pattern<Self>,

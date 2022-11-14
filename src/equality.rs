@@ -14,7 +14,6 @@ pub struct Equality<L: SynthLanguage> {
 }
 
 struct RHS<L: SynthLanguage> {
-    name: String,
     rhs: Pattern<L>,
 }
 
@@ -54,10 +53,7 @@ impl<L: SynthLanguage> Equality<L> {
         let l_pat: Pattern<L> = ser.lhs.parse().unwrap();
         let r_pat: Pattern<L> = ser.rhs.parse().unwrap();
         let name = format!("{} ==> {}", l_pat, r_pat);
-        let rhs = RHS {
-            name: name.clone(),
-            rhs: r_pat.clone(),
-        };
+        let rhs = RHS { rhs: r_pat.clone() };
 
         Self {
             name: name.clone().into(),
@@ -72,10 +68,7 @@ impl<L: SynthLanguage> Equality<L> {
         let l_pat = L::generalize(e1, map);
         let r_pat = L::generalize(e2, map);
         let name = format!("{} ==> {}", l_pat, r_pat);
-        let rhs = RHS {
-            name: name.clone(),
-            rhs: r_pat.clone(),
-        };
+        let rhs = RHS { rhs: r_pat.clone() };
         let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
         match rewrite {
             Some(rw) => Some(Equality {
