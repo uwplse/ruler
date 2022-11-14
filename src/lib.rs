@@ -235,8 +235,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
     pub fn run(mut self) -> Report<L> {
         let t = Instant::now();
 
-        let time = t.elapsed().as_secs_f64();
-
         let filename = self.params.workload.clone().expect("workload is required");
         let (workload, vars) = self.enumerate_workload(&filename);
         println!(
@@ -258,11 +256,18 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let num_rules = self.prior_rws.len() + self.new_rws.len();
 
+        let time = t.elapsed().as_secs_f64();
+
         println!(
-            "Learned {} new rewrites using {} prior rewrites",
+            "Learned {} new rewrites in {} using {} prior rewrites",
             self.new_rws.len(),
+            time,
             self.prior_rws.len()
         );
+
+        for (name, eq) in &self.new_rws {
+            println!("{:?}      {}", eq.score(), name);
+        }
 
         Report {
             params: self.params,
