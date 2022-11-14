@@ -122,6 +122,10 @@ impl SynthLanguage for Bool {
     ) -> ValidationResult {
         ValidationResult::Valid
     }
+
+    fn is_constant(&self) -> bool {
+        matches!(self, Bool::Lit(_))
+    }
 }
 
 fn main() {

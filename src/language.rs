@@ -77,6 +77,8 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     fn to_var(&self) -> Option<Symbol>;
     fn mk_var(sym: egg::Symbol) -> Self;
 
+    fn is_constant(&self) -> bool;
+
     fn to_enode_or_var(self) -> ENodeOrVar<Self> {
         match self.to_var() {
             Some(var) => ENodeOrVar::Var(format!("?{}", var).parse().unwrap()),
@@ -124,8 +126,38 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
         RecExpr::from(nodes)
     }
 
-    fn score(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> [i32; 5] {
-        [0, 0, 0, 0, 0]
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
+        let l_size = AstSize.cost_rec(&lhs.ast) as i32;
+        let r_size = AstSize.cost_rec(&rhs.ast) as i32;
+        let mut vars: HashSet<Var> = Default::default();
+        vars.extend(lhs.vars());
+        vars.extend(rhs.vars());
+
+        let mut ops: HashSet<String> = Default::default();
+        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+            if !node.is_leaf() {
+                ops.insert(node.to_string());
+            }
+        }
+
+        let num_consts = lhs
+            .ast
+            .as_ref()
+            .iter()
+            .chain(rhs.ast.as_ref())
+            .filter(|n| match n {
+                ENodeOrVar::ENode(n) => n.is_constant(),
+                ENodeOrVar::Var(_) => false,
+            })
+            .count() as i32;
+
+        [
+            vars.len() as i32,
+            -num_consts,
+            -i32::max(l_size, r_size),
+            -(l_size + r_size),
+            -(ops.len() as i32),
+        ]
     }
 
     fn validate(

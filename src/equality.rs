@@ -80,6 +80,10 @@ impl<L: SynthLanguage> Equality<L> {
             None => None,
         }
     }
+
+    pub fn score(&self) -> impl Ord + Debug {
+        L::score(&self.lhs, &self.rhs)
+    }
 }
 
 #[derive(Clone, Serialize, Debug, Deserialize)]

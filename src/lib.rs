@@ -156,8 +156,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for ids in by_cvec.values() {
             let mut terms_ids: Vec<_> = ids.iter().map(|&id| (extract.find_best(id), id)).collect();
             terms_ids.sort_by_key(|x| x.0 .0); // sort by cost
-            let ((c1, e1), id1) = terms_ids.remove(0);
-            for ((c2, e2), id2) in terms_ids {
+            let ((_, e1), _) = terms_ids.remove(0);
+            for ((_, e2), _) in terms_ids {
                 if let Some(eq) = Equality::new(&e1, &e2) {
                     candidates.insert(eq.name.clone(), eq);
                 }
@@ -170,14 +170,78 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn select(&mut self, step_size: usize, candidates: EqualityMap<L>) -> EqualityMap<L> {
-        for (name, candidate) in candidates {
-            self.new_rws.insert(name, candidate);
+        println!(
+            "Selecting {} rewrites from {} candidates",
+            step_size,
+            candidates.len()
+        );
+
+        // 1. sort by score
+        let mut sorted_candidates: EqualityMap<L> = candidates
+            .sorted_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()))
+            .collect();
+
+        // 2. insert step_size best candidates into self.new_rws
+        for _ in 0..step_size {
+            let popped = sorted_candidates.pop();
+            if let Some((name, eq)) = popped {
+                println!("selected {}", name);
+                self.new_rws.insert(name, eq);
+            } else {
+                break;
+            }
         }
-        EqualityMap::default()
+
+        // 3. return remaining candidates
+        let mut remaining_candidates: EqualityMap<L> = Default::default();
+
+        for (name, candidate) in sorted_candidates {
+            remaining_candidates.insert(name, candidate);
+        }
+        println!(
+            "Returning {} remaining candidates",
+            remaining_candidates.len()
+        );
+        remaining_candidates
     }
 
     fn shrink(&mut self, candidates: &EqualityMap<L>) -> EqualityMap<L> {
-        EqualityMap::default()
+        // 1. make new egraph
+        // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
+        let mut runner = self.mk_runner(EGraph::default());
+
+        // 2. insert lhs and rhs of all candidates as roots
+        for eq in candidates.values() {
+            runner = runner.with_expr(&L::instantiate(&eq.lhs));
+            runner = runner.with_expr(&L::instantiate(&eq.rhs));
+        }
+
+        // 3. run eqsat with self.prior_rws and self.new_rws
+        let rewrites = self
+            .prior_rws
+            .values()
+            .map(|eq| &eq.rewrite)
+            .chain(self.new_rws.values().map(|eq| &eq.rewrite));
+        runner = runner.run(rewrites);
+
+        // 4. go through candidates (root pairs) and if they haven't yet
+        // merged, they are still candidates
+        let mut remaining_candidates = EqualityMap::default();
+        let extract = Extractor::new(&runner.egraph, AstSize);
+        for ids in runner.roots.chunks(2) {
+            if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
+                // candidate has merged (derivable from other rewrites)
+                continue;
+            }
+            let (_, left) = extract.find_best(ids[0]);
+            let (_, right) = extract.find_best(ids[1]);
+            if let Some(eq) = Equality::new(&left, &right) {
+                remaining_candidates.insert(eq.name.clone(), eq);
+            }
+        }
+        println!("{} candidates after shrinking", remaining_candidates.len());
+
+        remaining_candidates
     }
 
     fn choose_eqs(&mut self, candidates: EqualityMap<L>) {
