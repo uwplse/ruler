@@ -88,19 +88,18 @@ impl SynthLanguage for Bool {
 
     fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
         println!("initializing vars: {:?}", vars);
-        let mut initialize_cvec = || {
-            let mut vals = vec![];
-            for _ in 0..synth.egraph.analysis.cvec_len {
-                vals.push(Some(synth.rng.gen::<bool>()));
-            }
-            vals
-        };
 
-        let mut egraph = EGraph::new(SynthAnalysis { cvec_len: 10 });
+        let consts = vec![Some(true), Some(false)];
+        let cvecs = self_product(&consts, vars.len());
 
-        for v in vars {
-            let id = egraph.add(Bool::Var(Symbol::from(v)));
-            egraph[id].data.cvec = initialize_cvec();
+        let mut egraph = EGraph::new(SynthAnalysis {
+            cvec_len: cvecs[0].len(),
+        });
+
+        for (i, v) in vars.iter().enumerate() {
+            let id = egraph.add(Bool::Var(Symbol::from(v.clone())));
+            let cvec = cvecs[i].clone();
+            egraph[id].data.cvec = cvec;
         }
 
         synth.egraph = egraph;
