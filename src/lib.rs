@@ -169,8 +169,25 @@ impl<L: SynthLanguage> Synthesizer<L> {
         candidates
     }
 
-    fn choose_eqs(&mut self, candidates: EqualityMap<L>) -> EqualityMap<L> {
-        candidates
+    fn select(&mut self, step_size: usize, candidates: EqualityMap<L>) -> EqualityMap<L> {
+        for (name, candidate) in candidates {
+            self.new_rws.insert(name, candidate);
+        }
+        EqualityMap::default()
+    }
+
+    fn shrink(&mut self, candidates: &EqualityMap<L>) -> EqualityMap<L> {
+        EqualityMap::default()
+    }
+
+    fn choose_eqs(&mut self, candidates: EqualityMap<L>) {
+        let step_size = 1;
+        let mut remaining_candidates = candidates;
+        while remaining_candidates.len() > 0 {
+            remaining_candidates = self.select(step_size, remaining_candidates);
+
+            remaining_candidates = self.shrink(&remaining_candidates);
+        }
     }
 
     pub fn run(mut self) -> Report<L> {
@@ -204,7 +221,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
             println!("{} => {}", v.lhs, v.rhs);
         }
 
-        self.new_rws = self.choose_eqs(candidates);
+        self.choose_eqs(candidates);
+
         let num_rules = self.prior_rws.len() + self.new_rws.len();
 
         println!(
