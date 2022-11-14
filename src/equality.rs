@@ -13,11 +13,11 @@ pub struct Equality<L: SynthLanguage> {
     pub rewrite: Rewrite<L, SynthAnalysis>,
 }
 
-struct RHS<L: SynthLanguage> {
+struct Rhs<L: SynthLanguage> {
     rhs: Pattern<L>,
 }
 
-impl<L: SynthLanguage> Applier<L, SynthAnalysis> for RHS<L> {
+impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
     fn vars(&self) -> Vec<Var> {
         self.rhs.vars()
     }
@@ -53,12 +53,12 @@ impl<L: SynthLanguage> Equality<L> {
         let l_pat: Pattern<L> = ser.lhs.parse().unwrap();
         let r_pat: Pattern<L> = ser.rhs.parse().unwrap();
         let name = format!("{} ==> {}", l_pat, r_pat);
-        let rhs = RHS { rhs: r_pat.clone() };
+        let rhs = Rhs { rhs: r_pat.clone() };
 
         Self {
             name: name.clone().into(),
             lhs: l_pat.clone(),
-            rhs: r_pat.clone(),
+            rhs: r_pat,
             rewrite: Rewrite::new(name, l_pat, rhs).unwrap(),
         }
     }
@@ -68,17 +68,15 @@ impl<L: SynthLanguage> Equality<L> {
         let l_pat = L::generalize(e1, map);
         let r_pat = L::generalize(e2, map);
         let name = format!("{} ==> {}", l_pat, r_pat);
-        let rhs = RHS { rhs: r_pat.clone() };
+        let rhs = Rhs { rhs: r_pat.clone() };
         let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
-        match rewrite {
-            Some(rw) => Some(Equality {
-                name: name.into(),
-                lhs: l_pat,
-                rhs: r_pat,
-                rewrite: rw,
-            }),
-            None => None,
-        }
+
+        rewrite.map(|rw| Equality {
+            name: name.into(),
+            lhs: l_pat,
+            rhs: r_pat,
+            rewrite: rw,
+        })
     }
 
     pub fn score(&self) -> impl Ord + Debug {

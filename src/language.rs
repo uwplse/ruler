@@ -117,7 +117,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
                 ENodeOrVar::ENode(n) => n.clone(),
                 ENodeOrVar::Var(v) => {
                     let s = v.to_string();
-                    assert!(s.starts_with("?"));
+                    assert!(s.starts_with('?'));
                     Self::mk_var(s[1..].into())
                 }
             })

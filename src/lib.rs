@@ -247,7 +247,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn choose_eqs(&mut self, candidates: EqualityMap<L>) {
         let step_size = 1;
         let mut remaining_candidates = candidates;
-        while remaining_candidates.len() > 0 {
+        while !remaining_candidates.is_empty() {
             remaining_candidates = self.select(step_size, remaining_candidates);
 
             remaining_candidates = self.shrink(&remaining_candidates);

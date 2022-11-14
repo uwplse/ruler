@@ -1,7 +1,6 @@
 use egg::*;
 use ruler::*;
 use std::ops::*;
-use SynthLanguage;
 
 define_language! {
   pub enum Bool {
@@ -25,12 +24,7 @@ impl SynthLanguage for Bool {
         match self {
             Bool::Not(a) => {
                 let cvec = get_cvec(a);
-                cvec.iter()
-                    .map(|a| match a {
-                        Some(x) => Some(x.not()),
-                        None => None,
-                    })
-                    .collect()
+                cvec.iter().map(|a| a.map(|a| a.not())).collect()
             }
             Bool::And([x, y]) => {
                 let x_cvec = get_cvec(x);
