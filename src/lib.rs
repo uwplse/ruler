@@ -54,7 +54,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 File::open(&filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
             let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
             for eq in report.rewrites {
-                println!("{}", eq.name);
                 priors.insert(eq.name.clone(), eq);
             }
         }
@@ -95,9 +94,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn mk_runner(&self, mut egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
         Runner::default()
             .with_scheduler(SimpleScheduler)
-            .with_node_limit(1000)
-            .with_iter_limit(2)
-            .with_time_limit(Duration::from_secs(2))
+            .with_node_limit(usize::MAX)
+            .with_iter_limit(5)
+            .with_time_limit(Duration::from_secs(10))
             .with_egraph(egraph)
     }
 
@@ -108,12 +107,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
         println!("running {} rewrites", rewrites.len());
         let starting_ids = self.egraph.classes().map(|c| c.id);
 
+        let num_rewrites = rewrites.len();
         let mut runner = self.mk_runner(self.egraph.clone());
-        runner = runner.run(rewrites.clone());
+        runner = runner.run(rewrites);
 
         println!(
             "Done running {} rewrites. Stop reason: {:?}",
-            rewrites.len(),
+            num_rewrites,
             runner.stop_reason.unwrap()
         );
 
@@ -165,7 +165,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     pub fn run(mut self) -> Report<L> {
-        println!("run");
         let t = Instant::now();
 
         let time = t.elapsed().as_secs_f64();

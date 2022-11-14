@@ -38,17 +38,28 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
     }
 
     fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+        let mut merge_a = false;
+        let mut merge_b = false;
+
+        // let cost_fn = |x: &RecExpr<L>| AstSize.cost_rec(x);
+
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
                 match (to.cvec[i].clone(), from.cvec[i].clone()) {
-                    (None, Some(_)) => to.cvec[i] = from.cvec[i].clone(),
+                    (None, Some(_)) => {
+                        to.cvec[i] = from.cvec[i].clone();
+                        merge_a = true;
+                    }
+                    (Some(_), None) => {
+                        merge_b = true;
+                    }
                     (Some(x), Some(y)) => assert_eq!(x, y, "cvecs do not match!!"),
                     _ => (),
                 }
             }
         }
 
-        DidMerge(true, true)
+        DidMerge(merge_a, merge_b)
     }
 }
 

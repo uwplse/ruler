@@ -13,30 +13,75 @@ pub struct Equality<L: SynthLanguage> {
     pub rewrite: Rewrite<L, SynthAnalysis>,
 }
 
+struct RHS<L: SynthLanguage> {
+    name: String,
+    rhs: Pattern<L>,
+}
+
+impl<L: SynthLanguage> Applier<L, SynthAnalysis> for RHS<L> {
+    fn vars(&self) -> Vec<Var> {
+        self.rhs.vars()
+    }
+
+    fn apply_one(
+        &self,
+        egraph: &mut EGraph<L, SynthAnalysis>,
+        matched_id: Id,
+        subst: &Subst,
+        _ast: Option<&PatternAst<L>>,
+        _sym: Symbol,
+    ) -> Vec<Id> {
+        if !egraph[matched_id].data.is_defined() {
+            return vec![];
+        }
+
+        let id = apply_pat(self.rhs.ast.as_ref(), egraph, subst);
+        if id == matched_id {
+            return vec![];
+        }
+
+        if !egraph[id].data.is_defined() {
+            return vec![];
+        }
+
+        egraph.union(id, matched_id);
+        vec![id]
+    }
+}
+
 impl<L: SynthLanguage> Equality<L> {
     fn from_serialized_eq(ser: SerializedEq) -> Self {
         let l_pat: Pattern<L> = ser.lhs.parse().unwrap();
         let r_pat: Pattern<L> = ser.rhs.parse().unwrap();
         let name = format!("{} ==> {}", l_pat, r_pat);
+        let rhs = RHS {
+            name: name.clone(),
+            rhs: r_pat.clone(),
+        };
+
         Self {
             name: name.clone().into(),
             lhs: l_pat.clone(),
             rhs: r_pat.clone(),
-            rewrite: Rewrite::new(name, l_pat, r_pat).unwrap(),
+            rewrite: Rewrite::new(name, l_pat, rhs).unwrap(),
         }
     }
 
     pub fn new(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
         let map = &mut HashMap::default();
-        let lhs = L::generalize(e1, map);
-        let rhs = L::generalize(e2, map);
-        let name = format!("{} ==> {}", lhs, rhs);
-        let rewrite = Rewrite::new(name.clone(), lhs.clone(), rhs.clone()).ok();
+        let l_pat = L::generalize(e1, map);
+        let r_pat = L::generalize(e2, map);
+        let name = format!("{} ==> {}", l_pat, r_pat);
+        let rhs = RHS {
+            name: name.clone(),
+            rhs: r_pat.clone(),
+        };
+        let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
         match rewrite {
             Some(rw) => Some(Equality {
                 name: name.into(),
-                lhs: lhs,
-                rhs: rhs,
+                lhs: l_pat,
+                rhs: r_pat,
                 rewrite: rw,
             }),
             None => None,
@@ -87,4 +132,25 @@ impl<L: SynthLanguage> From<Equality<L>> for SerializedEq {
             rhs: eq.rhs.to_string(),
         }
     }
+}
+
+fn apply_pat<L: Language, A: Analysis<L>>(
+    pat: &[ENodeOrVar<L>],
+    egraph: &mut EGraph<L, A>,
+    subst: &Subst,
+) -> Id {
+    let mut ids = vec![0.into(); pat.len()];
+
+    for (i, pat_node) in pat.iter().enumerate() {
+        let id = match pat_node {
+            ENodeOrVar::Var(w) => subst[*w],
+            ENodeOrVar::ENode(e) => {
+                let n = e.clone().map_children(|child| ids[usize::from(child)]);
+                egraph.add(n)
+            }
+        };
+        ids[i] = id;
+    }
+
+    *ids.last().unwrap()
 }
