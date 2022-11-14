@@ -77,7 +77,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
             let expr: RecExpr<L> = line.unwrap().parse().unwrap();
             for node in expr.as_ref() {
                 if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
-                    vars.extend(vec![v.to_string()]);
+                    let mut v = v.to_string();
+                    v.remove(0);
+                    vars.extend(vec![v]);
                 }
             }
             terms.push(expr);
@@ -117,7 +119,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             runner.stop_reason.unwrap()
         );
 
-        println!("New egraph size: {}", runner.egraph.number_of_classes());
         let mut found_unions = HashMap::default();
         for id in starting_ids {
             let new_id = runner.egraph.find(id);
@@ -134,6 +135,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             }
         }
+        println!("New egraph size: {}", self.egraph.number_of_classes());
         runner.egraph.rebuild();
         runner.egraph
     }
@@ -159,6 +161,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 if let Some(eq) = Equality::new(&e1, &e2) {
                     candidates.insert(eq.name.clone(), eq);
                 }
+                if let Some(eq) = Equality::new(&e2, &e1) {
+                    candidates.insert(eq.name.clone(), eq);
+                }
             }
         }
         candidates
@@ -171,7 +176,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let filename = self.params.workload.clone().expect("workload is required");
         let (workload, vars) = self.enumerate_workload(&filename);
-        println!("enumerated {} terms", workload.len());
+        println!(
+            "enumerated {} terms with {} vars",
+            workload.len(),
+            vars.len()
+        );
         L::initialize_vars(&mut self, vars);
         Synthesizer::add_workload(&mut self.egraph, &workload);
 
