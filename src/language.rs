@@ -19,6 +19,7 @@ impl Default for SynthAnalysis {
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
+    pub interval: Interval<L::Constant>,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -34,14 +35,13 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
         let get_cvec = |id: &Id| &egraph[*id].data.cvec;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
+            interval: enode.mk_interval(egraph),
         }
     }
 
     fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let mut merge_a = false;
         let mut merge_b = false;
-
-        // let cost_fn = |x: &RecExpr<L>| AstSize.cost_rec(x);
 
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
@@ -59,7 +59,45 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
             }
         }
 
+        // New interval is max of mins, min of maxes
+        let new_min = match (to.interval.low.as_ref(), from.interval.low.as_ref()) {
+            (None, None) => None,
+            (None, Some(y)) => Some(y.clone()),
+            (Some(x), None) => Some(x.clone()),
+            (Some(x), Some(y)) => Some(x.max(y).clone()),
+        };
+        let new_max = match (to.interval.high.as_ref(), from.interval.high.as_ref()) {
+            (None, None) => None,
+            (None, Some(y)) => Some(y.clone()),
+            (Some(x), None) => Some(x.clone()),
+            (Some(x), Some(y)) => Some(x.min(y).clone()),
+        };
+        let new_interval = Interval::new(new_min, new_max);
+        if to.interval != new_interval {
+            to.interval = new_interval;
+            merge_a = true;
+        }
+
+        if to.interval != from.interval {
+            merge_b = true;
+        }
+
         DidMerge(merge_a, merge_b)
+    }
+
+    fn modify(egraph: &mut EGraph<L, Self>, id: Id) {
+        let interval = &egraph[id].data.interval;
+        if let Interval {
+            low: Some(low),
+            high: Some(high),
+        } = interval
+        {
+            if low == high {
+                let enode = L::mk_constant(low.clone());
+                let added = egraph.add(enode);
+                egraph.union(id, added);
+            }
+        }
     }
 }
 
@@ -72,12 +110,17 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
 
+    fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+        Interval::default()
+    }
+
     fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>);
 
     fn to_var(&self) -> Option<Symbol>;
     fn mk_var(sym: egg::Symbol) -> Self;
 
     fn is_constant(&self) -> bool;
+    fn mk_constant(c: Self::Constant) -> Self;
 
     fn to_enode_or_var(self) -> ENodeOrVar<Self> {
         match self.to_var() {

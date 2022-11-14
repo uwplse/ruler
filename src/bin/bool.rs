@@ -79,6 +79,52 @@ impl SynthLanguage for Bool {
         }
     }
 
+    fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+        let get_interval = |x: &Id| {
+            let interval = egraph[*x].data.interval.clone();
+            (
+                interval
+                    .low
+                    .expect("Bool shouldn't have infinite intervals"),
+                interval
+                    .high
+                    .expect("Bool shouldn't have infinite intervals"),
+            )
+        };
+        match self {
+            Bool::Lit(c) => Interval::new(Some(*c), Some(*c)),
+            Bool::Var(_) => Interval::new(Some(false), Some(true)),
+            Bool::Not(x) => {
+                let (low, high) = get_interval(x);
+                Interval::new(Some(!high), Some(!low))
+            }
+            Bool::And([x, y]) => {
+                let (x_low, x_high) = get_interval(x);
+                let (y_low, y_high) = get_interval(y);
+                Interval::new(Some(x_low && y_low), Some(x_high && y_high))
+            }
+            Bool::Or([x, y]) => {
+                let (x_low, x_high) = get_interval(x);
+                let (y_low, y_high) = get_interval(y);
+                Interval::new(Some(x_low || y_low), Some(x_high || y_high))
+            }
+            Bool::Xor([x, y]) => {
+                let (x_low, x_high) = get_interval(x);
+                let (y_low, y_high) = get_interval(y);
+                if x_low == x_high && y_low == y_high {
+                    Interval::new(Some(x_low != y_low), Some(x_low != y_low))
+                } else {
+                    Interval::new(Some(false), Some(true))
+                }
+            }
+            Bool::Implies([x, y]) => {
+                let (x_low, x_high) = get_interval(x);
+                let (y_low, y_high) = get_interval(y);
+                Interval::new(Some(!x_high || y_low), Some(!x_low || y_high))
+            }
+        }
+    }
+
     fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
         println!("initializing vars: {:?}", vars);
 
@@ -119,6 +165,10 @@ impl SynthLanguage for Bool {
 
     fn is_constant(&self) -> bool {
         matches!(self, Bool::Lit(_))
+    }
+
+    fn mk_constant(c: Self::Constant) -> Self {
+        Bool::Lit(c)
     }
 }
 
