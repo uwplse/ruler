@@ -57,7 +57,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 priors.insert(eq.name.clone(), eq);
             }
         }
-        println!("Parsed {} prior rules", priors.len());
 
         Self {
             params,
@@ -109,15 +108,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
         println!("running {} rewrites", rewrites.len());
         let starting_ids = self.egraph.classes().map(|c| c.id);
 
-        let num_rewrites = rewrites.len();
         let mut runner = self.mk_runner(self.egraph.clone());
         runner = runner.run(rewrites);
-
-        println!(
-            "Done running {} rewrites. Stop reason: {:?}",
-            num_rewrites,
-            runner.stop_reason.unwrap()
-        );
 
         let mut found_unions = HashMap::default();
         for id in starting_ids {
@@ -135,7 +127,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             }
         }
-        println!("New egraph size: {}", self.egraph.number_of_classes());
         runner.egraph.rebuild();
         runner.egraph
     }
@@ -148,8 +139,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 by_cvec.entry(&class.data.cvec).or_default().push(class.id);
             }
         }
-
-        println!("{} unique cvecs", by_cvec.len());
 
         let mut candidates = EqualityMap::default();
         let extract = Extractor::new(&self.egraph, AstSize);
@@ -170,12 +159,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn select(&mut self, step_size: usize, candidates: EqualityMap<L>) -> EqualityMap<L> {
-        println!(
-            "Selecting {} rewrites from {} candidates",
-            step_size,
-            candidates.len()
-        );
-
         // 1. sort by score
         let mut sorted_candidates: EqualityMap<L> = candidates
             .sorted_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()))
@@ -185,7 +168,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for _ in 0..step_size {
             let popped = sorted_candidates.pop();
             if let Some((name, eq)) = popped {
-                println!("selected {}", name);
                 self.new_rws.insert(name, eq);
             } else {
                 break;
@@ -198,10 +180,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         for (name, candidate) in sorted_candidates {
             remaining_candidates.insert(name, candidate);
         }
-        println!(
-            "Returning {} remaining candidates",
-            remaining_candidates.len()
-        );
+
         remaining_candidates
     }
 
@@ -239,7 +218,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 remaining_candidates.insert(eq.name.clone(), eq);
             }
         }
-        println!("{} candidates after shrinking", remaining_candidates.len());
 
         remaining_candidates
     }
@@ -269,21 +247,12 @@ impl<L: SynthLanguage> Synthesizer<L> {
         L::initialize_vars(&mut self, vars);
         Synthesizer::add_workload(&mut self.egraph, &workload);
 
-        println!(
-            "Added workload to egraph. {} eclasses",
-            self.egraph.number_of_classes()
-        );
-
         let eqs = self.prior_rws.clone();
 
         self.run_rewrites(eqs.values().map(|eq| &eq.rewrite).collect());
 
         let candidates = self.cvec_match();
-        println!("{} candidates", candidates.len());
-
-        for v in candidates.values() {
-            println!("{} => {}", v.lhs, v.rhs);
-        }
+        println!("Found {} candidates", candidates.len());
 
         self.choose_eqs(candidates);
 
