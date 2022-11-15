@@ -14,10 +14,12 @@ use std::{
 };
 
 pub use equality::*;
+pub use interval::*;
 pub use language::*;
 pub use util::*;
 
 mod equality;
+mod interval;
 mod language;
 mod util;
 
@@ -52,8 +54,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         if let Some(filename) = params.prior_rules.clone() {
             let file =
                 File::open(&filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
-            let report: SlimReport<L> = serde_json::from_reader(file).unwrap();
-            for eq in report.rewrites {
+            let report: Report<L> = serde_json::from_reader(file).unwrap();
+            for eq in report.prior_rws {
+                priors.insert(eq.name.clone(), eq);
+            }
+            for eq in report.new_rws {
                 priors.insert(eq.name.clone(), eq);
             }
         }
