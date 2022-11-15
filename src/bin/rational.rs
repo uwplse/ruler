@@ -14,10 +14,10 @@ fn mk_rat(n: i64, d: i64) -> Ratio<BigInt> {
     }
     let n = n
         .to_bigint()
-        .expect(&format!("Could not make bigint from {}", n));
+        .unwrap_or_else(|| panic!("could not make bigint from {}", n));
     let d = d
         .to_bigint()
-        .expect(&format!("Could not make bigint from {}", d));
+        .unwrap_or_else(|| panic!("could not make bigint from {}", d));
 
     Ratio::new(n, d)
 }
