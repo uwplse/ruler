@@ -22,58 +22,11 @@ impl SynthLanguage for Bool {
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Bool::Not(a) => {
-                let cvec = get_cvec(a);
-                cvec.iter().map(|a| a.map(|a| a.not())).collect()
-            }
-            Bool::And([x, y]) => {
-                let x_cvec = get_cvec(x);
-                let y_cvec = get_cvec(y);
-                x_cvec
-                    .iter()
-                    .zip(y_cvec.iter())
-                    .map(|(x, y)| match (x, y) {
-                        (Some(x), Some(y)) => Some(*x & *y),
-                        _ => None,
-                    })
-                    .collect()
-            }
-            Bool::Or([x, y]) => {
-                let x_cvec = get_cvec(x);
-                let y_cvec = get_cvec(y);
-                x_cvec
-                    .iter()
-                    .zip(y_cvec.iter())
-                    .map(|(x, y)| match (x, y) {
-                        (Some(x), Some(y)) => Some(*x | *y),
-                        _ => None,
-                    })
-                    .collect()
-            }
-            Bool::Xor([x, y]) => {
-                let x_cvec = get_cvec(x);
-                let y_cvec = get_cvec(y);
-                x_cvec
-                    .iter()
-                    .zip(y_cvec.iter())
-                    .map(|(x, y)| match (x, y) {
-                        (Some(x), Some(y)) => Some(*x ^ *y),
-                        _ => None,
-                    })
-                    .collect()
-            }
-            Bool::Implies([x, y]) => {
-                let x_cvec = get_cvec(x);
-                let y_cvec = get_cvec(y);
-                x_cvec
-                    .iter()
-                    .zip(y_cvec.iter())
-                    .map(|(x, y)| match (x, y) {
-                        (Some(x), Some(y)) => Some(!(*x) || *y),
-                        _ => None,
-                    })
-                    .collect()
-            }
+            Bool::Not(x) => map!(get_cvec, x => Some(x.not())),
+            Bool::And([x, y]) => map!(get_cvec, x, y => Some(*x & *y)),
+            Bool::Or([x, y]) => map!(get_cvec, x, y => Some(*x | *y)),
+            Bool::Xor([x, y]) => map!(get_cvec, x, y => Some(*x ^ *y)),
+            Bool::Implies([x, y]) => map!(get_cvec, x, y => Some(!(*x) | *y)),
             Bool::Lit(c) => vec![Some(*c); cvec_len],
             Bool::Var(_) => vec![],
         }

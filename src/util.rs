@@ -22,3 +22,27 @@ pub fn self_product<T: Clone>(ts: &[T], n: usize) -> Vec<Vec<T>> {
     }
     res
 }
+
+#[macro_export]
+macro_rules! map {
+    ($get:ident, $a:ident => $body:expr) => {
+        $get($a)
+            .iter()
+            .map(|a| match a {
+                Some($a) => $body,
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+
+    ($get:ident, $a:ident, $b:ident => $body:expr) => {
+        $get($a)
+            .iter()
+            .zip($get($b).iter())
+            .map(|tup| match tup {
+                (Some($a), Some($b)) => $body,
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+}
