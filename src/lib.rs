@@ -170,14 +170,18 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .collect();
 
         // 2. insert step_size best candidates into self.new_rws
-        for _ in 0..step_size {
+        let mut selected: EqualityMap<L> = Default::default();
+        while selected.len() < step_size {
             let popped = sorted_candidates.pop();
             if let Some((name, eq)) = popped {
-                self.new_rws.insert(name, eq);
+                if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
+                    selected.insert(name, eq);
+                }
             } else {
                 break;
             }
         }
+        self.new_rws.extend(selected);
 
         // 3. return remaining candidates
         let mut remaining_candidates: EqualityMap<L> = Default::default();
