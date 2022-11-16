@@ -1,3 +1,4 @@
+use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, RecExpr, Rewrite, Subst};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::{str::FromStr, sync::Arc};

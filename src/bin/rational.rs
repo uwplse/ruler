@@ -1,4 +1,3 @@
-use egg::*;
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use ruler::*;
@@ -22,7 +21,7 @@ fn mk_rat(n: i64, d: i64) -> Ratio<BigInt> {
     Ratio::new(n, d)
 }
 
-define_language! {
+egg::define_language! {
   pub enum Math {
     "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),

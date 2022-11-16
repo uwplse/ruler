@@ -1,8 +1,7 @@
-use egg::*;
 use ruler::*;
 use std::ops::*;
 
-define_language! {
+egg::define_language! {
   pub enum Bool {
     "~" = Not(Id),
     "&" = And([Id; 2]),

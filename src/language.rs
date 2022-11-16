@@ -4,6 +4,9 @@ use std::{
 };
 
 use clap::Parser;
+use egg::{
+    Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
+};
 
 use crate::*;
 
@@ -30,7 +33,7 @@ impl<L: SynthLanguage> Signature<L> {
     }
 }
 
-impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
+impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
     type Data = Signature<L>;
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
@@ -106,7 +109,7 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
 pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
 
-pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
+pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
     fn eval<'a, F>(&'a self, cvec_len: usize, _get_cvec: F) -> CVec<Self>
@@ -123,7 +126,7 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>);
 
     fn to_var(&self) -> Option<Symbol>;
-    fn mk_var(sym: egg::Symbol) -> Self;
+    fn mk_var(sym: Symbol) -> Self;
 
     fn is_constant(&self) -> bool;
     fn mk_constant(c: Self::Constant) -> Self;

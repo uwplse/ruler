@@ -1,6 +1,6 @@
+use egg::{AstSize, ENodeOrVar, Extractor, RecExpr, Rewrite, Runner};
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
-use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     fs::File,
@@ -88,7 +88,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     fn mk_runner(&self, egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
         Runner::default()
-            .with_scheduler(SimpleScheduler)
+            .with_scheduler(egg::SimpleScheduler)
             .with_node_limit(usize::MAX)
             .with_iter_limit(5)
             .with_time_limit(Duration::from_secs(10))
@@ -284,14 +284,4 @@ pub fn synth<L: SynthLanguage>(params: SynthParams) {
     let file =
         std::fs::File::create(&outfile).unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
     serde_json::to_writer_pretty(file, &report).expect("failed to write json");
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(bound = "L: SynthLanguage")]
-pub struct Report<L: SynthLanguage> {
-    pub params: SynthParams,
-    pub time: f64,
-    pub num_rules: usize,
-    pub prior_rws: Vec<Equality<L>>,
-    pub new_rws: Vec<Equality<L>>,
 }
