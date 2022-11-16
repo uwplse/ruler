@@ -218,12 +218,10 @@ pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'stati
     fn run_synth() {
         match Command::parse() {
             Command::Synth(params) => {
-                let outfile = params.outfile.clone();
-                let syn = Synthesizer::<Self>::new(params);
-                let report = syn.run();
-                let file = std::fs::File::create(&outfile)
-                    .unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
-                serde_json::to_writer_pretty(file, &report).expect("failed to write json");
+                synth::synth::<Self>(params);
+            }
+            Command::Derive(params) => {
+                derive::derive::<Self>(params);
             }
         }
     }
