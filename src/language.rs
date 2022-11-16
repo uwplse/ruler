@@ -3,6 +3,8 @@ use std::{
     hash::Hash,
 };
 
+use clap::Parser;
+
 use crate::*;
 
 #[derive(Clone)]

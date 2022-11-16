@@ -1,4 +1,3 @@
-use clap::Parser;
 use egg::*;
 
 use rand::SeedableRng;
@@ -13,11 +12,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub use command::*;
 pub use equality::*;
 pub use interval::*;
 pub use language::*;
 pub use util::*;
 
+mod command;
 mod equality;
 mod interval;
 mod language;
@@ -286,27 +287,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             new_rws: self.new_rws.into_iter().map(|(_, eq)| eq).collect(),
         }
     }
-}
-
-#[derive(Parser)]
-#[clap(rename_all = "kebab-case")]
-pub enum Command {
-    Synth(SynthParams),
-}
-
-/// All parameters for rule synthesis.
-#[derive(Parser, Deserialize, Serialize)]
-#[clap(rename_all = "kebab-case")]
-pub struct SynthParams {
-    /// Output file name
-    #[clap(long, default_value = "out.json")]
-    pub outfile: String,
-
-    #[clap(long)]
-    pub prior_rules: Option<String>,
-
-    #[clap(long)]
-    pub workload: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
