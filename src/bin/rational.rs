@@ -1,5 +1,5 @@
 use egg::*;
-use num::{rational::Ratio, BigInt, ToPrimitive, Zero};
+use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use ruler::*;
 use std::ops::*;
@@ -58,8 +58,19 @@ impl SynthLanguage for Math {
         }
     }
 
-    fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
-        Interval::new(None, None)
+    fn mk_interval<'a, F>(&'a self, mut get_interval: F) -> Interval<Self::Constant>
+    where
+        F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
+    {
+        match self {
+            Math::Lit(n) => Interval::new(Some(n.clone()), Some(n.clone())),
+            Math::Var(_) => Interval::default(),
+            Math::Neg(x) => neg(get_interval(x)),
+            Math::Add([x, y]) => add(get_interval(x), get_interval(y)),
+            Math::Sub([x, y]) => add(get_interval(x), &neg(get_interval(y))),
+            Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
+            Math::Div([x, y]) => mul(get_interval(x), &recip(get_interval(y))),
+        }
     }
 
     fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
@@ -154,4 +165,112 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
 
 fn main() {
     Math::run_synth()
+}
+
+// Interval helpers
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Sign {
+    Positive,
+    ContainsZero,
+    Negative,
+}
+
+fn sign(interval: &Interval<Constant>) -> Sign {
+    match (&interval.low, &interval.high) {
+        (None, None) => Sign::ContainsZero,
+        (Some(x), None) => {
+            if x.is_positive() {
+                Sign::Positive
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (None, Some(y)) => {
+            if y.is_negative() {
+                Sign::Negative
+            } else {
+                Sign::ContainsZero
+            }
+        }
+        (Some(x), Some(y)) => {
+            if x.is_positive() && y.is_positive() {
+                Sign::Positive
+            } else if x.is_negative() && y.is_negative() {
+                Sign::Negative
+            } else {
+                Sign::ContainsZero
+            }
+        }
+    }
+}
+
+fn neg(interval: &Interval<Constant>) -> Interval<Constant> {
+    let low = interval.low.clone();
+    let high = interval.high.clone();
+    Interval::new(high.map(|x| -x), low.map(|x| -x))
+}
+
+fn add(a: &Interval<Constant>, b: &Interval<Constant>) -> Interval<Constant> {
+    let add_opts = |x: Option<Constant>, y: Option<Constant>| x.zip(y).map(|(x, y)| x + y);
+    let a = a.clone();
+    let b = b.clone();
+    Interval::new(add_opts(a.low, b.low), add_opts(a.high, b.high))
+}
+
+fn mul(a: &Interval<Constant>, b: &Interval<Constant>) -> Interval<Constant> {
+    let mul_opts = |x: Option<Constant>, y: Option<Constant>| x.zip(y).map(|(x, y)| x * y);
+    let (sign_a, sign_b) = (sign(a), sign(b));
+    let a = a.clone();
+    let b = b.clone();
+    match (sign_a, sign_b) {
+        (Sign::Negative, Sign::Negative) => {
+            Interval::new(mul_opts(a.high, b.high), mul_opts(a.low, b.low))
+        }
+        (Sign::Positive, Sign::Positive) => {
+            Interval::new(mul_opts(a.low, b.low), mul_opts(a.high, b.high))
+        }
+        (Sign::Positive, Sign::Negative) => {
+            Interval::new(mul_opts(a.high, b.low), mul_opts(a.low, b.high))
+        }
+        (Sign::Negative, Sign::Positive) => {
+            Interval::new(mul_opts(a.low, b.high), mul_opts(a.high, b.low))
+        }
+
+        (Sign::Positive, Sign::ContainsZero) => {
+            Interval::new(mul_opts(a.high.clone(), b.low), mul_opts(a.high, b.high))
+        }
+        (Sign::ContainsZero, Sign::Positive) => {
+            Interval::new(mul_opts(a.low, b.high.clone()), mul_opts(a.high, b.high))
+        }
+
+        (Sign::Negative, Sign::ContainsZero) => {
+            Interval::new(mul_opts(a.low.clone(), b.high), mul_opts(a.low, b.low))
+        }
+        (Sign::ContainsZero, Sign::Negative) => {
+            Interval::new(mul_opts(a.high, b.low.clone()), mul_opts(a.low, b.low))
+        }
+
+        (Sign::ContainsZero, Sign::ContainsZero) => {
+            let al_bh = mul_opts(a.low.clone(), b.high.clone());
+            let ah_bl = mul_opts(a.high.clone(), b.low.clone());
+            let min = al_bh.zip(ah_bl).map(|(x, y)| x.min(y));
+
+            let ah_bh = mul_opts(a.high, b.high);
+            let al_bl = mul_opts(a.low, b.low);
+            let max = ah_bh.zip(al_bl).map(|(x, y)| x.max(y));
+            Interval::new(min, max)
+        }
+    }
+}
+
+fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
+    let interval = interval.clone();
+    let sign = sign(&interval);
+    match (interval.low, interval.high) {
+        (Some(x), Some(y)) => match sign {
+            Sign::ContainsZero => Interval::default(),
+            _ => Interval::new(Some(y.recip()), Some(x.recip())),
+        },
+        _ => Interval::default(),
+    }
 }

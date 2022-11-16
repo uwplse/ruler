@@ -35,9 +35,10 @@ impl<L: SynthLanguage> egg::Analysis<L> for SynthAnalysis {
 
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
         let get_cvec = |id: &Id| &egraph[*id].data.cvec;
+        let get_interval = |id: &Id| &egraph[*id].data.interval;
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
-            interval: enode.mk_interval(egraph),
+            interval: enode.mk_interval(get_interval),
         }
     }
 
@@ -108,11 +109,14 @@ pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
 pub trait SynthLanguage: egg::Language + Send + Sync + Display + FromOp + 'static {
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
-    fn eval<'a, F>(&'a self, cvec_len: usize, f: F) -> CVec<Self>
+    fn eval<'a, F>(&'a self, cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
 
-    fn mk_interval(&self, _egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
+    fn mk_interval<'a, F>(&'a self, _get_interval: F) -> Interval<Self::Constant>
+    where
+        F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
+    {
         Interval::default()
     }
 

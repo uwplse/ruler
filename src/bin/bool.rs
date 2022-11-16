@@ -32,9 +32,11 @@ impl SynthLanguage for Bool {
         }
     }
 
-    fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
-        let get_interval = |x: &Id| {
-            let interval = egraph[*x].data.interval.clone();
+    fn mk_interval<'a, F>(&'a self, mut get_interval: F) -> Interval<Self::Constant>
+    where
+        F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
+    {
+        let unwrap_interval = |interval: &Interval<Self::Constant>| {
             (
                 interval
                     .low
@@ -48,22 +50,22 @@ impl SynthLanguage for Bool {
             Bool::Lit(c) => Interval::new(Some(*c), Some(*c)),
             Bool::Var(_) => Interval::new(Some(false), Some(true)),
             Bool::Not(x) => {
-                let (low, high) = get_interval(x);
+                let (low, high) = unwrap_interval(get_interval(x));
                 Interval::new(Some(!high), Some(!low))
             }
             Bool::And([x, y]) => {
-                let (x_low, x_high) = get_interval(x);
-                let (y_low, y_high) = get_interval(y);
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
                 Interval::new(Some(x_low && y_low), Some(x_high && y_high))
             }
             Bool::Or([x, y]) => {
-                let (x_low, x_high) = get_interval(x);
-                let (y_low, y_high) = get_interval(y);
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
                 Interval::new(Some(x_low || y_low), Some(x_high || y_high))
             }
             Bool::Xor([x, y]) => {
-                let (x_low, x_high) = get_interval(x);
-                let (y_low, y_high) = get_interval(y);
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
                 if x_low == x_high && y_low == y_high {
                     Interval::new(Some(x_low != y_low), Some(x_low != y_low))
                 } else {
@@ -71,8 +73,8 @@ impl SynthLanguage for Bool {
                 }
             }
             Bool::Implies([x, y]) => {
-                let (x_low, x_high) = get_interval(x);
-                let (y_low, y_high) = get_interval(y);
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
                 Interval::new(Some(!x_high || y_low), Some(!x_low || y_high))
             }
         }
