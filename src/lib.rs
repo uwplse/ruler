@@ -47,17 +47,14 @@ pub struct SynthParams {
 #[derive(Parser, Deserialize, Serialize)]
 #[clap(rename_all = "kebab-case")]
 pub struct DeriveParams {
+    in1: String,
+    in2: String,
     /// Output file name
     #[clap(long, default_value = "out.json")]
     pub outfile: String,
 
-    /// Input file name
-    #[clap(long)]
-    pub in1: String,
-
-    /// Input file name
-    #[clap(long)]
-    pub in2: String,
+    #[clap(long, default_value = "10")]
+    iter_limit: usize,
 }
 
 #[derive(Serialize, Deserialize)]
