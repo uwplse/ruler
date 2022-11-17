@@ -1,4 +1,4 @@
-use egg::{AstSize, ENodeOrVar, Extractor, RecExpr, Rewrite, Runner};
+use egg::{AstSize, EClass, ENodeOrVar, Extractor, RecExpr, Rewrite, Runner};
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use std::{
@@ -126,6 +126,49 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn cvec_match(&self) -> EqualityMap<L> {
+        // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
+        // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
+
+        let not_all_none: Vec<&EClass<L, Signature<L>>> = self
+            .egraph
+            .classes()
+            .filter(|x| x.data.cvec.iter().any(|v| v.is_some()))
+            .collect();
+
+        let compare = |cvec1: &CVec<L>, cvec2: &CVec<L>| -> bool {
+            for tup in cvec1.iter().zip(cvec2) {
+                match tup {
+                    (Some(a), Some(b)) if a != b => return false,
+                    _ => (),
+                }
+            }
+            true
+        };
+        let mut candidates = EqualityMap::default();
+        let extract = Extractor::new(&self.egraph, AstSize);
+        for class1 in &not_all_none {
+            for class2 in &not_all_none {
+                if class1.id == class2.id {
+                    continue;
+                }
+                if compare(&class1.data.cvec, &class2.data.cvec) {
+                    let (_, e1) = extract.find_best(class1.id);
+                    let (_, e2) = extract.find_best(class2.id);
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        candidates.insert(eq.name.clone(), eq);
+                    }
+                    if let Some(eq) = Equality::new(&e2, &e1) {
+                        candidates.insert(eq.name.clone(), eq);
+                    }
+                }
+            }
+        }
+        candidates
+    }
+
+    // TODO: Figure out what to do with this- it doesn't match the definition
+    // of cvec matching from the paper, but it is faster.
+    fn _fast_cvec_match(&self) -> EqualityMap<L> {
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
 
         for class in self.egraph.classes() {
