@@ -51,10 +51,13 @@ pub struct DeriveParams {
     in2: String,
     /// Output file name
     #[clap(long, default_value = "out.json")]
-    pub outfile: String,
+    outfile: String,
 
     #[clap(long, default_value = "10")]
     iter_limit: usize,
+
+    #[clap(long)]
+    ci: bool,
 }
 
 #[derive(Serialize, Deserialize)]

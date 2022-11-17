@@ -131,4 +131,13 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
     let file = File::create(&params.outfile)
         .unwrap_or_else(|_| panic!("Failed to create {}", &params.outfile));
     serde_json::to_writer_pretty(file, &json).unwrap();
+
+    if params.ci {
+        for eq in &not_derivable {
+            println!("Couldn't derive {}", eq.name);
+        }
+        if !not_derivable.is_empty() {
+            std::process::exit(-1);
+        }
+    }
 }
