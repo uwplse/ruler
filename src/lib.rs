@@ -1,6 +1,7 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+pub use bv::*;
 pub use derive::*;
 pub use equality::*;
 pub use interval::*;
@@ -8,6 +9,7 @@ pub use language::*;
 pub use synth::*;
 pub use util::*;
 
+mod bv;
 mod derive;
 mod equality;
 mod interval;

@@ -87,15 +87,17 @@ jobs:
 
       - name: "Synthesize rational rules"
         run: |
-          cargo rational --workload tests/rat-atoms3.terms --outfile out/rat3.json
-          cargo rational --workload tests/rat-atoms5.terms --prior-rules out/rat3.json --outfile out/rat5.json
-          cargo rational --workload tests/rat-canon.terms --prior-rules out/rat5.json --outfile out/rat-canon.json
-          cargo run --release --bin rational derive out/rat-canon.json tests/rat.json  --outfile out/rat-derive.json
+          cargo rational --workload tests/workloads/rat-atoms3.terms --outfile out/rat3.json
+          cargo rational --workload tests/workloads/rat-atoms5.terms --prior-rules out/rat3.json --outfile out/rat5.json
+          cargo rational --workload tests/workloads/rat-canon.terms --prior-rules out/rat5.json --outfile out/rat-canon.json
+          cargo run --release --bin rational derive out/rat-canon.json tests/rat.json --ci  --outfile out/rat-derive.json
 
-      # - name: "Synthesize bv4 rules"
-      #   run: |
-      #     cargo bv4 --iters 2 --variables 3 --outfile out/bv4.json
-      #     cargo run --release --bin bv4 derive --ci out/bv4.json tests/bv4.json out/bv4-derive.json
+      - name: "Synthesize bv4 rules"
+        run: |
+          cargo bv4 --workload tests/workloads/bv4-atoms3.terms --outfile out/bv43.json
+          cargo bv4 --workload tests/workloads/bv4-atoms5.terms --prior-rules out/bv43.json --outfile out/bv45.json
+          cargo bv4 --workload tests/workloads/bv4-canon.terms --prior-rules out/bv45.json --outfile out/bv4-canon.json
+          cargo run --release --bin bv4 derive out/bv4-canon.json tests/bv4.json --ci --outfile out/bv4-derive.json
 
       # - name: "Synthesize bv32 rules"
       #   run: |
