@@ -90,7 +90,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         Runner::default()
             .with_scheduler(egg::SimpleScheduler)
             .with_node_limit(usize::MAX)
-            .with_iter_limit(5)
+            .with_iter_limit(2)
             .with_time_limit(Duration::from_secs(10))
             .with_egraph(egraph)
     }
@@ -128,6 +128,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn cvec_match(&self) -> EqualityMap<L> {
         // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
         // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
+
+        println!(
+            "starting cvec match with {} eclasses",
+            self.egraph.number_of_classes()
+        );
 
         let not_all_none: Vec<&EClass<L, Signature<L>>> = self
             .egraph

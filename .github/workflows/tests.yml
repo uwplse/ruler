@@ -87,39 +87,41 @@ jobs:
 
       - name: "Synthesize rational rules"
         run: |
-          cargo rational --iters 2 --variables 3 --num-fuzz 100 --do-final-run --outfile out/rat.json
-          cargo run --release --bin rational derive --ci out/rat.json tests/rat.json out/rat-derive.json
+          cargo rational --workload tests/rat-atoms3.terms --outfile out/rat3.json
+          cargo rational --workload tests/rat-atoms5.terms --prior-rules out/rat3.json --outfile out/rat5.json
+          cargo rational --workload tests/rat-canon.terms --prior-rules out/rat5.json --outfile out/rat-canon.json
+          cargo run --release --bin rational derive out/rat-canon.json tests/rat.json  --outfile out/rat-derive.json
 
-      - name: "Synthesize rational rules (EMA)"
-        run: |
-          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --num-fuzz 100 --do-final-run --outfile out/rat-ema.json
-          cargo run --release --bin rational derive --ci out/rat-ema.json tests/rat-ema.json out/rat-ema-derive.json
+      # - name: "Synthesize rational rules (EMA)"
+      #   run: |
+      #     cargo rational --iters 2 --variables 3 --ema-above-iter 1 --num-fuzz 100 --do-final-run --outfile out/rat-ema.json
+      #     cargo run --release --bin rational derive --ci out/rat-ema.json tests/rat-ema.json out/rat-ema-derive.json
 
-      - name: "Synthesize rational rules (EMA, no consts)"
-        run: |
-          cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --num-fuzz 100 --do-final-run --outfile out/rat-ema-no-const.json
-          cargo run --release --bin rational derive --ci out/rat-ema-no-const.json tests/rat-ema-no-const.json out/rat-ema-no-const-derive.json
+      # - name: "Synthesize rational rules (EMA, no consts)"
+      #   run: |
+      #     cargo rational --iters 2 --variables 3 --ema-above-iter 1 --no-constants-above-iter 1 --num-fuzz 100 --do-final-run --outfile out/rat-ema-no-const.json
+      #     cargo run --release --bin rational derive --ci out/rat-ema-no-const.json tests/rat-ema-no-const.json out/rat-ema-no-const-derive.json
 
-      - name: "Synthesize bv4 rules"
-        run: |
-          cargo bv4 --iters 2 --variables 3 --outfile out/bv4.json
-          cargo run --release --bin bv4 derive --ci out/bv4.json tests/bv4.json out/bv4-derive.json
+      # - name: "Synthesize bv4 rules"
+      #   run: |
+      #     cargo bv4 --iters 2 --variables 3 --outfile out/bv4.json
+      #     cargo run --release --bin bv4 derive --ci out/bv4.json tests/bv4.json out/bv4-derive.json
 
-      - name: "Synthesize bv32 rules"
-        run: |
-          cargo bv32 --iters 2 --variables 3 --outfile out/bv32.json
-          cargo run --release --bin bv32 derive --ci out/bv32.json tests/bv32.json out/bv32-derive.json
+      # - name: "Synthesize bv32 rules"
+      #   run: |
+      #     cargo bv32 --iters 2 --variables 3 --outfile out/bv32.json
+      #     cargo run --release --bin bv32 derive --ci out/bv32.json tests/bv32.json out/bv32-derive.json
 
-      - name: "Synthesize real rules from rational rules (rule lifting)"
-        run: |
-          cargo real-rat --iters 2 --variables 3 --no-constants-above-iter 1 --prior-rules out/rat.json --outfile out/real.json
-          cargo run --release --bin real-rat derive --ci --only-new out/real.json tests/real.json out/real-derive.json
+      # - name: "Synthesize real rules from rational rules (rule lifting)"
+      #   run: |
+      #     cargo real-rat --iters 2 --variables 3 --no-constants-above-iter 1 --prior-rules out/rat.json --outfile out/real.json
+      #     cargo run --release --bin real-rat derive --ci --only-new out/real.json tests/real.json out/real-derive.json
 
-      - name: "Synthesize bv2 rules from bool rules (rule lifting)"
-        run: |
-          cargo bool --iters 2 --variables 3 --outfile out/bool.json
-          cargo bv-bool --iters 2 --variables 3 --prior-rules out/bool.json --outfile out/bv2-bool.json
-          cargo run --release --bin bv-bool derive --ci out/bv2-bool.json tests/bv2-bool.json out/bv2-derive.json
+      # - name: "Synthesize bv2 rules from bool rules (rule lifting)"
+      #   run: |
+      #     cargo bool --iters 2 --variables 3 --outfile out/bool.json
+      #     cargo bv-bool --iters 2 --variables 3 --prior-rules out/bool.json --outfile out/bv2-bool.json
+      #     cargo run --release --bin bv-bool derive --ci out/bv2-bool.json tests/bv2-bool.json out/bv2-derive.json
 
       # Need to filter out rational rules from real.json
       # - name: "Synthesize complex rules from real rules (rule lifting, no constants)"
