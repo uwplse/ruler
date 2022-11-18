@@ -181,6 +181,17 @@ macro_rules! impl_bv {
                 }
             }
 
+            fn mk_interval<'a, F>(&'a self, mut get_interval: F) -> Interval<Self::Constant>
+            where
+                F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
+            {
+              match self {
+                Bv::Lit(c) => Interval::new(Some(*c), Some(*c)),
+                // Todo- proper interval analysis. For now it's just constant folding
+                _ => Interval::default()
+              }
+            }
+
             fn to_var(&self) -> Option<Symbol> {
               if let Bv::Var(sym) = self {
                 Some(*sym)
