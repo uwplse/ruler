@@ -17,6 +17,9 @@ const INNER_N: u32 = 32;
 impl<const N: u32> BV<N> {
     pub const ZERO: Self = Self(0);
     pub const ALL_ONES: Self = Self((!(0)) >> (INNER_N - N));
+    pub const NEG_ONE: Self = Self::ALL_ONES;
+    pub const MIN: Self = Self(1 << (N - 1));
+    pub const MAX: Self = Self(Self::ALL_ONES.0 >> 1);
 
     pub fn new(n: impl Into<Inner>) -> Self {
         Self(n.into() & Self::ALL_ONES.0)
@@ -240,4 +243,25 @@ macro_rules! impl_bv {
             }
         }
     };
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    type BV4 = BV<4>;
+
+    #[test]
+    fn test_bv() {
+        assert_eq!(BV4::ALL_ONES.0, 0b1111);
+        assert_eq!(BV4::MAX.0, 0b0111);
+        assert_eq!(BV4::MIN.0, 0b1000);
+
+        let one = BV4::from(1);
+
+        assert_eq!(BV4::MAX.wrapping_add(one), BV::MIN);
+        assert_eq!(BV4::NEG_ONE.wrapping_neg(), one);
+        assert_eq!(BV4::MIN.wrapping_mul(BV::NEG_ONE), BV::MIN);
+        assert_eq!(BV4::MIN.wrapping_neg(), BV::MIN);
+    }
 }

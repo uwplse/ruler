@@ -288,3 +288,163 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
         _ => Interval::default(),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
+        let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
+        Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
+    }
+
+    #[test]
+    fn sign_test() {
+        assert_eq!(sign(&interval(None, None)), Sign::ContainsZero);
+        assert_eq!(sign(&interval(None, Some(-100))), Sign::Negative);
+        assert_eq!(sign(&interval(None, Some(100))), Sign::ContainsZero);
+        assert_eq!(sign(&interval(Some(-100), None)), Sign::ContainsZero);
+        assert_eq!(sign(&interval(Some(100), None)), Sign::Positive);
+        assert_eq!(sign(&interval(Some(-100), Some(-50))), Sign::Negative);
+        assert_eq!(sign(&interval(Some(50), Some(100))), Sign::Positive);
+        assert_eq!(sign(&interval(Some(-10), Some(100))), Sign::ContainsZero);
+    }
+
+    #[test]
+    fn neg_interval_test() {
+        assert_eq!(neg(&interval(None, None)), interval(None, None));
+        assert_eq!(neg(&interval(Some(10), None)), interval(None, Some(-10)));
+        assert_eq!(neg(&interval(Some(-10), None)), interval(None, Some(10)));
+        assert_eq!(neg(&interval(None, Some(10))), interval(Some(-10), None));
+        assert_eq!(neg(&interval(None, Some(-10))), interval(Some(10), None));
+        assert_eq!(
+            neg(&interval(Some(5), Some(10))),
+            interval(Some(-10), Some(-5))
+        );
+    }
+
+    #[test]
+    fn add_interval_test() {
+        assert_eq!(
+            add(&interval(None, None), &interval(None, None)),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(&interval(None, None), &interval(Some(-10), Some(10))),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(&interval(Some(-10), Some(10)), &interval(None, None)),
+            interval(None, None)
+        );
+        assert_eq!(
+            add(
+                &interval(Some(-20), Some(5)),
+                &interval(Some(-10), Some(10))
+            ),
+            interval(Some(-30), Some(15))
+        );
+    }
+
+    #[test]
+    fn mul_interval_test() {
+        assert_eq!(
+            mul(&interval(None, Some(-3)), &interval(None, Some(-4))),
+            interval(Some(12), None)
+        );
+        assert_eq!(
+            mul(
+                &interval(Some(-100), Some(-2)),
+                &interval(Some(-50), Some(-20))
+            ),
+            interval(Some(40), Some(5000))
+        );
+        assert_eq!(
+            mul(&interval(Some(2), None), &interval(Some(50), None)),
+            interval(Some(100), None)
+        );
+        assert_eq!(
+            mul(&interval(Some(30), Some(50)), &interval(Some(2), Some(3))),
+            interval(Some(60), Some(150))
+        );
+        assert_eq!(
+            mul(
+                &interval(Some(-10), Some(-5)),
+                &interval(Some(6), Some(100))
+            ),
+            interval(Some(-1000), Some(-30))
+        );
+        assert_eq!(
+            mul(&interval(Some(3), Some(10)), &interval(None, Some(-1))),
+            interval(None, Some(-3))
+        );
+        assert_eq!(
+            mul(&interval(Some(2), Some(5)), &interval(Some(-3), Some(4))),
+            interval(Some(-15), Some(20))
+        );
+        assert_eq!(
+            mul(&interval(Some(-2), None), &interval(Some(3), Some(4))),
+            interval(Some(-8), None)
+        );
+        assert_eq!(
+            mul(&interval(None, None), &interval(Some(-10), Some(-4))),
+            interval(None, None)
+        );
+        assert_eq!(
+            mul(&interval(Some(-8), Some(6)), &interval(Some(-3), Some(-2))),
+            interval(Some(-18), Some(24))
+        );
+        assert_eq!(
+            mul(&interval(Some(-4), Some(6)), &interval(Some(-8), Some(10))),
+            interval(Some(-48), Some(60))
+        );
+        assert_eq!(
+            mul(
+                &interval(Some(-100), Some(50)),
+                &interval(Some(-5), Some(7))
+            ),
+            interval(Some(-700), Some(500))
+        );
+        assert_eq!(
+            mul(&interval(Some(-5), Some(6)), &interval(Some(-4), Some(8))),
+            interval(Some(-40), Some(48))
+        );
+        assert_eq!(
+            mul(&interval(Some(-4), Some(10)), &interval(Some(-8), Some(6))),
+            interval(Some(-80), Some(60))
+        );
+        assert_eq!(
+            mul(&interval(None, Some(10)), &interval(Some(-5), Some(15))),
+            interval(None, None)
+        );
+        assert_eq!(
+            mul(&interval(Some(-4), Some(10)), &interval(Some(-8), None)),
+            interval(None, None)
+        );
+    }
+
+    #[test]
+    fn recip_interval_test() {
+        assert_eq!(recip(&interval(None, None)), interval(None, None));
+        assert_eq!(
+            recip(&interval(Some(50), Some(100))),
+            Interval::new(
+                Some(Ratio::new(1.to_bigint().unwrap(), 100.to_bigint().unwrap())),
+                Some(Ratio::new(1.to_bigint().unwrap(), 50.to_bigint().unwrap())),
+            )
+        );
+        assert_eq!(
+            recip(&interval(Some(-10), Some(-5))),
+            Interval::new(
+                Some(Ratio::new(
+                    1.to_bigint().unwrap(),
+                    (-5).to_bigint().unwrap()
+                )),
+                Some(Ratio::new(
+                    1.to_bigint().unwrap(),
+                    (-10).to_bigint().unwrap()
+                )),
+            )
+        );
+    }
+}
