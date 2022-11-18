@@ -112,6 +112,10 @@ pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
 pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
+    fn is_rule_lifting() -> bool {
+        false
+    }
+
     fn eval<'a, F>(&'a self, cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
@@ -136,6 +140,20 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
             Some(var) => ENodeOrVar::Var(format!("?{}", var).parse().unwrap()),
             None => ENodeOrVar::ENode(self),
         }
+    }
+
+    fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        let pattern_is_extractable = |pat: &Pattern<Self>| {
+            pat.ast.as_ref().iter().all(|n| match n {
+                ENodeOrVar::ENode(n) => n.is_extractable(),
+                ENodeOrVar::Var(_) => true,
+            })
+        };
+        pattern_is_extractable(lhs) && pattern_is_extractable(rhs)
+    }
+
+    fn is_extractable(&self) -> bool {
+        true
     }
 
     fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {

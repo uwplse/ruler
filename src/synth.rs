@@ -1,4 +1,4 @@
-use egg::{AstSize, EClass, ENodeOrVar, Extractor, RecExpr, Rewrite, Runner};
+use egg::{AstSize, EClass, ENodeOrVar, Extractor, RecExpr, Rewrite, Runner, StopReason};
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use std::{
@@ -35,6 +35,7 @@ pub struct Synthesizer<L: SynthLanguage> {
     pub egraph: EGraph<L, SynthAnalysis>,
     pub prior_rws: EqualityMap<L>,
     pub new_rws: EqualityMap<L>,
+    pub lifting_rws: Vec<Rewrite<L, SynthAnalysis>>,
 }
 
 impl<L: SynthLanguage> Synthesizer<L> {
@@ -58,6 +59,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             egraph: Default::default(),
             prior_rws: priors,
             new_rws: Default::default(),
+            lifting_rws: vec![],
         }
     }
 
@@ -96,24 +98,26 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn run_rewrites(
-        &mut self,
+        &self,
+        mut runner: Runner<L, SynthAnalysis>,
         rewrites: Vec<&Rewrite<L, SynthAnalysis>>,
-    ) -> EGraph<L, SynthAnalysis> {
-        println!("running {} rewrites", rewrites.len());
-        let starting_ids = self.egraph.classes().map(|c| c.id);
-
-        let mut runner = self.mk_runner(self.egraph.clone());
+    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
+        let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
         runner = runner.run(rewrites);
+        let stop_reason = runner.stop_reason.unwrap();
 
         let mut found_unions = HashMap::default();
-        for id in starting_ids {
+        for id in ids {
             let new_id = runner.egraph.find(id);
-            found_unions
-                .entry(new_id)
-                .or_insert_with(Vec::default)
-                .push(id);
+            found_unions.entry(new_id).or_insert_with(Vec::new).push(id);
         }
-        for ids in found_unions.values() {
+
+        runner.egraph.rebuild();
+        (runner.egraph, found_unions, stop_reason)
+    }
+
+    fn apply_unions(&mut self, unions: HashMap<Id, Vec<Id>>) {
+        for ids in unions.values() {
             if ids.len() > 1 {
                 let first = ids[0];
                 for id in &ids[1..] {
@@ -121,8 +125,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
                 }
             }
         }
-        runner.egraph.rebuild();
-        runner.egraph
+        self.egraph.rebuild();
     }
 
     fn cvec_match(&self) -> EqualityMap<L> {
@@ -278,6 +281,91 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
     }
 
+    fn run_cvec_synth(&mut self) -> EqualityMap<L> {
+        let eqs = self.prior_rws.clone();
+
+        let runner = self.mk_runner(self.egraph.clone());
+        let (_, unions, _) =
+            self.run_rewrites(runner, eqs.values().map(|eq| &eq.rewrite).collect());
+
+        self.apply_unions(unions);
+
+        self.cvec_match()
+    }
+
+    fn extract_candidates_from_unions(&mut self, unions: HashMap<Id, Vec<Id>>) -> EqualityMap<L> {
+        let mut candidates: EqualityMap<L> = EqualityMap::default();
+        let clone = self.egraph.clone();
+        let extract = Extractor::new(&clone, AstSize); // TODO: cost function for allowed
+        for ids in unions.values() {
+            for id1 in ids.clone() {
+                for id2 in ids.clone() {
+                    let (c1, e1) = extract.find_best(id1);
+                    let (c2, e2) = extract.find_best(id2);
+                    if c1 == usize::MAX || c2 == usize::MAX {
+                        continue;
+                    }
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        if e1 != e2 {
+                            // TODO: we used to validate here- do we need to?
+                            candidates.insert(eq.name.clone(), eq);
+                        }
+                    }
+                }
+            }
+        }
+        candidates
+    }
+
+    fn run_rule_lifting(&mut self) -> EqualityMap<L> {
+        // Run allowed rules
+        let mut allowed: EqualityMap<L> = EqualityMap::default();
+        for (name, eq) in self.prior_rws.clone() {
+            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
+                allowed.insert(name, eq);
+            }
+        }
+        let runner = self.mk_runner(self.egraph.clone());
+        let rewrites = allowed.values().map(|eq| &eq.rewrite).collect();
+        let (_, unions, _) = self.run_rewrites(runner, rewrites);
+        self.apply_unions(unions);
+
+        // Run lifting rules
+        let runner = self
+            .mk_runner(self.egraph.clone())
+            .with_iter_limit(usize::MAX)
+            .with_time_limit(Duration::from_secs(1000))
+            .with_node_limit(usize::MAX);
+
+        let rewrites = self.lifting_rws.iter().collect();
+        let (new_egraph, unions, stop_reason) = self.run_rewrites(runner, rewrites);
+        assert!(
+            matches!(stop_reason, StopReason::Saturated),
+            "lifting rules must saturate. Instead, ended due to {:?}",
+            stop_reason
+        );
+        let mut candidates = self.extract_candidates_from_unions(unions);
+
+        self.egraph = new_egraph;
+
+        // Run all rules
+        let runner = self.mk_runner(self.egraph.clone());
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
+            .prior_rws
+            .values()
+            .map(|eq| &eq.rewrite)
+            .chain(self.lifting_rws.iter())
+            .collect();
+        let (_, unions, _) = self.run_rewrites(runner, rewrites);
+        candidates.extend(self.extract_candidates_from_unions(unions));
+
+        assert!(candidates
+            .iter()
+            .all(|(_, v)| L::is_allowed_rewrite(&v.lhs, &v.rhs)),);
+
+        candidates
+    }
+
     pub fn run(mut self) -> Report<L> {
         let t = Instant::now();
 
@@ -291,12 +379,11 @@ impl<L: SynthLanguage> Synthesizer<L> {
         L::initialize_vars(&mut self, vars);
         Synthesizer::add_workload(&mut self.egraph, &workload);
 
-        let eqs = self.prior_rws.clone();
-
-        self.run_rewrites(eqs.values().map(|eq| &eq.rewrite).collect());
-
-        let candidates = self.cvec_match();
-        println!("Found {} candidates", candidates.len());
+        let candidates = if L::is_rule_lifting() {
+            self.run_rule_lifting()
+        } else {
+            self.run_cvec_synth()
+        };
 
         self.choose_eqs(candidates);
 
