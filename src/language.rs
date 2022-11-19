@@ -6,6 +6,7 @@ use std::{
 use clap::Parser;
 use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
+    Rewrite,
 };
 
 use crate::*;
@@ -116,6 +117,10 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         false
     }
 
+    fn get_lifting_rewrites() -> Vec<Rewrite<Self, SynthAnalysis>> {
+        panic!("No lifting rewrites")
+    }
+
     fn eval<'a, F>(&'a self, cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
@@ -142,18 +147,18 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         }
     }
 
+    fn is_allowed_op(&self) -> bool {
+        true
+    }
+
     fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
         let pattern_is_extractable = |pat: &Pattern<Self>| {
             pat.ast.as_ref().iter().all(|n| match n {
-                ENodeOrVar::ENode(n) => n.is_extractable(),
+                ENodeOrVar::ENode(n) => n.is_allowed_op(),
                 ENodeOrVar::Var(_) => true,
             })
         };
         pattern_is_extractable(lhs) && pattern_is_extractable(rhs)
-    }
-
-    fn is_extractable(&self) -> bool {
-        true
     }
 
     fn generalize(expr: &RecExpr<Self>, map: &mut HashMap<Symbol, Var>) -> Pattern<Self> {

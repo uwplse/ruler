@@ -35,7 +35,6 @@ pub struct Synthesizer<L: SynthLanguage> {
     pub egraph: EGraph<L, SynthAnalysis>,
     pub prior_rws: EqualityMap<L>,
     pub new_rws: EqualityMap<L>,
-    pub lifting_rws: Vec<Rewrite<L, SynthAnalysis>>,
 }
 
 impl<L: SynthLanguage> Synthesizer<L> {
@@ -59,7 +58,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             egraph: Default::default(),
             prior_rws: priors,
             new_rws: Default::default(),
-            lifting_rws: vec![],
         }
     }
 
@@ -296,7 +294,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn extract_candidates_from_unions(&mut self, unions: HashMap<Id, Vec<Id>>) -> EqualityMap<L> {
         let mut candidates: EqualityMap<L> = EqualityMap::default();
         let clone = self.egraph.clone();
-        let extract = Extractor::new(&clone, AstSize); // TODO: cost function for allowed
+        let extract = Extractor::new(&clone, ExtractableAstSize); // TODO: cost function for allowed
         for ids in unions.values() {
             for id1 in ids.clone() {
                 for id2 in ids.clone() {
@@ -319,12 +317,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
     fn run_rule_lifting(&mut self) -> EqualityMap<L> {
         // Run allowed rules
+        println!("{}", self.egraph.number_of_classes());
         let mut allowed: EqualityMap<L> = EqualityMap::default();
         for (name, eq) in self.prior_rws.clone() {
             if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
                 allowed.insert(name, eq);
             }
         }
+        println!("{} allowed rules", allowed.len());
         let runner = self.mk_runner(self.egraph.clone());
         let rewrites = allowed.values().map(|eq| &eq.rewrite).collect();
         let (_, unions, _) = self.run_rewrites(runner, rewrites);
@@ -337,8 +337,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .with_time_limit(Duration::from_secs(1000))
             .with_node_limit(usize::MAX);
 
-        let rewrites = self.lifting_rws.iter().collect();
-        let (new_egraph, unions, stop_reason) = self.run_rewrites(runner, rewrites);
+        let lifting_rewrites = L::get_lifting_rewrites();
+        let (new_egraph, unions, stop_reason) =
+            self.run_rewrites(runner, lifting_rewrites.iter().collect());
         assert!(
             matches!(stop_reason, StopReason::Saturated),
             "lifting rules must saturate. Instead, ended due to {:?}",
@@ -354,7 +355,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .prior_rws
             .values()
             .map(|eq| &eq.rewrite)
-            .chain(self.lifting_rws.iter())
+            .chain(lifting_rewrites.iter())
             .collect();
         let (_, unions, _) = self.run_rewrites(runner, rewrites);
         candidates.extend(self.extract_candidates_from_unions(unions));
@@ -419,4 +420,21 @@ pub fn synth<L: SynthLanguage>(params: SynthParams) {
     let file =
         std::fs::File::create(&outfile).unwrap_or_else(|_| panic!("Failed to open '{}'", outfile));
     serde_json::to_writer_pretty(file, &report).expect("failed to write json");
+}
+
+// Cost function for ast size in the domain
+// Penalizes ops not in the domain
+pub struct ExtractableAstSize;
+impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
+    type Cost = usize;
+    fn cost<C>(&mut self, enode: &L, mut costs: C) -> Self::Cost
+    where
+        C: FnMut(Id) -> Self::Cost,
+    {
+        if enode.is_allowed_op() {
+            enode.fold(1, |sum, id| sum.saturating_add(costs(id)))
+        } else {
+            usize::max_value()
+        }
+    }
 }

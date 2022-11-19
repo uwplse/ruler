@@ -97,6 +97,13 @@ jobs:
           cargo bv4 --workload tests/workloads/bv4-atoms3.terms --outfile out/bv43.json
           cargo bv4 --workload tests/workloads/bv4-atoms5.terms --prior-rules out/bv43.json --outfile out/bv45.json
           cargo run --release --bin bv4 derive out/bv45.json tests/bv4.json --ci --outfile out/bv4-derive.json
+      
+      - name: "Synthesize bv2 rules from bool rules (rule lifting)"
+        run: |
+          cargo bool --workload tests/workloads/bool-atoms3.terms --outfile out/bool3.json
+          cargo bool --workload tests/workloads/bool-atoms5.terms --outfile out/bool5.json
+          cargo bv-bool --workload tests/workloads/bv-depth1.terms --prior-rules out/bool5.json --outfile out/bv.json
+          cargo run --release --bin bv-bool derive --ci out/bv2-bool.json tests/bv2-bool.json out/bv2-derive.json
 
       # - name: "Synthesize bv32 rules"
       #   run: |

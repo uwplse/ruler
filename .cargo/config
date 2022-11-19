@@ -3,5 +3,7 @@ rational = ["run", "--release", "--bin", "rational", "--", "synth"]
 bool =     ["run", "--release", "--bin", "bool",     "--", "synth"]
 bv4 =      ["run", "--release", "--bin", "bv4",      "--", "synth"]
 
+bv-bool =  ["run", "--release", "--bin", "bv-bool",  "--", "synth"]
+
 [build]
 rustflags = "-C target-cpu=native"
