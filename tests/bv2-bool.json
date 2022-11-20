@@ -1,424 +1,264 @@
 {
   "params": {
-    "seed": 0,
-    "n_samples": 0,
-    "variables": 3,
-    "outfile": "tests/bv2-bool.json",
-    "no_constant_fold": false,
-    "iters": 2,
-    "rules_to_take": 18446744073709551615,
-    "node_chunk_size": 100000,
-    "eq_chunk_size": 18446744073709551615,
-    "no_constants_above_iter": 999999,
-    "no_conditionals": false,
-    "no_run_rewrites": false,
-    "linear_cvec_matching": false,
-    "ema_above_iter": 999999,
-    "disabled_ops": null,
-    "disabled_consts": null,
-    "filtered_consts": null,
-    "keep_all": false,
-    "eqsat_node_limit": 300000,
-    "eqsat_iter_limit": 2,
-    "eqsat_time_limit": 60,
-    "important_cvec_offsets": 5,
-    "str_int_variables": 1,
-    "complete_cvec": false,
-    "no_xor": false,
-    "no_shift": false,
-    "num_fuzz": 0,
-    "use_smt": false,
-    "do_final_run": false,
-    "prior_rules": "out/bool.json",
-    "workload": null
+    "outfile": "../secret/ruler/tests/bv2-bool.json",
+    "prior_rules": "b5.json",
+    "workload": "../secret/ruler/tests/workloads/bv-depth1.terms"
   },
-  "time": 0.935279189,
-  "num_rules": 19,
-  "smt_unknown": 0,
-  "all_eqs": [
+  "prior_rws": [],
+  "time": 0.041149416,
+  "num_rules": 63,
+  "new_rws": [
     {
-      "lhs": "(and ?c (and ?b ?a))",
-      "rhs": "(and ?b (and ?a ?c))",
-      "bidirectional": true
+      "lhs": "(^ ?c (^ ?b ?a))",
+      "rhs": "(^ ?b (^ ?a ?c))"
     },
     {
-      "lhs": "(or ?c (or ?b ?a))",
-      "rhs": "(or ?b (or ?a ?c))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?c (xor ?b ?a))",
-      "rhs": "(xor ?b (xor ?a ?c))",
-      "bidirectional": true
+      "lhs": "(^ ?b (^ ?a ?c))",
+      "rhs": "(^ ?c (^ ?b ?a))"
     },
     {
       "lhs": "(| ?c (| ?b ?a))",
-      "rhs": "(| ?b (| ?a ?c))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(^ ?c (^ ?b ?a))",
-      "rhs": "(^ ?a (^ ?b ?c))",
-      "bidirectional": false
+      "rhs": "(| ?a (| ?b ?c))"
     },
     {
       "lhs": "(& ?c (& ?b ?a))",
-      "rhs": "(& ?a (& ?b ?c))",
-      "bidirectional": false
+      "rhs": "(& ?a (& ?b ?c))"
+    },
+    {
+      "lhs": "(-> ?c (-> ?b ?a))",
+      "rhs": "(-> ?b (-> ?c ?a))"
+    },
+    {
+      "lhs": "(| ?c (-> ?b ?a))",
+      "rhs": "(-> ?b (| ?a ?c))"
+    },
+    {
+      "lhs": "(-> ?b (| ?a ?c))",
+      "rhs": "(| ?c (-> ?b ?a))"
+    },
+    {
+      "lhs": "(-> ?c (-> ?b ?a))",
+      "rhs": "(-> (& ?c ?b) ?a)"
+    },
+    {
+      "lhs": "(-> (& ?c ?b) ?a)",
+      "rhs": "(-> ?c (-> ?b ?a))"
+    },
+    {
+      "lhs": "(or ?b ?a)",
+      "rhs": "(or ?a ?b)"
     },
     {
       "lhs": "(and ?b ?a)",
-      "rhs": "(and ?a ?b)",
-      "bidirectional": false
+      "rhs": "(and ?a ?b)"
     },
     {
       "lhs": "(xor ?b ?a)",
-      "rhs": "(xor ?a ?b)",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(or ?b ?a)",
-      "rhs": "(or ?a ?b)",
-      "bidirectional": false
+      "rhs": "(xor ?a ?b)"
     },
     {
       "lhs": "(| ?b ?a)",
-      "rhs": "(| ?a ?b)",
-      "bidirectional": false
+      "rhs": "(| ?a ?b)"
     },
     {
       "lhs": "(& ?b ?a)",
-      "rhs": "(& ?a ?b)",
-      "bidirectional": false
+      "rhs": "(& ?a ?b)"
     },
     {
       "lhs": "(^ ?b ?a)",
-      "rhs": "(^ ?a ?b)",
-      "bidirectional": false
+      "rhs": "(^ ?a ?b)"
     },
     {
-      "lhs": "(xor ?b (not ?a))",
-      "rhs": "(not (xor ?a ?b))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?b (not ?a))",
-      "rhs": "(xor ?a (not ?b))",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(or ?b (and ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(and ?b (or ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(| ?b (& ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(& ?b (| ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(or ?b ?a)",
-      "rhs": "(or ?b (xor ?b ?a))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(| ?b ?a)",
-      "rhs": "(| ?a (^ ?b ?a))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(and ?b (not ?a))",
-      "rhs": "(and ?b (xor ?a ?b))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?a (and ?b ?a))",
-      "rhs": "(and ?a (not ?b))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(^ ?b (& ?b ?a))",
-      "rhs": "(& ?b (~ ?a))",
-      "bidirectional": true
+      "lhs": "(~ (-> ?b ?a))",
+      "rhs": "(& ?b (~ ?a))"
     },
     {
       "lhs": "(& ?b (~ ?a))",
-      "rhs": "(& ?b (^ ?a ?b))",
-      "bidirectional": true
+      "rhs": "(~ (-> ?b ?a))"
     },
     {
-      "lhs": "(xor ?a (or ?b ?a))",
-      "rhs": "(and ?b (not ?a))",
-      "bidirectional": true
+      "lhs": "(-> (-> ?a ?b) ?a)",
+      "rhs": "?a"
     },
     {
-      "lhs": "(^ ?b (| ?b ?a))",
-      "rhs": "(& ?a (~ ?b))",
-      "bidirectional": true
+      "lhs": "(& ?a (-> ?b ?a))",
+      "rhs": "?a"
     },
     {
-      "lhs": "?a",
-      "rhs": "(or ?a ?a)",
-      "bidirectional": true
+      "lhs": "(| ?a (& ?b ?a))",
+      "rhs": "?a"
     },
     {
-      "lhs": "?a",
-      "rhs": "(and ?a ?a)",
-      "bidirectional": true
+      "lhs": "(& ?b (| ?b ?a))",
+      "rhs": "?b"
     },
     {
-      "lhs": "?a",
-      "rhs": "(^ false ?a)",
-      "bidirectional": true
+      "lhs": "(| ?b ?a)",
+      "rhs": "(-> (-> ?a ?b) ?b)"
     },
     {
-      "lhs": "?a",
-      "rhs": "(| false ?a)",
-      "bidirectional": true
+      "lhs": "(-> (-> ?a ?b) ?b)",
+      "rhs": "(| ?b ?a)"
     },
     {
-      "lhs": "?a",
-      "rhs": "(& true ?a)",
-      "bidirectional": true
+      "lhs": "(-> ?b ?a)",
+      "rhs": "(-> (^ ?a ?b) ?a)"
     },
     {
-      "lhs": "(^ ?a ?a)",
-      "rhs": "false",
-      "bidirectional": false
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(| ?a ?a)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(& ?a ?a)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(~ ?a)",
-      "rhs": "(^ true ?a)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(xor ?a 0)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(or ?a 0)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?a ?a)",
-      "rhs": "0",
-      "bidirectional": false
-    }
-  ],
-  "new_eqs": [
-    {
-      "lhs": "(and ?c (and ?b ?a))",
-      "rhs": "(and ?b (and ?a ?c))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(or ?c (or ?b ?a))",
-      "rhs": "(or ?b (or ?a ?c))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?c (xor ?b ?a))",
-      "rhs": "(xor ?b (xor ?a ?c))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(and ?b ?a)",
-      "rhs": "(and ?a ?b)",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(xor ?b ?a)",
-      "rhs": "(xor ?a ?b)",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(or ?b ?a)",
-      "rhs": "(or ?a ?b)",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(xor ?b (not ?a))",
-      "rhs": "(not (xor ?a ?b))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?b (not ?a))",
-      "rhs": "(xor ?a (not ?b))",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(or ?b (and ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(and ?b (or ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(or ?b ?a)",
-      "rhs": "(or ?b (xor ?b ?a))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(and ?b (not ?a))",
-      "rhs": "(and ?b (xor ?a ?b))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?a (and ?b ?a))",
-      "rhs": "(and ?a (not ?b))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?a (or ?b ?a))",
-      "rhs": "(and ?b (not ?a))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(or ?a ?a)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(and ?a ?a)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(xor ?a 0)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "?a",
-      "rhs": "(or ?a 0)",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(xor ?a ?a)",
-      "rhs": "0",
-      "bidirectional": false
-    }
-  ],
-  "old_eqs": [
-    {
-      "lhs": "(& ?c (& ?b ?a))",
-      "rhs": "(& ?a (& ?b ?c))",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(^ ?c (^ ?b ?a))",
-      "rhs": "(^ ?a (^ ?b ?c))",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(| ?c (| ?b ?a))",
-      "rhs": "(| ?b (| ?a ?c))",
-      "bidirectional": true
-    },
-    {
-      "lhs": "(^ ?b ?a)",
-      "rhs": "(^ ?a ?b)",
-      "bidirectional": false
+      "lhs": "(-> (^ ?a ?b) ?a)",
+      "rhs": "(-> ?b ?a)"
     },
     {
       "lhs": "(& ?b ?a)",
-      "rhs": "(& ?a ?b)",
-      "bidirectional": false
+      "rhs": "(& ?b (-> ?b ?a))"
     },
     {
-      "lhs": "(| ?b ?a)",
-      "rhs": "(| ?a ?b)",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(& ?b (| ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(| ?b (& ?b ?a))",
-      "rhs": "?b",
-      "bidirectional": false
-    },
-    {
-      "lhs": "(| ?b ?a)",
-      "rhs": "(| ?a (^ ?b ?a))",
-      "bidirectional": true
+      "lhs": "(& ?b (-> ?b ?a))",
+      "rhs": "(& ?b ?a)"
     },
     {
       "lhs": "(& ?b (~ ?a))",
-      "rhs": "(& ?b (^ ?a ?b))",
-      "bidirectional": true
+      "rhs": "(& ?b (^ ?a ?b))"
     },
     {
-      "lhs": "(^ ?b (& ?b ?a))",
-      "rhs": "(& ?b (~ ?a))",
-      "bidirectional": true
+      "lhs": "(& ?b (^ ?a ?b))",
+      "rhs": "(& ?b (~ ?a))"
     },
     {
-      "lhs": "(^ ?b (| ?b ?a))",
-      "rhs": "(& ?a (~ ?b))",
-      "bidirectional": true
+      "lhs": "(^ ?a (& ?b ?a))",
+      "rhs": "(& ?a (~ ?b))"
+    },
+    {
+      "lhs": "(& ?a (~ ?b))",
+      "rhs": "(^ ?a (& ?b ?a))"
+    },
+    {
+      "lhs": "(~ (-> ?b ?a))",
+      "rhs": "(^ ?a (| ?b ?a))"
+    },
+    {
+      "lhs": "(^ ?a (| ?b ?a))",
+      "rhs": "(~ (-> ?b ?a))"
+    },
+    {
+      "lhs": "(~ (| ?b ?a))",
+      "rhs": "(^ ?b (-> ?a ?b))"
+    },
+    {
+      "lhs": "(^ ?b (-> ?a ?b))",
+      "rhs": "(~ (| ?b ?a))"
+    },
+    {
+      "lhs": "(~ (& ?b ?a))",
+      "rhs": "(-> ?a (^ ?b ?a))"
+    },
+    {
+      "lhs": "(-> ?a (^ ?b ?a))",
+      "rhs": "(~ (& ?b ?a))"
+    },
+    {
+      "lhs": "(~ (& ?b ?a))",
+      "rhs": "(^ ?a (-> ?a ?b))"
+    },
+    {
+      "lhs": "(^ ?a (-> ?a ?b))",
+      "rhs": "(~ (& ?b ?a))"
     },
     {
       "lhs": "?a",
-      "rhs": "(& ?a ?a)",
-      "bidirectional": true
+      "rhs": "(and ?a ?a)"
+    },
+    {
+      "lhs": "(and ?a ?a)",
+      "rhs": "?a"
     },
     {
       "lhs": "?a",
-      "rhs": "(| ?a ?a)",
-      "bidirectional": true
+      "rhs": "(or ?a ?a)"
+    },
+    {
+      "lhs": "(or ?a ?a)",
+      "rhs": "?a"
     },
     {
       "lhs": "(^ ?a ?a)",
-      "rhs": "false",
-      "bidirectional": false
+      "rhs": "false"
     },
     {
       "lhs": "?a",
-      "rhs": "(& true ?a)",
-      "bidirectional": true
+      "rhs": "(^ false ?a)"
+    },
+    {
+      "lhs": "(^ false ?a)",
+      "rhs": "?a"
     },
     {
       "lhs": "?a",
-      "rhs": "(| false ?a)",
-      "bidirectional": true
+      "rhs": "(-> true ?a)"
+    },
+    {
+      "lhs": "(-> true ?a)",
+      "rhs": "?a"
     },
     {
       "lhs": "?a",
-      "rhs": "(^ false ?a)",
-      "bidirectional": true
+      "rhs": "(& true ?a)"
+    },
+    {
+      "lhs": "(& true ?a)",
+      "rhs": "?a"
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(| false ?a)"
+    },
+    {
+      "lhs": "(| false ?a)",
+      "rhs": "?a"
+    },
+    {
+      "lhs": "(-> ?a ?a)",
+      "rhs": "true"
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(~ (~ ?a))"
+    },
+    {
+      "lhs": "(~ (~ ?a))",
+      "rhs": "?a"
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(& ?a ?a)"
+    },
+    {
+      "lhs": "(& ?a ?a)",
+      "rhs": "?a"
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(| ?a ?a)"
+    },
+    {
+      "lhs": "(| ?a ?a)",
+      "rhs": "?a"
     },
     {
       "lhs": "(~ ?a)",
-      "rhs": "(^ true ?a)",
-      "bidirectional": true
+      "rhs": "(^ true ?a)"
+    },
+    {
+      "lhs": "(^ true ?a)",
+      "rhs": "(~ ?a)"
+    },
+    {
+      "lhs": "(~ ?a)",
+      "rhs": "(-> ?a false)"
+    },
+    {
+      "lhs": "(-> ?a false)",
+      "rhs": "(~ ?a)"
     }
   ]
 }
