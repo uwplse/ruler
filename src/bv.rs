@@ -211,7 +211,7 @@ macro_rules! impl_bv {
                 matches!(self, Bv::Lit(_))
             }
 
-            fn mk_constant(c: Self::Constant) -> Self {
+            fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
                 Bv::Lit(c)
             }
 

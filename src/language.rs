@@ -101,7 +101,7 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
         } = interval
         {
             if low == high {
-                let enode = L::mk_constant(low.clone());
+                let enode = L::mk_constant(low.clone(), egraph);
                 let added = egraph.add(enode);
                 egraph.union(id, added);
             }
@@ -143,7 +143,12 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     fn mk_var(sym: Symbol) -> Self;
 
     fn is_constant(&self) -> bool;
-    fn mk_constant(c: Self::Constant) -> Self;
+    /**
+     * Most domains don't need a reference to the egraph to make a constant node.
+     * However, Nat represents numbers recursively, so adding a new constant
+     * requires adding multiple nodes to the egraph.
+     */
+    fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self;
 
     fn to_enode_or_var(self) -> ENodeOrVar<Self> {
         match self.to_var() {
