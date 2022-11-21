@@ -229,8 +229,6 @@ macro_rules! impl_bv {
                 consts.sort();
                 consts.dedup();
 
-                println!("{}", consts.len());
-
                 let mut cvecs = self_product(&consts, vars.len());
 
                 let mut egraph = EGraph::new(SynthAnalysis {
@@ -247,10 +245,44 @@ macro_rules! impl_bv {
 
             fn validate(
                 _synth: &mut Synthesizer<Self>,
-                _lhs: &Pattern<Self>,
-                _rhs: &Pattern<Self>,
+                lhs: &Pattern<Self>,
+                rhs: &Pattern<Self>,
             ) -> ValidationResult {
-                ValidationResult::Valid
+                use z3::{*, ast::Ast};
+
+                fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Bv]) -> z3::ast::BV<'a> {
+                    let mut buf: Vec<z3::ast::BV> = vec![];
+                    for node in expr.as_ref().iter() {
+                        match node {
+                            Bv::Var(v) => buf.push(z3::ast::BV::new_const(&ctx, v.to_string(), $n)),
+                            Bv::Lit(c) => buf.push(z3::ast::BV::from_u64(&ctx, c.0 as u64, $n)),
+                            Bv::Add([a, b]) => buf.push(buf[usize::from(*a)].bvadd(&buf[usize::from(*b)])),
+                            Bv::Sub([a, b]) => buf.push(buf[usize::from(*a)].bvsub(&buf[usize::from(*b)])),
+                            Bv::Mul([a, b]) => buf.push(buf[usize::from(*a)].bvmul(&buf[usize::from(*b)])),
+                            Bv::Shl([a, b]) => buf.push(buf[usize::from(*a)].bvshl(&buf[usize::from(*b)])),
+                            Bv::Shr([a, b]) => buf.push(buf[usize::from(*a)].bvlshr(&buf[usize::from(*b)])),
+                            Bv::And([a, b]) => buf.push(buf[usize::from(*a)].bvand(&buf[usize::from(*b)])),
+                            Bv::Or([a, b]) => buf.push(buf[usize::from(*a)].bvor(&buf[usize::from(*b)])),
+                            Bv::Xor([a, b]) => buf.push(buf[usize::from(*a)].bvxor(&buf[usize::from(*b)])),
+                            Bv::Not(a) => buf.push(buf[usize::from(*a)].bvnot()),
+                            Bv::Neg(a) => buf.push(buf[usize::from(*a)].bvneg()),
+                        }
+                    }
+                    buf.pop().unwrap()
+                }
+
+                let mut cfg = z3::Config::new();
+                cfg.set_timeout_msec(1000);
+                let ctx = z3::Context::new(&cfg);
+                let solver = z3::Solver::new(&ctx);
+                let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+                let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+                solver.assert(&lexpr._eq(&rexpr).not());
+                match solver.check() {
+                    SatResult::Sat => ValidationResult::Invalid,
+                    SatResult::Unsat => ValidationResult::Valid,
+                    SatResult::Unknown => ValidationResult::Unknown
+                }
             }
         }
     };
