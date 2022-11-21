@@ -93,6 +93,7 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
     }
 
     fn modify(egraph: &mut EGraph<L, Self>, id: Id) {
+        L::custom_modify(egraph, id);
         let interval = &egraph[id].data.interval;
         if let Interval {
             low: Some(low),
@@ -112,6 +113,10 @@ pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
 
 pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
+
+    // Overrideable hook into the egraph analysis modify method
+    // for language-specific purposes (such as custom constant folding)
+    fn custom_modify(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
 
     fn is_rule_lifting() -> bool {
         false

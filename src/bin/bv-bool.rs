@@ -104,6 +104,42 @@ impl SynthLanguage for BvBool {
         BvBool::Num(c)
     }
 
+    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if egraph[id].nodes.iter().any(|n| matches!(n, BvBool::Num(_))) {
+            // e-class is already a constant
+            return;
+        }
+
+        let get_bool_const = |nodes: &[BvBool]| {
+            // let nodes = &egraph[id].nodes;
+            for n in nodes {
+                if let BvBool::Lit(v) = n {
+                    return Some(*v);
+                }
+            }
+            None
+        };
+
+        for n in &egraph[id].nodes {
+            if let BvBool::Make([i, j]) = n {
+                if let Some(x) = get_bool_const(&egraph[*i].nodes) {
+                    if let Some(y) = get_bool_const(&egraph[*j].nodes) {
+                        let cnst = match (x, y) {
+                            (true, true) => BV::<2>::from(3),
+                            (true, false) => BV::<2>::from(2),
+                            (false, true) => BV::<2>::from(1),
+                            (false, false) => BV::<2>::from(0),
+                        };
+
+                        let c_id = egraph.add(BvBool::Num(cnst));
+                        egraph.union(id, c_id);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     fn validate(
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,

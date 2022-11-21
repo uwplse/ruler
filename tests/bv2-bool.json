@@ -1,12 +1,12 @@
 {
   "params": {
-    "outfile": "../secret/ruler/tests/bv2-bool.json",
+    "outfile": "main.json",
     "prior_rules": "b5.json",
     "workload": "../secret/ruler/tests/workloads/bv-depth1.terms"
   },
   "prior_rws": [],
-  "time": 0.041149416,
-  "num_rules": 63,
+  "time": 0.053217916,
+  "num_rules": 69,
   "new_rws": [
     {
       "lhs": "(^ ?c (^ ?b ?a))",
@@ -45,16 +45,16 @@
       "rhs": "(-> ?c (-> ?b ?a))"
     },
     {
-      "lhs": "(or ?b ?a)",
-      "rhs": "(or ?a ?b)"
+      "lhs": "(xor ?b ?a)",
+      "rhs": "(xor ?a ?b)"
     },
     {
       "lhs": "(and ?b ?a)",
       "rhs": "(and ?a ?b)"
     },
     {
-      "lhs": "(xor ?b ?a)",
-      "rhs": "(xor ?a ?b)"
+      "lhs": "(or ?b ?a)",
+      "rhs": "(or ?a ?b)"
     },
     {
       "lhs": "(| ?b ?a)",
@@ -166,18 +166,18 @@
     },
     {
       "lhs": "?a",
-      "rhs": "(and ?a ?a)"
-    },
-    {
-      "lhs": "(and ?a ?a)",
-      "rhs": "?a"
-    },
-    {
-      "lhs": "?a",
       "rhs": "(or ?a ?a)"
     },
     {
       "lhs": "(or ?a ?a)",
+      "rhs": "?a"
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(and ?a ?a)"
+    },
+    {
+      "lhs": "(and ?a ?a)",
       "rhs": "?a"
     },
     {
@@ -259,6 +259,30 @@
     {
       "lhs": "(-> ?a false)",
       "rhs": "(~ ?a)"
+    },
+    {
+      "lhs": "(xor ?a ?a)",
+      "rhs": "0"
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(or ?a 0)"
+    },
+    {
+      "lhs": "(or ?a 0)",
+      "rhs": "?a"
+    },
+    {
+      "lhs": "?a",
+      "rhs": "(xor ?a 0)"
+    },
+    {
+      "lhs": "(xor ?a 0)",
+      "rhs": "?a"
+    },
+    {
+      "lhs": "(and ?a 0)",
+      "rhs": "0"
     }
   ]
 }
