@@ -188,50 +188,61 @@ macro_rules! impl_bv {
             where
                 F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
             {
-              match self {
-                Bv::Lit(c) => Interval::new(Some(*c), Some(*c)),
-                // Todo- proper interval analysis. For now it's just constant folding
-                _ => Interval::default()
-              }
+                match self {
+                    Bv::Lit(c) => Interval::new(Some(*c), Some(*c)),
+                    // Todo- proper interval analysis. For now it's just constant folding
+                    _ => Interval::default()
+                }
             }
 
             fn to_var(&self) -> Option<Symbol> {
-              if let Bv::Var(sym) = self {
-                Some(*sym)
-              } else {
-                None
-              }
+                if let Bv::Var(sym) = self {
+                    Some(*sym)
+                } else {
+                    None
+                }
             }
 
             fn mk_var(sym: Symbol) -> Self {
-              Bv::Var(sym)
+                Bv::Var(sym)
             }
 
             fn is_constant(&self) -> bool {
-              matches!(self, Bv::Lit(_))
+                matches!(self, Bv::Lit(_))
             }
 
             fn mk_constant(c: Self::Constant) -> Self {
-              Bv::Lit(c)
+                Bv::Lit(c)
             }
 
             fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
-              let mut consts: Vec<Option<BV>> = (0..1u64 << $n).map(|i| Some((i as u32).into())).collect();
-              consts.sort();
-              consts.dedup();
+                //   let mut consts: Vec<Option<BV>> = (0..1u64 << $n).map(|i| Some((i as u32).into())).collect();
+                let mut consts = vec![];
 
-              let mut cvecs = self_product(&consts, vars.len());
+                for i in 0..2 {
+                    let i = BV::from(i);
+                    consts.push(Some(BV::MIN.wrapping_add(i)));
+                    consts.push(Some(BV::MAX.wrapping_sub(i)));
+                    consts.push(Some(i));
+                    consts.push(Some(i.wrapping_neg()));
+                }
+                consts.sort();
+                consts.dedup();
 
-              let mut egraph = EGraph::new(SynthAnalysis {
-                cvec_len: cvecs[0].len()
-              });
+                println!("{}", consts.len());
 
-              for (i, v) in vars.iter().enumerate() {
-                let id = egraph.add(Bv::Var(Symbol::from(v.clone())));
-                egraph[id].data.cvec = cvecs[i].clone()
-              }
+                let mut cvecs = self_product(&consts, vars.len());
 
-              synth.egraph = egraph;
+                let mut egraph = EGraph::new(SynthAnalysis {
+                    cvec_len: cvecs[0].len()
+                });
+
+                for (i, v) in vars.iter().enumerate() {
+                    let id = egraph.add(Bv::Var(Symbol::from(v.clone())));
+                    egraph[id].data.cvec = cvecs[i].clone()
+                }
+
+                synth.egraph = egraph;
             }
 
             fn validate(

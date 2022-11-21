@@ -2,6 +2,9 @@
 rational = ["run", "--release", "--bin", "rational", "--", "synth"]
 bool =     ["run", "--release", "--bin", "bool",     "--", "synth"]
 bv4 =      ["run", "--release", "--bin", "bv4",      "--", "synth"]
+bv8 =      ["run", "--release", "--bin", "bv8",      "--", "synth"]
+bv16 =      ["run", "--release", "--bin", "bv16",      "--", "synth"]
+bv32 =      ["run", "--release", "--bin", "bv32",      "--", "synth"]
 
 bv-bool =  ["run", "--release", "--bin", "bv-bool",  "--", "synth"]
 
