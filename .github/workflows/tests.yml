@@ -90,7 +90,6 @@ jobs:
           cargo rational --workload tests/workloads/rat-atoms3.terms --outfile out/rat3.json
           cargo rational --workload tests/workloads/rat-atoms5.terms --prior-rules out/rat3.json --outfile out/rat5.json
           cargo rational --workload tests/workloads/rat-canon.terms --prior-rules out/rat5.json --outfile out/rat-canon.json
-          cargo run --release --bin rational derive out/rat-canon.json tests/rat.json --ci  --outfile out/rat-derive.json
 
       - name: "Synthesize bv4 rules"
         run: |
