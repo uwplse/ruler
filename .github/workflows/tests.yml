@@ -100,7 +100,7 @@ jobs:
       - name: "Synthesize bv2 rules from bool rules (rule lifting)"
         run: |
           cargo bool --workload tests/workloads/bool-atoms3.terms --outfile out/bool3.json
-          cargo bool --workload tests/workloads/bool-atoms5.terms --outfile out/bool5.json
+          cargo bool --workload tests/workloads/bool-atoms5.terms --prior-rules out/bool3.json --outfile out/bool5.json
           cargo bv-bool --workload tests/workloads/bv-depth1.terms --prior-rules out/bool5.json --outfile out/bv2-bool.json
           cargo run --release --bin bv-bool derive out/bv2-bool.json tests/bv2-bool.json --ci --outfile out/bv2-derive.json
 
