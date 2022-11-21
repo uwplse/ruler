@@ -118,14 +118,6 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     // for language-specific purposes (such as custom constant folding)
     fn custom_modify(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
 
-    fn is_rule_lifting() -> bool {
-        false
-    }
-
-    fn get_lifting_rewrites() -> Vec<Rewrite<Self, SynthAnalysis>> {
-        panic!("No lifting rewrites")
-    }
-
     fn eval<'a, F>(&'a self, cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
@@ -157,6 +149,20 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         }
     }
 
+    // Configures whether to run rule lifting or cvec algorithm for
+    // finding candidates.
+    // If rule lifting is enabled, L::get_lifting_rewrites() and L::is_allowed_op()
+    // must be implemented
+    fn is_rule_lifting() -> bool {
+        false
+    }
+
+    // Used for rule lifting
+    fn get_lifting_rewrites() -> Vec<Rewrite<Self, SynthAnalysis>> {
+        panic!("No lifting rewrites")
+    }
+
+    // Used for rule lifting
     fn is_allowed_op(&self) -> bool {
         true
     }
