@@ -1,6 +1,6 @@
 use egg::rewrite;
-use num::rational::{ParseRatioError, Ratio};
-use num::{BigInt, Signed, Zero};
+use num::rational::Ratio;
+use num::BigInt;
 use ruler::*;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -98,10 +98,6 @@ impl Debug for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(self.as_str(), f)
     }
-}
-
-fn real_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
-    r.as_str().parse()
 }
 
 egg::define_language! {
