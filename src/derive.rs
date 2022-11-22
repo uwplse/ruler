@@ -108,6 +108,12 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
                 break;
             }
         }
+        // One more sat
+        runner = mk_runner(runner.egraph, &l, &r)
+            .with_node_limit(usize::MAX)
+            .with_time_limit(Duration::from_secs(30))
+            .with_iter_limit(100)
+            .run(&sat);
         l_id = runner.egraph.find(runner.roots[0]);
         r_id = runner.egraph.find(runner.roots[1]);
         if l_id == r_id {
