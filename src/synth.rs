@@ -89,9 +89,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
     fn mk_runner(&self, egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
         Runner::default()
             .with_scheduler(egg::SimpleScheduler)
-            .with_node_limit(usize::MAX)
-            .with_iter_limit(2)
-            .with_time_limit(Duration::from_secs(10))
+            .with_node_limit(self.params.node_limit)
+            .with_iter_limit(self.params.iter_limit)
+            .with_time_limit(Duration::from_secs(self.params.time_limit))
             .with_egraph(egraph)
     }
 
@@ -305,6 +305,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
+                            if self.prior_rws.contains_key(&eq.name) {
+                                // We already have this rule
+                                continue;
+                            }
                             // TODO: we used to validate here- do we need to?
                             candidates.insert(eq.name.clone(), eq);
                         }

@@ -43,6 +43,19 @@ pub struct SynthParams {
 
     #[clap(long)]
     pub workload: Option<String>,
+
+    ////////////////
+    // eqsat args //
+    ////////////////
+    /// node limit for all the eqsats
+    #[clap(long, default_value = "300000")]
+    pub node_limit: usize,
+    /// iter limit for all the eqsats
+    #[clap(long, default_value = "2")]
+    pub iter_limit: usize,
+    /// time limit (seconds) for all the eqsats
+    #[clap(long, default_value = "60")]
+    pub time_limit: u64,
 }
 
 /// All parameters for rule synthesis.
