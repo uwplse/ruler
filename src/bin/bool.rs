@@ -1,237 +1,112 @@
-/*!
-Domain of Booleans.
-The rewrites for this small domain are correct by construction as
-they are model checked.
-!*/
-
-use egg::*;
 use ruler::*;
-
 use std::ops::*;
 
-define_language! {
-    /// Define the operators for the domain.
-    pub enum Math {
-        "~" = Not(Id),
-        "&" = And([Id; 2]),
-        "|" = Or([Id; 2]),
-        "^" = Xor([Id; 2]),
-        "->" = Implies([Id; 2]),
-        Lit(bool),
-        Var(egg::Symbol),
-    }
+egg::define_language! {
+  pub enum Bool {
+    "~" = Not(Id),
+    "&" = And([Id; 2]),
+    "|" = Or([Id; 2]),
+    "^" = Xor([Id; 2]),
+    "->" = Implies([Id; 2]),
+    Lit(bool),
+    Var(egg::Symbol),
+  }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Type {
-    Bool,
-}
-
-impl std::fmt::Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "b")
-    }
-}
-
-impl SynthLanguage for Math {
+impl SynthLanguage for Bool {
     type Constant = bool;
-    type Type = Type;
 
-    fn get_type(&self) -> Self::Type {
-        Type::Bool
-    }
-
-    fn convert_parse(s: &str) -> RecExpr<Self> {
-        let s = s
-            .replace("and", "&")
-            .replace("xor", "^")
-            .replace("or", "|")
-            .replace("not", "~");
-        s.parse().unwrap()
-    }
-
-    fn eval<'a, F>(&'a self, cvec_len: usize, mut v: F) -> CVec<Self>
+    fn eval<'a, F>(&'a self, cvec_len: usize, mut get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Math::Not(a) => map!(v, a => Some(a.not())),
-
-            Math::And([a, b]) => map!(v, a, b => Some(*a & *b)),
-            Math::Or([a, b]) => map!(v, a, b => Some(*a | *b)),
-            Math::Xor([a, b]) => map!(v, a, b => Some(*a ^ *b)),
-            Math::Implies([a, b]) => map!(v, a, b => Some(!(*a) || *b)),
-
-            Math::Lit(n) => vec![Some(*n); cvec_len],
-            Math::Var(_) => vec![],
+            Bool::Not(x) => map!(get_cvec, x => Some(x.not())),
+            Bool::And([x, y]) => map!(get_cvec, x, y => Some(*x & *y)),
+            Bool::Or([x, y]) => map!(get_cvec, x, y => Some(*x | *y)),
+            Bool::Xor([x, y]) => map!(get_cvec, x, y => Some(*x ^ *y)),
+            Bool::Implies([x, y]) => map!(get_cvec, x, y => Some(!(*x) | *y)),
+            Bool::Lit(c) => vec![Some(*c); cvec_len],
+            Bool::Var(_) => vec![],
         }
     }
 
-    fn mk_interval(&self, egraph: &EGraph<Self, SynthAnalysis>) -> Interval<Self::Constant> {
-        let mut interval = Interval::default();
-        match self {
-            Math::Lit(n) => interval = Interval::new(Some(*n), Some(*n)),
-            Math::Var(_) => interval = Interval::new(Some(false), Some(true)),
-            Math::Not(x) => {
-                if let Interval {
-                    low: Some(a),
-                    high: Some(b),
-                } = egraph[*x].data.interval.clone()
-                {
-                    interval = Interval::new(Some(!b), Some(!a))
-                }
-            }
-            Math::And([x, y]) => {
-                if let Interval {
-                    low: Some(a),
-                    high: Some(b),
-                } = egraph[*x].data.interval.clone()
-                {
-                    if let Interval {
-                        low: Some(c),
-                        high: Some(d),
-                    } = egraph[*y].data.interval.clone()
-                    {
-                        interval = Interval::new(Some(a && c), Some(b && d))
-                    }
-                }
-            }
-            Math::Or([x, y]) => {
-                if let Interval {
-                    low: Some(a),
-                    high: Some(b),
-                } = egraph[*x].data.interval.clone()
-                {
-                    if let Interval {
-                        low: Some(c),
-                        high: Some(d),
-                    } = egraph[*y].data.interval.clone()
-                    {
-                        interval = Interval::new(Some(a || c), Some(b || d))
-                    }
-                }
-            }
-            Math::Xor([x, y]) => {
-                if let Interval {
-                    low: Some(a),
-                    high: Some(b),
-                } = egraph[*x].data.interval.clone()
-                {
-                    if let Interval {
-                        low: Some(c),
-                        high: Some(d),
-                    } = egraph[*y].data.interval.clone()
-                    {
-                        if a == b && c == d {
-                            interval = Interval::new(Some(b != c), Some(b != c))
-                        } else {
-                            interval = Interval::new(Some(false), Some(true))
-                        }
-                    }
-                }
-            }
-            Math::Implies([x, y]) => {
-                if let Interval {
-                    low: Some(a),
-                    high: Some(b),
-                } = egraph[*x].data.interval.clone()
-                {
-                    if let Interval {
-                        low: Some(c),
-                        high: Some(d),
-                    } = egraph[*y].data.interval.clone()
-                    {
-                        interval = Interval::new(Some(!b || c), Some(!a || d))
-                    }
-                }
-            }
+    fn mk_interval<'a, F>(&'a self, mut get_interval: F) -> Interval<Self::Constant>
+    where
+        F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
+    {
+        let unwrap_interval = |interval: &Interval<Self::Constant>| {
+            (
+                interval
+                    .low
+                    .expect("Bool shouldn't have infinite intervals"),
+                interval
+                    .high
+                    .expect("Bool shouldn't have infinite intervals"),
+            )
         };
-        if interval.low.is_none() || interval.high.is_none() {
-            panic!("There shouldn't be infinite intervals for bool.");
-        } else {
-            interval
+        match self {
+            Bool::Lit(c) => Interval::new(Some(*c), Some(*c)),
+            Bool::Var(_) => Interval::new(Some(false), Some(true)),
+            Bool::Not(x) => {
+                let (low, high) = unwrap_interval(get_interval(x));
+                Interval::new(Some(!high), Some(!low))
+            }
+            Bool::And([x, y]) => {
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
+                Interval::new(Some(x_low && y_low), Some(x_high && y_high))
+            }
+            Bool::Or([x, y]) => {
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
+                Interval::new(Some(x_low || y_low), Some(x_high || y_high))
+            }
+            Bool::Xor([x, y]) => {
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
+                if x_low == x_high && y_low == y_high {
+                    Interval::new(Some(x_low != y_low), Some(x_low != y_low))
+                } else {
+                    Interval::new(Some(false), Some(true))
+                }
+            }
+            Bool::Implies([x, y]) => {
+                let (x_low, x_high) = unwrap_interval(get_interval(x));
+                let (y_low, y_high) = unwrap_interval(get_interval(y));
+                Interval::new(Some(!x_high || y_low), Some(!x_low || y_high))
+            }
         }
     }
 
-    fn to_var(&self) -> Option<Symbol> {
-        if let Math::Var(sym) = self {
-            Some(*sym)
-        } else {
-            None
-        }
-    }
+    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+        println!("initializing vars: {:?}", vars);
 
-    fn mk_var(sym: Symbol) -> Self {
-        Math::Var(sym)
-    }
-
-    fn is_constant(&self) -> bool {
-        matches!(self, Math::Lit(_))
-    }
-
-    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
-        Math::Lit(c)
-    }
-
-    fn init_synth(synth: &mut Synthesizer<Self>) {
-        // let consts: Vec<Option<bool>> = vec![];
-        let consts: Vec<Option<bool>> = vec![Some(false), Some(true)];
-
-        let consts = self_product(&consts, synth.params.variables);
-        // println!("cvec len: {}", consts[0].len());
+        let consts = vec![Some(true), Some(false)];
+        let cvecs = self_product(&consts, vars.len());
 
         let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: consts[0].len(),
-            constant_fold: if synth.params.no_constant_fold {
-                ConstantFoldMethod::NoFold
-            } else {
-                ConstantFoldMethod::IntervalAnalysis
-            },
-            rule_lifting: false,
+            cvec_len: cvecs[0].len(),
         });
 
-        egraph.add(Math::Lit(false));
-        egraph.add(Math::Lit(true));
-
-        for (i, item) in consts.iter().enumerate().take(synth.params.variables) {
-            let var = Symbol::from("b".to_owned() + letter(i));
-            let id = egraph.add(Math::Var(var));
-            egraph[id].data.cvec = item.clone();
+        for (i, v) in vars.iter().enumerate() {
+            let id = egraph.add(Bool::Var(Symbol::from(v.clone())));
+            let cvec = cvecs[i].clone();
+            egraph[id].data.cvec = cvec;
         }
 
         synth.egraph = egraph;
     }
 
-    fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfOps);
+    fn mk_var(sym: egg::Symbol) -> Self {
+        Bool::Var(sym)
+    }
 
-        // maps ids to n_ops
-        let ids: HashMap<Id, usize> = synth
-            .ids()
-            .map(|id| (id, extract.find_best_cost(id)))
-            .collect();
-
-        let mut to_add = vec![];
-        for i in synth.ids() {
-            for j in synth.ids() {
-                if ids[&i] + ids[&j] + 1 != iter {
-                    continue;
-                }
-                to_add.push(Math::And([i, j]));
-                to_add.push(Math::Or([i, j]));
-                to_add.push(Math::Implies([i, j]));
-                if !synth.params.no_xor {
-                    to_add.push(Math::Xor([i, j]));
-                }
-            }
-            if ids[&i] + 1 != iter {
-                continue;
-            }
-            to_add.push(Math::Not(i));
+    fn to_var(&self) -> Option<Symbol> {
+        match self {
+            Bool::Var(v) => Some(*v),
+            _ => None,
         }
-
-        log::info!("Made a layer of {} enodes", to_add.len());
-        to_add
     }
 
     fn validate(
@@ -241,130 +116,16 @@ impl SynthLanguage for Math {
     ) -> ValidationResult {
         ValidationResult::Valid
     }
+
+    fn is_constant(&self) -> bool {
+        matches!(self, Bool::Lit(_))
+    }
+
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
+        Bool::Lit(c)
+    }
 }
 
-/// Entry point.
 fn main() {
-    Math::main()
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    fn get_params(num_iters: usize) -> SynthParams {
-        SynthParams {
-            seed: 0,
-            n_samples: 2,
-            variables: 3,
-            outfile: String::from("out.json"),
-            no_constant_fold: true,
-            iters: Some(num_iters),
-            rules_to_take: 0,
-            node_chunk_size: 0,
-            eq_chunk_size: 0,
-            no_constants_above_iter: 999999,
-            no_conditionals: true,
-            no_run_rewrites: false,
-            linear_cvec_matching: false,
-            ema_above_iter: 999999,
-            disabled_ops: None,
-            disabled_consts: None,
-            filtered_consts: None,
-            keep_all: false,
-            eqsat_node_limit: 300000,
-            eqsat_iter_limit: 2,
-            eqsat_time_limit: 60,
-            important_cvec_offsets: 5,
-            str_int_variables: 1,
-            complete_cvec: false,
-            no_xor: false,
-            no_shift: false,
-            num_fuzz: 0,
-            use_smt: false,
-            do_final_run: true,
-            prior_rules: None,
-            workload: None,
-        }
-    }
-
-    #[test]
-    fn iter1_rules() {
-        let _ = env_logger::try_init();
-        let syn = ruler::Synthesizer::<Math>::new(get_params(1));
-        let report = syn.run();
-        assert_eqs_same_as_strs(
-            &report.all_eqs,
-            &[
-                "(& ?ba ?bb) <=> (& ?bb ?ba)",
-                "(| ?ba ?bb) <=> (| ?bb ?ba)",
-                "(^ ?ba ?bb) <=> (^ ?bb ?ba)",
-                "?ba <=> (| ?ba ?ba)",
-                "?ba <=> (& ?ba ?ba)",
-                "(^ ?ba ?ba) => false",
-                "?ba <=> (& true ?ba)",
-                "?ba <=> (| false ?ba)",
-                "?ba <=> (^ false ?ba)",
-                "(~ ?ba) <=> (^ true ?ba)",
-                "(& false ?ba) => false",
-                "(| true ?ba) => true",
-                "(-> false ?ba) => true",
-                "?ba <=> (-> true ?ba)",
-                "(-> ?ba ?ba) => true",
-                "(~ ?ba) <=> (-> ?ba false)",
-                "(-> ?ba true) => true",
-            ],
-        );
-    }
-
-    #[test]
-    fn iter2_rules() {
-        let _ = env_logger::try_init();
-        let syn = ruler::Synthesizer::<Math>::new(get_params(2));
-        let report = syn.run();
-        assert_eqs_same_as_strs(
-            &report.all_eqs,
-            &[
-                "?ba <=> (-> true ?ba)",
-                "?ba <=> (| false ?ba)",
-                "?ba <=> (& true ?ba)",
-                "(| ?bb ?ba) <=> (-> (-> ?bb ?ba) ?ba)",
-                "(-> ?ba ?ba) => true",
-                "(-> ?bc (-> ?bb ?ba)) <=> (-> ?bb (-> ?bc ?ba))",
-                "(| ?bc (-> ?bb ?ba)) <=> (-> ?bb (| ?ba ?bc))",
-                "(& ?bb ?ba) <=> (& ?ba (-> ?ba ?bb))",
-                "(| true ?ba) => true",
-                "(^ ?bc (^ ?bb ?ba)) <=> (^ ?bb (^ ?ba ?bc))",
-                "(& ?bc (& ?bb ?ba)) <=> (& ?ba (& ?bb ?bc))",
-                "(-> (-> ?ba ?bb) ?ba) => ?ba",
-                "(-> ?bb ?ba) <=> (-> (^ ?ba ?bb) ?ba)",
-                "(| ?bc (| ?bb ?ba)) <=> (| ?bb (| ?ba ?bc))",
-                "?ba <=> (& ?ba ?ba)",
-                "(^ ?bb ?ba) <=> (^ ?ba ?bb)",
-                "(~ (-> ?bb ?ba)) <=> (^ ?ba (| ?ba ?bb))",
-                "(| ?bb ?ba) <=> (| ?ba ?bb)",
-                "(-> ?bc (-> ?bb ?ba)) <=> (-> (& ?bc ?bb) ?ba)",
-                "?ba <=> (^ false ?ba)",
-                "(& ?bb ?ba) <=> (& ?ba ?bb)",
-                "(& false ?ba) => false",
-                "(^ ?ba ?ba) => false",
-                "(-> false ?ba) => true",
-                "(~ ?ba) <=> (^ true ?ba)",
-                "(~ (-> ?bb ?ba)) <=> (& ?bb (~ ?ba))",
-                "(| ?bb ?ba) <=> (-> (~ ?ba) ?bb)",
-                "?ba <=> (| ?ba ?ba)",
-                "(& ?bb (| ?bb ?ba)) => ?bb",
-                "(~ ?ba) <=> (-> ?ba false)",
-                "(^ ?ba (~ ?ba)) => true",
-                "(-> ?bb (~ ?ba)) <=> (-> ?bb (^ ?bb ?ba))",
-                "(~ (-> ?bb ?ba)) <=> (^ ?bb (& ?ba ?bb))",
-                "(| (~ ?bb) ?ba) <=> (-> ?bb ?ba)",
-                "(-> ?bb ?ba) <=> (-> ?bb (& ?ba ?bb))",
-                "(-> ?ba true) => true",
-                "(^ ?bb (-> ?bb ?ba)) <=> (-> ?ba (~ ?bb))",
-                "(| ?bb (& ?bb ?ba)) => ?bb",
-                "(& ?ba (-> ?bb ?ba)) => ?ba",
-            ],
-        );
-    }
+    Bool::run_synth()
 }

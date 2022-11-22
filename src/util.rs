@@ -1,52 +1,48 @@
-use num::{rational::Ratio, BigInt, Zero};
+/// Return the `i`th letter from the English alphabet.
+pub fn letter(i: usize) -> &'static str {
+    let alpha = "abcdefghijklmnopqrstuvwxyz";
+    &alpha[i..i + 1]
+}
 
 /// Helper function to cross product a list of values `ts` across `n` variables.
 pub fn self_product<T: Clone>(ts: &[T], n: usize) -> Vec<Vec<T>> {
-    (0..n)
-        .map(|i| {
-            let mut res = vec![];
-            let nc = ts.len();
-            let nrows = nc.pow(n as u32);
-            while res.len() < nrows {
-                for c in ts {
-                    for _ in 0..nc.pow(i as u32) {
-                        res.push(c.clone())
-                    }
+    let num_consts = ts.len();
+    let num_rows = num_consts.pow(n as u32);
+    let mut res = vec![];
+    for i in 0..n {
+        let mut entry = vec![];
+        while entry.len() < num_rows {
+            for c in ts {
+                for _ in 0..num_consts.pow(i as u32) {
+                    entry.push(c.clone());
                 }
             }
-            res
-        })
-        .collect()
-}
-
-// Division the rounds up
-// Hack from https://www.reddit.com/r/rust/comments/bk7v15/my_next_favourite_way_to_divide_integers_rounding/
-pub fn div_up(a: usize, b: usize) -> usize {
-    (0..a).step_by(b).size_hint().0
-}
-
-// Make a Ratio whose denominator is not zero.
-pub fn mk_constant(n: &BigInt, d: &BigInt) -> Ratio<BigInt> {
-    if d.is_zero() {
-        panic!("mk_constant: denominator is zero!")
-    } else {
-        Ratio::new(n.clone(), d.clone())
+        }
+        res.push(entry);
     }
+    res
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[macro_export]
+macro_rules! map {
+    ($get:ident, $a:ident => $body:expr) => {
+        $get($a)
+            .iter()
+            .map(|a| match a {
+                Some($a) => $body,
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
 
-    #[test]
-    fn test_product() {
-        let ts = &[4, 5, 6];
-        assert_eq!(
-            self_product(ts, 2),
-            vec![
-                vec![4, 5, 6, 4, 5, 6, 4, 5, 6],
-                vec![4, 4, 4, 5, 5, 5, 6, 6, 6]
-            ],
-        );
-    }
+    ($get:ident, $a:ident, $b:ident => $body:expr) => {
+        $get($a)
+            .iter()
+            .zip($get($b).iter())
+            .map(|tup| match tup {
+                (Some($a), Some($b)) => $body,
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
 }

@@ -6,5 +6,5 @@ ruler::impl_bv!(32);
 
 /// Entry point.
 fn main() {
-    Math::main()
+    Bv::run_synth()
 }

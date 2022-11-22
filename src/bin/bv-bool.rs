@@ -1,14 +1,10 @@
-/*!
-    2 bit implementation of Bitvectors.
-!*/
-use egg::*;
+use egg::Subst;
 use ruler::*;
 use std::ops::*;
 
-define_language! {
-    /// Define the operators for the domain.
-    pub enum Math {
-        // boolean domain
+egg::define_language! {
+  pub enum BvBool {
+    // boolean domain
         "~" = Not(Id),
         "&" = And([Id; 2]),
         "|" = Or([Id; 2]),
@@ -28,61 +24,68 @@ define_language! {
         "bv" = Make([Id; 2]),
         "first" = First(Id),
         "second" = Second(Id),
-    }
+  }
 }
 
-fn is_bv_str(s: &'static str) -> impl Fn(&mut EGraph<Math, SynthAnalysis>, Id, &Subst) -> bool {
+fn is_bv_str(s: &'static str) -> impl Fn(&mut EGraph<BvBool, SynthAnalysis>, Id, &Subst) -> bool {
     let var = s.parse().unwrap();
-    move |egraph, _, subst| egraph[subst[var]].nodes.iter().any(Math::is_allowed)
+    move |egraph, _, subst| egraph[subst[var]].nodes.iter().any(BvBool::is_allowed_op)
 }
 
-fn extract_bool_constant(nodes: &[Math]) -> Option<bool> {
-    for n in nodes {
-        if let Math::Lit(v) = n {
-            return Some(*v);
-        }
-    }
-
-    None
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Type {
-    Top,
-}
-impl std::fmt::Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
-    }
-}
-// BV-bool language
-impl SynthLanguage for Math {
+impl SynthLanguage for BvBool {
     type Constant = BV<2>;
-    type Type = Type;
 
-    fn get_type(&self) -> Self::Type {
-        Type::Top
+    fn is_rule_lifting() -> bool {
+        true
     }
 
-    fn convert_parse(s: &str) -> RecExpr<Self> {
-        let s = s
-            .replace("and", "&")
-            .replace("xor", "^")
-            .replace("or", "|")
-            .replace("not", "~");
-        s.parse().unwrap()
+    fn get_lifting_rewrites() -> Vec<egg::Rewrite<Self, SynthAnalysis>> {
+        vec![
+            egg::rewrite!("def-bv"; "?a" => "(bv (first ?a) (second ?a))" if is_bv_str("?a")),
+            egg::rewrite!("def-not-first"; "(first (not ?a))" => "(~ (first ?a))"),
+            egg::rewrite!("def-not-second"; "(second (not ?a))" => "(~ (second ?a))"),
+            egg::rewrite!("def-and-first"; "(first (and ?a ?b))" => "(& (first ?a) (first ?b))"),
+            egg::rewrite!("def-and-second"; "(second (and ?a ?b))" => "(& (second ?a) (second ?b))"),
+            egg::rewrite!("def-or-first"; "(first (or ?a ?b))" => "(| (first ?a) (first ?b))"),
+            egg::rewrite!("def-or-second"; "(second (or ?a ?b))" => "(| (second ?a) (second ?b))"),
+            egg::rewrite!("def-xor-first"; "(first (xor ?a ?b))" => "(^ (first ?a) (first ?b))"),
+            egg::rewrite!("def-xor-second"; "(second (xor ?a ?b))" => "(^ (second ?a) (second ?b))"),
+        ]
     }
 
-    // no evaluation needed
-    fn eval<'a, F>(&'a self, _cvec_len: usize, mut _v: F) -> CVec<Self>
+    fn is_allowed_op(&self) -> bool {
+        matches!(
+            self,
+            BvBool::Band(_)
+                | BvBool::Bxor(_)
+                | BvBool::Bnot(_)
+                | BvBool::Bor(_)
+                | BvBool::Num(_)
+                | BvBool::Var(_)
+                | BvBool::Make(_)
+        )
+    }
+
+    // No eval needed for rule lifting
+    fn eval<'a, F>(&'a self, _cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         vec![]
     }
 
+    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+        for var in vars {
+            let var_id = synth.egraph.add(BvBool::Var(Symbol::from(var)));
+            let fst_id = synth.egraph.add(BvBool::First(var_id));
+            let sec_id = synth.egraph.add(BvBool::Second(var_id));
+            let mk_id = synth.egraph.add(BvBool::Make([fst_id, sec_id]));
+            synth.egraph.union(var_id, mk_id);
+        }
+    }
+
     fn to_var(&self) -> Option<Symbol> {
-        if let Math::Var(sym) = self {
+        if let BvBool::Var(sym) = self {
             Some(*sym)
         } else {
             None
@@ -90,132 +93,51 @@ impl SynthLanguage for Math {
     }
 
     fn mk_var(sym: Symbol) -> Self {
-        Math::Var(sym)
+        BvBool::Var(sym)
     }
 
     fn is_constant(&self) -> bool {
-        matches!(self, Math::Num(_))
+        matches!(self, BvBool::Lit(_))
     }
 
     fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
-        Math::Num(c)
+        BvBool::Num(c)
     }
 
-    // override default behavior
-    fn is_allowed(&self) -> bool {
-        matches!(
-            self,
-            Math::Band(_)
-                | Math::Bor(_)
-                | Math::Bxor(_)
-                | Math::Bnot(_)
-                | Math::Num(_)
-                | Math::Var(_)
-                | Math::Make(_)
-        )
-    }
-
-    fn is_extractable(&self) -> bool {
-        matches!(
-            self,
-            Math::Band(_)
-                | Math::Bor(_)
-                | Math::Bxor(_)
-                | Math::Bnot(_)
-                | Math::Num(_)
-                | Math::Var(_)
-        )
-    }
-
-    fn init_synth(synth: &mut Synthesizer<Self>) {
-        let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: 0,
-            constant_fold: if synth.params.no_constant_fold {
-                ConstantFoldMethod::NoFold
-            } else {
-                ConstantFoldMethod::Lang
-            },
-            rule_lifting: true,
-        });
-
-        for i in 0..synth.params.variables {
-            let var = egg::Symbol::from(letter(i));
-            let var_id = egraph.add(Math::Var(var));
-            let fst_id = egraph.add(Math::First(var_id));
-            let sec_id = egraph.add(Math::Second(var_id));
-            let mk_id = egraph.add(Math::Make([fst_id, sec_id]));
-            egraph.union(var_id, mk_id);
+    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if egraph[id].nodes.iter().any(|n| matches!(n, BvBool::Num(_))) {
+            // e-class is already a constant
+            return;
         }
 
-        // seed egraph with bool constants
-        egraph.add(Math::Lit(true));
-        egraph.add(Math::Lit(false));
-
-        // seed egraph with bv constants
-        egraph.add(Math::Num(BV::<2>::from(3)));
-        egraph.add(Math::Num(BV::<2>::from(2)));
-        egraph.add(Math::Num(BV::<2>::from(1)));
-        egraph.add(Math::Num(BV::<2>::from(0)));
-
-        synth.lifting_rewrites = vec![
-            rewrite!("def-bv"; "?a" => "(bv (first ?a) (second ?a))" if is_bv_str("?a")),
-            rewrite!("def-not-first"; "(first (not ?a))" => "(~ (first ?a))"),
-            rewrite!("def-not-second"; "(second (not ?a))" => "(~ (second ?a))"),
-            rewrite!("def-and-first"; "(first (and ?a ?b))" => "(& (first ?a) (first ?b))"),
-            rewrite!("def-and-second"; "(second (and ?a ?b))" => "(& (second ?a) (second ?b))"),
-            rewrite!("def-or-first"; "(first (or ?a ?b))" => "(| (first ?a) (first ?b))"),
-            rewrite!("def-or-second"; "(second (or ?a ?b))" => "(| (second ?a) (second ?b))"),
-            rewrite!("def-xor-first"; "(first (xor ?a ?b))" => "(^ (first ?a) (first ?b))"),
-            rewrite!("def-xor-second"; "(second (xor ?a ?b))" => "(^ (second ?a) (second ?b))"),
-        ];
-
-        synth.egraph = egraph;
-    }
-
-    fn make_layer(synth: &Synthesizer<Self>, iter: usize) -> Vec<Self> {
-        let extract = Extractor::new(&synth.egraph, NumberOfAllowedOps);
-        let mut to_add = vec![];
-
-        // maps ids to n_ops
-        let ids: HashMap<Id, usize> = synth
-            .ids()
-            .map(|id| (id, extract.find_best_cost(id)))
-            .collect();
-
-        for i in synth.ids() {
-            for j in synth.ids() {
-                if (ids[&i] + ids[&j] + 1 != iter)
-                    || !synth.egraph[i].nodes.iter().any(Math::is_allowed)
-                    || !synth.egraph[j].nodes.iter().any(Math::is_allowed)
-                {
-                    continue;
+        let get_bool_const = |nodes: &[BvBool]| {
+            // let nodes = &egraph[id].nodes;
+            for n in nodes {
+                if let BvBool::Lit(v) = n {
+                    return Some(*v);
                 }
+            }
+            None
+        };
 
-                if iter > synth.params.no_constants_above_iter {
-                    if synth.egraph[i].data.exact || synth.egraph[j].data.exact {
-                        continue;
+        for n in &egraph[id].nodes {
+            if let BvBool::Make([i, j]) = n {
+                if let Some(x) = get_bool_const(&egraph[*i].nodes) {
+                    if let Some(y) = get_bool_const(&egraph[*j].nodes) {
+                        let cnst = match (x, y) {
+                            (true, true) => BV::<2>::from(3),
+                            (true, false) => BV::<2>::from(2),
+                            (false, true) => BV::<2>::from(1),
+                            (false, false) => BV::<2>::from(0),
+                        };
+
+                        let c_id = egraph.add(BvBool::Num(cnst));
+                        egraph.union(id, c_id);
+                        return;
                     }
-                } else if synth.egraph[i].data.exact && synth.egraph[j].data.exact {
-                    continue;
-                };
-
-                to_add.push(Math::Band([i, j]));
-                to_add.push(Math::Bor([i, j]));
-                to_add.push(Math::Bxor([i, j]));
+                }
             }
-
-            if ids[&i] + 1 != iter
-                || synth.egraph[i].data.exact
-                || !synth.egraph[i].nodes.iter().any(Math::is_allowed)
-            {
-                continue;
-            }
-
-            to_add.push(Math::Bnot(i));
         }
-
-        log::info!("Made a layer of {} enodes", to_add.len());
-        to_add
     }
 
     fn validate(
@@ -225,34 +147,7 @@ impl SynthLanguage for Math {
     ) -> ValidationResult {
         ValidationResult::Valid
     }
-
-    fn constant_fold(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        if egraph[id].nodes.iter().any(|n| matches!(n, Math::Num(_))) {
-            return;
-        }
-
-        for n in &egraph[id].nodes {
-            if let Math::Make([i, j]) = n {
-                if let Some(v) = extract_bool_constant(&egraph[*i].nodes) {
-                    if let Some(w) = extract_bool_constant(&egraph[*j].nodes) {
-                        let cnst = match (v, w) {
-                            (true, true) => BV::<2>::from(3),
-                            (true, false) => BV::<2>::from(2),
-                            (false, true) => BV::<2>::from(1),
-                            (false, false) => BV::<2>::from(0),
-                        };
-
-                        let c_id = egraph.add(Math::Num(cnst));
-                        egraph.union(id, c_id);
-                        return;
-                    }
-                }
-            }
-        }
-    }
 }
-
-/// Entry point.
 fn main() {
-    Math::main()
+    BvBool::run_synth()
 }

@@ -3,7 +3,8 @@
 !*/
 
 ruler::impl_bv!(16);
+
 /// Entry point.
 fn main() {
-    Math::main()
+    Bv::run_synth()
 }

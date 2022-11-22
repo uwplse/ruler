@@ -6,25 +6,25 @@
  * Example: 6 is represented as (XO (XI XH))
  * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
  */
-use egg::*;
+use egg::rewrite;
 use ruler::*;
 
-define_language! {
-    pub enum Pos {
-        // Nat
-        "Z" = Z,
-        "S" = S(Id),
+egg::define_language! {
+ pub enum Pos {
+    // Nat
+    "Z" = Z,
+    "S" = S(Id),
 
-        // Pos
-        "XH" = XH,
-        "XO" = XO(Id),
-        "XI" = XI(Id),
+    // Pos
+    "XH" = XH,
+    "XO" = XO(Id),
+    "XI" = XI(Id),
 
-        "+" = Add([Id; 2]),
-        "*" = Mul([Id; 2]),
+    "+" = Add([Id; 2]),
+    "*" = Mul([Id; 2]),
 
-        Var(egg::Symbol),
-    }
+    Var(egg::Symbol),
+ }
 }
 
 impl Pos {
@@ -44,33 +44,39 @@ impl Pos {
     }
 }
 
-impl std::fmt::Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Type {
-    Pos,
-}
-
 impl SynthLanguage for Pos {
     type Constant = usize;
 
-    type Type = Type;
-
-    fn get_type(&self) -> Self::Type {
-        Type::Pos
+    fn is_rule_lifting() -> bool {
+        true
     }
 
-    fn eval<'a, F>(&'a self, _cvec_len: usize, _f: F) -> CVec<Self>
+    fn get_lifting_rewrites() -> Vec<egg::Rewrite<Self, SynthAnalysis>> {
+        vec![
+            rewrite!("def-xh"; "XH" <=> "(S Z)"),
+            rewrite!("def-xo"; "(XO ?a)" <=> "(+ ?a ?a)"),
+            rewrite!("def-xi"; "(XI ?a)" <=> "(+ ?a (+ ?a (S Z)))"),
+        ]
+        .concat()
+    }
+
+    fn is_allowed_op(&self) -> bool {
+        matches!(
+            self,
+            Pos::XH | Pos::XO(_) | Pos::XI(_) | Pos::Add(_) | Pos::Mul(_) | Pos::Var(_)
+        )
+    }
+
+    // No eval needed for rule lifting
+    fn eval<'a, F>(&'a self, _cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
-        // No eval needed for rule lifting
         vec![]
     }
+
+    // Nov variable initialization needed
+    fn initialize_vars(_synth: &mut Synthesizer<Self>, _vars: Vec<String>) {}
 
     fn to_var(&self) -> Option<Symbol> {
         if let Pos::Var(sym) = self {
@@ -80,8 +86,12 @@ impl SynthLanguage for Pos {
         }
     }
 
-    fn mk_var(sym: egg::Symbol) -> Self {
+    fn mk_var(sym: Symbol) -> Self {
         Pos::Var(sym)
+    }
+
+    fn is_constant(&self) -> bool {
+        matches!(self, Pos::Z | Pos::XH)
     }
 
     fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
@@ -93,34 +103,6 @@ impl SynthLanguage for Pos {
         }
     }
 
-    fn is_constant(&self) -> bool {
-        matches!(self, Pos::Z | Pos::XH)
-    }
-
-    fn init_synth(synth: &mut Synthesizer<Self>) {
-        let mut egraph: EGraph<Pos, SynthAnalysis> = EGraph::new(SynthAnalysis {
-            cvec_len: 0,
-            constant_fold: ConstantFoldMethod::IntervalAnalysis,
-            rule_lifting: true,
-        });
-
-        egraph.add(Pos::Z);
-        egraph.add(Pos::XH);
-
-        synth.lifting_rewrites = vec![
-            rewrite!("def-xh"; "XH" <=> "(S Z)"),
-            rewrite!("def-xo"; "(XO ?a)" <=> "(+ ?a ?a)"),
-            rewrite!("def-xi"; "(XI ?a)" <=> "(+ ?a (+ ?a (S Z)))"),
-        ]
-        .concat();
-
-        synth.egraph = egraph;
-    }
-
-    fn make_layer(_synth: &Synthesizer<Self>, _iter: usize) -> Vec<Self> {
-        vec![]
-    }
-
     fn validate(
         _synth: &mut Synthesizer<Self>,
         _lhs: &Pattern<Self>,
@@ -128,27 +110,8 @@ impl SynthLanguage for Pos {
     ) -> ValidationResult {
         ValidationResult::Valid
     }
-
-    fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
-        let contains_nat_node = |pat: &Pattern<Self>| {
-            pat.ast
-                .as_ref()
-                .iter()
-                .any(|n| matches!(n, ENodeOrVar::ENode(Pos::Z) | ENodeOrVar::ENode(Pos::S(_))))
-        };
-        let is_extractable = |pat: &Pattern<Self>| {
-            pat.ast.as_ref().iter().all(|n| match n {
-                ENodeOrVar::Var(_) => true,
-                ENodeOrVar::ENode(n) => n.is_extractable(),
-            })
-        };
-
-        is_extractable(lhs)
-            && is_extractable(rhs)
-            && !(contains_nat_node(lhs) || contains_nat_node(rhs))
-    }
 }
 
 fn main() {
-    Pos::main()
+    Pos::run_synth()
 }
