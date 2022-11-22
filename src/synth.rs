@@ -191,10 +191,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
-                    if let Some(eq) = Equality::new(&e1, &e2) {
+                    if let Some(eq) = Equality::new(e1, e2) {
                         candidates.insert(eq.name.clone(), eq);
                     }
-                    if let Some(eq) = Equality::new(&e2, &e1) {
+                    if let Some(eq) = Equality::new(e2, e1) {
                         candidates.insert(eq.name.clone(), eq);
                     }
                 }
