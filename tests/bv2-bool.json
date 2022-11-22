@@ -2,7 +2,10 @@
   "params": {
     "outfile": "main.json",
     "prior_rules": "b5.json",
-    "workload": "../secret/ruler/tests/workloads/bv-depth1.terms"
+    "workload": "../secret/ruler/tests/workloads/bv-depth1.terms",
+    "node_limit": 300000,
+    "iter_limit": 2,
+    "time_limit": 60
   },
   "prior_rws": [],
   "time": 0.053217916,

@@ -2,7 +2,10 @@
   "params": {
     "outfile": "bv4.json",
     "prior_rules": "",
-    "workload": ""
+    "workload": "",
+    "node_limit": 300000,
+    "iter_limit": 2,
+    "time_limit": 60
   },
   "prior_rws": [],
   "time": 0.581612708,
