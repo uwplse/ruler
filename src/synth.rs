@@ -305,6 +305,10 @@ impl<L: SynthLanguage> Synthesizer<L> {
                     }
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
+                            if self.prior_rws.contains_key(&eq.name) {
+                                // We already have this rule
+                                continue;
+                            }
                             // TODO: we used to validate here- do we need to?
                             candidates.insert(eq.name.clone(), eq);
                         }

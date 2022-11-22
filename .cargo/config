@@ -1,5 +1,6 @@
 [alias]
 bool     = ["run", "--release", "--bin", "bool",     "--", "synth"]
+bv-bool =  ["run", "--release", "--bin", "bv-bool",  "--", "synth"]
 bv4      = ["run", "--release", "--bin", "bv4",      "--", "synth"]
 bv8      = ["run", "--release", "--bin", "bv8",      "--", "synth"]
 bv16     = ["run", "--release", "--bin", "bv16",     "--", "synth"]
@@ -7,8 +8,7 @@ bv32     = ["run", "--release", "--bin", "bv32",     "--", "synth"]
 nat      = ["run", "--release", "--bin", "nat",      "--", "synth"]
 pos      = ["run", "--release", "--bin", "pos",      "--", "synth"]
 rational = ["run", "--release", "--bin", "rational", "--", "synth"]
-
-bv-bool =  ["run", "--release", "--bin", "bv-bool",  "--", "synth"]
+trig     = ["run", "--release", "--bin", "trig",     "--", "synth"]
 
 [build]
 rustflags = "-C target-cpu=native"
