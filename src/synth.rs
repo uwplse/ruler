@@ -185,16 +185,18 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         let mut candidates = EqualityMap::default();
         let extract = Extractor::new(&self.egraph, AstSize);
+
         for ids in by_cvec.values() {
-            let mut terms_ids: Vec<_> = ids.iter().map(|&id| (extract.find_best(id), id)).collect();
-            terms_ids.sort_by_key(|x| x.0 .0); // sort by cost
-            let ((_, e1), _) = terms_ids.remove(0);
-            for ((_, e2), _) in terms_ids {
-                if let Some(eq) = Equality::new(&e1, &e2) {
-                    candidates.insert(eq.name.clone(), eq);
-                }
-                if let Some(eq) = Equality::new(&e2, &e1) {
-                    candidates.insert(eq.name.clone(), eq);
+            let exprs: Vec<_> = ids.iter().map(|&id| extract.find_best(id).1).collect();
+
+            for (idx, e1) in exprs.iter().enumerate() {
+                for e2 in exprs[(idx + 1)..].iter() {
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        candidates.insert(eq.name.clone(), eq);
+                    }
+                    if let Some(eq) = Equality::new(&e2, &e1) {
+                        candidates.insert(eq.name.clone(), eq);
+                    }
                 }
             }
         }
