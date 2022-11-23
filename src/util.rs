@@ -45,4 +45,15 @@ macro_rules! map {
             })
             .collect::<Vec<_>>()
     };
+    ($get:ident, $a:ident, $b:ident, $c:ident => $body:expr) => {
+        $get($a)
+            .iter()
+            .zip($get($b).iter())
+            .zip($get($c).iter())
+            .map(|tup| match tup {
+                ((Some($a), Some($b)), Some($c)) => $body,
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
 }
