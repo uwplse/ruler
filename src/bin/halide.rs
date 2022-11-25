@@ -114,7 +114,7 @@ impl SynthLanguage for Pred {
 
     fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
         let consts = vec![
-            Some(-1.to_bigint().unwrap()),
+            Some((-1).to_bigint().unwrap()),
             Some(0.to_bigint().unwrap()),
             Some(1.to_bigint().unwrap()),
         ];
