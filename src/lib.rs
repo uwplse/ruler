@@ -105,9 +105,23 @@ impl Sexp {
                 .collect(),
         }
     }
+
+    fn measure(&self, metric: Metric) -> usize {
+        match self {
+            Sexp::Atom(_) => match metric {
+                Metric::List => 0,
+                Metric::Atoms | Metric::Depth => 1,
+            },
+            Sexp::List(s) => match metric {
+                Metric::Atoms => s.len(),
+                Metric::List => s.iter().map(|x| x.measure(metric)).sum::<usize>() + 1,
+                Metric::Depth => s.iter().map(|x| x.measure(metric)).max().unwrap() + 1,
+            },
+        }
+    }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Copy, PartialEq, Eq, Clone, Debug)]
 enum Metric {
     Atoms,
     List,
@@ -124,7 +138,7 @@ enum EnumoPattern {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 enum Filter {
-    Met(Metric, usize),
+    MetricLt(Metric, usize),
     Contains(EnumoPattern),
     Canon(Vec<String>),
     And(Box<Self>, Box<Self>),
@@ -132,11 +146,19 @@ enum Filter {
 
 impl Filter {
     fn test(&self, sexp: &Sexp) -> bool {
-        todo!()
+        match self {
+            Filter::MetricLt(metric, n) => sexp.measure(*metric) < *n,
+            Filter::Contains(_) => todo!(),
+            Filter::Canon(_) => todo!(),
+            Filter::And(_, _) => todo!(),
+        }
     }
 
     fn is_monotonic(&self) -> bool {
-        todo!()
+        match self {
+            Filter::MetricLt(_, _) => true,
+            _ => todo!(),
+        }
     }
 }
 
@@ -200,10 +222,10 @@ mod test {
 
     #[test]
     fn simple_plug2() {
-        let atom = s!(x);
+        let x = s!(x);
         let pegs = vec![s!(1), s!(2)];
         let expected = pegs.clone();
-        let actual = atom.plug("x", &pegs);
+        let actual = x.plug("x", &pegs);
         assert_eq!(actual, expected);
     }
 
