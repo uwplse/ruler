@@ -147,7 +147,7 @@ impl Filter {
                     }
             }
             Filter::Canon(_) => todo!(),
-            Filter::And(_, _) => todo!(),
+            Filter::And(f1, f2) => f1.test(sexp) && f2.test(sexp),
         }
     }
 
@@ -247,6 +247,27 @@ mod test {
         ]);
         let actual = wkld.filter(Filter::Contains(pat)).force();
         let expected = vec![s!((+ a a)), s!((+ a (+ b b))), s!((+ (+ a b) (+ a b)))];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn filter_and() {
+        let wkld = Workload::Set(vec![
+            s!(x),
+            s!(y),
+            s!(x y),
+            s!(y x),
+            s!(x x x),
+            s!(y y z),
+            s!(x y z),
+        ]);
+        let actual = wkld
+            .filter(Filter::And(
+                Box::new(Filter::Contains(EnumoPattern::Lit("x".into()))),
+                Box::new(Filter::Contains(EnumoPattern::Lit("y".into()))),
+            ))
+            .force();
+        let expected = vec![s!(x y), s!(y x), s!(x y z)];
         assert_eq!(actual, expected);
     }
 
