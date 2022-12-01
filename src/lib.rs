@@ -91,6 +91,22 @@ pub enum Sexp {
     List(Vec<Self>),
 }
 
+impl std::fmt::Display for Sexp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Sexp::Atom(x) => write!(f, "{}", x),
+            Sexp::List(l) => {
+                write!(f, "(");
+                for x in l {
+                    write!(f, "{} ", x);
+                }
+                write!(f, ")");
+                Ok(())
+            }
+        }
+    }
+}
+
 impl Sexp {
     fn plug(&self, name: &str, pegs: &[Self]) -> Vec<Sexp> {
         use itertools::Itertools;
@@ -197,8 +213,29 @@ impl Workload {
         }
     }
 
+    fn iter(self, atom: &str, n: usize) -> Self {
+        if n == 0 {
+            Self::Set(vec![])
+        } else {
+            let rec = self.clone().iter(atom, n - 1);
+            self.plug(atom, rec)
+        }
+    }
+
     fn plug(self, name: impl Into<String>, workload: Workload) -> Self {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload))
+    }
+
+    fn filter(self, filter: Filter) -> Self {
+        if filter.is_monotonic() {
+            if let Workload::Plug(wkld, name, pegs) = self {
+                Workload::Plug(Box::new(wkld.filter(filter)), name, pegs)
+            } else {
+                Workload::Filter(filter, Box::new(self))
+            }
+        } else {
+            Workload::Filter(filter, Box::new(self))
+        }
     }
 }
 
@@ -245,6 +282,53 @@ mod test {
             s!(3 3),
         ];
         let actual = term.plug("x", &pegs);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn multi_plug() {
+        let wkld = Workload::Set(vec![s!(a b), s!(a), s!(b)]);
+        let a_s = Workload::Set(vec![s!(1), s!(2), s!(3)]);
+        let b_s = Workload::Set(vec![s!(x), s!(y)]);
+        let actual = wkld.plug("a", a_s).plug("b", b_s).force();
+        let expected = vec![
+            s!(1 x),
+            s!(1 y),
+            s!(2 x),
+            s!(2 y),
+            s!(3 x),
+            s!(3 y),
+            s!(1),
+            s!(2),
+            s!(3),
+            s!(x),
+            s!(y),
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn push_filter_through_plug() {
+        let wkld = Workload::Set(vec![s!(x x x), s!(x x), s!(x)]);
+        let pegs = Workload::Set(vec![s!(1), s!(2), s!(3)]);
+        let actual = wkld
+            .plug("x", pegs)
+            .filter(Filter::MetricLt(Metric::Atoms, 3))
+            .force();
+        let expected = vec![
+            s!(1 1),
+            s!(1 2),
+            s!(1 3),
+            s!(2 1),
+            s!(2 2),
+            s!(2 3),
+            s!(3 1),
+            s!(3 2),
+            s!(3 3),
+            s!(1),
+            s!(2),
+            s!(3),
+        ];
         assert_eq!(actual, expected);
     }
 }
