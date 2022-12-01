@@ -1,3 +1,5 @@
+use crate::HashMap;
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Sexp {
     Atom(String),
@@ -9,11 +11,11 @@ impl std::fmt::Display for Sexp {
         match self {
             Sexp::Atom(x) => write!(f, "{}", x),
             Sexp::List(l) => {
-                write!(f, "(");
+                write!(f, "(").expect("not written");
                 for x in l {
-                    write!(f, "{} ", x);
+                    write!(f, "{} ", x).expect("not written");
                 }
-                write!(f, ")");
+                write!(f, ")").expect("not written");
                 Ok(())
             }
         }
@@ -65,6 +67,64 @@ enum EnumoPattern {
     List(Vec<EnumoPattern>),
 }
 
+impl EnumoPattern {
+    fn matches(
+        &self,
+        sexp: &Sexp,
+        mut subst: HashMap<String, Sexp>,
+    ) -> Option<HashMap<String, Sexp>> {
+        match self {
+            EnumoPattern::Wild => {
+                // Wild matches anything
+                Some(subst)
+            }
+            EnumoPattern::Var(pvar) => {
+                // Variables can match anything but must match consistently
+                if let Some(x) = subst.get(pvar) {
+                    // pvar already bound, check consistency
+                    if sexp.eq(x) {
+                        Some(subst)
+                    } else {
+                        None
+                    }
+                } else {
+                    // pvar not yet bound, just add to subst
+                    subst.insert(pvar.clone(), sexp.clone());
+                    Some(subst)
+                }
+            }
+            EnumoPattern::Lit(plit) => match sexp {
+                Sexp::Atom(lit) => {
+                    if plit == lit {
+                        Some(subst)
+                    } else {
+                        None
+                    }
+                }
+                Sexp::List(_) => None,
+            },
+            EnumoPattern::List(pats) => match sexp {
+                Sexp::Atom(_) => None,
+                Sexp::List(args) => {
+                    if pats.len() == args.len() {
+                        pats.iter()
+                            .zip(args.iter())
+                            .fold(Some(subst), |acc, (pat, sexp)| {
+                                if let Some(subst) = acc {
+                                    pat.matches(sexp, subst)
+                                } else {
+                                    None
+                                }
+                            })
+                    } else {
+                        None
+                    }
+                }
+            },
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 enum Filter {
     MetricLt(Metric, usize),
@@ -77,7 +137,15 @@ impl Filter {
     fn test(&self, sexp: &Sexp) -> bool {
         match self {
             Filter::MetricLt(metric, n) => sexp.measure(*metric) < *n,
-            Filter::Contains(_) => todo!(),
+            Filter::Contains(pat) => {
+                pat.matches(sexp, Default::default()).is_some()
+                    || match sexp {
+                        Sexp::Atom(_) => false,
+                        Sexp::List(args) => args
+                            .iter()
+                            .any(|s| pat.matches(s, Default::default()).is_some()),
+                    }
+            }
             Filter::Canon(_) => todo!(),
             Filter::And(_, _) => todo!(),
         }
@@ -86,7 +154,7 @@ impl Filter {
     fn is_monotonic(&self) -> bool {
         match self {
             Filter::MetricLt(_, _) => true,
-            _ => todo!(),
+            _ => false,
         }
     }
 }
@@ -160,6 +228,26 @@ mod test {
         (( $($x:tt)* )) => { Sexp::List(vec![ $(s!($x)),* ]) };
         ($x:tt) => { Sexp::Atom(format!(stringify!($x))) };
         ($($x:tt)*) => { s!(( $($x)* )) };
+    }
+
+    #[test]
+    fn test_contains() {
+        let wkld = Workload::Set(vec![
+            s!((+ a a)),
+            s!((+ a b)),
+            s!((+ a (+ a b))),
+            s!((+ a (+ b b))),
+            s!((+ (+ a b) (+ a b))),
+            s!((+ (+ a b) (+ b a)) ),
+        ]);
+        let pat = EnumoPattern::List(vec![
+            EnumoPattern::Lit("+".into()),
+            EnumoPattern::Var("?x".into()),
+            EnumoPattern::Var("?x".into()),
+        ]);
+        let actual = wkld.filter(Filter::Contains(pat)).force();
+        let expected = vec![s!((+ a a)), s!((+ a (+ b b))), s!((+ (+ a b) (+ a b)))];
+        assert_eq!(actual, expected);
     }
 
     #[test]
