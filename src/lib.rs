@@ -11,7 +11,7 @@ pub use util::*;
 
 mod bv;
 mod derive;
-mod enumo;
+pub mod enumo;
 mod equality;
 mod interval;
 mod language;
