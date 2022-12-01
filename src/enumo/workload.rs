@@ -16,7 +16,7 @@ impl Workload {
                 let mut res = vec![];
                 let workload = workload.force();
                 for sexp in tgt.force() {
-                    res.extend(sexp.plug(&name, &workload));
+                    res.extend(sexp.plug(name, &workload));
                 }
                 res
             }

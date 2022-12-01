@@ -27,10 +27,7 @@ impl Filter {
     }
 
     pub(crate) fn is_monotonic(&self) -> bool {
-        match self {
-            Filter::MetricLt(_, _) => true,
-            _ => false,
-        }
+        matches!(self, Filter::MetricLt(_, _))
     }
 }
 
