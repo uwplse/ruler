@@ -23,6 +23,44 @@ impl std::fmt::Display for Sexp {
 }
 
 impl Sexp {
+    fn mk_canon(
+        &self,
+        symbols: &[String],
+        mut idx: usize,
+        mut subst: HashMap<String, String>,
+    ) -> (HashMap<String, String>, usize) {
+        match self {
+            Sexp::Atom(x) => {
+                if symbols.contains(x) && !subst.contains_key(x) {
+                    subst.insert(x.into(), symbols[idx].clone());
+                    idx += 1;
+                }
+                (subst, idx)
+            }
+            Sexp::List(exps) => exps.iter().fold((subst, idx), |(acc, idx), item| {
+                item.mk_canon(symbols, idx, acc)
+            }),
+        }
+    }
+
+    fn apply_subst(&self, subst: &HashMap<String, String>) -> Self {
+        match self {
+            Sexp::Atom(s) => {
+                if let Some(v) = subst.get(s) {
+                    Sexp::Atom(v.into())
+                } else {
+                    Sexp::Atom(s.into())
+                }
+            }
+            Sexp::List(exps) => Sexp::List(exps.iter().map(|s| s.apply_subst(subst)).collect()),
+        }
+    }
+
+    fn canon(&self, symbols: &[String]) -> Self {
+        let (subst, _) = self.mk_canon(symbols, 0, Default::default());
+        self.apply_subst(&subst)
+    }
+
     fn plug(&self, name: &str, pegs: &[Self]) -> Vec<Sexp> {
         use itertools::Itertools;
         match self {
@@ -146,7 +184,7 @@ impl Filter {
                             .any(|s| pat.matches(s, Default::default()).is_some()),
                     }
             }
-            Filter::Canon(_) => todo!(),
+            Filter::Canon(symbols) => sexp.eq(&sexp.canon(symbols)),
             Filter::And(f1, f2) => f1.test(sexp) && f2.test(sexp),
         }
     }
@@ -228,6 +266,50 @@ mod test {
         (( $($x:tt)* )) => { Sexp::List(vec![ $(s!($x)),* ]) };
         ($x:tt) => { Sexp::Atom(format!(stringify!($x))) };
         ($($x:tt)*) => { s!(( $($x)* )) };
+    }
+
+    #[test]
+    fn canon() {
+        let inputs = vec![
+            s!((+ (/ c b) a)),
+            s!((+ (- c c) (/ a a))),
+            s!(a),
+            s!(b),
+            s!(x),
+            s!((+ a a)),
+            s!((+ b b)),
+            s!((+ a b)),
+            s!((+ b a)),
+            s!((+ a x)),
+            s!((+ x a)),
+            s!((+ b x)),
+            s!((+ x b)),
+            s!((+ a (+ b c))),
+            s!((+ a (+ c b))),
+        ];
+        let expecteds = vec![
+            s!((+ (/ a b) c)),
+            s!((+ (- a a) (/ b b))),
+            s!(a),
+            s!(a),
+            s!(x),
+            s!((+ a a)),
+            s!((+ a a)),
+            s!((+ a b)),
+            s!((+ a b)),
+            s!((+ a x)),
+            s!((+ x a)),
+            s!((+ a x)),
+            s!((+ x a)),
+            s!((+ a (+ b c))),
+            s!((+ a (+ b c))),
+        ];
+        for (test, expected) in inputs.iter().zip(expecteds.iter()) {
+            assert_eq!(
+                &test.canon(vec!["a".into(), "b".into(), "c".into()].as_ref()),
+                expected
+            );
+        }
     }
 
     #[test]
