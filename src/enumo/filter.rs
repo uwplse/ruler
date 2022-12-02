@@ -35,6 +35,22 @@ mod test {
     use crate::s;
 
     #[test]
+    fn metric_lt() {
+        let wkld = Workload::Set(vec![
+            s!((+ a a)),
+            s!((+ a b)),
+            s!((+ a (+ a b))),
+            s!((+ a (+ b b))),
+            s!((+ (+ a b) (+ a b))),
+            s!((+ (+ a b) (+ b a)) ),
+            s!((~ (+ a b))),
+        ]);
+        let actual = wkld.filter(Filter::MetricLt(Metric::Atoms, 5)).force();
+        let expected = vec![s!((+ a a)), s!((+ a b)), s!((~ (+ a b)))];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
     fn contains() {
         let wkld = Workload::Set(vec![
             s!((+ a a)),

@@ -132,8 +132,7 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn simple() {
+    fn iter_bool(n: usize) -> Workload {
         let consts = Workload::Set(vec![s!(true), s!(false)]);
         let vars = Workload::Set(vec![s!(a), s!(b), s!(c)]);
         let uops = Workload::Set(vec![s!(~)]);
@@ -141,15 +140,26 @@ mod test {
 
         let lang = Workload::Set(vec![s!(cnst), s!(var), s!((uop expr)), s!((bop expr expr))]);
 
-        let bool3 = lang
-            .iter_metric("expr", Metric::Atoms, 3)
-            .plug("cnst", consts)
-            .plug("var", vars)
-            .plug("uop", uops)
-            .plug("bop", bops);
+        lang.clone()
+            .iter_metric("expr", Metric::Atoms, n)
+            .plug("cnst", &consts)
+            .plug("var", &vars)
+            .plug("uop", &uops)
+            .plug("bop", &bops)
+    }
 
-        assert_eq!(bool3.force().len(), 110);
+    #[test]
+    fn simple() {
+        let atoms3 = iter_bool(3);
+        assert_eq!(atoms3.force().len(), 110);
 
-        Bool::run_workload(bool3, vec![]);
+        let rules3 = Bool::run_workload(atoms3, vec![]);
+        assert_eq!(rules3.len(), 13);
+
+        let atoms4 = iter_bool(4);
+        assert_eq!(atoms4.force().len(), 415);
+
+        let rules4 = Bool::run_workload(atoms4, rules3);
+        assert_eq!(rules4.len(), 7);
     }
 }

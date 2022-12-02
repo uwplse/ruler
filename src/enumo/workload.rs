@@ -40,7 +40,7 @@ impl Workload {
             Self::Set(vec![])
         } else {
             let rec = self.clone().iter(atom, n - 1);
-            self.plug(atom, rec)
+            self.plug(atom, &rec)
         }
     }
 
@@ -48,14 +48,17 @@ impl Workload {
         self.iter(atom, n - 1).filter(Filter::MetricLt(met, n + 1))
     }
 
-    pub fn plug(self, name: impl Into<String>, workload: Workload) -> Self {
-        Workload::Plug(Box::new(self), name.into(), Box::new(workload))
+    pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
+        Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
     }
 
     pub fn filter(self, filter: Filter) -> Self {
         if filter.is_monotonic() {
             if let Workload::Plug(wkld, name, pegs) = self {
-                Workload::Plug(Box::new(wkld.filter(filter)), name, pegs)
+                Workload::Filter(
+                    filter.clone(),
+                    Box::new(Workload::Plug(Box::new(wkld.filter(filter)), name, pegs)),
+                )
             } else {
                 Workload::Filter(filter, Box::new(self))
             }
@@ -75,7 +78,7 @@ mod test {
         let wkld = Workload::Set(vec![s!(x x x), s!(x x), s!(x)]);
         let pegs = Workload::Set(vec![s!(1), s!(2), s!(3)]);
         let actual = wkld
-            .plug("x", pegs)
+            .plug("x", &pegs)
             .filter(Filter::MetricLt(Metric::Atoms, 3))
             .force();
         let expected = vec![

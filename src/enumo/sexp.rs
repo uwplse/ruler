@@ -181,7 +181,7 @@ mod test {
         let wkld = Workload::Set(vec![s!(a b), s!(a), s!(b)]);
         let a_s = Workload::Set(vec![s!(1), s!(2), s!(3)]);
         let b_s = Workload::Set(vec![s!(x), s!(y)]);
-        let actual = wkld.plug("a", a_s).plug("b", b_s).force();
+        let actual = wkld.plug("a", &a_s).plug("b", &b_s).force();
         let expected = vec![
             s!(1 x),
             s!(1 y),

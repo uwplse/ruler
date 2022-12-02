@@ -269,4 +269,20 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
             node_limit: 300000,
         })
     }
+
+    fn run_workload_with_limits(
+        workload: Workload,
+        prior_rules: Ruleset<Self>,
+        iter_limit: usize,
+        time_limit: u64,
+        node_limit: usize,
+    ) -> Ruleset<Self> {
+        synth::synth(SynthParams {
+            workload,
+            prior_rules,
+            iter_limit,
+            time_limit,
+            node_limit,
+        })
+    }
 }
