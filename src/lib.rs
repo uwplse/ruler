@@ -1,4 +1,5 @@
 use clap::Parser;
+use enumo::Workload;
 use serde::{Deserialize, Serialize};
 
 pub use bv::*;
@@ -23,39 +24,18 @@ pub type Symbol = egg::Symbol;
 pub type Var = egg::Var;
 pub type EGraph<L, N> = egg::EGraph<L, N>;
 pub type Pattern<L> = egg::Pattern<L>;
+pub type Ruleset<L> = Vec<Equality<L>>;
 
-#[derive(Parser)]
-#[clap(rename_all = "kebab-case")]
-pub enum Command {
-    Synth(SynthParams),
-    Derive(DeriveParams),
-}
+pub struct SynthParams<L: SynthLanguage> {
+    pub prior_rules: Ruleset<L>,
 
-/// All parameters for rule synthesis.
-#[derive(Parser, Deserialize, Serialize)]
-#[clap(rename_all = "kebab-case")]
-pub struct SynthParams {
-    /// Output file name
-    #[clap(long, default_value = "out.json")]
-    pub outfile: String,
-
-    #[clap(long)]
-    pub prior_rules: Option<String>,
-
-    #[clap(long)]
-    pub workload: Option<String>,
+    pub workload: Workload,
 
     ////////////////
     // eqsat args //
     ////////////////
-    /// node limit for all the eqsats
-    #[clap(long, default_value = "300000")]
     pub node_limit: usize,
-    /// iter limit for all the eqsats
-    #[clap(long, default_value = "2")]
     pub iter_limit: usize,
-    /// time limit (seconds) for all the eqsats
-    #[clap(long, default_value = "60")]
     pub time_limit: u64,
 }
 
@@ -79,7 +59,6 @@ pub struct DeriveParams {
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "L: SynthLanguage")]
 pub struct Report<L: SynthLanguage> {
-    pub params: SynthParams,
     pub time: f64,
     pub num_rules: usize,
     pub prior_rws: Vec<Equality<L>>,

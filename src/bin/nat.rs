@@ -1,4 +1,5 @@
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand_pcg::Pcg64;
 use ruler::*;
 use z3::ast::Ast;
 
@@ -84,13 +85,14 @@ impl SynthLanguage for Nat {
     }
 
     fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+        let mut rng = Pcg64::seed_from_u64(0);
         let cvec_len = 10;
         let mut egraph: EGraph<Nat, SynthAnalysis> = EGraph::new(SynthAnalysis { cvec_len });
         for v in vars {
             let id = egraph.add(Nat::Var(Symbol::from(v)));
             let mut vals = vec![];
             for _ in 0..cvec_len {
-                vals.push(Some(synth.rng.gen::<usize>()));
+                vals.push(Some(rng.gen::<usize>()));
             }
             egraph[id].data.cvec = vals.clone();
         }

@@ -3,13 +3,12 @@ use std::{
     hash::Hash,
 };
 
-use clap::Parser;
 use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
     Rewrite,
 };
 
-use crate::*;
+use crate::{enumo::Workload, *};
 
 #[derive(Clone)]
 pub struct SynthAnalysis {
@@ -258,13 +257,10 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     ) -> ValidationResult;
 
     fn run_synth() {
-        match Command::parse() {
-            Command::Synth(params) => {
-                synth::synth::<Self>(params);
-            }
-            Command::Derive(params) => {
-                derive::derive::<Self>(params);
-            }
-        }
+        println!("will be removed soon")
+    }
+
+    fn run_workload(_workload: Workload, _prior_rules: Ruleset<Self>) -> Ruleset<Self> {
+        vec![]
     }
 }

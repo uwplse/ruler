@@ -1,6 +1,4 @@
 use egg::{AstSize, EClass, ENodeOrVar, Extractor, RecExpr, Rewrite, Runner, StopReason};
-use rand::SeedableRng;
-use rand_pcg::Pcg64;
 use std::{
     fmt::Debug,
     fs::File,
@@ -30,17 +28,16 @@ pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash
 pub type EqualityMap<L> = IndexMap<Arc<str>, Equality<L>>;
 
 pub struct Synthesizer<L: SynthLanguage> {
-    pub params: SynthParams,
-    pub rng: Pcg64,
+    pub params: SynthParams<L>,
     pub egraph: EGraph<L, SynthAnalysis>,
     pub prior_rws: EqualityMap<L>,
     pub new_rws: EqualityMap<L>,
 }
 
 impl<L: SynthLanguage> Synthesizer<L> {
-    fn new(params: SynthParams) -> Self {
+    fn new(params: SynthParams<L>) -> Self {
         let mut priors: EqualityMap<L> = Default::default();
-        if let Some(filename) = params.prior_rules.clone() {
+        if let Some(filename) = Some("prior.rules") {
             let file =
                 File::open(&filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
             let report: Report<L> = serde_json::from_reader(file).unwrap();
@@ -54,7 +51,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         Self {
             params,
-            rng: Pcg64::seed_from_u64(0), // TODO- parameterize?
             egraph: Default::default(),
             prior_rws: priors,
             new_rws: Default::default(),
@@ -376,7 +372,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     pub fn run(mut self) -> Report<L> {
         let t = Instant::now();
 
-        let filename = self.params.workload.clone().expect("workload is required");
+        let filename = "terms.txt";
         let (workload, vars) = self.enumerate_workload(&filename);
         println!(
             "enumerated {} terms with {} vars",
@@ -410,7 +406,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
 
         Report {
-            params: self.params,
             time,
             num_rules,
             prior_rws: self.prior_rws.into_iter().map(|(_, eq)| eq).collect(),
@@ -419,8 +414,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 }
 
-pub fn synth<L: SynthLanguage>(params: SynthParams) {
-    let outfile = params.outfile.clone();
+pub fn synth<L: SynthLanguage>(params: SynthParams<L>) {
+    let outfile = "out.json";
     let syn = Synthesizer::<L>::new(params);
     let report = syn.run();
     let file =
