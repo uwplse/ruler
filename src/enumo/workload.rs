@@ -35,13 +35,17 @@ impl Workload {
         }
     }
 
-    pub fn iter(self, atom: &str, n: usize) -> Self {
+    fn iter(self, atom: &str, n: usize) -> Self {
         if n == 0 {
             Self::Set(vec![])
         } else {
             let rec = self.clone().iter(atom, n - 1);
             self.plug(atom, rec)
         }
+    }
+
+    pub fn iter_metric(self, atom: &str, met: Metric, n: usize) -> Self {
+        self.iter(atom, n - 1).filter(Filter::MetricLt(met, n + 1))
     }
 
     pub fn plug(self, name: impl Into<String>, workload: Workload) -> Self {
