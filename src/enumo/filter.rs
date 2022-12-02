@@ -13,12 +13,10 @@ impl Filter {
         match self {
             Filter::MetricLt(metric, n) => sexp.measure(*metric) < *n,
             Filter::Contains(pat) => {
-                pat.matches(sexp, Default::default()).is_some()
+                pat.matches(sexp)
                     || match sexp {
                         Sexp::Atom(_) => false,
-                        Sexp::List(args) => args
-                            .iter()
-                            .any(|s| pat.matches(s, Default::default()).is_some()),
+                        Sexp::List(args) => args.iter().any(|s| pat.matches(s)),
                     }
             }
             Filter::Canon(symbols) => sexp.eq(&sexp.canon(symbols)),

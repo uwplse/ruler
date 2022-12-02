@@ -82,7 +82,7 @@ impl Sexp {
                 Metric::Atoms | Metric::Depth => 1,
             },
             Sexp::List(s) => match metric {
-                Metric::Atoms => s.len(),
+                Metric::Atoms => s.iter().map(|x| x.measure(metric)).sum::<usize>(),
                 Metric::List => s.iter().map(|x| x.measure(metric)).sum::<usize>() + 1,
                 Metric::Depth => s.iter().map(|x| x.measure(metric)).max().unwrap() + 1,
             },
@@ -96,15 +96,60 @@ mod test {
     use crate::*;
 
     #[test]
-    fn simple_plug() {
+    fn measure_atoms() {
+        let exprs = vec![
+            (Sexp::Atom("a".into()), 1),
+            (s!((a b)), 2),
+            (s!((a b c)), 3),
+            (s!((a (b c))), 3),
+            (s!((a b (c d))), 4),
+            (s!((a (b (c d)))), 4),
+            (s!((a (b c) (d e))), 5),
+        ];
+        for (expr, size) in exprs {
+            assert_eq!(expr.measure(Metric::Atoms), size);
+        }
+    }
+
+    #[test]
+    fn measure_lists() {
+        let exprs = vec![
+            (Sexp::Atom("a".into()), 0),
+            (s!((a b)), 1),
+            (s!((a b c)), 1),
+            (s!((a (b c))), 2),
+            (s!((a b (c d))), 2),
+            (s!((a (b (c d)))), 3),
+            (s!((a (b c) (d e))), 3),
+        ];
+        for (expr, size) in exprs {
+            assert_eq!(expr.measure(Metric::List), size);
+        }
+    }
+
+    #[test]
+    fn measure_depth() {
+        let exprs = vec![
+            (Sexp::Atom("a".into()), 1),
+            (s!((a b)), 2),
+            (s!((a b c)), 2),
+            (s!((a (b c))), 3),
+            (s!((a b (c d))), 3),
+            (s!((a (b (c d)))), 4),
+            (s!((a (b c) (d e))), 3),
+        ];
+        for (expr, size) in exprs {
+            assert_eq!(expr.measure(Metric::Depth), size);
+        }
+    }
+
+    #[test]
+    fn plug() {
         let x = s!(x);
         let expected = vec![x.clone()];
         let actual = x.plug("a", &[s!(1), s!(2)]);
         assert_eq!(actual, expected);
-    }
 
-    #[test]
-    fn simple_plug2() {
         let x = s!(x);
         let pegs = vec![s!(1), s!(2)];
         let expected = pegs.clone();

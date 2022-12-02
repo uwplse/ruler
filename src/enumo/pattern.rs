@@ -9,7 +9,11 @@ pub enum Pattern {
 }
 
 impl Pattern {
-    pub(crate) fn matches(
+    pub(crate) fn matches(&self, sexp: &Sexp) -> bool {
+        self.matches_with(sexp, Default::default()).is_some()
+    }
+
+    fn matches_with(
         &self,
         sexp: &Sexp,
         mut subst: HashMap<String, Sexp>,
@@ -52,7 +56,7 @@ impl Pattern {
                             .zip(args.iter())
                             .fold(Some(subst), |acc, (pat, sexp)| {
                                 if let Some(subst) = acc {
-                                    pat.matches(sexp, subst)
+                                    pat.matches_with(sexp, subst)
                                 } else {
                                     None
                                 }
@@ -62,6 +66,40 @@ impl Pattern {
                     }
                 }
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Pattern;
+    use super::*;
+    use crate::*;
+
+    #[test]
+    fn matches() {
+        let patterns = vec![
+            Pattern::Wild,
+            Pattern::Lit("x".into()),
+            Pattern::List(vec![
+                Pattern::Lit("+".into()),
+                Pattern::Var("?x".into()),
+                Pattern::Var("?x".into()),
+            ]),
+        ];
+
+        let exprs = vec![s!(a), s!(x), s!(+ x y), s!(+ y y), s!(+ (* a b) (* a b))];
+
+        let expected = vec![
+            vec![true, true, true, true, true],
+            vec![false, true, false, false, false],
+            vec![false, false, false, true, true],
+        ];
+
+        for (i, pat) in patterns.iter().enumerate() {
+            for (j, expr) in exprs.iter().enumerate() {
+                assert_eq!(pat.matches(expr), expected[i][j]);
+            }
         }
     }
 }
