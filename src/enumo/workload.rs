@@ -12,11 +12,11 @@ impl Workload {
     pub fn force(&self) -> Vec<Sexp> {
         match self {
             Workload::Set(set) => set.clone(),
-            Workload::Plug(tgt, name, workload) => {
+            Workload::Plug(wkld, name, pegs) => {
                 let mut res = vec![];
-                let workload = workload.force();
-                for sexp in tgt.force() {
-                    res.extend(sexp.plug(name, &workload));
+                let pegs = pegs.force();
+                for sexp in wkld.force() {
+                    res.extend(sexp.plug(name, &pegs));
                 }
                 res
             }
@@ -57,7 +57,7 @@ impl Workload {
             if let Workload::Plug(wkld, name, pegs) = self {
                 Workload::Filter(
                     filter.clone(),
-                    Box::new(Workload::Plug(Box::new(wkld.filter(filter)), name, pegs)),
+                    Box::new(Workload::Plug(wkld, name, Box::new(pegs.filter(filter)))),
                 )
             } else {
                 Workload::Filter(filter, Box::new(self))
@@ -72,31 +72,6 @@ impl Workload {
 mod test {
     use super::*;
     use crate::*;
-
-    #[test]
-    fn push_filter_through_plug() {
-        let wkld = Workload::Set(vec![s!(x x x), s!(x x), s!(x)]);
-        let pegs = Workload::Set(vec![s!(1), s!(2), s!(3)]);
-        let actual = wkld
-            .plug("x", &pegs)
-            .filter(Filter::MetricLt(Metric::Atoms, 3))
-            .force();
-        let expected = vec![
-            s!(1 1),
-            s!(1 2),
-            s!(1 3),
-            s!(2 1),
-            s!(2 2),
-            s!(2 3),
-            s!(3 1),
-            s!(3 2),
-            s!(3 3),
-            s!(1),
-            s!(2),
-            s!(3),
-        ];
-        assert_eq!(actual, expected);
-    }
 
     #[test]
     fn iter() {
@@ -116,6 +91,14 @@ mod test {
 
         let actual3 = lang.iter_metric("expr", Metric::Atoms, 3).force();
         assert_eq!(actual3.len(), 10);
+    }
+
+    #[test]
+    fn iter_metric_fast() {
+        // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
+        let lang = Workload::Set(vec![s!(cnst), s!(var), s!((uop expr)), s!((bop expr expr))]);
+        let six = lang.iter_metric("expr", Metric::Atoms, 6);
+        assert_eq!(six.force().len(), 188);
     }
 
     #[test]

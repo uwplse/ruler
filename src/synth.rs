@@ -53,7 +53,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
         let sexps = workload.force();
         for sexp in sexps {
             let s = sexp.to_string();
-            println!("{}", s);
             let expr: RecExpr<L> = s.parse().unwrap();
             for node in expr.as_ref() {
                 if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {

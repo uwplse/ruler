@@ -162,5 +162,8 @@ mod test {
 
         let rules4 = Bool::run_workload(atoms4, rules3);
         assert_eq!(rules4.len(), 5);
+
+        let atoms5 = iter_bool(5);
+        assert_eq!(atoms5.force().len(), 4599);
     }
 }
