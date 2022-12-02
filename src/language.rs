@@ -260,7 +260,13 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         println!("will be removed soon")
     }
 
-    fn run_workload(_workload: Workload, _prior_rules: Ruleset<Self>) -> Ruleset<Self> {
-        vec![]
+    fn run_workload(workload: Workload, prior_rules: Ruleset<Self>) -> Ruleset<Self> {
+        synth::synth(SynthParams {
+            workload,
+            prior_rules,
+            iter_limit: 2,
+            time_limit: 60,
+            node_limit: 300000,
+        })
     }
 }
