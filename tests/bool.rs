@@ -155,24 +155,24 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let rules3 = Bool::run_workload(atoms3, vec![]);
+        let rules3 = Bool::run_workload_with_limits(atoms3, vec![], 3, 30, 1000000);
         assert_eq!(rules3.len(), 14);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let rules4 = Bool::run_workload(atoms4, all_rules.clone());
-        assert_eq!(rules4.len(), 5);
+        let rules4 = Bool::run_workload_with_limits(atoms4, all_rules.clone(), 3, 30, 1000000);
+        assert_eq!(rules4.len(), 3);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let rules5 = Bool::run_workload(atoms5, all_rules.clone());
-        assert_eq!(rules5.len(), 21);
+        let rules5 = Bool::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
+        assert_eq!(rules5.len(), 15);
         all_rules.extend(rules5);
 
-        assert_eq!(all_rules.len(), 40);
+        assert_eq!(all_rules.len(), 32);
     }
 }
