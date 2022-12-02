@@ -45,7 +45,7 @@ impl Workload {
     }
 
     pub fn iter_metric(self, atom: &str, met: Metric, n: usize) -> Self {
-        self.iter(atom, n - 1).filter(Filter::MetricLt(met, n + 1))
+        self.iter(atom, n).filter(Filter::MetricLt(met, n + 1))
     }
 
     pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
@@ -96,5 +96,73 @@ mod test {
             s!(3),
         ];
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn iter() {
+        let lang = Workload::Set(vec![s!(cnst), s!(var), s!((uop expr)), s!((bop expr expr))]);
+        let actual2 = lang.clone().iter("expr", 2).force();
+        assert_eq!(actual2.len(), 8);
+
+        let actual3 = lang.iter("expr", 3).force();
+        assert_eq!(actual3.len(), 74);
+    }
+
+    #[test]
+    fn iter_metric() {
+        let lang = Workload::Set(vec![s!(cnst), s!(var), s!((uop expr)), s!((bop expr expr))]);
+        let actual2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
+        assert_eq!(actual2.len(), 4);
+
+        let actual3 = lang.iter_metric("expr", Metric::Atoms, 3).force();
+        assert_eq!(actual3.len(), 10);
+    }
+
+    #[test]
+    fn contains() {
+        let lang = Workload::Set(vec![s!(cnst), s!(var), s!((uop expr)), s!((bop expr expr))]);
+
+        let actual3 = lang
+            .clone()
+            .iter_metric("expr", Metric::Atoms, 3)
+            .filter(Filter::Contains(enumo::Pattern::Lit("var".into())))
+            .force();
+
+        let expected3 = vec![
+            s!(var),
+            s!(uop var),
+            s!((uop (uop var))),
+            s!(bop cnst var),
+            s!(bop var cnst),
+            s!(bop var var),
+        ];
+
+        assert_eq!(actual3, expected3);
+
+        let actual4 = lang
+            .iter_metric("expr", Metric::Atoms, 4)
+            .filter(Filter::Contains(enumo::Pattern::Lit("var".into())))
+            .force();
+
+        let expected4 = vec![
+            s!(var),
+            s!((uop var)),
+            s!((uop (uop var))),
+            s!((uop (uop (uop var)))),
+            s!((uop (bop cnst var))),
+            s!((uop (bop var cnst))),
+            s!((uop (bop var var))),
+            s!((bop cnst var)),
+            s!((bop cnst (uop var))),
+            s!((bop var cnst)),
+            s!((bop var var)),
+            s!((bop var (uop cnst))),
+            s!((bop var (uop var))),
+            s!((bop (uop cnst) var)),
+            s!((bop (uop var) cnst)),
+            s!((bop (uop var) var)),
+        ];
+
+        assert_eq!(actual4, expected4);
     }
 }

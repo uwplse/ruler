@@ -142,6 +142,7 @@ mod test {
 
         lang.clone()
             .iter_metric("expr", Metric::Atoms, n)
+            .filter(enumo::Filter::Contains(enumo::Pattern::Lit("var".into())))
             .plug("cnst", &consts)
             .plug("var", &vars)
             .plug("uop", &uops)
@@ -151,15 +152,15 @@ mod test {
     #[test]
     fn simple() {
         let atoms3 = iter_bool(3);
-        assert_eq!(atoms3.force().len(), 110);
+        assert_eq!(atoms3.force().len(), 93);
 
         let rules3 = Bool::run_workload(atoms3, vec![]);
-        assert_eq!(rules3.len(), 13);
+        assert_eq!(rules3.len(), 14);
 
         let atoms4 = iter_bool(4);
-        assert_eq!(atoms4.force().len(), 415);
+        assert_eq!(atoms4.force().len(), 348);
 
         let rules4 = Bool::run_workload(atoms4, rules3);
-        assert_eq!(rules4.len(), 7);
+        assert_eq!(rules4.len(), 5);
     }
 }

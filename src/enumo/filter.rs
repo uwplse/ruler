@@ -16,7 +16,7 @@ impl Filter {
                 pat.matches(sexp)
                     || match sexp {
                         Sexp::Atom(_) => false,
-                        Sexp::List(args) => args.iter().any(|s| pat.matches(s)),
+                        Sexp::List(args) => args.iter().any(|s| self.test(s)),
                     }
             }
             Filter::Canon(symbols) => sexp.eq(&sexp.canon(symbols)),
