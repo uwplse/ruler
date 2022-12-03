@@ -221,7 +221,3 @@ impl SynthLanguage for Trig {
         ValidationResult::Valid
     }
 }
-
-fn main() {
-    Trig::run_synth()
-}

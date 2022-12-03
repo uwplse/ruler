@@ -256,10 +256,6 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         rhs: &Pattern<Self>,
     ) -> ValidationResult;
 
-    fn run_synth() {
-        println!("will be removed soon")
-    }
-
     fn run_workload(workload: Workload, prior_rules: Ruleset<Self>) -> Ruleset<Self> {
         synth::synth(SynthParams {
             workload,

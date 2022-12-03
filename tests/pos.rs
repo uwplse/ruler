@@ -111,7 +111,3 @@ impl SynthLanguage for Pos {
         ValidationResult::Valid
     }
 }
-
-fn main() {
-    Pos::run_synth()
-}

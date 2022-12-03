@@ -177,10 +177,6 @@ fn egg_to_z3<'a>(
     (buf.pop().unwrap(), assumes)
 }
 
-fn main() {
-    Math::run_synth()
-}
-
 // Interval helpers
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Sign {
