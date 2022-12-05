@@ -180,25 +180,12 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
 
 #[cfg(test)]
 mod test {
-    use ruler::enumo::{Metric, Sexp, Workload};
+    use ruler::enumo::Workload;
 
     use super::*;
 
     fn iter_nat(n: usize) -> Workload {
-        let consts = Workload::Set(vec![s!(Z)]);
-        let vars = Workload::Set(vec![s!(a), s!(b), s!(c)]);
-        let uops = Workload::Set(vec![s!(S)]);
-        let bops = Workload::Set(vec![s!(+), s!(*)]);
-
-        let lang = Workload::Set(vec![s!(cnst), s!(var), s!((uop expr)), s!((bop expr expr))]);
-
-        lang.clone()
-            .iter_metric("expr", Metric::Atoms, n)
-            .filter(enumo::Filter::Contains(enumo::Pattern::Lit("var".into())))
-            .plug("cnst", &consts)
-            .plug("var", &vars)
-            .plug("uop", &uops)
-            .plug("bop", &bops)
+        Workload::iter_lang(n, &["Z"], &["a", "b", "c"], &["S"], &["+", "*"])
     }
 
     #[test]
@@ -224,6 +211,10 @@ mod test {
         let rules5 = Nat::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
         assert_eq!(rules5.len(), 5);
         all_rules.extend(rules5);
+
+        for v in &all_rules {
+            println!("{}", v.name);
+        }
 
         assert_eq!(all_rules.len(), 12);
     }

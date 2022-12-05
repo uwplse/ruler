@@ -111,3 +111,58 @@ impl SynthLanguage for Pos {
         ValidationResult::Valid
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ruler::enumo::Workload;
+
+    use super::*;
+
+    fn iter_pos(n: usize) -> Workload {
+        Workload::iter_lang(n, &["XH"], &["a", "b", "c"], &["XO", "XI"], &["+", "*"])
+    }
+
+    #[test]
+    fn rule_lifting() {
+        let nat_rules: Vec<Equality<Pos>> = vec![
+            "(+ ?b ?a) ==> (+ ?a ?b)",
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(+ Z ?a) ==> ?a",
+            "(* ?a Z) ==> Z",
+            "(S (+ ?b ?a)) ==> (+ ?b (S ?a))",
+            "(* ?a (S Z)) ==> ?a",
+            "(+ ?a (S Z)) ==> (S ?a)",
+            "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
+            "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
+            "(+ ?b (* ?b ?a)) ==> (* ?b (S ?a))",
+            "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
+            "(+ ?a ?a) ==> (* ?a (S (S Z)))",
+        ]
+        .iter()
+        .map(|s| s.parse().unwrap())
+        .collect();
+
+        let mut all_rules = vec![];
+        all_rules.extend(nat_rules);
+
+        let atoms3 = iter_pos(3);
+        assert_eq!(atoms3.force().len(), 51);
+
+        let rules3 = Pos::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
+        assert_eq!(rules3.len(), 3);
+        all_rules.extend(rules3);
+
+        let atoms4 = iter_pos(4);
+        assert_eq!(atoms4.force().len(), 255);
+
+        let rules4 = Pos::run_workload_with_limits(atoms4, all_rules.clone(), 3, 30, 1000000);
+        assert_eq!(rules4.len(), 4);
+        all_rules.extend(rules4);
+
+        let atoms5 = iter_pos(5);
+        assert_eq!(atoms5.force().len(), 1527);
+
+        let rules4 = Pos::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
+        assert_eq!(rules4.len(), 8);
+    }
+}

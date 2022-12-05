@@ -128,25 +128,18 @@ impl SynthLanguage for Bool {
 
 #[cfg(test)]
 mod test {
-    use ruler::enumo::{Metric, Sexp, Workload};
+    use ruler::enumo::Workload;
 
     use super::*;
 
     fn iter_bool(n: usize) -> Workload {
-        let consts = Workload::Set(vec![s!(true), s!(false)]);
-        let vars = Workload::Set(vec![s!(a), s!(b), s!(c)]);
-        let uops = Workload::Set(vec![s!(~)]);
-        let bops = Workload::Set(vec![s!(&), s!(|), s!(^), s!(->)]);
-
-        let lang = Workload::Set(vec![s!(cnst), s!(var), s!((uop expr)), s!((bop expr expr))]);
-
-        lang.clone()
-            .iter_metric("expr", Metric::Atoms, n)
-            .filter(enumo::Filter::Contains(enumo::Pattern::Lit("var".into())))
-            .plug("cnst", &consts)
-            .plug("var", &vars)
-            .plug("uop", &uops)
-            .plug("bop", &bops)
+        Workload::iter_lang(
+            n,
+            &["true", "false"],
+            &["a", "b", "c"],
+            &["~"],
+            &["&", "|", "^", "->"],
+        )
     }
 
     #[test]

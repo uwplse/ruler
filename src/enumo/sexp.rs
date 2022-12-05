@@ -1,9 +1,21 @@
+use std::str::FromStr;
+
 use super::*;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Sexp {
     Atom(String),
     List(Vec<Self>),
+}
+
+impl FromStr for Sexp {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use symbolic_expressions::parser::parse_str;
+        let sexp = parse_str(s).unwrap();
+        Ok(Self::from_symbolic_expr(sexp))
+    }
 }
 
 impl std::fmt::Display for Sexp {
@@ -23,6 +35,18 @@ impl std::fmt::Display for Sexp {
 }
 
 impl Sexp {
+    fn from_symbolic_expr(sexp: symbolic_expressions::Sexp) -> Self {
+        match sexp {
+            symbolic_expressions::Sexp::String(s) => Self::Atom(s),
+            symbolic_expressions::Sexp::List(ss) => Self::List(
+                ss.iter()
+                    .map(|s| Sexp::from_symbolic_expr(s.clone()))
+                    .collect(),
+            ),
+            symbolic_expressions::Sexp::Empty => Self::List(vec![]),
+        }
+    }
+
     fn mk_canon(
         &self,
         symbols: &[String],
@@ -93,65 +117,80 @@ impl Sexp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::*;
+
+    #[test]
+    fn from_str() {
+        assert_eq!("a".parse::<Sexp>().unwrap(), Sexp::Atom("a".into()));
+        assert_eq!(
+            "(+ (- 1 2) 0)".parse::<Sexp>().unwrap(),
+            Sexp::List(vec![
+                Sexp::Atom("+".into()),
+                Sexp::List(vec![
+                    Sexp::Atom("-".into()),
+                    Sexp::Atom("1".into()),
+                    Sexp::Atom("2".into()),
+                ]),
+                Sexp::Atom("0".into()),
+            ])
+        )
+    }
 
     #[test]
     fn measure_atoms() {
         let exprs = vec![
-            (Sexp::Atom("a".into()), 1),
-            (s!((a b)), 2),
-            (s!((a b c)), 3),
-            (s!((a (b c))), 3),
-            (s!((a b (c d))), 4),
-            (s!((a (b (c d)))), 4),
-            (s!((a (b c) (d e))), 5),
+            ("a", 1),
+            ("(a b)", 2),
+            ("(a b c)", 3),
+            ("(a (b c))", 3),
+            ("(a b (c d))", 4),
+            ("(a (b (c d)))", 4),
+            ("(a (b c) (d e))", 5),
         ];
         for (expr, size) in exprs {
-            assert_eq!(expr.measure(Metric::Atoms), size);
+            assert_eq!(expr.parse::<Sexp>().unwrap().measure(Metric::Atoms), size);
         }
     }
 
     #[test]
     fn measure_lists() {
         let exprs = vec![
-            (Sexp::Atom("a".into()), 0),
-            (s!((a b)), 1),
-            (s!((a b c)), 1),
-            (s!((a (b c))), 2),
-            (s!((a b (c d))), 2),
-            (s!((a (b (c d)))), 3),
-            (s!((a (b c) (d e))), 3),
+            ("a", 0),
+            ("(a b)", 1),
+            ("(a b c)", 1),
+            ("(a (b c))", 2),
+            ("(a b (c d))", 2),
+            ("(a (b (c d)))", 3),
+            ("(a (b c) (d e))", 3),
         ];
         for (expr, size) in exprs {
-            assert_eq!(expr.measure(Metric::List), size);
+            assert_eq!(expr.parse::<Sexp>().unwrap().measure(Metric::List), size);
         }
     }
 
     #[test]
     fn measure_depth() {
         let exprs = vec![
-            (Sexp::Atom("a".into()), 1),
-            (s!((a b)), 2),
-            (s!((a b c)), 2),
-            (s!((a (b c))), 3),
-            (s!((a b (c d))), 3),
-            (s!((a (b (c d)))), 4),
-            (s!((a (b c) (d e))), 3),
+            ("a", 1),
+            ("(a b)", 2),
+            ("(a b c)", 2),
+            ("(a (b c))", 3),
+            ("(a b (c d))", 3),
+            ("(a (b (c d)))", 4),
+            ("(a (b c) (d e))", 3),
         ];
         for (expr, size) in exprs {
-            assert_eq!(expr.measure(Metric::Depth), size);
+            assert_eq!(expr.parse::<Sexp>().unwrap().measure(Metric::Depth), size);
         }
     }
 
     #[test]
     fn plug() {
-        let x = s!(x);
+        let x = "x".parse::<Sexp>().unwrap();
+        let pegs = Workload::from_vec(vec!["1", "2", "3"]).force();
         let expected = vec![x.clone()];
-        let actual = x.plug("a", &[s!(1), s!(2)]);
+        let actual = x.plug("a", &pegs);
         assert_eq!(actual, expected);
 
-        let x = s!(x);
-        let pegs = vec![s!(1), s!(2)];
         let expected = pegs.clone();
         let actual = x.plug("x", &pegs);
         assert_eq!(actual, expected);
@@ -159,81 +198,67 @@ mod test {
 
     #[test]
     fn plug_cross_product() {
-        let term = s!(x x);
-        let pegs = vec![s!(1), s!(2), s!(3)];
-        let expected = vec![
-            s!(1 1),
-            s!(1 2),
-            s!(1 3),
-            s!(2 1),
-            s!(2 2),
-            s!(2 3),
-            s!(3 1),
-            s!(3 2),
-            s!(3 3),
-        ];
-        let actual = term.plug("x", &pegs);
+        let term = "(x x)";
+        let pegs = Workload::from_vec(vec!["1", "2", "3"]).force();
+        let expected = Workload::from_vec(vec![
+            "(1 1)", "(1 2)", "(1 3)", "(2 1)", "(2 2)", "(2 3)", "(3 1)", "(3 2)", "(3 3)",
+        ])
+        .force();
+        let actual = term.parse::<Sexp>().unwrap().plug("x", &pegs);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn multi_plug() {
-        let wkld = Workload::Set(vec![s!(a b), s!(a), s!(b)]);
-        let a_s = Workload::Set(vec![s!(1), s!(2), s!(3)]);
-        let b_s = Workload::Set(vec![s!(x), s!(y)]);
+        let wkld = Workload::from_vec(vec!["(a b)", "(a)", "(b)"]);
+        let a_s = Workload::from_vec(vec!["1", "2", "3"]);
+        let b_s = Workload::from_vec(vec!["x", "y"]);
         let actual = wkld.plug("a", &a_s).plug("b", &b_s).force();
-        let expected = vec![
-            s!(1 x),
-            s!(1 y),
-            s!(2 x),
-            s!(2 y),
-            s!(3 x),
-            s!(3 y),
-            s!(1),
-            s!(2),
-            s!(3),
-            s!(x),
-            s!(y),
-        ];
+        let expected = Workload::from_vec(vec![
+            "(1 x)", "(1 y)", "(2 x)", "(2 y)", "(3 x)", "(3 y)", "(1)", "(2)", "(3)", "(x)", "(y)",
+        ])
+        .force();
         assert_eq!(actual, expected)
     }
 
     #[test]
     fn canon() {
-        let inputs = vec![
-            s!((+ (/ c b) a)),
-            s!((+ (- c c) (/ a a))),
-            s!(a),
-            s!(b),
-            s!(x),
-            s!((+ a a)),
-            s!((+ b b)),
-            s!((+ a b)),
-            s!((+ b a)),
-            s!((+ a x)),
-            s!((+ x a)),
-            s!((+ b x)),
-            s!((+ x b)),
-            s!((+ a (+ b c))),
-            s!((+ a (+ c b))),
-        ];
-        let expecteds = vec![
-            s!((+ (/ a b) c)),
-            s!((+ (- a a) (/ b b))),
-            s!(a),
-            s!(a),
-            s!(x),
-            s!((+ a a)),
-            s!((+ a a)),
-            s!((+ a b)),
-            s!((+ a b)),
-            s!((+ a x)),
-            s!((+ x a)),
-            s!((+ a x)),
-            s!((+ x a)),
-            s!((+ a (+ b c))),
-            s!((+ a (+ b c))),
-        ];
+        let inputs = Workload::from_vec(vec![
+            "(+ (/ c b) a)",
+            "(+ (- c c) (/ a a))",
+            "a",
+            "b",
+            "x",
+            "(+ a a)",
+            "(+ b b)",
+            "(+ a b)",
+            "(+ b a)",
+            "(+ a x)",
+            "(+ x a)",
+            "(+ b x)",
+            "(+ x b)",
+            "(+ a (+ b c))",
+            "(+ a (+ c b))",
+        ])
+        .force();
+        let expecteds = Workload::from_vec(vec![
+            "(+ (/ a b) c)",
+            "(+ (- a a) (/ b b))",
+            "a",
+            "a",
+            "x",
+            "(+ a a)",
+            "(+ a a)",
+            "(+ a b)",
+            "(+ a b)",
+            "(+ a x)",
+            "(+ x a)",
+            "(+ a x)",
+            "(+ x a)",
+            "(+ a (+ b c))",
+            "(+ a (+ b c))",
+        ])
+        .force();
         for (test, expected) in inputs.iter().zip(expecteds.iter()) {
             assert_eq!(
                 &test.canon(vec!["a".into(), "b".into(), "c".into()].as_ref()),

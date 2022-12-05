@@ -32,33 +32,32 @@ impl Filter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::s;
 
     #[test]
     fn metric_lt() {
-        let wkld = Workload::Set(vec![
-            s!((+ a a)),
-            s!((+ a b)),
-            s!((+ a (+ a b))),
-            s!((+ a (+ b b))),
-            s!((+ (+ a b) (+ a b))),
-            s!((+ (+ a b) (+ b a)) ),
-            s!((~ (+ a b))),
+        let wkld = Workload::from_vec(vec![
+            "(+ a a)",
+            "(+ a b)",
+            "(+ a (+ a b))",
+            "(+ a (+ b b))",
+            "(+ (+ a b) (+ a b))",
+            "(+ (+ a b) (+ b a)) ",
+            "(~ (+ a b))",
         ]);
         let actual = wkld.filter(Filter::MetricLt(Metric::Atoms, 5)).force();
-        let expected = vec![s!((+ a a)), s!((+ a b)), s!((~ (+ a b)))];
+        let expected = Workload::from_vec(vec!["(+ a a)", "(+ a b)", "(~ (+ a b))"]).force();
         assert_eq!(actual, expected)
     }
 
     #[test]
     fn contains() {
-        let wkld = Workload::Set(vec![
-            s!((+ a a)),
-            s!((+ a b)),
-            s!((+ a (+ a b))),
-            s!((+ a (+ b b))),
-            s!((+ (+ a b) (+ a b))),
-            s!((+ (+ a b) (+ b a)) ),
+        let wkld = Workload::from_vec(vec![
+            "(+ a a)",
+            "(+ a b)",
+            "(+ a (+ a b))",
+            "(+ a (+ b b))",
+            "(+ (+ a b) (+ a b))",
+            "(+ (+ a b) (+ b a)) ",
         ]);
         let pat = Pattern::List(vec![
             Pattern::Lit("+".into()),
@@ -66,20 +65,15 @@ mod test {
             Pattern::Var("?x".into()),
         ]);
         let actual = wkld.filter(Filter::Contains(pat)).force();
-        let expected = vec![s!((+ a a)), s!((+ a (+ b b))), s!((+ (+ a b) (+ a b)))];
+        let expected =
+            Workload::from_vec(vec!["(+ a a)", "(+ a (+ b b))", "(+ (+ a b) (+ a b))"]).force();
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn and() {
-        let wkld = Workload::Set(vec![
-            s!(x),
-            s!(y),
-            s!(x y),
-            s!(y x),
-            s!(x x x),
-            s!(y y z),
-            s!(x y z),
+        let wkld = Workload::from_vec(vec![
+            "x", "y", "(x y)", "(y x)", "(x x x)", "(y y z)", "(x y z)",
         ]);
         let actual = wkld
             .filter(Filter::And(
@@ -87,7 +81,7 @@ mod test {
                 Box::new(Filter::Contains(Pattern::Lit("y".into()))),
             ))
             .force();
-        let expected = vec![s!(x y), s!(y x), s!(x y z)];
+        let expected = Workload::from_vec(vec!["(x y)", "(y x)", "(x y z)"]).force();
         assert_eq!(actual, expected);
     }
 }

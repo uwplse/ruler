@@ -72,9 +72,9 @@ impl Pattern {
 
 #[cfg(test)]
 mod test {
+    use crate::enumo::Workload;
+
     use super::Pattern;
-    use super::*;
-    use crate::*;
 
     #[test]
     fn matches() {
@@ -88,7 +88,8 @@ mod test {
             ]),
         ];
 
-        let exprs = vec![s!(a), s!(x), s!(+ x y), s!(+ y y), s!(+ (* a b) (* a b))];
+        let exprs =
+            Workload::from_vec(vec!["a", "x", "(+ x y)", "(+ y y)", "(+ (* a b) (* a b))"]).force();
 
         let expected = vec![
             vec![true, true, true, true, true],
