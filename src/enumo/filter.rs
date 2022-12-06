@@ -59,12 +59,9 @@ mod test {
             "(+ (+ a b) (+ a b))",
             "(+ (+ a b) (+ b a)) ",
         ]);
-        let pat = Pattern::List(vec![
-            Pattern::Lit("+".into()),
-            Pattern::Var("?x".into()),
-            Pattern::Var("?x".into()),
-        ]);
-        let actual = wkld.filter(Filter::Contains(pat)).force();
+        let actual = wkld
+            .filter(Filter::Contains("(+ ?x ?x)".parse().unwrap()))
+            .force();
         let expected =
             Workload::from_vec(vec!["(+ a a)", "(+ a (+ b b))", "(+ (+ a b) (+ a b))"]).force();
         assert_eq!(actual, expected);
@@ -77,8 +74,8 @@ mod test {
         ]);
         let actual = wkld
             .filter(Filter::And(
-                Box::new(Filter::Contains(Pattern::Lit("x".into()))),
-                Box::new(Filter::Contains(Pattern::Lit("y".into()))),
+                Box::new(Filter::Contains("x".parse().unwrap())),
+                Box::new(Filter::Contains("y".parse().unwrap())),
             ))
             .force();
         let expected = Workload::from_vec(vec!["(x y)", "(y x)", "(x y z)"]).force();

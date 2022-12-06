@@ -62,7 +62,7 @@ impl Workload {
         let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
 
         lang.iter_metric("expr", Metric::Atoms, n)
-            .filter(Filter::Contains(Pattern::Lit("var".into())))
+            .filter(Filter::Contains("var".parse().unwrap()))
             .plug("cnst", &Workload::from_vec(consts.to_vec()))
             .plug("var", &Workload::from_vec(vars.to_vec()))
             .plug("uop", &Workload::from_vec(uops.to_vec()))
@@ -92,7 +92,6 @@ impl Workload {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::*;
 
     #[test]
     fn iter() {
@@ -129,7 +128,7 @@ mod test {
         let actual3 = lang
             .clone()
             .iter_metric("expr", Metric::Atoms, 3)
-            .filter(Filter::Contains(enumo::Pattern::Lit("var".into())))
+            .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
         let expected3 = Workload::from_vec(vec![
@@ -146,7 +145,7 @@ mod test {
 
         let actual4 = lang
             .iter_metric("expr", Metric::Atoms, 4)
-            .filter(Filter::Contains(enumo::Pattern::Lit("var".into())))
+            .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
         let expected4 = Workload::from_vec(vec![

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use super::*;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -8,7 +10,31 @@ pub enum Pattern {
     List(Vec<Pattern>),
 }
 
+impl FromStr for Pattern {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use symbolic_expressions::parser::parse_str;
+        let sexp = parse_str(s).unwrap();
+        Ok(Self::from_symbolic_expr(sexp))
+    }
+}
+
 impl Pattern {
+    fn from_symbolic_expr(sexp: symbolic_expressions::Sexp) -> Self {
+        match sexp {
+            symbolic_expressions::Sexp::String(s) if s == "*" => Self::Wild,
+            symbolic_expressions::Sexp::String(s) if s.starts_with("?") => Self::Var(s),
+            symbolic_expressions::Sexp::String(s) => Self::Lit(s),
+            symbolic_expressions::Sexp::List(ss) => Self::List(
+                ss.iter()
+                    .map(|s| Self::from_symbolic_expr(s.clone()))
+                    .collect(),
+            ),
+            symbolic_expressions::Sexp::Empty => Self::List(vec![]),
+        }
+    }
+
     pub(crate) fn matches(&self, sexp: &Sexp) -> bool {
         self.matches_with(sexp, Default::default()).is_some()
     }
@@ -77,16 +103,38 @@ mod test {
     use super::Pattern;
 
     #[test]
-    fn matches() {
-        let patterns = vec![
-            Pattern::Wild,
-            Pattern::Lit("x".into()),
+    fn from_str() {
+        assert_eq!("a".parse::<Pattern>().unwrap(), Pattern::Lit("a".into()));
+        assert_eq!("*".parse::<Pattern>().unwrap(), Pattern::Wild);
+        assert_eq!("?a".parse::<Pattern>().unwrap(), Pattern::Var("?a".into()));
+        assert_eq!(
+            "(+ ?x ?x)".parse::<Pattern>().unwrap(),
             Pattern::List(vec![
                 Pattern::Lit("+".into()),
                 Pattern::Var("?x".into()),
                 Pattern::Var("?x".into()),
-            ]),
-        ];
+            ])
+        );
+        assert_eq!(
+            "(- * (+ ?x ?x))".parse::<Pattern>().unwrap(),
+            Pattern::List(vec![
+                Pattern::Lit("-".into()),
+                Pattern::Wild,
+                Pattern::List(vec![
+                    Pattern::Lit("+".into()),
+                    Pattern::Var("?x".into()),
+                    Pattern::Var("?x".into()),
+                ])
+            ])
+        );
+    }
+
+    #[test]
+    fn matches() {
+        let patterns: Vec<Pattern> = vec!["*", "x", "(+ ?x ?x)"]
+            .iter()
+            .map(|x| x.parse::<Pattern>().unwrap())
+            .collect();
 
         let exprs =
             Workload::from_vec(vec!["a", "x", "(+ x y)", "(+ y y)", "(+ (* a b) (* a b))"]).force();
