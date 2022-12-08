@@ -9,20 +9,6 @@ impl<L: SynthLanguage> Default for Ruleset<L> {
     }
 }
 
-impl<L: SynthLanguage> Iterator for Ruleset<L> {
-    type Item = Equality<L>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.0.is_empty() {
-            None
-        } else {
-            let first = self.0[0].clone();
-            self.0 = self.0[1..].to_vec();
-            Some(first)
-        }
-    }
-}
-
 impl<L: SynthLanguage> Ruleset<L> {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()

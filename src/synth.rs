@@ -35,8 +35,7 @@ pub struct Synthesizer<L: SynthLanguage> {
 impl<L: SynthLanguage> Synthesizer<L> {
     fn new(params: SynthParams<L>) -> Self {
         let mut priors: EqualityMap<L> = Default::default();
-        for eq in params.prior_rules.clone() {
-            println!("{}", eq.name.clone());
+        for eq in &params.prior_rules.0 {
             priors.insert(eq.name.clone(), eq.clone());
         }
 
