@@ -24,7 +24,7 @@ impl Pattern {
     fn from_symbolic_expr(sexp: symbolic_expressions::Sexp) -> Self {
         match sexp {
             symbolic_expressions::Sexp::String(s) if s == "*" => Self::Wild,
-            symbolic_expressions::Sexp::String(s) if s.starts_with("?") => Self::Var(s),
+            symbolic_expressions::Sexp::String(s) if s.starts_with('?') => Self::Var(s),
             symbolic_expressions::Sexp::String(s) => Self::Lit(s),
             symbolic_expressions::Sexp::List(ss) => Self::List(
                 ss.iter()
