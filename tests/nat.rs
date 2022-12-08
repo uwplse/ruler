@@ -180,7 +180,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
 
 #[cfg(test)]
 mod test {
-    use ruler::enumo::Workload;
+    use ruler::enumo::{Ruleset, Workload};
 
     use super::*;
 
@@ -190,11 +190,11 @@ mod test {
 
     #[test]
     fn simple() {
-        let mut all_rules = vec![];
+        let mut all_rules = Ruleset::default();
         let atoms3 = iter_nat(3);
         assert_eq!(atoms3.force().len(), 39);
 
-        let rules3 = Nat::run_workload_with_limits(atoms3, vec![], 3, 30, 1000000);
+        let rules3 = Nat::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
         assert_eq!(rules3.len(), 4);
         all_rules.extend(rules3);
 
@@ -211,10 +211,6 @@ mod test {
         let rules5 = Nat::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
         assert_eq!(rules5.len(), 5);
         all_rules.extend(rules5);
-
-        for v in &all_rules {
-            println!("{}", v.name);
-        }
 
         assert_eq!(all_rules.len(), 12);
     }

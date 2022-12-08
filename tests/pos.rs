@@ -114,7 +114,7 @@ impl SynthLanguage for Pos {
 
 #[cfg(test)]
 mod tests {
-    use ruler::enumo::Workload;
+    use ruler::enumo::{Ruleset, Workload};
 
     use super::*;
 
@@ -142,8 +142,8 @@ mod tests {
         .map(|s| s.parse().unwrap())
         .collect();
 
-        let mut all_rules = vec![];
-        all_rules.extend(nat_rules);
+        let mut all_rules = Ruleset::default();
+        all_rules.extend(Ruleset(nat_rules));
 
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
