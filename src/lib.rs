@@ -1,5 +1,5 @@
 use clap::Parser;
-use enumo::Workload;
+use enumo::{Ruleset, Workload};
 use serde::{Deserialize, Serialize};
 
 pub use bv::*;
@@ -24,7 +24,6 @@ pub type Symbol = egg::Symbol;
 pub type Var = egg::Var;
 pub type EGraph<L, N> = egg::EGraph<L, N>;
 pub type Pattern<L> = egg::Pattern<L>;
-pub type Ruleset<L> = Vec<Equality<L>>;
 
 pub struct SynthParams<L: SynthLanguage> {
     pub prior_rules: Ruleset<L>,

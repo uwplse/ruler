@@ -128,7 +128,7 @@ impl SynthLanguage for Bool {
 
 #[cfg(test)]
 mod test {
-    use ruler::enumo::Workload;
+    use ruler::enumo::{Ruleset, Workload};
 
     use super::*;
 
@@ -144,11 +144,11 @@ mod test {
 
     #[test]
     fn simple() {
-        let mut all_rules = vec![];
+        let mut all_rules = Ruleset::default();
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let rules3 = Bool::run_workload_with_limits(atoms3, vec![], 3, 30, 1000000);
+        let rules3 = Bool::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
         assert_eq!(rules3.len(), 14);
         all_rules.extend(rules3);
 

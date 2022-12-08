@@ -35,7 +35,8 @@ pub struct Synthesizer<L: SynthLanguage> {
 impl<L: SynthLanguage> Synthesizer<L> {
     fn new(params: SynthParams<L>) -> Self {
         let mut priors: EqualityMap<L> = Default::default();
-        for eq in &params.prior_rules {
+        for eq in params.prior_rules.clone() {
+            println!("{}", eq.name.clone());
             priors.insert(eq.name.clone(), eq.clone());
         }
 
@@ -407,7 +408,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 pub fn synth<L: SynthLanguage>(params: SynthParams<L>) -> Ruleset<L> {
     let syn = Synthesizer::<L>::new(params);
     let report = syn.run();
-    report.new_rws
+    Ruleset(report.new_rws)
 }
 
 // Cost function for ast size in the domain
