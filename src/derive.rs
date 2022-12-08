@@ -1,17 +1,8 @@
-use std::{fs::File, time::Duration};
+use std::time::Duration;
 
 use egg::{RecExpr, Rewrite, Runner};
 
 use crate::*;
-
-pub fn parse<L: SynthLanguage>(filename: &str) -> Vec<Equality<L>> {
-    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
-    let report: Report<L> = serde_json::from_reader(file).unwrap();
-    let mut eqs = vec![];
-    eqs.extend(report.prior_rws);
-    eqs.extend(report.new_rws);
-    eqs
-}
 
 fn is_saturating<L: SynthLanguage>(lhs: &Pattern<L>, rhs: &Pattern<L>) -> bool {
     let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
@@ -47,16 +38,16 @@ fn mk_runner<L: SynthLanguage>(
 }
 
 pub fn derive<L: SynthLanguage>(params: DeriveParams) {
-    let test_rules = parse::<L>(&params.in1);
+    let test_rules = Ruleset::from_file(&params.in1);
     let num_test = test_rules.len();
-    let baseline_rules = parse::<L>(&params.in2);
+    let baseline_rules = Ruleset::from_file(&params.in2);
 
     println!("Using {} to derive {}", params.in1, params.in2);
 
     let mut sat: Vec<Rewrite<L, SynthAnalysis>> = vec![];
     let mut other: Vec<Rewrite<L, SynthAnalysis>> = vec![];
 
-    for eq in test_rules {
+    for eq in test_rules.0 {
         if is_saturating(&eq.lhs, &eq.rhs) {
             sat.push(eq.rewrite);
         } else {
@@ -74,7 +65,7 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
     let mut derivable = vec![];
     let mut not_derivable = vec![];
 
-    baseline_rules.into_iter().for_each(|eq| {
+    baseline_rules.0.into_iter().for_each(|eq| {
         let l = L::instantiate(&eq.lhs);
         let r = L::instantiate(&eq.rhs);
 
@@ -127,16 +118,6 @@ pub fn derive<L: SynthLanguage>(params: DeriveParams) {
         derivable.len(),
         not_derivable.len()
     );
-
-    let json = serde_json::json!({
-        "files": [params.in1, params.in2],
-        "derivable": derivable,
-        "not_derivable": not_derivable
-    });
-
-    let file = File::create(&params.outfile)
-        .unwrap_or_else(|_| panic!("Failed to create {}", &params.outfile));
-    serde_json::to_writer_pretty(file, &json).unwrap();
 
     if params.ci {
         for eq in &not_derivable {
