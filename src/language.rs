@@ -3,13 +3,12 @@ use std::{
     hash::Hash,
 };
 
-use clap::Parser;
 use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
     Rewrite,
 };
 
-use crate::*;
+use crate::{enumo::Workload, *};
 
 #[derive(Clone)]
 pub struct SynthAnalysis {
@@ -257,14 +256,29 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         rhs: &Pattern<Self>,
     ) -> ValidationResult;
 
-    fn run_synth() {
-        match Command::parse() {
-            Command::Synth(params) => {
-                synth::synth::<Self>(params);
-            }
-            Command::Derive(params) => {
-                derive::derive::<Self>(params);
-            }
-        }
+    fn run_workload(workload: Workload, prior_rules: Ruleset<Self>) -> Ruleset<Self> {
+        synth::synth(SynthParams {
+            workload,
+            prior_rules,
+            iter_limit: 2,
+            time_limit: 60,
+            node_limit: 300000,
+        })
+    }
+
+    fn run_workload_with_limits(
+        workload: Workload,
+        prior_rules: Ruleset<Self>,
+        iter_limit: usize,
+        time_limit: u64,
+        node_limit: usize,
+    ) -> Ruleset<Self> {
+        synth::synth(SynthParams {
+            workload,
+            prior_rules,
+            iter_limit,
+            time_limit,
+            node_limit,
+        })
     }
 }

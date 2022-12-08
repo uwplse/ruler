@@ -148,6 +148,3 @@ impl SynthLanguage for BvBool {
         ValidationResult::Valid
     }
 }
-fn main() {
-    BvBool::run_synth()
-}
