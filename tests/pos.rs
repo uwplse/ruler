@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn rule_lifting() {
-        let nat_rules: Vec<Equality<Pos>> = vec![
+        let nat_rules = [
             "(+ ?b ?a) ==> (+ ?a ?b)",
             "(* ?b ?a) ==> (* ?a ?b)",
             "(+ Z ?a) ==> ?a",
@@ -137,13 +137,10 @@ mod tests {
             "(+ ?b (* ?b ?a)) ==> (* ?b (S ?a))",
             "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
             "(+ ?a ?a) ==> (* ?a (S (S Z)))",
-        ]
-        .iter()
-        .map(|s| s.parse().unwrap())
-        .collect();
+        ];
 
         let mut all_rules = Ruleset::default();
-        all_rules.extend(Ruleset(nat_rules));
+        all_rules.extend(Ruleset::from_str_vec(&nat_rules));
 
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
