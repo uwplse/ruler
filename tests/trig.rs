@@ -191,7 +191,7 @@ impl SynthLanguage for Trig {
     }
 
     // No variable initialization needed
-    fn initialize_vars(_synth: &mut Synthesizer<Self>, _vars: Vec<String>) {}
+    fn initialize_vars(_egraph: &mut EGraph<Self, SynthAnalysis>, _vars: &[String]) {}
 
     fn to_var(&self) -> Option<Symbol> {
         if let Trig::Var(Variable(sym)) = self {

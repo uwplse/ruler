@@ -112,7 +112,7 @@ impl SynthLanguage for Pred {
         }
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let consts = vec![
             Some((-1).to_bigint().unwrap()),
             Some(0.to_bigint().unwrap()),
@@ -120,17 +120,13 @@ impl SynthLanguage for Pred {
         ];
         let cvecs = self_product(&consts, vars.len());
 
-        let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: cvecs[0].len(),
-        });
+        egraph.analysis.cvec_len = cvecs[0].len();
 
         for (i, v) in vars.iter().enumerate() {
             let id = egraph.add(Pred::Var(Symbol::from(v.clone())));
             let cvec = cvecs[i].clone();
             egraph[id].data.cvec = cvec;
         }
-
-        synth.egraph = egraph;
     }
 
     fn to_var(&self) -> Option<Symbol> {

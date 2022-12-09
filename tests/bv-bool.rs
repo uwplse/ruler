@@ -74,13 +74,13 @@ impl SynthLanguage for BvBool {
         vec![]
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         for var in vars {
-            let var_id = synth.egraph.add(BvBool::Var(Symbol::from(var)));
-            let fst_id = synth.egraph.add(BvBool::First(var_id));
-            let sec_id = synth.egraph.add(BvBool::Second(var_id));
-            let mk_id = synth.egraph.add(BvBool::Make([fst_id, sec_id]));
-            synth.egraph.union(var_id, mk_id);
+            let var_id = egraph.add(BvBool::Var(Symbol::from(var)));
+            let fst_id = egraph.add(BvBool::First(var_id));
+            let sec_id = egraph.add(BvBool::Second(var_id));
+            let mk_id = egraph.add(BvBool::Make([fst_id, sec_id]));
+            egraph.union(var_id, mk_id);
         }
     }
 

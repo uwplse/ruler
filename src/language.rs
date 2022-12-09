@@ -128,7 +128,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         Interval::default()
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>);
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]);
 
     fn to_var(&self) -> Option<Symbol>;
     fn mk_var(sym: Symbol) -> Self;

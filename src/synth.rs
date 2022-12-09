@@ -1,4 +1,4 @@
-use egg::{AstSize, EClass, ENodeOrVar, Extractor, RecExpr, Rewrite, Runner, StopReason};
+use egg::{AstSize, EClass, Extractor, Rewrite, Runner, StopReason};
 use std::{
     fmt::Debug,
     hash::BuildHasherDefault,
@@ -34,32 +34,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             params,
             egraph: Default::default(),
             new_rws: Default::default(),
-        }
-    }
-
-    fn parse_workload(&self, workload: &Workload) -> (Vec<RecExpr<L>>, Vec<String>) {
-        let mut terms = vec![];
-        let mut vars: HashSet<String> = HashSet::default();
-        let sexps = workload.force();
-        for sexp in sexps {
-            let s = sexp.to_string();
-            let expr: RecExpr<L> = s.parse().unwrap();
-            for node in expr.as_ref() {
-                if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
-                    let mut v = v.to_string();
-                    v.remove(0);
-                    vars.extend(vec![v]);
-                }
-            }
-            terms.push(expr);
-        }
-
-        (terms, vars.into_iter().collect())
-    }
-
-    fn add_workload(egraph: &mut EGraph<L, SynthAnalysis>, exprs: &[RecExpr<L>]) {
-        for expr in exprs {
-            egraph.add_expr(expr);
         }
     }
 
@@ -361,14 +335,19 @@ impl<L: SynthLanguage> Synthesizer<L> {
     pub fn run(mut self) -> Ruleset<L> {
         let t = Instant::now();
 
-        let (workload, vars) = self.parse_workload(&self.params.workload);
+        let mut egraph = EGraph::default();
+
+        // TODO: improve perf here by doing something more clever?
+        let vars = self.params.workload.get_vars::<L>();
+        L::initialize_vars(&mut egraph, &vars);
+        self.params.workload.to_egraph::<L>(&mut egraph);
         println!(
-            "enumerated {} terms with {} vars",
-            workload.len(),
+            "enumerated {} eclasses with {} vars",
+            egraph.number_of_classes(),
             vars.len()
         );
-        L::initialize_vars(&mut self, vars);
-        Synthesizer::add_workload(&mut self.egraph, &workload);
+
+        self.egraph = egraph;
 
         let candidates = if L::is_rule_lifting() {
             self.run_rule_lifting()

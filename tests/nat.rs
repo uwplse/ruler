@@ -96,20 +96,16 @@ impl SynthLanguage for Nat {
         }
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let mut rng = Pcg64::seed_from_u64(0);
-        let cvec_len = 10;
-        let mut egraph: EGraph<Nat, SynthAnalysis> = EGraph::new(SynthAnalysis { cvec_len });
         for v in vars {
             let id = egraph.add(Nat::Var(Symbol::from(v)));
             let mut vals = vec![];
-            for _ in 0..cvec_len {
+            for _ in 0..egraph.analysis.cvec_len {
                 vals.push(Some(rng.gen::<u64>().to_bigint().unwrap()));
             }
             egraph[id].data.cvec = vals.clone();
         }
-
-        synth.egraph = egraph;
     }
 
     fn to_var(&self) -> Option<Symbol> {
