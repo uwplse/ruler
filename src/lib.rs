@@ -1,9 +1,5 @@
-use clap::Parser;
-use enumo::{Ruleset, Workload};
-use serde::{Deserialize, Serialize};
-
 pub use bv::*;
-pub use derive::*;
+use enumo::{Ruleset, Workload};
 pub use equality::*;
 pub use interval::*;
 pub use language::*;
@@ -11,7 +7,6 @@ pub use synth::*;
 pub use util::*;
 
 mod bv;
-mod derive;
 pub mod enumo;
 mod equality;
 mod interval;
@@ -36,21 +31,4 @@ pub struct SynthParams<L: SynthLanguage> {
     pub node_limit: usize,
     pub iter_limit: usize,
     pub time_limit: u64,
-}
-
-/// All parameters for rule synthesis.
-#[derive(Parser, Deserialize, Serialize)]
-#[clap(rename_all = "kebab-case")]
-pub struct DeriveParams {
-    in1: String,
-    in2: String,
-    /// Output file name
-    #[clap(long, default_value = "out.json")]
-    outfile: String,
-
-    #[clap(long, default_value = "10")]
-    iter_limit: usize,
-
-    #[clap(long)]
-    ci: bool,
 }

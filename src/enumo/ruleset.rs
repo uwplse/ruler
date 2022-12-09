@@ -1,6 +1,8 @@
-use std::io::Write;
+use std::{io::Write, time::Duration};
 
-use crate::{Equality, SynthLanguage};
+use egg::{RecExpr, Rewrite, Runner};
+
+use crate::{EGraph, Equality, SynthAnalysis, SynthLanguage};
 
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub Vec<Equality<L>>);
@@ -56,5 +58,107 @@ impl<L: SynthLanguage> Ruleset<L> {
             eqs.push(l);
         }
         Self(eqs)
+    }
+
+    pub fn partition_sat(&self) -> (Self, Self) {
+        let mut sat = vec![];
+        let mut other = vec![];
+
+        for eq in &self.0 {
+            if eq.is_saturating() {
+                sat.push(eq.clone());
+            } else {
+                other.push(eq.clone());
+            }
+        }
+
+        (Ruleset(sat), Ruleset(other))
+    }
+
+    fn mk_runner(
+        egraph: EGraph<L, SynthAnalysis>,
+        lhs: &RecExpr<L>,
+        rhs: &RecExpr<L>,
+    ) -> Runner<L, SynthAnalysis> {
+        Runner::default()
+            .with_egraph(egraph)
+            .with_expr(lhs)
+            .with_expr(rhs)
+            .with_scheduler(egg::SimpleScheduler)
+            .with_hook(|r| {
+                if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
+                    Err("Done".to_owned())
+                } else {
+                    Ok(())
+                }
+            })
+    }
+
+    pub fn derive(&self, against: Self, iter_limit: usize) -> (Self, Self) {
+        let (sat, other) = self.partition_sat();
+        let sat: Vec<Rewrite<L, SynthAnalysis>> =
+            sat.0.iter().map(|eq| eq.rewrite.clone()).collect();
+        let other: Vec<Rewrite<L, SynthAnalysis>> =
+            other.0.iter().map(|eq| eq.rewrite.clone()).collect();
+
+        let mut derivable = vec![];
+        let mut not_derivable = vec![];
+
+        against.0.into_iter().for_each(|eq| {
+            let l = L::instantiate(&eq.lhs);
+            let r = L::instantiate(&eq.rhs);
+
+            let mut runner = Self::mk_runner(Default::default(), &l, &r);
+            let mut l_id;
+            let mut r_id;
+            for _ in 0..iter_limit {
+                // Sat
+                runner = Self::mk_runner(runner.egraph, &l, &r)
+                    .with_node_limit(usize::MAX)
+                    .with_time_limit(Duration::from_secs(30))
+                    .with_iter_limit(100)
+                    .run(&sat);
+
+                l_id = runner.egraph.find(runner.roots[0]);
+                r_id = runner.egraph.find(runner.roots[1]);
+
+                if l_id == r_id {
+                    break;
+                }
+
+                // Other
+                runner = Self::mk_runner(runner.egraph, &l, &r)
+                    .with_iter_limit(1)
+                    .run(&other);
+
+                l_id = runner.egraph.find(runner.roots[0]);
+                r_id = runner.egraph.find(runner.roots[1]);
+
+                if l_id == r_id {
+                    break;
+                }
+            }
+            // One more sat
+            runner = Self::mk_runner(runner.egraph, &l, &r)
+                .with_node_limit(usize::MAX)
+                .with_time_limit(Duration::from_secs(30))
+                .with_iter_limit(100)
+                .run(&sat);
+            l_id = runner.egraph.find(runner.roots[0]);
+            r_id = runner.egraph.find(runner.roots[1]);
+            if l_id == r_id {
+                derivable.push(eq);
+            } else {
+                not_derivable.push(eq);
+            }
+        });
+
+        println!(
+            "{} rules are derivable, {} are not",
+            derivable.len(),
+            not_derivable.len()
+        );
+
+        (Self(derivable), Self(not_derivable))
     }
 }

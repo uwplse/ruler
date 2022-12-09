@@ -190,4 +190,17 @@ mod test {
 
         assert_eq!(rules, read)
     }
+
+    #[test]
+    fn derive_rules() {
+        let three = Bool::run_workload_with_limits(iter_bool(3), Ruleset::default(), 3, 30, 100000);
+        three.to_file("three.txt");
+
+        let four = Bool::run_workload_with_limits(iter_bool(4), Ruleset::default(), 3, 30, 100000);
+        four.to_file("four.txt");
+
+        let (can, cannot) = three.derive(four, 2);
+        assert_eq!(can.len(), 10);
+        assert_eq!(cannot.len(), 6);
+    }
 }
