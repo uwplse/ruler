@@ -31,7 +31,7 @@ pub struct Synthesizer<L: SynthLanguage> {
 impl<L: SynthLanguage> Synthesizer<L> {
     fn new(params: SynthParams<L>) -> Self {
         Self {
-            params: params,
+            params,
             egraph: Default::default(),
             new_rws: Default::default(),
         }
