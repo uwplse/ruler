@@ -39,10 +39,10 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn to_file(&self, filename: &str) {
-        let mut file = std::fs::File::create(&filename)
+        let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
         for eq in &self.0 {
-            write!(file, "{}\n", eq.name).expect("Unable to write");
+            writeln!(file, "{}", eq.name).expect("Unable to write");
         }
     }
 
