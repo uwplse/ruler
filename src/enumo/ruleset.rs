@@ -1,8 +1,12 @@
 use std::{io::Write, sync::Arc, time::Duration};
 
-use egg::{AstSize, EClass, Extractor, RecExpr, Rewrite, Runner};
+use egg::{AstSize, EClass, Extractor, RecExpr, Rewrite, Runner, StopReason};
 
-use crate::{CVec, EGraph, Equality, IndexMap, Signature, SynthAnalysis, SynthLanguage};
+use crate::{
+    CVec, EGraph, Equality, HashMap, Id, IndexMap, Signature, SynthAnalysis, SynthLanguage,
+};
+
+use super::Workload;
 
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Equality<L>>);
@@ -92,13 +96,30 @@ impl<L: SynthLanguage> Ruleset<L> {
         (Ruleset(sat), Ruleset(other))
     }
 
-    fn mk_runner(
+    fn mk_runner_with_limits(
         egraph: EGraph<L, SynthAnalysis>,
+        node_limit: usize,
+        iter_limit: usize,
+        time_limit: u64,
+    ) -> Runner<L, SynthAnalysis> {
+        Runner::default()
+            .with_scheduler(egg::SimpleScheduler)
+            .with_node_limit(node_limit)
+            .with_iter_limit(iter_limit)
+            .with_time_limit(Duration::from_secs(time_limit))
+            .with_egraph(egraph)
+    }
+
+    fn mk_runner(egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis> {
+        Ruleset::mk_runner_with_limits(egraph, 300000, 2, 30)
+    }
+
+    fn runner_with_roots(
+        runner: Runner<L, SynthAnalysis>,
         lhs: &RecExpr<L>,
         rhs: &RecExpr<L>,
     ) -> Runner<L, SynthAnalysis> {
-        Runner::default()
-            .with_egraph(egraph)
+        runner
             .with_expr(lhs)
             .with_expr(rhs)
             .with_scheduler(egg::SimpleScheduler)
@@ -109,6 +130,44 @@ impl<L: SynthLanguage> Ruleset<L> {
                     Ok(())
                 }
             })
+    }
+
+    pub fn compress_egraph_with_limits(
+        &self,
+        egraph: EGraph<L, SynthAnalysis>,
+        node_limit: usize,
+        iter_limit: usize,
+        time_limit: u64,
+    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
+        let mut runner = Ruleset::mk_runner_with_limits(egraph, node_limit, iter_limit, time_limit);
+        let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
+            self.0.values().map(|eq| &eq.rewrite).collect();
+        runner = runner.run(rewrites);
+        let stop_reason = runner.stop_reason.unwrap();
+
+        let mut found_unions = HashMap::default();
+        for id in ids {
+            let new_id = runner.egraph.find(id);
+            found_unions.entry(new_id).or_insert_with(Vec::new).push(id);
+        }
+
+        runner.egraph.rebuild();
+        (runner.egraph, found_unions, stop_reason)
+    }
+
+    pub fn compress_egraph(
+        &self,
+        egraph: EGraph<L, SynthAnalysis>,
+    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
+        self.compress_egraph_with_limits(egraph, 300000, 2, 30)
+    }
+
+    pub fn compress_workload(
+        &self,
+        workload: Workload,
+    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
+        self.compress_egraph(workload.to_egraph())
     }
 
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
@@ -170,12 +229,12 @@ impl<L: SynthLanguage> Ruleset<L> {
             let l = L::instantiate(&eq.lhs);
             let r = L::instantiate(&eq.rhs);
 
-            let mut runner = Self::mk_runner(Default::default(), &l, &r);
+            let mut runner = Self::runner_with_roots(Self::mk_runner(Default::default()), &l, &r);
             let mut l_id;
             let mut r_id;
             for _ in 0..iter_limit {
                 // Sat
-                runner = Self::mk_runner(runner.egraph, &l, &r)
+                runner = Self::runner_with_roots(Self::mk_runner(runner.egraph), &l, &r)
                     .with_node_limit(usize::MAX)
                     .with_time_limit(Duration::from_secs(30))
                     .with_iter_limit(100)
@@ -189,7 +248,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
 
                 // Other
-                runner = Self::mk_runner(runner.egraph, &l, &r)
+                runner = Self::runner_with_roots(Self::mk_runner(runner.egraph), &l, &r)
                     .with_iter_limit(1)
                     .run(&other);
 
@@ -201,7 +260,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
             // One more sat
-            runner = Self::mk_runner(runner.egraph, &l, &r)
+            runner = Self::runner_with_roots(Self::mk_runner(runner.egraph), &l, &r)
                 .with_node_limit(usize::MAX)
                 .with_time_limit(Duration::from_secs(30))
                 .with_iter_limit(100)

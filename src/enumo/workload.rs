@@ -1,6 +1,6 @@
-use egg::{ENodeOrVar, RecExpr};
+use egg::{EGraph, ENodeOrVar, RecExpr};
 
-use crate::{EGraph, HashSet, SynthAnalysis, SynthLanguage};
+use crate::{HashSet, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
@@ -32,19 +32,14 @@ impl Workload {
         vars.into_iter().collect()
     }
 
-    pub fn to_egraph<L: SynthLanguage>(&self, egraph: &mut EGraph<L, SynthAnalysis>) {
-        let mut vars: HashSet<String> = HashSet::default();
+    pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
+        let mut egraph = EGraph::default();
+        let vars = self.get_vars::<L>();
+        L::initialize_vars(&mut egraph, &vars);
         for sexp in self.force() {
-            let expr: RecExpr<L> = sexp.to_string().parse().unwrap();
-            for node in expr.as_ref() {
-                if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
-                    let mut v = v.to_string();
-                    v.remove(0);
-                    vars.insert(v);
-                }
-            }
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
+        egraph
     }
 
     pub fn force(&self) -> Vec<Sexp> {

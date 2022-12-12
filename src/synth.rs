@@ -1,4 +1,4 @@
-use egg::{AstSize, Extractor, Rewrite, Runner, StopReason};
+use egg::{AstSize, Extractor, Runner, StopReason};
 use std::{
     fmt::Debug,
     hash::BuildHasherDefault,
@@ -44,27 +44,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .with_iter_limit(self.params.iter_limit)
             .with_time_limit(Duration::from_secs(self.params.time_limit))
             .with_egraph(egraph)
-    }
-
-    fn run_rules(
-        &self,
-        mut runner: Runner<L, SynthAnalysis>,
-        rules: Ruleset<L>,
-    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
-        let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            rules.0.values().map(|eq| &eq.rewrite).collect();
-        runner = runner.run(rewrites);
-        let stop_reason = runner.stop_reason.unwrap();
-
-        let mut found_unions = HashMap::default();
-        for id in ids {
-            let new_id = runner.egraph.find(id);
-            found_unions.entry(new_id).or_insert_with(Vec::new).push(id);
-        }
-
-        runner.egraph.rebuild();
-        (runner.egraph, found_unions, stop_reason)
     }
 
     fn apply_unions(&mut self, unions: HashMap<Id, Vec<Id>>) {
@@ -194,8 +173,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn run_cvec_synth(&mut self) -> Ruleset<L> {
-        let runner = self.mk_runner(self.egraph.clone());
-        let (_, unions, _) = self.run_rules(runner, self.params.prior_rules.clone());
+        let (_, unions, _) = self.params.prior_rules.compress_egraph(self.egraph.clone());
 
         self.apply_unions(unions);
 
@@ -240,19 +218,17 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
         println!("{} allowed rules", allowed.len());
-        let runner = self.mk_runner(self.egraph.clone());
-        let (_, unions, _) = self.run_rules(runner, allowed);
+        let (_, unions, _) = allowed.compress_egraph(self.egraph.clone());
         self.apply_unions(unions);
 
         // Run lifting rules
-        let runner = self
-            .mk_runner(self.egraph.clone())
-            .with_iter_limit(usize::MAX)
-            .with_time_limit(Duration::from_secs(1000))
-            .with_node_limit(usize::MAX);
-
         let lifting_rules = L::get_lifting_rewrites();
-        let (new_egraph, unions, stop_reason) = self.run_rules(runner, lifting_rules.clone());
+        let (new_egraph, unions, stop_reason) = lifting_rules.compress_egraph_with_limits(
+            self.egraph.clone(),
+            usize::MAX,
+            usize::MAX,
+            1000,
+        );
         assert!(
             matches!(stop_reason, StopReason::Saturated),
             "lifting rules must saturate. Instead, ended due to {:?}",
@@ -263,10 +239,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
         self.egraph = new_egraph;
 
         // Run all rules
-        let runner = self.mk_runner(self.egraph.clone());
         let mut all_rules = self.params.prior_rules.clone();
         all_rules.extend(lifting_rules);
-        let (_, unions, _) = self.run_rules(runner, all_rules);
+        let (_, unions, _) = all_rules.compress_egraph(self.egraph.clone());
         candidates.extend(self.extract_candidates_from_unions(unions));
 
         assert!(candidates
@@ -280,17 +255,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     pub fn run(mut self) -> Ruleset<L> {
         let t = Instant::now();
 
-        let mut egraph = EGraph::default();
-
-        // TODO: improve perf here by doing something more clever?
-        let vars = self.params.workload.get_vars::<L>();
-        L::initialize_vars(&mut egraph, &vars);
-        self.params.workload.to_egraph::<L>(&mut egraph);
-        println!(
-            "enumerated {} eclasses with {} vars",
-            egraph.number_of_classes(),
-            vars.len()
-        );
+        let egraph = self.params.workload.to_egraph::<L>();
+        println!("enumerated {} eclasses", egraph.number_of_classes(),);
 
         self.egraph = egraph;
 
