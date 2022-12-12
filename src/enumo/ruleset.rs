@@ -45,6 +45,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.len()
     }
 
+    pub fn add(&mut self, eq: Equality<L>) {
+        self.0.insert(eq.name.clone(), eq);
+    }
+
     pub fn extend(&mut self, other: Self) {
         self.0.extend(other.0)
     }

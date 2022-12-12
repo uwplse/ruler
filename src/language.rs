@@ -5,7 +5,6 @@ use std::{
 
 use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
-    Rewrite,
 };
 
 use crate::{enumo::Workload, *};
@@ -157,7 +156,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     }
 
     // Used for rule lifting
-    fn get_lifting_rewrites() -> Vec<Rewrite<Self, SynthAnalysis>> {
+    fn get_lifting_rewrites() -> Ruleset<Self> {
         panic!("No lifting rewrites")
     }
 

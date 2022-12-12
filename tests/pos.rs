@@ -6,8 +6,7 @@
  * Example: 6 is represented as (XO (XI XH))
  * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
  */
-use egg::rewrite;
-use ruler::*;
+use ruler::{enumo::Ruleset, *};
 
 egg::define_language! {
  pub enum Pos {
@@ -51,13 +50,15 @@ impl SynthLanguage for Pos {
         true
     }
 
-    fn get_lifting_rewrites() -> Vec<egg::Rewrite<Self, SynthAnalysis>> {
-        vec![
-            rewrite!("def-xh"; "XH" <=> "(S Z)"),
-            rewrite!("def-xo"; "(XO ?a)" <=> "(+ ?a ?a)"),
-            rewrite!("def-xi"; "(XI ?a)" <=> "(+ ?a (+ ?a (S Z)))"),
-        ]
-        .concat()
+    fn get_lifting_rewrites() -> Ruleset<Self> {
+        Ruleset::from_str_vec(&[
+            "XH ==> (S Z)",
+            "(S Z) ==> XH",
+            "(XO ?a) ==> (+ ?a ?a)",
+            "(+ ?a ?a) ==> (XO ?a)",
+            "(XI ?a) ==> (+ ?a (+ ?a (S Z)))",
+            "(+ ?a (+ ?a (S Z))) ==> (XI ?a)",
+        ])
     }
 
     fn is_allowed_op(&self) -> bool {

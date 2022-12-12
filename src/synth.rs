@@ -46,12 +46,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .with_egraph(egraph)
     }
 
-    fn run_rewrites(
+    fn run_rules(
         &self,
         mut runner: Runner<L, SynthAnalysis>,
-        rewrites: Vec<&Rewrite<L, SynthAnalysis>>,
+        rules: Ruleset<L>,
     ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
         let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
+            rules.0.values().map(|eq| &eq.rewrite).collect();
         runner = runner.run(rewrites);
         let stop_reason = runner.stop_reason.unwrap();
 
@@ -238,11 +240,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
     }
 
     fn run_cvec_synth(&mut self) -> Ruleset<L> {
-        let eqs = self.params.prior_rules.clone();
-
         let runner = self.mk_runner(self.egraph.clone());
-        let (_, unions, _) =
-            self.run_rewrites(runner, eqs.0.values().map(|eq| &eq.rewrite).collect());
+        let (_, unions, _) = self.run_rules(runner, self.params.prior_rules.clone());
 
         self.apply_unions(unions);
 
@@ -288,8 +287,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         }
         println!("{} allowed rules", allowed.len());
         let runner = self.mk_runner(self.egraph.clone());
-        let rewrites = allowed.0.values().map(|eq| &eq.rewrite).collect();
-        let (_, unions, _) = self.run_rewrites(runner, rewrites);
+        let (_, unions, _) = self.run_rules(runner, allowed);
         self.apply_unions(unions);
 
         // Run lifting rules
@@ -299,9 +297,8 @@ impl<L: SynthLanguage> Synthesizer<L> {
             .with_time_limit(Duration::from_secs(1000))
             .with_node_limit(usize::MAX);
 
-        let lifting_rewrites = L::get_lifting_rewrites();
-        let (new_egraph, unions, stop_reason) =
-            self.run_rewrites(runner, lifting_rewrites.iter().collect());
+        let lifting_rules = L::get_lifting_rewrites();
+        let (new_egraph, unions, stop_reason) = self.run_rules(runner, lifting_rules.clone());
         assert!(
             matches!(stop_reason, StopReason::Saturated),
             "lifting rules must saturate. Instead, ended due to {:?}",
@@ -313,15 +310,9 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         // Run all rules
         let runner = self.mk_runner(self.egraph.clone());
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> = self
-            .params
-            .prior_rules
-            .0
-            .values()
-            .map(|eq| &eq.rewrite)
-            .chain(lifting_rewrites.iter())
-            .collect();
-        let (_, unions, _) = self.run_rewrites(runner, rewrites);
+        let mut all_rules = self.params.prior_rules.clone();
+        all_rules.extend(lifting_rules);
+        let (_, unions, _) = self.run_rules(runner, all_rules);
         candidates.extend(self.extract_candidates_from_unions(unions));
 
         assert!(candidates
