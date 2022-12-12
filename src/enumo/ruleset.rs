@@ -1,8 +1,8 @@
 use std::{io::Write, sync::Arc, time::Duration};
 
-use egg::{RecExpr, Rewrite, Runner};
+use egg::{AstSize, EClass, Extractor, RecExpr, Rewrite, Runner};
 
-use crate::{EGraph, Equality, IndexMap, SynthAnalysis, SynthLanguage};
+use crate::{CVec, EGraph, Equality, IndexMap, Signature, SynthAnalysis, SynthLanguage};
 
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Equality<L>>);
@@ -109,6 +109,51 @@ impl<L: SynthLanguage> Ruleset<L> {
                     Ok(())
                 }
             })
+    }
+
+    pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
+        // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
+        // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
+
+        println!(
+            "starting cvec match with {} eclasses",
+            egraph.number_of_classes()
+        );
+
+        let not_all_none: Vec<&EClass<L, Signature<L>>> = egraph
+            .classes()
+            .filter(|x| x.data.cvec.iter().any(|v| v.is_some()))
+            .collect();
+
+        let compare = |cvec1: &CVec<L>, cvec2: &CVec<L>| -> bool {
+            for tup in cvec1.iter().zip(cvec2) {
+                match tup {
+                    (Some(a), Some(b)) if a != b => return false,
+                    _ => (),
+                }
+            }
+            true
+        };
+        let mut candidates = Ruleset::default();
+        let extract = Extractor::new(egraph, AstSize);
+        for class1 in &not_all_none {
+            for class2 in &not_all_none {
+                if class1.id == class2.id {
+                    continue;
+                }
+                if compare(&class1.data.cvec, &class2.data.cvec) {
+                    let (_, e1) = extract.find_best(class1.id);
+                    let (_, e2) = extract.find_best(class2.id);
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        candidates.insert(eq);
+                    }
+                    if let Some(eq) = Equality::new(&e2, &e1) {
+                        candidates.insert(eq);
+                    }
+                }
+            }
+        }
+        candidates
     }
 
     pub fn derive(&self, against: Self, iter_limit: usize) -> (Self, Self) {

@@ -1,4 +1,4 @@
-use egg::{AstSize, EClass, Extractor, Rewrite, Runner, StopReason};
+use egg::{AstSize, Extractor, Rewrite, Runner, StopReason};
 use std::{
     fmt::Debug,
     hash::BuildHasherDefault,
@@ -77,52 +77,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
         self.egraph.rebuild();
-    }
-
-    fn cvec_match(&self) -> Ruleset<L> {
-        // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
-        // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
-
-        println!(
-            "starting cvec match with {} eclasses",
-            self.egraph.number_of_classes()
-        );
-
-        let not_all_none: Vec<&EClass<L, Signature<L>>> = self
-            .egraph
-            .classes()
-            .filter(|x| x.data.cvec.iter().any(|v| v.is_some()))
-            .collect();
-
-        let compare = |cvec1: &CVec<L>, cvec2: &CVec<L>| -> bool {
-            for tup in cvec1.iter().zip(cvec2) {
-                match tup {
-                    (Some(a), Some(b)) if a != b => return false,
-                    _ => (),
-                }
-            }
-            true
-        };
-        let mut candidates = Ruleset::default();
-        let extract = Extractor::new(&self.egraph, AstSize);
-        for class1 in &not_all_none {
-            for class2 in &not_all_none {
-                if class1.id == class2.id {
-                    continue;
-                }
-                if compare(&class1.data.cvec, &class2.data.cvec) {
-                    let (_, e1) = extract.find_best(class1.id);
-                    let (_, e2) = extract.find_best(class2.id);
-                    if let Some(eq) = Equality::new(&e1, &e2) {
-                        candidates.insert(eq);
-                    }
-                    if let Some(eq) = Equality::new(&e2, &e1) {
-                        candidates.insert(eq);
-                    }
-                }
-            }
-        }
-        candidates
     }
 
     // TODO: Figure out what to do with this- it doesn't match the definition
@@ -245,7 +199,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         self.apply_unions(unions);
 
-        self.cvec_match()
+        Ruleset::cvec_match(&self.egraph)
     }
 
     fn extract_candidates_from_unions(&mut self, unions: HashMap<Id, Vec<Id>>) -> Ruleset<L> {
