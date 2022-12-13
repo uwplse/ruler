@@ -3,8 +3,8 @@ use std::{io::Write, sync::Arc, time::Duration};
 use egg::{AstSize, EClass, Extractor, RecExpr, Rewrite, Runner, StopReason};
 
 use crate::{
-    CVec, EGraph, Equality, HashMap, Id, IndexMap, Signature, SynthAnalysis, SynthLanguage,
-    ValidationResult,
+    CVec, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Signature, SynthAnalysis,
+    SynthLanguage, ValidationResult,
 };
 
 use super::Workload;
@@ -30,6 +30,21 @@ impl<L: SynthLanguage> Default for Ruleset<L> {
     fn default() -> Self {
         Self(IndexMap::default())
     }
+}
+
+fn apply_unions<L: SynthLanguage>(
+    egraph: &mut EGraph<L, SynthAnalysis>,
+    unions: HashMap<Id, Vec<Id>>,
+) {
+    for ids in unions.values() {
+        if ids.len() > 1 {
+            let first = ids[0];
+            for id in &ids[1..] {
+                egraph.union(first, *id);
+            }
+        }
+    }
+    egraph.rebuild();
 }
 
 impl<L: SynthLanguage> Ruleset<L> {
@@ -86,6 +101,38 @@ impl<L: SynthLanguage> Ruleset<L> {
             eqs.insert(eq.name.clone(), eq);
         }
         Self(eqs)
+    }
+
+    fn from_unions(
+        egraph: &EGraph<L, SynthAnalysis>,
+        unions: HashMap<Id, Vec<Id>>,
+        prior: &Self,
+    ) -> Self {
+        let mut candidates = Ruleset::default();
+        let clone = egraph.clone();
+        let extract = Extractor::new(&clone, ExtractableAstSize);
+        for ids in unions.values() {
+            for id1 in ids.clone() {
+                for id2 in ids.clone() {
+                    let (c1, e1) = extract.find_best(id1);
+                    let (c2, e2) = extract.find_best(id2);
+                    if c1 == usize::MAX || c2 == usize::MAX {
+                        continue;
+                    }
+                    if let Some(eq) = Equality::new(&e1, &e2) {
+                        if e1 != e2 {
+                            if prior.0.contains_key(&eq.name) {
+                                // We already have this rule
+                                continue;
+                            }
+                            candidates.insert(eq)
+                        }
+                    }
+                }
+            }
+        }
+
+        candidates
     }
 
     pub fn partition_sat(&self) -> (Self, Self) {
@@ -173,17 +220,46 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn compress_workload(&self, workload: Workload) -> EGraph<L, SynthAnalysis> {
         let mut egraph = workload.to_egraph();
         let (_, unions, _) = self.compress_egraph(egraph.clone());
-        for ids in unions.values() {
-            if ids.len() > 1 {
-                let first = ids[0];
-                for id in &ids[1..] {
-                    egraph.union(first, *id);
-                }
+        apply_unions(&mut egraph, unions);
+        egraph
+    }
+
+    pub fn lift_rules(egraph: &mut EGraph<L, SynthAnalysis>, prior: Ruleset<L>) -> Self {
+        // 1. Compress egraph using allowed rules
+        let mut allowed = Ruleset::default();
+        for eq in prior.0.values() {
+            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
+                allowed.insert(eq.clone());
             }
         }
-        egraph.rebuild();
+        let (_, unions, _) = allowed.compress_egraph(egraph.clone());
+        apply_unions(egraph, unions);
 
-        egraph
+        // 2a. Run lifting rules to saturation
+        let lifting_rules = L::get_lifting_rules();
+        let (mut new_egraph, unions, stop_reason) =
+            lifting_rules.compress_egraph_with_limits(egraph.clone(), usize::MAX, usize::MAX, 1000);
+        assert!(
+            matches!(stop_reason, StopReason::Saturated),
+            "lifting rules must saturate. Instead, ended due to {:?}",
+            stop_reason
+        );
+        // 2b. Extract candidates from unions
+        let mut candidates = Self::from_unions(egraph, unions, &prior);
+
+        // 3a. Run all rules
+        let mut all_rules = prior.clone();
+        all_rules.extend(lifting_rules);
+        let (_, unions, _) = all_rules.compress_egraph(new_egraph.clone());
+        // 3b. Extract candidates from unions
+        candidates.extend(Self::from_unions(&mut new_egraph, unions, &prior));
+
+        assert!(candidates
+            .0
+            .iter()
+            .all(|(_, v)| L::is_allowed_rewrite(&v.lhs, &v.rhs)),);
+
+        candidates
     }
 
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
@@ -223,6 +299,37 @@ impl<L: SynthLanguage> Ruleset<L> {
                         candidates.insert(eq);
                     }
                     if let Some(eq) = Equality::new(&e2, &e1) {
+                        candidates.insert(eq);
+                    }
+                }
+            }
+        }
+        candidates
+    }
+
+    // TODO: Figure out what to do with this- it doesn't match the definition
+    // of cvec matching from the paper, but it is faster.
+    pub fn fast_cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Ruleset<L> {
+        let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
+
+        for class in egraph.classes() {
+            if class.data.is_defined() {
+                by_cvec.entry(&class.data.cvec).or_default().push(class.id);
+            }
+        }
+
+        let mut candidates = Ruleset::default();
+        let extract = Extractor::new(&egraph, AstSize);
+
+        for ids in by_cvec.values() {
+            let exprs: Vec<_> = ids.iter().map(|&id| extract.find_best(id).1).collect();
+
+            for (idx, e1) in exprs.iter().enumerate() {
+                for e2 in exprs[(idx + 1)..].iter() {
+                    if let Some(eq) = Equality::new(e1, e2) {
+                        candidates.insert(eq);
+                    }
+                    if let Some(eq) = Equality::new(e2, e1) {
                         candidates.insert(eq);
                     }
                 }

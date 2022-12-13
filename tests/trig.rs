@@ -136,7 +136,7 @@ impl SynthLanguage for Trig {
         true
     }
 
-    fn get_lifting_rewrites() -> Ruleset<Self> {
+    fn get_lifting_rules() -> Ruleset<Self> {
         Ruleset::from_str_vec(&[
             // definition of sine, cosine, tangent
             "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",

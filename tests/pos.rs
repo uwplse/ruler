@@ -50,7 +50,7 @@ impl SynthLanguage for Pos {
         true
     }
 
-    fn get_lifting_rewrites() -> Ruleset<Self> {
+    fn get_lifting_rules() -> Ruleset<Self> {
         Ruleset::from_str_vec(&[
             "XH ==> (S Z)",
             "(S Z) ==> XH",

@@ -156,8 +156,8 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     }
 
     // Used for rule lifting
-    fn get_lifting_rewrites() -> Ruleset<Self> {
-        panic!("No lifting rewrites")
+    fn get_lifting_rules() -> Ruleset<Self> {
+        panic!("No lifting rules")
     }
 
     // Used for rule lifting
