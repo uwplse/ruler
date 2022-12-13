@@ -170,11 +170,20 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.compress_egraph_with_limits(egraph, 1000000, 3, 30)
     }
 
-    pub fn compress_workload(
-        &self,
-        workload: Workload,
-    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
-        self.compress_egraph(workload.to_egraph())
+    pub fn compress_workload(&self, workload: Workload) -> EGraph<L, SynthAnalysis> {
+        let mut egraph = workload.to_egraph();
+        let (_, unions, _) = self.compress_egraph(egraph.clone());
+        for ids in unions.values() {
+            if ids.len() > 1 {
+                let first = ids[0];
+                for id in &ids[1..] {
+                    egraph.union(first, *id);
+                }
+            }
+        }
+        egraph.rebuild();
+
+        egraph
     }
 
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
