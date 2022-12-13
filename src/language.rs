@@ -249,11 +249,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         ]
     }
 
-    fn validate(
-        synth: &mut Synthesizer<Self>,
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-    ) -> ValidationResult;
+    fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
 
     fn run_workload(workload: Workload, prior_rules: Ruleset<Self>) -> Ruleset<Self> {
         synth::synth(SynthParams {

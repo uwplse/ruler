@@ -1,9 +1,5 @@
-use egg::{AstSize, Extractor, Runner, StopReason};
-use std::{
-    fmt::Debug,
-    hash::BuildHasherDefault,
-    time::{Duration, Instant},
-};
+use egg::{AstSize, Extractor, StopReason};
+use std::{fmt::Debug, hash::BuildHasherDefault, time::Instant};
 
 use crate::*;
 
@@ -35,15 +31,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             egraph: Default::default(),
             new_rws: Default::default(),
         }
-    }
-
-    fn mk_runner(&self, egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis, ()> {
-        Runner::default()
-            .with_scheduler(egg::SimpleScheduler)
-            .with_node_limit(self.params.node_limit)
-            .with_iter_limit(self.params.iter_limit)
-            .with_time_limit(Duration::from_secs(self.params.time_limit))
-            .with_egraph(egraph)
     }
 
     fn apply_unions(&mut self, unions: HashMap<Id, Vec<Id>>) {
@@ -87,89 +74,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
             }
         }
         candidates
-    }
-
-    fn select(&mut self, step_size: usize, candidates: Ruleset<L>) -> Ruleset<L> {
-        // 1. sort by score
-        let mut sorted_candidates = Ruleset(
-            candidates
-                .0
-                .sorted_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()))
-                .collect(),
-        );
-
-        // 2. insert step_size best candidates into self.new_rws
-        let mut selected: Ruleset<L> = Default::default();
-        while selected.len() < step_size {
-            let popped = sorted_candidates.0.pop();
-            if let Some((_, eq)) = popped {
-                if let ValidationResult::Valid = L::validate(self, &eq.lhs, &eq.rhs) {
-                    selected.insert(eq);
-                }
-            } else {
-                break;
-            }
-        }
-        self.new_rws.extend(selected);
-
-        // 3. return remaining candidates
-        let mut remaining_candidates: Ruleset<L> = Default::default();
-
-        for (_, candidate) in sorted_candidates.0 {
-            remaining_candidates.insert(candidate);
-        }
-
-        remaining_candidates
-    }
-
-    fn shrink(&mut self, candidates: &Ruleset<L>) -> Ruleset<L> {
-        // 1. make new egraph
-        // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
-        let mut runner = self.mk_runner(EGraph::default());
-
-        // 2. insert lhs and rhs of all candidates as roots
-        for eq in candidates.0.values() {
-            runner = runner.with_expr(&L::instantiate(&eq.lhs));
-            runner = runner.with_expr(&L::instantiate(&eq.rhs));
-        }
-
-        // 3. run eqsat with self.prior_rws and self.new_rws
-        let rewrites = self
-            .params
-            .prior_rules
-            .0
-            .values()
-            .map(|eq| &eq.rewrite)
-            .chain(self.new_rws.0.values().map(|eq| &eq.rewrite));
-        runner = runner.run(rewrites);
-
-        // 4. go through candidates (root pairs) and if they haven't yet
-        // merged, they are still candidates
-        let mut remaining_candidates = Ruleset::default();
-        let extract = Extractor::new(&runner.egraph, AstSize);
-        for ids in runner.roots.chunks(2) {
-            if runner.egraph.find(ids[0]) == runner.egraph.find(ids[1]) {
-                // candidate has merged (derivable from other rewrites)
-                continue;
-            }
-            let (_, left) = extract.find_best(ids[0]);
-            let (_, right) = extract.find_best(ids[1]);
-            if let Some(eq) = Equality::new(&left, &right) {
-                remaining_candidates.insert(eq);
-            }
-        }
-
-        remaining_candidates
-    }
-
-    fn choose_eqs(&mut self, candidates: Ruleset<L>) {
-        let step_size = 1;
-        let mut remaining_candidates = candidates;
-        while !remaining_candidates.is_empty() {
-            remaining_candidates = self.select(step_size, remaining_candidates);
-
-            remaining_candidates = self.shrink(&remaining_candidates);
-        }
     }
 
     fn run_cvec_synth(&mut self) -> Ruleset<L> {
@@ -260,13 +164,14 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         self.egraph = egraph;
 
-        let candidates = if L::is_rule_lifting() {
+        let mut candidates = if L::is_rule_lifting() {
             self.run_rule_lifting()
         } else {
             self.run_cvec_synth()
         };
 
-        self.choose_eqs(candidates);
+        let chosen = candidates.minimize(self.params.prior_rules.clone());
+        self.new_rws.extend(chosen);
 
         let time = t.elapsed().as_secs_f64();
 

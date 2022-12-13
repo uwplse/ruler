@@ -132,11 +132,7 @@ impl SynthLanguage for Nat {
         }
     }
 
-    fn validate(
-        _synth: &mut Synthesizer<Self>,
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);

@@ -240,7 +240,6 @@ macro_rules! impl_bv {
             }
 
             fn validate(
-                _synth: &mut Synthesizer<Self>,
                 lhs: &Pattern<Self>,
                 rhs: &Pattern<Self>,
             ) -> ValidationResult {

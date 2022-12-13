@@ -4,6 +4,7 @@ use egg::{AstSize, EClass, Extractor, RecExpr, Rewrite, Runner, StopReason};
 
 use crate::{
     CVec, EGraph, Equality, HashMap, Id, IndexMap, Signature, SynthAnalysis, SynthLanguage,
+    ValidationResult,
 };
 
 use super::Workload;
@@ -51,6 +52,12 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn add(&mut self, eq: Equality<L>) {
         self.0.insert(eq.name.clone(), eq);
+    }
+
+    pub fn remove_all(&mut self, other: Self) {
+        for (name, _) in other.0 {
+            self.0.remove(&name);
+        }
     }
 
     pub fn extend(&mut self, other: Self) {
@@ -160,7 +167,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         &self,
         egraph: EGraph<L, SynthAnalysis>,
     ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
-        self.compress_egraph_with_limits(egraph, 300000, 2, 30)
+        self.compress_egraph_with_limits(egraph, 1000000, 3, 30)
     }
 
     pub fn compress_workload(
@@ -213,6 +220,76 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
         candidates
+    }
+
+    fn select(&mut self, step_size: usize) -> Self {
+        let mut chosen = Self::default();
+        self.0
+            .sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
+
+        // 2. insert step_size best candidates into self.new_rws
+        let mut selected: Ruleset<L> = Default::default();
+        while selected.len() < step_size {
+            let popped = self.0.pop();
+            if let Some((_, eq)) = popped {
+                if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
+                    selected.insert(eq);
+                }
+            } else {
+                break;
+            }
+        }
+        chosen.extend(selected);
+
+        // 3. return chosen candidates
+        chosen
+    }
+
+    fn shrink(&mut self, chosen: &Self) {
+        // 1. make new egraph
+        // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
+        let mut egraph = EGraph::default();
+
+        let mut initial = vec![];
+        // 2. insert lhs and rhs of all candidates as roots
+        for eq in self.0.values() {
+            let lhs = egraph.add_expr(&L::instantiate(&eq.lhs));
+            let rhs = egraph.add_expr(&L::instantiate(&eq.rhs));
+            initial.push((lhs, rhs));
+        }
+
+        // 3. compress with the rules we've chosen so far
+        (egraph, _, _) = chosen.compress_egraph(egraph);
+
+        // 4. go through candidates and if they have merged, then
+        // they are no longer candidates
+        let extract = Extractor::new(&egraph, AstSize);
+        self.0 = Default::default();
+        for (l_id, r_id) in initial {
+            if egraph.find(l_id) == egraph.find(r_id) {
+                // candidate has merged (derivable from other rewrites)
+                continue;
+            }
+            let (_, left) = extract.find_best(l_id);
+            let (_, right) = extract.find_best(r_id);
+            if let Some(eq) = Equality::new(&left, &right) {
+                self.insert(eq);
+            }
+        }
+    }
+
+    pub fn minimize(&mut self, prior: Ruleset<L>) -> Self {
+        let mut chosen = prior.clone();
+        let step_size = 1;
+        while !self.is_empty() {
+            let selected = self.select(step_size);
+            chosen.extend(selected.clone());
+            self.shrink(&chosen);
+        }
+        // Return only the new rules
+        chosen.remove_all(prior);
+
+        chosen
     }
 
     pub fn derive(&self, against: Self, iter_limit: usize) -> (Self, Self) {

@@ -147,11 +147,7 @@ impl SynthLanguage for BvBool {
         }
     }
 
-    fn validate(
-        _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
     }
 }
