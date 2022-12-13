@@ -86,6 +86,20 @@ impl<L: SynthLanguage> Equality<L> {
         })
     }
 
+    pub fn is_saturating(&self) -> bool {
+        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
+        let l_id = egraph.add_expr(&L::instantiate(&self.lhs));
+        let initial_size = egraph.number_of_classes();
+
+        let r_id = egraph.add_expr(&L::instantiate(&self.rhs));
+
+        egraph.union(l_id, r_id);
+        egraph.rebuild();
+        let final_size = egraph.number_of_classes();
+
+        initial_size >= final_size
+    }
+
     pub fn score(&self) -> impl Ord + Debug {
         L::score(&self.lhs, &self.rhs)
     }
