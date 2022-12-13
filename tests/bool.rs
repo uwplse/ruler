@@ -135,6 +135,39 @@ mod test {
     }
 
     #[test]
+    fn dsl() {
+        let mut all_rules: Ruleset<Bool> = Ruleset::default();
+        let atoms3 = iter_bool(3);
+        assert_eq!(atoms3.force().len(), 93);
+
+        let egraph = all_rules.compress_workload(atoms3);
+        let mut candidates = Ruleset::cvec_match(&egraph);
+        let rules3 = candidates.minimize(all_rules.clone());
+        assert_eq!(rules3.len(), 14);
+        all_rules.extend(rules3);
+
+        let atoms4 = iter_bool(4);
+        assert_eq!(atoms4.force().len(), 348);
+
+        let egraph = all_rules.compress_workload(atoms4);
+        candidates = Ruleset::cvec_match(&egraph);
+        let rules4 = candidates.minimize(all_rules.clone());
+        assert_eq!(rules4.len(), 3);
+        all_rules.extend(rules4);
+
+        let atoms5 = iter_bool(5);
+        assert_eq!(atoms5.force().len(), 4599);
+
+        let egraph = all_rules.compress_workload(atoms5);
+        candidates = Ruleset::cvec_match(&egraph);
+        let rules5 = candidates.minimize(all_rules.clone());
+        assert_eq!(rules5.len(), 15);
+        all_rules.extend(rules5);
+
+        assert_eq!(all_rules.len(), 32);
+    }
+
+    #[test]
     fn simple() {
         let mut all_rules = Ruleset::default();
         let atoms3 = iter_bool(3);
