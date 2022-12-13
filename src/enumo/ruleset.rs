@@ -237,7 +237,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // 2a. Run lifting rules to saturation
         let lifting_rules = L::get_lifting_rules();
-        let (mut new_egraph, unions, stop_reason) =
+        let (new_egraph, unions, stop_reason) =
             lifting_rules.compress_egraph_with_limits(egraph.clone(), usize::MAX, usize::MAX, 1000);
         assert!(
             matches!(stop_reason, StopReason::Saturated),
@@ -252,7 +252,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         all_rules.extend(lifting_rules);
         let (_, unions, _) = all_rules.compress_egraph(new_egraph.clone());
         // 3b. Extract candidates from unions
-        candidates.extend(Self::from_unions(&mut new_egraph, unions, &prior));
+        candidates.extend(Self::from_unions(&new_egraph, unions, &prior));
 
         assert!(candidates
             .0
@@ -319,7 +319,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         let mut candidates = Ruleset::default();
-        let extract = Extractor::new(&egraph, AstSize);
+        let extract = Extractor::new(egraph, AstSize);
 
         for ids in by_cvec.values() {
             let exprs: Vec<_> = ids.iter().map(|&id| extract.find_best(id).1).collect();
