@@ -54,12 +54,3 @@ pub struct DeriveParams {
     #[clap(long)]
     ci: bool,
 }
-
-#[derive(Serialize, Deserialize)]
-#[serde(bound = "L: SynthLanguage")]
-pub struct Report<L: SynthLanguage> {
-    pub time: f64,
-    pub num_rules: usize,
-    pub prior_rws: Vec<Equality<L>>,
-    pub new_rws: Vec<Equality<L>>,
-}

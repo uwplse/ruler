@@ -168,4 +168,26 @@ mod test {
 
         assert_eq!(all_rules.len(), 32);
     }
+
+    #[test]
+    fn round_trip_to_file() {
+        let rules: Ruleset<Bool> = Ruleset(
+            vec![
+                "(^ ?b ?a) ==> (^ ?a ?b)",
+                "(& ?b ?a) ==> (& ?a ?b)",
+                "(| ?b ?a) ==> (| ?a ?b)",
+                "(& ?a ?a) ==> ?a",
+                "?a ==> (~ (~ ?a))",
+            ]
+            .iter()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        );
+
+        rules.to_file("out.txt");
+
+        let read: Ruleset<Bool> = Ruleset::from_file("out.txt");
+
+        assert_eq!(rules, read)
+    }
 }

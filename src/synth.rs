@@ -360,7 +360,7 @@ impl<L: SynthLanguage> Synthesizer<L> {
         candidates
     }
 
-    pub fn run(mut self) -> Report<L> {
+    pub fn run(mut self) -> Ruleset<L> {
         let t = Instant::now();
 
         let (workload, vars) = self.parse_workload(&self.params.workload);
@@ -380,8 +380,6 @@ impl<L: SynthLanguage> Synthesizer<L> {
 
         self.choose_eqs(candidates);
 
-        let num_rules = self.prior_rws.len() + self.new_rws.len();
-
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -395,19 +393,13 @@ impl<L: SynthLanguage> Synthesizer<L> {
             println!("{:?}      {}", eq.score(), name);
         }
 
-        Report {
-            time,
-            num_rules,
-            prior_rws: self.prior_rws.into_iter().map(|(_, eq)| eq).collect(),
-            new_rws: self.new_rws.into_iter().map(|(_, eq)| eq).collect(),
-        }
+        Ruleset(self.new_rws.into_iter().map(|(_, eq)| eq).collect())
     }
 }
 
 pub fn synth<L: SynthLanguage>(params: SynthParams<L>) -> Ruleset<L> {
     let syn = Synthesizer::<L>::new(params);
-    let report = syn.run();
-    Ruleset(report.new_rws)
+    syn.run()
 }
 
 // Cost function for ast size in the domain
