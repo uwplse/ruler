@@ -1,6 +1,7 @@
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
+    time::Instant,
 };
 
 use egg::{
@@ -251,29 +252,37 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
 
-    fn run_workload(workload: Workload, prior_rules: Ruleset<Self>) -> Ruleset<Self> {
-        synth::synth(SynthParams {
-            workload,
-            prior_rules,
-            iter_limit: 2,
-            time_limit: 60,
-            node_limit: 300000,
-        })
-    }
-
-    fn run_workload_with_limits(
+    fn run_workload(
         workload: Workload,
         prior_rules: Ruleset<Self>,
-        iter_limit: usize,
-        time_limit: u64,
-        node_limit: usize,
+        limits: Limits,
     ) -> Ruleset<Self> {
-        synth::synth(SynthParams {
-            workload,
-            prior_rules,
-            iter_limit,
-            time_limit,
-            node_limit,
-        })
+        let t = Instant::now();
+
+        let mut egraph = workload.to_egraph::<Self>();
+        let mut candidates = if Self::is_rule_lifting() {
+            Ruleset::lift_rules(&mut egraph.clone(), prior_rules.clone(), limits)
+        } else {
+            let (_, unions, _) = prior_rules.compress_egraph(egraph.clone(), limits);
+            Ruleset::apply_unions(&mut egraph, unions);
+            Ruleset::cvec_match(&egraph)
+        };
+
+        let chosen = candidates.minimize(prior_rules.clone(), limits);
+
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} new rewrites in {} using {} prior rewrites",
+            chosen.len(),
+            time,
+            prior_rules.len()
+        );
+
+        for (name, eq) in &chosen.0 {
+            println!("{:?}      {}", eq.score(), name);
+        }
+
+        chosen
     }
 }

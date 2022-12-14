@@ -142,21 +142,45 @@ mod tests {
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
 
-        let rules3 = Pos::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
+        let rules3 = Pos::run_workload(
+            atoms3,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules3.len(), 3);
         all_rules.extend(rules3);
 
         let atoms4 = iter_pos(4);
         assert_eq!(atoms4.force().len(), 255);
 
-        let rules4 = Pos::run_workload_with_limits(atoms4, all_rules.clone(), 3, 30, 1000000);
+        let rules4 = Pos::run_workload(
+            atoms4,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_pos(5);
         assert_eq!(atoms5.force().len(), 1527);
 
-        let rules4 = Pos::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
+        let rules4 = Pos::run_workload(
+            atoms5,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules4.len(), 8);
     }
 }

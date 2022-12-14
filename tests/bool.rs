@@ -140,27 +140,27 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let egraph = all_rules.compress_workload(atoms3);
+        let egraph = all_rules.compress_workload(atoms3, Limits::default());
         let mut candidates = Ruleset::cvec_match(&egraph);
-        let rules3 = candidates.minimize(all_rules.clone());
+        let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules3.len(), 14);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let egraph = all_rules.compress_workload(atoms4);
+        let egraph = all_rules.compress_workload(atoms4, Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
-        let rules4 = candidates.minimize(all_rules.clone());
+        let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules4.len(), 3);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let egraph = all_rules.compress_workload(atoms5);
+        let egraph = all_rules.compress_workload(atoms5, Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
-        let rules5 = candidates.minimize(all_rules.clone());
+        let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules5.len(), 15);
         all_rules.extend(rules5);
 
@@ -173,21 +173,21 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let rules3 = Bool::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
+        let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::default());
         assert_eq!(rules3.len(), 14);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let rules4 = Bool::run_workload_with_limits(atoms4, all_rules.clone(), 3, 30, 1000000);
+        let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::default());
         assert_eq!(rules4.len(), 3);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let rules5 = Bool::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
+        let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
         assert_eq!(rules5.len(), 15);
         all_rules.extend(rules5);
 
@@ -213,13 +213,36 @@ mod test {
 
     #[test]
     fn derive_rules() {
-        let three = Bool::run_workload_with_limits(iter_bool(3), Ruleset::default(), 3, 30, 100000);
+        let three = Bool::run_workload(
+            iter_bool(3),
+            Ruleset::default(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         three.to_file("three.txt");
 
-        let four = Bool::run_workload_with_limits(iter_bool(4), Ruleset::default(), 3, 30, 100000);
+        let four = Bool::run_workload(
+            iter_bool(4),
+            Ruleset::default(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         four.to_file("four.txt");
 
-        let (can, cannot) = three.derive(four, 2);
+        let (can, cannot) = three.derive(
+            four,
+            Limits {
+                time: 30,
+                iter: 2,
+                node: 1000000,
+            },
+        );
         assert_eq!(can.len(), 10);
         assert_eq!(cannot.len(), 6);
     }
