@@ -174,7 +174,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             })
     }
 
-    pub fn compress_egraph(
+    fn compress_egraph(
         &self,
         egraph: EGraph<L, SynthAnalysis>,
         limits: Limits,
