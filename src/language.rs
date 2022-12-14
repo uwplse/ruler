@@ -24,8 +24,8 @@ impl Default for SynthAnalysis {
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
+    pub simplest: RecExpr<L>,
     pub interval: Interval<L::Constant>,
-    pub exact: bool,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -40,16 +40,42 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
     fn make(egraph: &EGraph<L, Self>, enode: &L) -> Self::Data {
         let get_cvec = |id: &Id| &egraph[*id].data.cvec;
         let get_interval = |id: &Id| &egraph[*id].data.interval;
+        let get_simplest = |i: &Id| &egraph[*i].data.simplest;
+
+        let simplest = if enode.is_var() || enode.is_constant() {
+            let mut rec = RecExpr::<L>::default();
+            rec.add(enode.clone());
+            rec
+        } else {
+            let mut nodes: Vec<L> = vec![];
+            let mut map: HashMap<Id, Id> = HashMap::default();
+            enode.for_each(|id| {
+                if map.get(&id).is_none() {
+                    let s = get_simplest(&id);
+                    let i = nodes.len();
+                    for n in s.as_ref() {
+                        nodes.push(n.clone().map_children(|id| Id::from(usize::from(id) + i)));
+                    }
+
+                    map.insert(id, Id::from(nodes.len() - 1));
+                }
+            });
+
+            nodes.push(enode.clone().map_children(|id| *map.get(&id).unwrap()));
+            RecExpr::from(nodes)
+        };
+
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
             interval: enode.mk_interval(get_interval),
-            exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
+            simplest,
         }
     }
 
     fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let mut merge_a = false;
         let mut merge_b = false;
+        let cost_fn = |x: &RecExpr<L>| ExtractableAstSize.cost_rec(x);
 
         if !to.cvec.is_empty() && !from.cvec.is_empty() {
             for i in 0..to.cvec.len() {
@@ -67,13 +93,6 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
             }
         }
 
-        if from.exact && !to.exact {
-            to.exact = true;
-            merge_a = true;
-        } else if !from.exact && to.exact {
-            merge_b = true;
-        }
-
         // New interval is max of mins, min of maxes
         let new_min = match (to.interval.low.as_ref(), from.interval.low.as_ref()) {
             (None, None) => None,
@@ -88,6 +107,14 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
             (Some(x), Some(y)) => Some(x.min(y).clone()),
         };
         let new_interval = Interval::new(new_min, new_max);
+
+        if cost_fn(&from.simplest) < cost_fn(&to.simplest) {
+            to.simplest = from.simplest;
+            merge_a = true;
+        } else if to.simplest != from.simplest {
+            merge_b = true;
+        }
+
         if to.interval != new_interval {
             to.interval = new_interval;
             merge_a = true;
@@ -101,9 +128,7 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
     }
 
     fn modify(egraph: &mut EGraph<L, Self>, id: Id) {
-        if egraph[id].data.exact {
-            L::custom_modify(egraph, id);
-        }
+        L::custom_modify(egraph, id);
 
         let interval = &egraph[id].data.interval;
         if let Interval {

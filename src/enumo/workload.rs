@@ -36,9 +36,16 @@ impl Workload {
         let mut egraph = EGraph::default();
         let vars = self.get_vars::<L>();
         L::initialize_vars(&mut egraph, &vars);
-        for sexp in self.force() {
+        let sexps = self.force();
+        for sexp in &sexps {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
+        println!(
+            "Enumerated workload representing {} terms into an egraph with {} classes and {} nodes",
+            sexps.len(),
+            egraph.number_of_classes(),
+            egraph.total_number_of_nodes()
+        );
         egraph
     }
 

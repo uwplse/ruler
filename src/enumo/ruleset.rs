@@ -215,11 +215,13 @@ impl<L: SynthLanguage> Ruleset<L> {
                 allowed.add(eq.clone());
             }
         }
+        println!("Running {} allowed rules", allowed.len());
         let (_, unions, _) = allowed.compress_egraph(egraph.clone(), limits);
         Self::apply_unions(egraph, unions);
 
         // 2a. Run lifting rules to saturation
         let lifting_rules = L::get_lifting_rules();
+        println!("Running {} lifting rules", lifting_rules.len());
         let (new_egraph, unions, stop_reason) = lifting_rules.compress_egraph(
             egraph.clone(),
             Limits {
@@ -239,6 +241,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         // 3a. Run all rules
         let mut all_rules = prior.clone();
         all_rules.extend(lifting_rules);
+        println!("Running all {} rules", all_rules.len());
         let (_, unions, _) = all_rules.compress_egraph(new_egraph.clone(), limits);
         // 3b. Extract candidates from unions
         candidates.extend(Self::from_unions(&new_egraph, unions, &prior));
@@ -248,6 +251,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .iter()
             .all(|(_, v)| L::is_allowed_rewrite(&v.lhs, &v.rhs)),);
 
+        println!("{} candidates", candidates.len());
         candidates
     }
 

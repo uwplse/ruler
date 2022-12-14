@@ -1,4 +1,3 @@
-use num::rational::ParseRatioError;
 use num::rational::Ratio;
 use num::BigInt;
 use num::{Signed, Zero};
@@ -102,14 +101,12 @@ impl Debug for Variable {
     }
 }
 
-fn real_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
-    r.as_str().parse()
-}
-
-fn extract_constant(nodes: &[Trig]) -> Option<Real> {
+fn extract_constant(nodes: &[Trig]) -> Option<Rational> {
     for n in nodes {
         if let Trig::RealConst(v) = n {
-            return Some(*v);
+            if let Ok(r) = v.as_str().parse() {
+                return Some(r);
+            }
         }
     }
 
@@ -185,7 +182,6 @@ impl SynthLanguage for Trig {
             "(cis 0) ==> 1",
             "(cis (/ PI 2)) ==> I",
             // cis identities
-            "(cis (~ ?a)) ==> (/ 1 (cis ?a))",
             "(cis (+ ?a ?b)) ==> (* (cis ?a) (cis ?b))",
             "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (~ ?b)))",
             "(* (cis ?a) (cis (~ ?a))) ==> 1",
@@ -242,64 +238,46 @@ impl SynthLanguage for Trig {
         for n in &egraph[id].nodes {
             match n {
                 Trig::Neg(i) => {
-                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
-                        if let Ok(x) = real_to_rational(&v) {
-                            let r = Real::from((-x).to_string());
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        let r = Real::from((-x).to_string());
+                        to_add = Some(Self::mk_constant(r, egraph));
+                        break;
+                    }
+                }
+                Trig::Add([i, j]) => {
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            let r = Real::from((x + y).to_string());
                             to_add = Some(Self::mk_constant(r, egraph));
                             break;
                         }
                     }
                 }
-                Trig::Add([i, j]) => {
-                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
-                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
-                            if let Ok(x) = real_to_rational(&v) {
-                                if let Ok(y) = real_to_rational(&w) {
-                                    let r = Real::from((x + y).to_string());
-                                    to_add = Some(Self::mk_constant(r, egraph));
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
                 Trig::Sub([i, j]) => {
-                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
-                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
-                            if let Ok(x) = real_to_rational(&v) {
-                                if let Ok(y) = real_to_rational(&w) {
-                                    let r = Real::from((x - y).to_string());
-                                    to_add = Some(Self::mk_constant(r, egraph));
-                                    break;
-                                }
-                            }
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            let r = Real::from((x - y).to_string());
+                            to_add = Some(Self::mk_constant(r, egraph));
+                            break;
                         }
                     }
                 }
                 Trig::Mul([i, j]) => {
-                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
-                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
-                            if let Ok(x) = real_to_rational(&v) {
-                                if let Ok(y) = real_to_rational(&w) {
-                                    let r = Real::from((x * y).to_string());
-                                    to_add = Some(Self::mk_constant(r, egraph));
-                                    break;
-                                }
-                            }
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            let r = Real::from((x * y).to_string());
+                            to_add = Some(Self::mk_constant(r, egraph));
+                            break;
                         }
                     }
                 }
                 Trig::Div([i, j]) => {
-                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
-                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
-                            if let Ok(x) = real_to_rational(&v) {
-                                if let Ok(y) = real_to_rational(&w) {
-                                    if !y.is_zero() {
-                                        let r = Real::from((x / y).to_string());
-                                        to_add = Some(Self::mk_constant(r, egraph));
-                                        break;
-                                    }
-                                }
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            if !y.is_zero() {
+                                let r = Real::from((x / y).to_string());
+                                to_add = Some(Self::mk_constant(r, egraph));
+                                break;
                             }
                         }
                     }
@@ -309,27 +287,21 @@ impl SynthLanguage for Trig {
         }
 
         if let Some(v) = to_add {
-            // println!("fold {:?} with {}", v, id);
             // add (~ v) if v is negative
             if let Trig::RealConst(n) = v {
-                if let Ok(x) = real_to_rational(&n) {
+                if let Ok(x) = n.as_str().parse::<Rational>() {
                     if x.is_negative() {
                         let pos_id = egraph.add(Self::mk_constant(
                             Real::from((-x).to_string()),
                             &mut egraph.clone(),
                         ));
                         let neg_id = egraph.add(Trig::Neg(pos_id));
-                        // println!("union: {} {}", neg_id, id);
                         egraph.union(neg_id, id);
                     }
                 }
             }
 
-            let c = extract_constant(&vec![v.clone()]).unwrap();
-            let r = real_to_rational(&c).ok();
-            // println!("union: {} {:?}", id, r.unwrap().to_string());
             let cnst_id = egraph.add(v);
-            // println!("union: {} {}", cnst_id, id);
             egraph.union(cnst_id, id);
         }
     }
@@ -351,7 +323,7 @@ mod test {
     #[test]
     fn simple() {
         let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.txt");
-        assert_eq!(complex.len(), 34);
+        assert_eq!(complex.len(), 57);
 
         let terms = Workload::from_vec(vec![
             "(sin 0)",
@@ -361,21 +333,8 @@ mod test {
             "(sin (/ PI 2))",
             "(sin PI)",
             "(sin (* PI 2))",
-            "(cos 0)",
-            "(cos (/ PI 6))",
-            "(cos (/ PI 4))",
-            "(cos (/ PI 3))",
-            "(cos (/ PI 2))",
-            "(cos PI)",
-            "(cos (* PI 2))",
-            "(tan 0)",
-            "(tan (/ PI 6))",
-            "(tan (/ PI 4))",
-            "(tan (/ PI 3))",
-            "(tan PI)",
-            "(tan (* PI 2))",
         ]);
-        assert_eq!(terms.force().len(), 20);
+        assert_eq!(terms.force().len(), 7);
 
         let rules = Trig::run_workload(
             terms,
@@ -386,5 +345,7 @@ mod test {
                 node: 2000000,
             },
         );
+
+        assert_eq!(rules.len(), 2);
     }
 }
