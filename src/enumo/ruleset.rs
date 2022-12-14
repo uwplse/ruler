@@ -64,10 +64,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.extend(other.0)
     }
 
-    pub fn insert(&mut self, eq: Equality<L>) {
-        self.0.insert(eq.name.clone(), eq);
-    }
-
     pub fn to_file(&self, filename: &str) {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
@@ -110,7 +106,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                                 // We already have this rule
                                 continue;
                             }
-                            candidates.insert(eq)
+                            candidates.add(eq)
                         }
                     }
                 }
@@ -216,7 +212,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut allowed = Ruleset::default();
         for eq in prior.0.values() {
             if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
-                allowed.insert(eq.clone());
+                allowed.add(eq.clone());
             }
         }
         let (_, unions, _) = allowed.compress_egraph(egraph.clone(), limits);
@@ -289,10 +285,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                     let (_, e1) = extract.find_best(class1.id);
                     let (_, e2) = extract.find_best(class2.id);
                     if let Some(eq) = Equality::new(&e1, &e2) {
-                        candidates.insert(eq);
+                        candidates.add(eq);
                     }
                     if let Some(eq) = Equality::new(&e2, &e1) {
-                        candidates.insert(eq);
+                        candidates.add(eq);
                     }
                 }
             }
@@ -320,10 +316,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
                     if let Some(eq) = Equality::new(e1, e2) {
-                        candidates.insert(eq);
+                        candidates.add(eq);
                     }
                     if let Some(eq) = Equality::new(e2, e1) {
-                        candidates.insert(eq);
+                        candidates.add(eq);
                     }
                 }
             }
@@ -342,7 +338,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             let popped = self.0.pop();
             if let Some((_, eq)) = popped {
                 if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
-                    selected.insert(eq);
+                    selected.add(eq);
                 }
             } else {
                 break;
@@ -382,7 +378,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             let (_, left) = extract.find_best(l_id);
             let (_, right) = extract.find_best(r_id);
             if let Some(eq) = Equality::new(&left, &right) {
-                self.insert(eq);
+                self.add(eq);
             }
         }
     }
