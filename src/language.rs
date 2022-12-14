@@ -25,6 +25,7 @@ impl Default for SynthAnalysis {
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
     pub interval: Interval<L::Constant>,
+    pub exact: bool,
 }
 
 impl<L: SynthLanguage> Signature<L> {
@@ -42,6 +43,7 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
         Signature {
             cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
             interval: enode.mk_interval(get_interval),
+            exact: !enode.is_var() && enode.all(|i| egraph[i].data.exact),
         }
     }
 
@@ -63,6 +65,13 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
                     _ => (),
                 }
             }
+        }
+
+        if from.exact && !to.exact {
+            to.exact = true;
+            merge_a = true;
+        } else if !from.exact && to.exact {
+            merge_b = true;
         }
 
         // New interval is max of mins, min of maxes
@@ -92,7 +101,10 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
     }
 
     fn modify(egraph: &mut EGraph<L, Self>, id: Id) {
-        L::custom_modify(egraph, id);
+        if egraph[id].data.exact {
+            L::custom_modify(egraph, id);
+        }
+
         let interval = &egraph[id].data.interval;
         if let Interval {
             low: Some(low),
@@ -132,6 +144,9 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
 
     fn to_var(&self) -> Option<Symbol>;
     fn mk_var(sym: Symbol) -> Self;
+    fn is_var(&self) -> bool {
+        self.to_var().is_some()
+    }
 
     fn is_constant(&self) -> bool;
     /**

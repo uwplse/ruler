@@ -1,5 +1,7 @@
+use num::rational::ParseRatioError;
 use num::rational::Ratio;
 use num::BigInt;
+use num::{Signed, Zero};
 use ruler::enumo::Ruleset;
 use ruler::*;
 use std::fmt;
@@ -98,6 +100,20 @@ impl Debug for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(self.as_str(), f)
     }
+}
+
+fn real_to_rational(r: &Real) -> Result<Rational, ParseRatioError> {
+    r.as_str().parse()
+}
+
+fn extract_constant(nodes: &[Trig]) -> Option<Real> {
+    for n in nodes {
+        if let Trig::RealConst(v) = n {
+            return Some(*v);
+        }
+    }
+
+    None
 }
 
 egg::define_language! {
@@ -213,7 +229,162 @@ impl SynthLanguage for Trig {
         Trig::RealConst(c)
     }
 
+    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if egraph[id]
+            .nodes
+            .iter()
+            .any(|x| matches!(x, Trig::RealConst(_)))
+        {
+            return;
+        }
+
+        let mut to_add: Option<Trig> = None;
+        for n in &egraph[id].nodes {
+            match n {
+                Trig::Neg(i) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Ok(x) = real_to_rational(&v) {
+                            let r = Real::from((-x).to_string());
+                            to_add = Some(Self::mk_constant(r, egraph));
+                            break;
+                        }
+                    }
+                }
+                Trig::Add([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x + y).to_string());
+                                    to_add = Some(Self::mk_constant(r, egraph));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Trig::Sub([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x - y).to_string());
+                                    to_add = Some(Self::mk_constant(r, egraph));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Trig::Mul([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    let r = Real::from((x * y).to_string());
+                                    to_add = Some(Self::mk_constant(r, egraph));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Trig::Div([i, j]) => {
+                    if let Some(v) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(w) = extract_constant(&egraph[*j].nodes) {
+                            if let Ok(x) = real_to_rational(&v) {
+                                if let Ok(y) = real_to_rational(&w) {
+                                    if !y.is_zero() {
+                                        let r = Real::from((x / y).to_string());
+                                        to_add = Some(Self::mk_constant(r, egraph));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if let Some(v) = to_add {
+            // println!("fold {:?} with {}", v, id);
+            // add (~ v) if v is negative
+            if let Trig::RealConst(n) = v {
+                if let Ok(x) = real_to_rational(&n) {
+                    if x.is_negative() {
+                        let pos_id = egraph.add(Self::mk_constant(
+                            Real::from((-x).to_string()),
+                            &mut egraph.clone(),
+                        ));
+                        let neg_id = egraph.add(Trig::Neg(pos_id));
+                        // println!("union: {} {}", neg_id, id);
+                        egraph.union(neg_id, id);
+                    }
+                }
+            }
+
+            let c = extract_constant(&vec![v.clone()]).unwrap();
+            let r = real_to_rational(&c).ok();
+            // println!("union: {} {:?}", id, r.unwrap().to_string());
+            let cnst_id = egraph.add(v);
+            // println!("union: {} {}", cnst_id, id);
+            egraph.union(cnst_id, id);
+        }
+    }
+
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use ruler::{
+        enumo::{Ruleset, Workload},
+        Limits, SynthLanguage,
+    };
+
+    use crate::Trig;
+
+    #[test]
+    fn simple() {
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.txt");
+        assert_eq!(complex.len(), 34);
+
+        let terms = Workload::from_vec(vec![
+            "(sin 0)",
+            "(sin (/ PI 6))",
+            "(sin (/ PI 4))",
+            "(sin (/ PI 3))",
+            "(sin (/ PI 2))",
+            "(sin PI)",
+            "(sin (* PI 2))",
+            "(cos 0)",
+            "(cos (/ PI 6))",
+            "(cos (/ PI 4))",
+            "(cos (/ PI 3))",
+            "(cos (/ PI 2))",
+            "(cos PI)",
+            "(cos (* PI 2))",
+            "(tan 0)",
+            "(tan (/ PI 6))",
+            "(tan (/ PI 4))",
+            "(tan (/ PI 3))",
+            "(tan PI)",
+            "(tan (* PI 2))",
+        ]);
+        assert_eq!(terms.force().len(), 20);
+
+        let rules = Trig::run_workload(
+            terms,
+            complex,
+            Limits {
+                time: 150,
+                iter: 3,
+                node: 2000000,
+            },
+        );
     }
 }
