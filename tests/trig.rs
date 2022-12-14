@@ -322,7 +322,7 @@ mod test {
 
     #[test]
     fn simple() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.txt");
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
         assert_eq!(complex.len(), 57);
 
         let terms = Workload::from_vec(vec![
