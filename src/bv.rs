@@ -215,7 +215,7 @@ macro_rules! impl_bv {
                 Bv::Lit(c)
             }
 
-            fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+            fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
                 //   let mut consts: Vec<Option<BV>> = (0..1u64 << $n).map(|i| Some((i as u32).into())).collect();
                 let mut consts = vec![];
 
@@ -231,20 +231,15 @@ macro_rules! impl_bv {
 
                 let mut cvecs = self_product(&consts, vars.len());
 
-                let mut egraph = EGraph::new(SynthAnalysis {
-                    cvec_len: cvecs[0].len()
-                });
+                egraph.analysis.cvec_len = cvecs[0].len();
 
                 for (i, v) in vars.iter().enumerate() {
                     let id = egraph.add(Bv::Var(Symbol::from(v.clone())));
                     egraph[id].data.cvec = cvecs[i].clone()
                 }
-
-                synth.egraph = egraph;
             }
 
             fn validate(
-                _synth: &mut Synthesizer<Self>,
                 lhs: &Pattern<Self>,
                 rhs: &Pattern<Self>,
             ) -> ValidationResult {

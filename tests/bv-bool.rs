@@ -1,5 +1,5 @@
 use egg::Subst;
-use ruler::*;
+use ruler::{enumo::Ruleset, *};
 use std::ops::*;
 
 egg::define_language! {
@@ -39,18 +39,25 @@ impl SynthLanguage for BvBool {
         true
     }
 
-    fn get_lifting_rewrites() -> Vec<egg::Rewrite<Self, SynthAnalysis>> {
-        vec![
-            egg::rewrite!("def-bv"; "?a" => "(bv (first ?a) (second ?a))" if is_bv_str("?a")),
-            egg::rewrite!("def-not-first"; "(first (not ?a))" => "(~ (first ?a))"),
-            egg::rewrite!("def-not-second"; "(second (not ?a))" => "(~ (second ?a))"),
-            egg::rewrite!("def-and-first"; "(first (and ?a ?b))" => "(& (first ?a) (first ?b))"),
-            egg::rewrite!("def-and-second"; "(second (and ?a ?b))" => "(& (second ?a) (second ?b))"),
-            egg::rewrite!("def-or-first"; "(first (or ?a ?b))" => "(| (first ?a) (first ?b))"),
-            egg::rewrite!("def-or-second"; "(second (or ?a ?b))" => "(| (second ?a) (second ?b))"),
-            egg::rewrite!("def-xor-first"; "(first (xor ?a ?b))" => "(^ (first ?a) (first ?b))"),
-            egg::rewrite!("def-xor-second"; "(second (xor ?a ?b))" => "(^ (second ?a) (second ?b))"),
-        ]
+    fn get_lifting_rules() -> Ruleset<Self> {
+        let mut rules = Ruleset::from_str_vec(&[
+            "(first (not ?a)) ==> (~ (first ?a))",
+            "(second (not ?a)) ==> (~ (second ?a))",
+            "(first (and ?a ?b)) ==> (& (first ?a) (first ?b))",
+            "(second (and ?a ?b)) ==> (& (second ?a) (second ?b))",
+            "(first (or ?a ?b)) ==> (| (first ?a) (first ?b))",
+            "(second (or ?a ?b)) ==> (| (second ?a) (second ?b))",
+            "(first (xor ?a ?b)) ==> (^ (first ?a) (first ?b))",
+            "(second (xor ?a ?b)) ==> (^ (second ?a) (second ?b))",
+        ]);
+
+        rules.add(Equality {
+            name: "def-bv".into(),
+            lhs: "?a".parse().unwrap(),
+            rhs: "(bv (first ?a) (second ?a))".parse().unwrap(),
+            rewrite: egg::rewrite!("def-bv"; "?a" => "(bv (first ?a) (second ?a))" if is_bv_str("?a")),
+        });
+        rules
     }
 
     fn is_allowed_op(&self) -> bool {
@@ -74,13 +81,13 @@ impl SynthLanguage for BvBool {
         vec![]
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         for var in vars {
-            let var_id = synth.egraph.add(BvBool::Var(Symbol::from(var)));
-            let fst_id = synth.egraph.add(BvBool::First(var_id));
-            let sec_id = synth.egraph.add(BvBool::Second(var_id));
-            let mk_id = synth.egraph.add(BvBool::Make([fst_id, sec_id]));
-            synth.egraph.union(var_id, mk_id);
+            let var_id = egraph.add(BvBool::Var(Symbol::from(var)));
+            let fst_id = egraph.add(BvBool::First(var_id));
+            let sec_id = egraph.add(BvBool::Second(var_id));
+            let mk_id = egraph.add(BvBool::Make([fst_id, sec_id]));
+            egraph.union(var_id, mk_id);
         }
     }
 
@@ -140,11 +147,7 @@ impl SynthLanguage for BvBool {
         }
     }
 
-    fn validate(
-        _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
     }
 }

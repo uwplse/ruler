@@ -1,3 +1,7 @@
+use egg::{EGraph, ENodeOrVar, RecExpr};
+
+use crate::{HashSet, SynthAnalysis, SynthLanguage};
+
 use super::*;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -11,6 +15,31 @@ pub enum Workload {
 impl Workload {
     pub fn from_vec(strs: Vec<&str>) -> Self {
         Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
+    }
+
+    pub fn get_vars<L: SynthLanguage>(&self) -> Vec<String> {
+        let mut vars: HashSet<String> = HashSet::default();
+        for sexp in self.force() {
+            let expr: RecExpr<L> = sexp.to_string().parse().unwrap();
+            for node in expr.as_ref() {
+                if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
+                    let mut v = v.to_string();
+                    v.remove(0);
+                    vars.insert(v);
+                }
+            }
+        }
+        vars.into_iter().collect()
+    }
+
+    pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
+        let mut egraph = EGraph::default();
+        let vars = self.get_vars::<L>();
+        L::initialize_vars(&mut egraph, &vars);
+        for sexp in self.force() {
+            egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
+        }
+        egraph
     }
 
     pub fn force(&self) -> Vec<Sexp> {

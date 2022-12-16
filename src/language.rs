@@ -1,11 +1,11 @@
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
+    time::Instant,
 };
 
 use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
-    Rewrite,
 };
 
 use crate::{enumo::Workload, *};
@@ -128,7 +128,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         Interval::default()
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>);
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]);
 
     fn to_var(&self) -> Option<Symbol>;
     fn mk_var(sym: Symbol) -> Self;
@@ -157,8 +157,8 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     }
 
     // Used for rule lifting
-    fn get_lifting_rewrites() -> Vec<Rewrite<Self, SynthAnalysis>> {
-        panic!("No lifting rewrites")
+    fn get_lifting_rules() -> Ruleset<Self> {
+        panic!("No lifting rules")
     }
 
     // Used for rule lifting
@@ -250,35 +250,38 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         ]
     }
 
-    fn validate(
-        synth: &mut Synthesizer<Self>,
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-    ) -> ValidationResult;
+    fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
 
-    fn run_workload(workload: Workload, prior_rules: Ruleset<Self>) -> Ruleset<Self> {
-        synth::synth(SynthParams {
-            workload,
-            prior_rules,
-            iter_limit: 2,
-            time_limit: 60,
-            node_limit: 300000,
-        })
-    }
-
-    fn run_workload_with_limits(
+    fn run_workload(
         workload: Workload,
         prior_rules: Ruleset<Self>,
-        iter_limit: usize,
-        time_limit: u64,
-        node_limit: usize,
+        limits: Limits,
     ) -> Ruleset<Self> {
-        synth::synth(SynthParams {
-            workload,
-            prior_rules,
-            iter_limit,
-            time_limit,
-            node_limit,
-        })
+        let t = Instant::now();
+
+        let mut candidates = if Self::is_rule_lifting() {
+            let mut egraph = workload.to_egraph::<Self>();
+            Ruleset::lift_rules(&mut egraph, prior_rules.clone(), limits)
+        } else {
+            let egraph = prior_rules.compress_workload(workload, limits);
+            Ruleset::cvec_match(&egraph)
+        };
+
+        let chosen = candidates.minimize(prior_rules.clone(), limits);
+
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} new rewrites in {} using {} prior rewrites",
+            chosen.len(),
+            time,
+            prior_rules.len()
+        );
+
+        for (name, eq) in &chosen.0 {
+            println!("{:?}      {}", eq.score(), name);
+        }
+
+        chosen
     }
 }

@@ -6,8 +6,7 @@
  * Example: 6 is represented as (XO (XI XH))
  * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
  */
-use egg::rewrite;
-use ruler::*;
+use ruler::{enumo::Ruleset, *};
 
 egg::define_language! {
  pub enum Pos {
@@ -51,13 +50,15 @@ impl SynthLanguage for Pos {
         true
     }
 
-    fn get_lifting_rewrites() -> Vec<egg::Rewrite<Self, SynthAnalysis>> {
-        vec![
-            rewrite!("def-xh"; "XH" <=> "(S Z)"),
-            rewrite!("def-xo"; "(XO ?a)" <=> "(+ ?a ?a)"),
-            rewrite!("def-xi"; "(XI ?a)" <=> "(+ ?a (+ ?a (S Z)))"),
-        ]
-        .concat()
+    fn get_lifting_rules() -> Ruleset<Self> {
+        Ruleset::from_str_vec(&[
+            "XH ==> (S Z)",
+            "(S Z) ==> XH",
+            "(XO ?a) ==> (+ ?a ?a)",
+            "(+ ?a ?a) ==> (XO ?a)",
+            "(XI ?a) ==> (+ ?a (+ ?a (S Z)))",
+            "(+ ?a (+ ?a (S Z))) ==> (XI ?a)",
+        ])
     }
 
     fn is_allowed_op(&self) -> bool {
@@ -76,7 +77,7 @@ impl SynthLanguage for Pos {
     }
 
     // Nov variable initialization needed
-    fn initialize_vars(_synth: &mut Synthesizer<Self>, _vars: Vec<String>) {}
+    fn initialize_vars(_egraph: &mut EGraph<Self, SynthAnalysis>, _vars: &[String]) {}
 
     fn to_var(&self) -> Option<Symbol> {
         if let Pos::Var(sym) = self {
@@ -103,11 +104,7 @@ impl SynthLanguage for Pos {
         }
     }
 
-    fn validate(
-        _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
     }
 }
@@ -124,7 +121,7 @@ mod tests {
 
     #[test]
     fn rule_lifting() {
-        let nat_rules: Vec<Equality<Pos>> = vec![
+        let nat_rules = [
             "(+ ?b ?a) ==> (+ ?a ?b)",
             "(* ?b ?a) ==> (* ?a ?b)",
             "(+ Z ?a) ==> ?a",
@@ -137,32 +134,53 @@ mod tests {
             "(+ ?b (* ?b ?a)) ==> (* ?b (S ?a))",
             "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
             "(+ ?a ?a) ==> (* ?a (S (S Z)))",
-        ]
-        .iter()
-        .map(|s| s.parse().unwrap())
-        .collect();
+        ];
 
         let mut all_rules = Ruleset::default();
-        all_rules.extend(Ruleset(nat_rules));
+        all_rules.extend(Ruleset::from_str_vec(&nat_rules));
 
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
 
-        let rules3 = Pos::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
+        let rules3 = Pos::run_workload(
+            atoms3,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules3.len(), 3);
         all_rules.extend(rules3);
 
         let atoms4 = iter_pos(4);
         assert_eq!(atoms4.force().len(), 255);
 
-        let rules4 = Pos::run_workload_with_limits(atoms4, all_rules.clone(), 3, 30, 1000000);
+        let rules4 = Pos::run_workload(
+            atoms4,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_pos(5);
         assert_eq!(atoms5.force().len(), 1527);
 
-        let rules4 = Pos::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
+        let rules4 = Pos::run_workload(
+            atoms5,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules4.len(), 8);
     }
 }

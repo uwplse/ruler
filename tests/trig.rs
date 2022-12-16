@@ -1,6 +1,6 @@
-use egg::rewrite;
 use num::rational::Ratio;
 use num::BigInt;
+use ruler::enumo::Ruleset;
 use ruler::*;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -136,46 +136,46 @@ impl SynthLanguage for Trig {
         true
     }
 
-    fn get_lifting_rewrites() -> Vec<egg::Rewrite<Self, SynthAnalysis>> {
-        vec![
+    fn get_lifting_rules() -> Ruleset<Self> {
+        Ruleset::from_str_vec(&[
             // definition of sine, cosine, tangent
-            rewrite!("def-sin"; "(sin ?a)" <=> "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"),
-            rewrite!("def-cos"; "(cos ?a)" <=> "(/ (+ (cis ?a) (cis (~ ?a))) 2)"),
-            rewrite!("def-tan"; "(tan ?a)" <=> "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"),
-
+            "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",
+            "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)",
+            "(cos ?a) ==> (/ (+ (cis ?a) (cis (~ ?a))) 2)",
+            "(/ (+ (cis ?a) (cis (~ ?a))) 2) ==> (cos ?a)",
+            "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
+            "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
             // definition of cosecant, secant, cotangent
-            rewrite!("def-csc"; "(csc ?a)" <=> "(/ 1 (sin ?a))"),
-            rewrite!("def-sec"; "(sec ?a)" <=> "(/ 1 (cos ?a))"),
-            rewrite!("def-cot"; "(cot ?a)" <=> "(/ 1 (tan ?a))"),
-
+            "(csc ?a) ==> (/ 1 (sin ?a))",
+            "(/ 1 (sin ?a)) ==> (csc ?a)",
+            "(sec ?a) ==> (/ 1 (cos ?a))",
+            "(/ 1 (cos ?a)) ==> (sec ?a)",
+            "(cot ?a) ==> (/ 1 (tan ?a))",
+            "(/ 1 (tan ?a)) ==> (cot ?a)",
             // relating tangent to sine and cosine
-            rewrite!("def-tan-ratio"; "(tan ?a)" <=> "(/ (sin ?a) (cos ?a))"),
+            "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
+            "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
             // definition of cos^2(a) and sin^2(a)
-            rewrite!("def-cos-sq"; "(* (cos ?a) (cos ?a))" <=>
-                     "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)"),
-            rewrite!("def-sin-sq"; "(* (sin ?a) (sin ?a))" <=>
-                     "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))"),
-
+            "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)",
+            "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
+            "(* (sin ?a) (sin ?a)) ==> (~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))",
+            "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
             // definition of square
-            rewrite!("def-sqr"; "(sqr ?a)" <=> "(* ?a ?a)"),
-            vec![
-                // constant folding for PI
-                rewrite!("add-pi"; "(+ PI PI)" => "(* 2 PI)"),
-
-                // constant folding for cis
-                rewrite!("cis-0"; "(cis 0)" => "1"),
-                rewrite!("cis-pi"; "(cis (/ PI 2))" => "I"),
-
-                // cis identities
-                // rewrite!("inv-cis"; "(cis (~ ?a))" => "(/ 1 (cis ?a))"),
-                rewrite!("add-cis"; "(cis (+ ?a ?b))" => "(* (cis ?a) (cis ?b))"),
-                rewrite!("sub-cis"; "(cis (- ?a ?b))" => "(* (cis ?a) (cis (~ ?b)))"),
-                rewrite!("cancel-cis"; "(* (cis ?a) (cis (~ ?a)))" => "1"),
-
-                // definition of cis
-                rewrite!("square-i"; "(* I I)" => "-1"),
-            ],
-        ].concat()
+            "(sqr ?a) ==> (* ?a ?a)",
+            "(* ?a ?a) ==> (sqr ?a)",
+            // constant folding for PI
+            "(+ PI PI) ==> (* 2 PI)",
+            // constant folding for cis
+            "(cis 0) ==> 1",
+            "(cis (/ PI 2)) ==> I",
+            // cis identities
+            "(cis (~ ?a)) ==> (/ 1 (cis ?a))",
+            "(cis (+ ?a ?b)) ==> (* (cis ?a) (cis ?b))",
+            "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (~ ?b)))",
+            "(* (cis ?a) (cis (~ ?a))) ==> 1",
+            // definition of cis
+            "(* I I) ==> -1",
+        ])
     }
 
     fn is_allowed_op(&self) -> bool {
@@ -191,7 +191,7 @@ impl SynthLanguage for Trig {
     }
 
     // No variable initialization needed
-    fn initialize_vars(_synth: &mut Synthesizer<Self>, _vars: Vec<String>) {}
+    fn initialize_vars(_egraph: &mut EGraph<Self, SynthAnalysis>, _vars: &[String]) {}
 
     fn to_var(&self) -> Option<Symbol> {
         if let Trig::Var(Variable(sym)) = self {
@@ -213,11 +213,7 @@ impl SynthLanguage for Trig {
         Trig::RealConst(c)
     }
 
-    fn validate(
-        _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
     }
 }

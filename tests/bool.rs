@@ -79,23 +79,19 @@ impl SynthLanguage for Bool {
         }
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         println!("initializing vars: {:?}", vars);
 
         let consts = vec![Some(true), Some(false)];
         let cvecs = self_product(&consts, vars.len());
 
-        let mut egraph = EGraph::new(SynthAnalysis {
-            cvec_len: cvecs[0].len(),
-        });
+        egraph.analysis.cvec_len = cvecs[0].len();
 
         for (i, v) in vars.iter().enumerate() {
             let id = egraph.add(Bool::Var(Symbol::from(v.clone())));
             let cvec = cvecs[i].clone();
             egraph[id].data.cvec = cvec;
         }
-
-        synth.egraph = egraph;
     }
 
     fn mk_var(sym: egg::Symbol) -> Self {
@@ -109,11 +105,7 @@ impl SynthLanguage for Bool {
         }
     }
 
-    fn validate(
-        _synth: &mut Synthesizer<Self>,
-        _lhs: &Pattern<Self>,
-        _rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
     }
 
@@ -143,26 +135,59 @@ mod test {
     }
 
     #[test]
-    fn simple() {
-        let mut all_rules = Ruleset::default();
+    fn dsl() {
+        let mut all_rules: Ruleset<Bool> = Ruleset::default();
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let rules3 = Bool::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
+        let egraph = all_rules.compress_workload(atoms3, Limits::default());
+        let mut candidates = Ruleset::cvec_match(&egraph);
+        let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules3.len(), 14);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let rules4 = Bool::run_workload_with_limits(atoms4, all_rules.clone(), 3, 30, 1000000);
+        let egraph = all_rules.compress_workload(atoms4, Limits::default());
+        candidates = Ruleset::cvec_match(&egraph);
+        let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules4.len(), 3);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let rules5 = Bool::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
+        let egraph = all_rules.compress_workload(atoms5, Limits::default());
+        candidates = Ruleset::cvec_match(&egraph);
+        let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
+        assert_eq!(rules5.len(), 15);
+        all_rules.extend(rules5);
+
+        assert_eq!(all_rules.len(), 32);
+    }
+
+    #[test]
+    fn simple() {
+        let mut all_rules = Ruleset::default();
+        let atoms3 = iter_bool(3);
+        assert_eq!(atoms3.force().len(), 93);
+
+        let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::default());
+        assert_eq!(rules3.len(), 14);
+        all_rules.extend(rules3);
+
+        let atoms4 = iter_bool(4);
+        assert_eq!(atoms4.force().len(), 348);
+
+        let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::default());
+        assert_eq!(rules4.len(), 3);
+        all_rules.extend(rules4);
+
+        let atoms5 = iter_bool(5);
+        assert_eq!(atoms5.force().len(), 4599);
+
+        let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
         assert_eq!(rules5.len(), 15);
         all_rules.extend(rules5);
 
@@ -171,18 +196,13 @@ mod test {
 
     #[test]
     fn round_trip_to_file() {
-        let rules: Ruleset<Bool> = Ruleset(
-            vec![
-                "(^ ?b ?a) ==> (^ ?a ?b)",
-                "(& ?b ?a) ==> (& ?a ?b)",
-                "(| ?b ?a) ==> (| ?a ?b)",
-                "(& ?a ?a) ==> ?a",
-                "?a ==> (~ (~ ?a))",
-            ]
-            .iter()
-            .map(|x| x.parse().unwrap())
-            .collect(),
-        );
+        let rules: Ruleset<Bool> = Ruleset::from_str_vec(&[
+            "(^ ?b ?a) ==> (^ ?a ?b)",
+            "(& ?b ?a) ==> (& ?a ?b)",
+            "(| ?b ?a) ==> (| ?a ?b)",
+            "(& ?a ?a) ==> ?a",
+            "?a ==> (~ (~ ?a))",
+        ]);
 
         rules.to_file("out.txt");
 
@@ -193,13 +213,36 @@ mod test {
 
     #[test]
     fn derive_rules() {
-        let three = Bool::run_workload_with_limits(iter_bool(3), Ruleset::default(), 3, 30, 100000);
+        let three = Bool::run_workload(
+            iter_bool(3),
+            Ruleset::default(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         three.to_file("three.txt");
 
-        let four = Bool::run_workload_with_limits(iter_bool(4), Ruleset::default(), 3, 30, 100000);
+        let four = Bool::run_workload(
+            iter_bool(4),
+            Ruleset::default(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         four.to_file("four.txt");
 
-        let (can, cannot) = three.derive(four, 2);
+        let (can, cannot) = three.derive(
+            four,
+            Limits {
+                time: 30,
+                iter: 2,
+                node: 1000000,
+            },
+        );
         assert_eq!(can.len(), 10);
         assert_eq!(cannot.len(), 6);
     }

@@ -96,20 +96,16 @@ impl SynthLanguage for Nat {
         }
     }
 
-    fn initialize_vars(synth: &mut Synthesizer<Self>, vars: Vec<String>) {
+    fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let mut rng = Pcg64::seed_from_u64(0);
-        let cvec_len = 10;
-        let mut egraph: EGraph<Nat, SynthAnalysis> = EGraph::new(SynthAnalysis { cvec_len });
         for v in vars {
             let id = egraph.add(Nat::Var(Symbol::from(v)));
             let mut vals = vec![];
-            for _ in 0..cvec_len {
+            for _ in 0..egraph.analysis.cvec_len {
                 vals.push(Some(rng.gen::<u64>().to_bigint().unwrap()));
             }
             egraph[id].data.cvec = vals.clone();
         }
-
-        synth.egraph = egraph;
     }
 
     fn to_var(&self) -> Option<Symbol> {
@@ -136,11 +132,7 @@ impl SynthLanguage for Nat {
         }
     }
 
-    fn validate(
-        _synth: &mut Synthesizer<Self>,
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-    ) -> ValidationResult {
+    fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
@@ -194,21 +186,45 @@ mod test {
         let atoms3 = iter_nat(3);
         assert_eq!(atoms3.force().len(), 39);
 
-        let rules3 = Nat::run_workload_with_limits(atoms3, all_rules.clone(), 3, 30, 1000000);
+        let rules3 = Nat::run_workload(
+            atoms3,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules3.len(), 4);
         all_rules.extend(rules3);
 
         let atoms4 = iter_nat(4);
         assert_eq!(atoms4.force().len(), 132);
 
-        let rules4 = Nat::run_workload_with_limits(atoms4, all_rules.clone(), 3, 30, 1000000);
+        let rules4 = Nat::run_workload(
+            atoms4,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules4.len(), 3);
         all_rules.extend(rules4);
 
         let atoms5 = iter_nat(5);
         assert_eq!(atoms5.force().len(), 819);
 
-        let rules5 = Nat::run_workload_with_limits(atoms5, all_rules.clone(), 3, 30, 1000000);
+        let rules5 = Nat::run_workload(
+            atoms5,
+            all_rules.clone(),
+            Limits {
+                time: 30,
+                iter: 3,
+                node: 1000000,
+            },
+        );
         assert_eq!(rules5.len(), 5);
         all_rules.extend(rules5);
 
