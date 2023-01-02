@@ -148,6 +148,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .with_scheduler(egg::SimpleScheduler)
             .with_node_limit(limits.node)
             .with_iter_limit(limits.iter)
+            // Egg default time limit is 5 seconds. Bump up to 10 minutes to reduce variance due to timing
             .with_time_limit(Duration::from_secs(600))
             .with_egraph(egraph)
     }
