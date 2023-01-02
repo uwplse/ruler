@@ -217,7 +217,6 @@ mod test {
             iter_bool(3),
             Ruleset::default(),
             Limits {
-                time: 30,
                 iter: 3,
                 node: 1000000,
             },
@@ -228,7 +227,6 @@ mod test {
             iter_bool(4),
             Ruleset::default(),
             Limits {
-                time: 30,
                 iter: 3,
                 node: 1000000,
             },
@@ -238,7 +236,6 @@ mod test {
         let (can, cannot) = three.derive(
             four,
             Limits {
-                time: 30,
                 iter: 2,
                 node: 1000000,
             },

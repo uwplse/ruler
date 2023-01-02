@@ -146,7 +146,6 @@ mod tests {
             atoms3,
             all_rules.clone(),
             Limits {
-                time: 30,
                 iter: 3,
                 node: 1000000,
             },
@@ -161,7 +160,6 @@ mod tests {
             atoms4,
             all_rules.clone(),
             Limits {
-                time: 30,
                 iter: 3,
                 node: 1000000,
             },
@@ -176,7 +174,6 @@ mod tests {
             atoms5,
             all_rules.clone(),
             Limits {
-                time: 30,
                 iter: 3,
                 node: 1000000,
             },
