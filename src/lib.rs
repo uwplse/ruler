@@ -54,7 +54,6 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
-    pub time: u64,
     pub iter: usize,
     pub node: usize,
 }
@@ -62,7 +61,6 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            time: 30,
             iter: 3,
             node: 300000,
         }

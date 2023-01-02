@@ -148,7 +148,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .with_scheduler(egg::SimpleScheduler)
             .with_node_limit(limits.node)
             .with_iter_limit(limits.iter)
-            .with_time_limit(Duration::from_secs(limits.time))
+            .with_time_limit(Duration::from_secs(600))
             .with_egraph(egraph)
     }
 
@@ -223,7 +223,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         let (new_egraph, unions, stop_reason) = lifting_rules.compress_egraph(
             egraph.clone(),
             Limits {
-                time: 1000,
                 iter: usize::MAX,
                 node: usize::MAX,
             },
@@ -421,7 +420,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                     Self::mk_runner(
                         runner.egraph,
                         Limits {
-                            time: 100,
                             iter: usize::MAX,
                             node: usize::MAX,
                         },
@@ -443,7 +441,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                     Self::mk_runner(
                         runner.egraph,
                         Limits {
-                            time: limits.time,
                             iter: 1,
                             node: limits.node,
                         },
@@ -465,7 +462,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 Self::mk_runner(
                     runner.egraph,
                     Limits {
-                        time: 30,
                         iter: usize::MAX,
                         node: usize::MAX,
                     },
