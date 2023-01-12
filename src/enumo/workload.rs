@@ -10,7 +10,7 @@ pub enum Workload<L: SynthLanguage> {
     Plug(Box<Self>, String, Box<Self>),
     Filter(Filter, Box<Self>),
     Append(Vec<Self>),
-    EGraph(EGraph<L, SynthAnalysis>),
+    EGraph(Box<EGraph<L, SynthAnalysis>>),
 }
 
 impl<L: SynthLanguage> Eq for Workload<L> {}
@@ -37,7 +37,7 @@ impl<L: SynthLanguage> Workload<L> {
 
     pub fn to_egraph(&self) -> EGraph<L, SynthAnalysis> {
         if let Workload::EGraph(e) = self {
-            return e.clone();
+            return *e.clone();
         }
 
         let mut egraph = EGraph::default();

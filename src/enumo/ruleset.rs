@@ -197,7 +197,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut egraph = workload.to_egraph();
         let (_, unions, _) = self.compress_egraph(egraph.clone(), limits);
         Self::apply_unions(&mut egraph, unions);
-        Workload::EGraph(egraph)
+        Workload::EGraph(Box::new(egraph))
         // extract the smallest term from each eclass and make a workload out of those terms?
     }
 
