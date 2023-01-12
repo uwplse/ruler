@@ -22,9 +22,40 @@ impl<L: SynthLanguage> PartialEq for Workload<L> {
             (Self::Plug(x, l1, l2), Self::Plug(y, r1, r2)) => x == y && l1 == r1 && l2 == r2,
             (Self::Filter(x, l1), Self::Filter(y, r1)) => x == y && l1 == r1,
             (Self::Append(x), Self::Append(y)) => x == y,
-            // For now, workloads of egraphs are never equal
-            // maybe we can do something more complicated later.
-            (Self::EGraph(_), Self::EGraph(_)) => false,
+            (Self::EGraph(x), Self::EGraph(y)) => {
+                // Define two egraphs to be equal if they have all the same eclasses and enodes.
+                let xclasses = x.classes();
+                // It suffies to check that x and y have the same number of eclasses and that
+                // all of the eclasses in x are present in y.
+                if xclasses.len() != y.classes().len() {
+                    return false;
+                }
+                for xclass in xclasses {
+                    // Ignore empty eclasses- I don't think this should ever come up?
+                    if xclass.is_empty() {
+                        continue;
+                    }
+                    let xnodes = &xclass.nodes;
+                    let first = &xnodes[0];
+                    match y.lookup(first.clone()) {
+                        None => return false,
+
+                        Some(yid) => {
+                            let ynodes = &y[yid].nodes;
+                            if xnodes.len() != ynodes.len() {
+                                return false;
+                            }
+                            for n in xnodes {
+                                if !ynodes.contains(n) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+                // If we haven't returned false, then the egraphs are equal.
+                true
+            }
             _ => false,
         }
     }
@@ -158,6 +189,40 @@ mod test {
     use egg::SymbolLang;
 
     use super::*;
+
+    #[test]
+    fn egraph_equality() {
+        let mut eg1: EGraph<SymbolLang, SynthAnalysis> = EGraph::default();
+        let mut eg2: EGraph<SymbolLang, SynthAnalysis> = EGraph::default();
+
+        let id1 = eg1.add_expr(&"(+ x y)".parse().unwrap());
+
+        let id2 = eg2.add_expr(&"(+ x y)".parse().unwrap());
+
+        assert!(
+            Workload::EGraph(Box::new(eg1.clone())).eq(&Workload::EGraph(Box::new(eg2.clone())))
+        );
+
+        let id3 = eg1.add_expr(&"(+ y x)".parse().unwrap());
+        assert!(
+            !Workload::EGraph(Box::new(eg1.clone())).eq(&Workload::EGraph(Box::new(eg2.clone())))
+        );
+
+        let id4 = eg2.add_expr(&"(+ y x)".parse().unwrap());
+        assert!(
+            Workload::EGraph(Box::new(eg1.clone())).eq(&Workload::EGraph(Box::new(eg2.clone())))
+        );
+
+        eg1.union(id1, id3);
+        assert!(
+            !Workload::EGraph(Box::new(eg1.clone())).eq(&Workload::EGraph(Box::new(eg2.clone())))
+        );
+
+        eg2.union(id2, id4);
+        assert!(
+            Workload::EGraph(Box::new(eg1.clone())).eq(&Workload::EGraph(Box::new(eg2.clone())))
+        );
+    }
 
     #[test]
     fn iter() {
