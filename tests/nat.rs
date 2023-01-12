@@ -176,7 +176,7 @@ mod test {
 
     use super::*;
 
-    fn iter_nat(n: usize) -> Workload {
+    fn iter_nat(n: usize) -> Workload<Nat> {
         Workload::iter_lang(n, &["Z"], &["a", "b", "c"], &["S"], &["+", "*"])
     }
 

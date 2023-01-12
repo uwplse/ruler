@@ -116,7 +116,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    pub fn apply_unions(egraph: &mut EGraph<L, SynthAnalysis>, unions: HashMap<Id, Vec<Id>>) {
+    fn apply_unions(egraph: &mut EGraph<L, SynthAnalysis>, unions: HashMap<Id, Vec<Id>>) {
         for ids in unions.values() {
             if ids.len() > 1 {
                 let first = ids[0];
@@ -193,15 +193,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         (runner.egraph, found_unions, stop_reason)
     }
 
-    pub fn compress_workload(
-        &self,
-        workload: Workload,
-        limits: Limits,
-    ) -> EGraph<L, SynthAnalysis> {
+    pub fn compress_workload(&self, workload: Workload<L>, limits: Limits) -> Workload<L> {
         let mut egraph = workload.to_egraph();
         let (_, unions, _) = self.compress_egraph(egraph.clone(), limits);
         Self::apply_unions(&mut egraph, unions);
-        egraph
+        Workload::EGraph(egraph)
+        // extract the smallest term from each eclass and make a workload out of those terms?
     }
 
     pub fn lift_rules(
@@ -251,7 +248,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
+    pub fn cvec_match(workload: &Workload<L>) -> Self {
+        let egraph = workload.to_egraph();
+
         // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
         // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
 
@@ -275,7 +274,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             true
         };
         let mut candidates = Ruleset::default();
-        let extract = Extractor::new(egraph, AstSize);
+        let extract = Extractor::new(&egraph, AstSize);
         for class1 in &not_all_none {
             for class2 in &not_all_none {
                 if class1.id == class2.id {

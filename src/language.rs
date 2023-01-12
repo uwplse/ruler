@@ -253,14 +253,16 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
 
     fn run_workload(
-        workload: Workload,
+        workload: Workload<Self>,
         prior_rules: Ruleset<Self>,
         limits: Limits,
     ) -> Ruleset<Self> {
         let t = Instant::now();
 
+        println!("workload size: {}", workload.force().len());
+
         let mut candidates = if Self::is_rule_lifting() {
-            let mut egraph = workload.to_egraph::<Self>();
+            let mut egraph = workload.to_egraph();
             Ruleset::lift_rules(&mut egraph, prior_rules.clone(), limits)
         } else {
             let egraph = prior_rules.compress_workload(workload, limits);

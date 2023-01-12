@@ -115,7 +115,7 @@ mod tests {
 
     use super::*;
 
-    fn iter_pos(n: usize) -> Workload {
+    fn iter_pos(n: usize) -> Workload<Pos> {
         Workload::iter_lang(n, &["XH"], &["a", "b", "c"], &["XO", "XI"], &["+", "*"])
     }
 

@@ -98,7 +98,7 @@ impl Pattern {
 
 #[cfg(test)]
 mod test {
-    use crate::enumo::Workload;
+    use crate::enumo::{EnumoSym, Workload};
 
     use super::Pattern;
 
@@ -136,8 +136,14 @@ mod test {
             .map(|x| x.parse::<Pattern>().unwrap())
             .collect();
 
-        let exprs =
-            Workload::from_vec(vec!["a", "x", "(+ x y)", "(+ y y)", "(+ (* a b) (* a b))"]).force();
+        let exprs = Workload::<EnumoSym>::from_vec(vec![
+            "a",
+            "x",
+            "(+ x y)",
+            "(+ y y)",
+            "(+ (* a b) (* a b))",
+        ])
+        .force();
 
         let expected = vec![
             vec![true, true, true, true, true],

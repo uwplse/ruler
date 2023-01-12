@@ -4,20 +4,42 @@ use crate::{HashSet, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum Workload {
+#[derive(Clone, Debug)]
+pub enum Workload<L: SynthLanguage> {
     Set(Vec<Sexp>),
     Plug(Box<Self>, String, Box<Self>),
     Filter(Filter, Box<Self>),
     Append(Vec<Self>),
+    EGraph(EGraph<L, SynthAnalysis>),
 }
 
-impl Workload {
+impl<L: SynthLanguage> Eq for Workload<L> {}
+
+impl<L: SynthLanguage> PartialEq for Workload<L> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Set(x), Self::Set(y)) => x == y,
+            (Self::Plug(x, l1, l2), Self::Plug(y, r1, r2)) => x == y && l1 == r1 && l2 == r2,
+            (Self::Filter(x, l1), Self::Filter(y, r1)) => x == y && l1 == r1,
+            (Self::Append(x), Self::Append(y)) => x == y,
+            // For now, workloads of egraphs are never equal
+            // maybe we can do something more complicated later.
+            (Self::EGraph(_), Self::EGraph(_)) => false,
+            _ => false,
+        }
+    }
+}
+
+impl<L: SynthLanguage> Workload<L> {
     pub fn from_vec(strs: Vec<&str>) -> Self {
         Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
     }
 
-    pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
+    pub fn to_egraph(&self) -> EGraph<L, SynthAnalysis> {
+        if let Workload::EGraph(e) = self {
+            return e.clone();
+        }
+
         let mut egraph = EGraph::default();
         let sexps = self.force();
 
@@ -70,6 +92,10 @@ impl Workload {
                 }
                 set
             }
+            // extract every term represented by the egraph?
+            // the smallest term from each eclass?
+            // something else?
+            Workload::EGraph(_) => todo!(),
         }
     }
 
@@ -103,7 +129,11 @@ impl Workload {
             .plug("bop", &Workload::from_vec(bops.to_vec()))
     }
 
-    pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
+    pub fn append(self, other: &Workload<L>) -> Self {
+        Workload::Append(vec![self, other.clone()])
+    }
+
+    pub fn plug(self, name: impl Into<String>, workload: &Workload<L>) -> Self {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
     }
 
@@ -129,7 +159,8 @@ mod test {
 
     #[test]
     fn iter() {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang: Workload<EnumoSym> =
+            Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let actual2 = lang.clone().iter("expr", 2).force();
         assert_eq!(actual2.len(), 8);
 
@@ -139,7 +170,8 @@ mod test {
 
     #[test]
     fn iter_metric() {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang: Workload<EnumoSym> =
+            Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let actual2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
         assert_eq!(actual2.len(), 4);
 
@@ -150,14 +182,16 @@ mod test {
     #[test]
     fn iter_metric_fast() {
         // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang: Workload<EnumoSym> =
+            Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let six = lang.iter_metric("expr", Metric::Atoms, 6);
         assert_eq!(six.force().len(), 188);
     }
 
     #[test]
     fn contains() {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang: Workload<EnumoSym> =
+            Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
 
         let actual3 = lang
             .clone()
@@ -165,7 +199,7 @@ mod test {
             .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
-        let expected3 = Workload::from_vec(vec![
+        let expected3 = Workload::<EnumoSym>::from_vec(vec![
             "var",
             "(uop var)",
             "(uop (uop var))",
@@ -182,7 +216,7 @@ mod test {
             .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
-        let expected4 = Workload::from_vec(vec![
+        let expected4 = Workload::<EnumoSym>::from_vec(vec![
             "var",
             "(uop var)",
             "(uop (uop var))",

@@ -124,7 +124,7 @@ mod test {
 
     use super::*;
 
-    fn iter_bool(n: usize) -> Workload {
+    fn iter_bool(n: usize) -> Workload<Bool> {
         Workload::iter_lang(
             n,
             &["true", "false"],
