@@ -116,6 +116,8 @@ impl Sexp {
 
 #[cfg(test)]
 mod test {
+    use egg::SymbolLang;
+
     use super::*;
 
     #[test]
@@ -186,7 +188,7 @@ mod test {
     #[test]
     fn plug() {
         let x = "x".parse::<Sexp>().unwrap();
-        let pegs = Workload::<EnumoSym>::from_vec(vec!["1", "2", "3"]).force();
+        let pegs = Workload::<SymbolLang>::from_vec(vec!["1", "2", "3"]).force();
         let expected = vec![x.clone()];
         let actual = x.plug("a", &pegs);
         assert_eq!(actual, expected);
@@ -199,8 +201,8 @@ mod test {
     #[test]
     fn plug_cross_product() {
         let term = "(x x)";
-        let pegs = Workload::<EnumoSym>::from_vec(vec!["1", "2", "3"]).force();
-        let expected = Workload::<EnumoSym>::from_vec(vec![
+        let pegs = Workload::<SymbolLang>::from_vec(vec!["1", "2", "3"]).force();
+        let expected = Workload::<SymbolLang>::from_vec(vec![
             "(1 1)", "(1 2)", "(1 3)", "(2 1)", "(2 2)", "(2 3)", "(3 1)", "(3 2)", "(3 3)",
         ])
         .force();
@@ -210,11 +212,11 @@ mod test {
 
     #[test]
     fn multi_plug() {
-        let wkld: Workload<EnumoSym> = Workload::from_vec(vec!["(a b)", "(a)", "(b)"]);
+        let wkld: Workload<SymbolLang> = Workload::from_vec(vec!["(a b)", "(a)", "(b)"]);
         let a_s = Workload::from_vec(vec!["1", "2", "3"]);
         let b_s = Workload::from_vec(vec!["x", "y"]);
         let actual = wkld.plug("a", &a_s).plug("b", &b_s).force();
-        let expected = Workload::<EnumoSym>::from_vec(vec![
+        let expected = Workload::<SymbolLang>::from_vec(vec![
             "(1 x)", "(1 y)", "(2 x)", "(2 y)", "(3 x)", "(3 y)", "(1)", "(2)", "(3)", "(x)", "(y)",
         ])
         .force();
@@ -223,7 +225,7 @@ mod test {
 
     #[test]
     fn canon() {
-        let inputs = Workload::<EnumoSym>::from_vec(vec![
+        let inputs = Workload::<SymbolLang>::from_vec(vec![
             "(+ (/ c b) a)",
             "(+ (- c c) (/ a a))",
             "a",
@@ -241,7 +243,7 @@ mod test {
             "(+ a (+ c b))",
         ])
         .force();
-        let expecteds = Workload::<EnumoSym>::from_vec(vec![
+        let expecteds = Workload::<SymbolLang>::from_vec(vec![
             "(+ (/ a b) c)",
             "(+ (- a a) (/ b b))",
             "a",

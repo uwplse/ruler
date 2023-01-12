@@ -1,6 +1,7 @@
 use std::{fmt::Display, hash::BuildHasherDefault};
 
 pub use bv::*;
+use egg::SymbolLang;
 use enumo::Ruleset;
 pub use equality::*;
 pub use language::*;
@@ -91,5 +92,48 @@ impl<T> Default for Interval<T> {
             low: None,
             high: None,
         }
+    }
+}
+
+// // This is an extremely minimal implementation of SynthLanguage
+// // It is not intended for any real uses.
+// // Workloads of arbitrary s-expressions can use SymbolLang as a
+// // default type parameter.
+impl SynthLanguage for SymbolLang {
+    type Constant = usize;
+
+    fn eval<'a, F>(&'a self, _cvec_len: usize, _get_cvec: F) -> CVec<Self>
+    where
+        F: FnMut(&'a Id) -> &'a CVec<Self>,
+    {
+        vec![]
+    }
+
+    fn initialize_vars(_egraph: &mut EGraph<Self, SynthAnalysis>, _vars: &[String]) {}
+
+    fn to_var(&self) -> Option<Symbol> {
+        None
+    }
+
+    fn mk_var(sym: Symbol) -> Self {
+        SymbolLang {
+            op: sym,
+            children: vec![],
+        }
+    }
+
+    fn is_constant(&self) -> bool {
+        false
+    }
+
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
+        SymbolLang {
+            op: c.to_string().into(),
+            children: vec![],
+        }
+    }
+
+    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
+        ValidationResult::Unknown
     }
 }

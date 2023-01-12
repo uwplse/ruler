@@ -98,7 +98,9 @@ impl Pattern {
 
 #[cfg(test)]
 mod test {
-    use crate::enumo::{EnumoSym, Workload};
+    use egg::SymbolLang;
+
+    use crate::enumo::Workload;
 
     use super::Pattern;
 
@@ -136,7 +138,7 @@ mod test {
             .map(|x| x.parse::<Pattern>().unwrap())
             .collect();
 
-        let exprs = Workload::<EnumoSym>::from_vec(vec![
+        let exprs = Workload::<SymbolLang>::from_vec(vec![
             "a",
             "x",
             "(+ x y)",

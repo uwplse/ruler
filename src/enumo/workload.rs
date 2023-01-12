@@ -155,11 +155,13 @@ impl<L: SynthLanguage> Workload<L> {
 
 #[cfg(test)]
 mod test {
+    use egg::SymbolLang;
+
     use super::*;
 
     #[test]
     fn iter() {
-        let lang: Workload<EnumoSym> =
+        let lang: Workload<SymbolLang> =
             Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let actual2 = lang.clone().iter("expr", 2).force();
         assert_eq!(actual2.len(), 8);
@@ -170,7 +172,7 @@ mod test {
 
     #[test]
     fn iter_metric() {
-        let lang: Workload<EnumoSym> =
+        let lang: Workload<SymbolLang> =
             Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let actual2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
         assert_eq!(actual2.len(), 4);
@@ -182,7 +184,7 @@ mod test {
     #[test]
     fn iter_metric_fast() {
         // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
-        let lang: Workload<EnumoSym> =
+        let lang: Workload<SymbolLang> =
             Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let six = lang.iter_metric("expr", Metric::Atoms, 6);
         assert_eq!(six.force().len(), 188);
@@ -190,7 +192,7 @@ mod test {
 
     #[test]
     fn contains() {
-        let lang: Workload<EnumoSym> =
+        let lang: Workload<SymbolLang> =
             Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
 
         let actual3 = lang
@@ -199,7 +201,7 @@ mod test {
             .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
-        let expected3 = Workload::<EnumoSym>::from_vec(vec![
+        let expected3 = Workload::<SymbolLang>::from_vec(vec![
             "var",
             "(uop var)",
             "(uop (uop var))",
@@ -216,7 +218,7 @@ mod test {
             .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
-        let expected4 = Workload::<EnumoSym>::from_vec(vec![
+        let expected4 = Workload::<SymbolLang>::from_vec(vec![
             "var",
             "(uop var)",
             "(uop (uop var))",
