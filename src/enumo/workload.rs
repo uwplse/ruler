@@ -225,6 +225,25 @@ mod test {
     }
 
     #[test]
+    fn egraph_equality_order() {
+        let mut eg1: EGraph<SymbolLang, SynthAnalysis> = EGraph::default();
+        eg1.add_expr(&"(+ x y)".parse().unwrap());
+        eg1.add_expr(&"0".parse().unwrap());
+        eg1.add_expr(&"(+ y x)".parse().unwrap());
+        eg1.add_expr(&"1".parse().unwrap());
+
+        let mut eg2: EGraph<SymbolLang, SynthAnalysis> = EGraph::default();
+        eg2.add_expr(&"(+ y x)".parse().unwrap());
+        eg2.add_expr(&"(+ x y)".parse().unwrap());
+        eg2.add_expr(&"1".parse().unwrap());
+        eg2.add_expr(&"0".parse().unwrap());
+
+        assert!(
+            Workload::EGraph(Box::new(eg1.clone())).eq(&Workload::EGraph(Box::new(eg2.clone())))
+        );
+    }
+
+    #[test]
     fn iter() {
         let lang: Workload<SymbolLang> =
             Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
