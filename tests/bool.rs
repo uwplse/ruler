@@ -121,7 +121,9 @@ impl SynthLanguage for Bool {
 #[cfg(test)]
 mod test {
     use ruler::enumo::{Ruleset, Workload};
-
+    use std::time::Instant;
+    use std::fs::File;
+    use std::io::Write;
     use super::*;
 
     fn iter_bool(n: usize) -> Workload {
@@ -192,6 +194,49 @@ mod test {
         all_rules.extend(rules5);
 
         assert_eq!(all_rules.len(), 32);
+    }
+
+    #[test]
+    fn bool_oopsla_equiv() {
+        let mut all_rules = Ruleset::default();
+        let start = Instant::now();
+
+        let layer_1 = Workload::make_layer(1, 
+            &[],
+            &["ba", "bb", "bc"],
+            &["~"],
+            &["&", "|", "^"],
+        );
+        let rules_1 = Bool::run_workload(layer_1, all_rules.clone(), Limits::default());
+        all_rules.extend(rules_1);
+
+        let layer_2 = Workload::make_layer(2,
+            &[],
+            &["ba", "bb", "bc"],
+            &["~"],
+            &["&", "|", "^"],
+        );
+        let rules_2 = Bool::run_workload(layer_2, all_rules.clone(), Limits::default());
+        all_rules.extend(rules_2);
+
+        let layer_3 = Workload::make_layer(3,
+            &[],
+            &["ba", "bb", "bc"],
+            &["~"],
+            &["&", "|", "^"],
+        );
+        let rules_3 = Bool::run_workload(layer_3, all_rules.clone(), Limits::default());
+        all_rules.extend(rules_3);
+
+        let duration = start.elapsed();
+        all_rules.to_file("equivalent/bool_rules_oopsla.rules");
+
+        let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
+        let (can, _cannot) = all_rules.derive(baseline,
+            Limits {
+                iter: 3,
+                node: 1000000,
+            },);
     }
 
     #[test]

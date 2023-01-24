@@ -86,6 +86,24 @@ impl Workload {
         self.iter(atom, n).filter(Filter::MetricLt(met, n + 1))
     }
 
+    pub fn make_layer(
+        n: usize,         
+        consts: &[&str],
+        vars: &[&str],
+        uops: &[&str],
+        bops: &[&str],
+    ) -> Self {
+        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+
+        lang.iter_metric("expr", Metric::List, n)
+            .filter(Filter::Contains("var".parse().unwrap()))
+            .filter(Filter::MetricLt(Metric::List, n))
+            .plug("cnst", &Workload::from_vec(consts.to_vec()))
+            .plug("var", &Workload::from_vec(vars.to_vec()))
+            .plug("uop", &Workload::from_vec(uops.to_vec()))
+            .plug("bop", &Workload::from_vec(bops.to_vec()))
+    }
+
     pub fn iter_lang(
         n: usize,
         consts: &[&str],

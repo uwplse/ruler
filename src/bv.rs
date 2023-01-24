@@ -286,7 +286,6 @@ macro_rules! impl_bv {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-
     type BV4 = BV<4>;
 
     #[test]

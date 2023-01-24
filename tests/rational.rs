@@ -28,6 +28,7 @@ egg::define_language! {
     "*" = Mul([Id; 2]),
     "/" = Div([Id; 2]),
     "~" = Neg(Id),
+    "fabs" = Abs(Id),
     Lit(Constant),
     Var(egg::Symbol),
   }
@@ -52,6 +53,7 @@ impl SynthLanguage for Math {
               }
             }),
             Math::Neg(x) => map!(get_cvec, x => Some(-x)),
+            Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
         }
@@ -65,6 +67,7 @@ impl SynthLanguage for Math {
             Math::Lit(n) => Interval::new(Some(n.clone()), Some(n.clone())),
             Math::Var(_) => Interval::default(),
             Math::Neg(x) => neg(get_interval(x)),
+            Math::Abs(a) => abs(get_interval(a)),
             Math::Add([x, y]) => add(get_interval(x), get_interval(y)),
             Math::Sub([x, y]) => add(get_interval(x), &neg(get_interval(y))),
             Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
@@ -158,6 +161,15 @@ fn egg_to_z3<'a>(
                 ))
             }
             Math::Neg(x) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*x)])),
+            Math::Abs(a) => {
+                let inner = &buf[usize::from(*a)].clone();
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Real::le(inner, &zero),
+                    &z3::ast::Real::unary_minus(inner),
+                    &inner,
+                ));
+            }
             Math::Lit(c) => buf.push(z3::ast::Real::from_real(
                 ctx,
                 (c.numer()).to_i32().unwrap(),
@@ -210,6 +222,44 @@ fn neg(interval: &Interval<Constant>) -> Interval<Constant> {
     let low = interval.low.clone();
     let high = interval.high.clone();
     Interval::new(high.map(|x| -x), low.map(|x| -x))
+}
+
+fn abs(interval: &Interval<Constant>) -> Interval<Constant> {
+    let low = interval.low.clone();
+    let high = interval.high.clone();
+
+    match (low, high) {
+        (None, None) => Interval::new(None, None),
+        (Some(x), None) => {
+            if x.is_negative() {
+                Interval::new(Some(-x), None)
+            } else {
+                Interval::new(Some(x), None)
+            }
+        }
+        (None, Some(y)) => {
+            if y.is_negative() {
+                Interval::new(None, Some(-y))
+            } else {
+                Interval::new(None, Some(y))
+            }
+        }
+        (Some(x), Some(y)) => {
+            if x.is_negative() {
+                if y.is_negative() {
+                    Interval::new(Some(-x), Some(-y))
+                } else {
+                    Interval::new(Some(-x), Some(y))
+                }
+            } else {
+                if y.is_negative() {
+                    Interval::new(Some(x), Some(-y))
+                } else {
+                    Interval::new(Some(x), Some(y))
+                }
+            }
+        }
+    }
 }
 
 fn add(a: &Interval<Constant>, b: &Interval<Constant>) -> Interval<Constant> {
@@ -280,6 +330,10 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ruler::enumo::{Ruleset, Workload};
+    use std::time::Instant;
+    use std::fs::File;
+    use std::io::Write;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
@@ -434,5 +488,51 @@ mod test {
                 )),
             )
         );
+    }
+
+    #[test]
+    fn rational_oopsla_equiv() {
+        let mut all_rules = Ruleset::default();
+        let start = Instant::now();
+
+        let layer_1 = Workload::make_layer(1, 
+            &["0", "1", "-1"],
+            &["a", "b", "c"],
+            &["~", "fabs"],
+            &["-", "*", "*", "/"],
+        );
+
+        let rules_1 = Math::run_workload(layer_1, all_rules.clone(), Limits::default());
+        all_rules.extend(rules_1);
+
+        let layer_2 = Workload::make_layer(2, 
+            &["0", "1", "-1"],
+            &["a", "b", "c"],
+            &["~", "fabs"],
+            &["-", "*", "*", "/"],
+        );
+
+        let rules_2 = Math::run_workload(layer_2, all_rules.clone(), Limits::default());
+        all_rules.extend(rules_2);
+
+        let layer_3 = Workload::make_layer(3, 
+            &["0", "1", "-1"],
+            &["a", "b", "c"],
+            &["~", "fabs"],
+            &["-", "*", "*", "/"],
+        );
+
+        let rules_3 = Math::run_workload(layer_3, all_rules.clone(), Limits::default());
+        all_rules.extend(rules_3);
+
+        let duration = start.elapsed();
+        all_rules.to_file("equivalent/rational_rules_oopsla.rules");
+
+        let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
+        let (can, _cannot) = all_rules.derive(baseline,
+            Limits {
+                iter: 3,
+                node: 1000000,
+            },);
     }
 }
