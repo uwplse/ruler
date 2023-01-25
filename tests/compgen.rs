@@ -168,3 +168,33 @@ impl SynthLanguage for VecLang {
         }
     }
 }
+
+mod test {
+    use ruler::enumo::{Ruleset, Workload};
+
+    use super::*;
+
+    fn iter_rat(n: usize) -> Workload {
+        Workload::iter_lang(
+            n,
+            &["-1", "0", "1"],
+            &["a", "b", "c"],
+            &[],
+            &["+", "-", "*", "/"],
+        )
+    }
+
+    #[test]
+    fn simple() {
+        let mut rules: Ruleset<VecLang> = Ruleset::default();
+        let atoms3 = iter_rat(3);
+        let rules3 = VecLang::run_workload(atoms3, rules.clone(), Limits::default());
+        rules.extend(rules3);
+        let atoms4 = iter_rat(4);
+        let rules4 = VecLang::run_workload(atoms4, rules.clone(), Limits::default());
+        rules.extend(rules4);
+        let atoms5 = iter_rat(5);
+        let rules5 = VecLang::run_workload(atoms5, rules.clone(), Limits::default());
+        rules.extend(rules5);
+    }
+}
