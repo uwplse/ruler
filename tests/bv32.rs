@@ -49,21 +49,29 @@ mod test {
         all_rules.to_file("equivalent/bv32_rules_oopsla.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
-        let (can, _cannot) = all_rules.derive(baseline,
+        let (can, _cannot) = all_rules.derive(baseline.clone(),
+            Limits {
+                iter: 3,
+                node: 1000000,
+            },);
+
+        let (canr, _cannotr) = baseline.derive(all_rules.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
             },);
 
         let num_rules = &all_rules.len();
-        let num_derivable = &can.len();
+        let forwards_derivable = &can.len();
+        let backwards_derivable = &canr.len();
         let time = &duration.as_secs();
 
         let stats = json!({
             "spec": "bv32",
             "num_rules": num_rules,
             "num_baseline": 60,
-            "num_derivable": num_derivable,
+            "enumo_oopsla": forwards_derivable,
+            "oopsla_enumo": backwards_derivable,
             "time": time
         });
 
