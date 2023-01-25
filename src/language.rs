@@ -1,4 +1,5 @@
 use std::{
+    borrow::{Borrow, Cow},
     fmt::{Debug, Display},
     hash::Hash,
     time::Instant,
@@ -248,6 +249,26 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
             -(l_size + r_size),
             -(ops.len() as i32),
         ]
+    }
+
+    fn eval_pattern(
+        pat: &Pattern<Self>,
+        ctx: &HashMap<Var, CVec<Self>>,
+        cvec_len: usize,
+    ) -> CVec<Self> {
+        let mut buf: Vec<Cow<CVec<Self>>> = vec![];
+        for enode in pat.ast.as_ref().iter() {
+            match enode {
+                ENodeOrVar::ENode(enode) => {
+                    let cvec = enode.eval(cvec_len, |id| buf[usize::from(*id)].borrow());
+                    buf.push(Cow::Owned(cvec));
+                }
+                ENodeOrVar::Var(var) => {
+                    buf.push(Cow::Borrowed(&ctx[var]));
+                }
+            }
+        }
+        buf.pop().unwrap().into_owned()
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
