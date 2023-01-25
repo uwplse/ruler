@@ -543,6 +543,7 @@ mod test {
         let stats = json!({
             "spec": "rational",
             "num_rules": num_rules,
+            "num_baseline": 52,
             "num_derivable": num_derivable,
             "time": time
         });

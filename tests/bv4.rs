@@ -62,6 +62,7 @@ mod test {
         let stats = json!({
             "spec": "bv4",
             "num_rules": num_rules,
+            "num_baseline": 60,
             "num_derivable": num_derivable,
             "time": time
         });

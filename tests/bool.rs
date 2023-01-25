@@ -246,6 +246,7 @@ mod test {
         let stats = json!({
             "spec": "bool",
             "num_rules": num_rules,
+            "num_baseline": 27,
             "num_derivable": num_derivable,
             "time": time
         });
