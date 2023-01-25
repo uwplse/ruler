@@ -121,9 +121,11 @@ impl SynthLanguage for Bool {
 #[cfg(test)]
 mod test {
     use ruler::enumo::{Ruleset, Workload};
-    use std::time::Instant;
-    use json_writer::JSONObjectWriter;
     use super::*;
+    use std::time::Instant;
+    use serde_json::*;
+    use std::fs::OpenOptions;
+    use std::io::Write;
 
     fn iter_bool(n: usize) -> Workload {
         Workload::iter_lang(
@@ -237,17 +239,22 @@ mod test {
                 node: 1000000,
             },);
 
-        let mut object_str = String::new();
         let num_rules = &all_rules.len();
         let num_derivable = &can.len();
         let time = &duration.as_secs();
 
-        let mut object_writer = JSONObjectWriter::new(&mut object_str);
-        object_writer.value("spec", "bool");
-        object_writer.value("num_rules", num_rules);
-        object_writer.value("num_derivable", num_derivable);
-        object_writer.value("time", time);
+        let stats = json!({
+            "spec": "bool",
+            "num_rules": num_rules,
+            "num_derivable": num_derivable,
+            "time": time
+        });
 
+        let stats_str = stats.to_string();
+
+        let mut file = OpenOptions::new().append(true).open("output.json").expect("Unable to open file");
+        file.write_all(stats_str.as_bytes()).expect("write failed");
+        file.write_all(", ".as_bytes()).expect("write failed");
     }
 
     #[test]

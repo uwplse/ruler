@@ -332,7 +332,8 @@ mod test {
     use super::*;
     use ruler::enumo::{Ruleset, Workload};
     use std::time::Instant;
-    use std::fs::File;
+    use serde_json::*;
+    use std::fs::OpenOptions;
     use std::io::Write;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -534,5 +535,21 @@ mod test {
                 iter: 3,
                 node: 1000000,
             },);
+
+        let num_rules = &all_rules.len();
+        let num_derivable = &can.len();
+        let time = &duration.as_secs();
+
+        let stats = json!({
+            "spec": "rational",
+            "num_rules": num_rules,
+            "num_derivable": num_derivable,
+            "time": time
+        });
+
+        let stats_str = stats.to_string();
+
+        let mut file = OpenOptions::new().append(true).open("output.json").expect("Unable to open file");
+        file.write_all(stats_str.as_bytes()).expect("write failed");
     }
 }
