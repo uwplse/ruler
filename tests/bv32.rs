@@ -49,6 +49,7 @@ mod test {
         all_rules.to_file("equivalent/bv32_rules_oopsla.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
+
         let (can, _cannot) = all_rules.derive(baseline.clone(),
             Limits {
                 iter: 3,
@@ -70,8 +71,8 @@ mod test {
             "spec": "bv32",
             "num_rules": num_rules,
             "num_baseline": 60,
-            "enumo_oopsla": forwards_derivable,
-            "oopsla_enumo": backwards_derivable,
+            "enumo_derives_oopsla": forwards_derivable,
+            "oopsla_derives_enumo": backwards_derivable,
             "time": time
         });
 
