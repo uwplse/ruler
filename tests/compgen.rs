@@ -45,6 +45,30 @@ impl Value {
         None
     }
 
+    fn int2bool<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Self>
+    where
+        F: Fn(i64, i64) -> bool,
+    {
+        if let Value::Int(i) = lhs {
+            if let Value::Int(j) = rhs {
+                return Some(Value::Bool(f(*i, *j)));
+            }
+        }
+        None
+    }
+
+    fn bool2<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Self>
+    where
+        F: Fn(bool, bool) -> bool,
+    {
+        if let Value::Bool(lv) = lhs {
+            if let Value::Bool(rv) = rhs {
+                return Some(Value::Bool(f(*lv, *rv)));
+            }
+        }
+        None
+    }
+
     fn sample(rng: &mut Pcg32, min: i64, max: i64, num_samples: usize) -> Vec<Value> {
         (0..num_samples)
             .map(|_| Value::Int(rng.gen_range(min, max)))
@@ -58,6 +82,12 @@ egg::define_language! {
     "*" = Mul([Id; 2]),
     "-" = Minus([Id; 2]),
     "/" = Div([Id; 2]),
+
+    "or" = Or([Id; 2]),
+    "&&" = And([Id; 2]),
+    "ite" = Ite([Id; 3]),
+    "<" = Lt([Id; 2]),
+
     Const(Value),
     Symbol(egg::Symbol),
   }
@@ -83,6 +113,12 @@ impl SynthLanguage for VecLang {
                 Some(x / y)
               }
             })),
+
+            VecLang::Or([l, r]) => map!(get_cvec, l, r => Value::bool2(l, r, |x, y| x || y)),
+            VecLang::And([l, r]) => map!(get_cvec, l, r => Value::bool2(l, r, |x, y| x && y)),
+            VecLang::Ite([_b, _t, _f]) => todo!(),
+            VecLang::Lt([l, r]) => map!(get_cvec, l, r => Value::int2bool(l, r, |x, y| x < y)),
+
             VecLang::Const(n) => vec![Some(n.clone()); cvec_len],
             VecLang::Symbol(_) => vec![],
         }
