@@ -47,7 +47,7 @@ jobs:
       - name: Install Rust compiler
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
+            toolchain: 1.66
             default: true
             override: true
             components: rustfmt, clippy
