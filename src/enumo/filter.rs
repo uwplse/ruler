@@ -99,12 +99,8 @@ mod test {
                 "(+ ?x ?x)".parse().unwrap(),
             ))))
             .force();
-        let expected = Workload::from_vec(vec![
-            "(+ a b)",
-            "(+ a (+ a b))",
-            "(+ (+ a b) (+ b a))",
-        ])
-        .force();
+        let expected =
+            Workload::from_vec(vec!["(+ a b)", "(+ a (+ a b))", "(+ (+ a b) (+ b a))"]).force();
         assert_eq!(actual, expected);
     }
 }
