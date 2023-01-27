@@ -88,7 +88,7 @@ mod test {
         let time = &duration.as_secs();
 
         let stats = json!({
-            "spec": "bv32",
+            "spec": "bv4",
             "num_rules": num_rules,
             "num_baseline": 60,
             "enumo_derives_oopsla": forwards_derivable,
