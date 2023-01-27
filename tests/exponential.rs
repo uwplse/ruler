@@ -246,8 +246,12 @@ mod test {
             .plug("v", &lower_layer)
             .plug("uop", &Workload::from_vec(vec!["exp"]))
             .plug("bop", &Workload::from_vec(vec!["+", "*"]))
-            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
-            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(exp (exp ?a))".parse().unwrap(),
+            ))))
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(log (log ?a))".parse().unwrap(),
+            ))));
 
         run_workload(upper_layer, prev_rules)
     }
@@ -262,8 +266,12 @@ mod test {
             .plug("v", &lower_layer)
             .plug("uop", &Workload::from_vec(vec!["log"]))
             .plug("bop", &Workload::from_vec(vec!["*"]))
-            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
-            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(exp (exp ?a))".parse().unwrap(),
+            ))))
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(log (log ?a))".parse().unwrap(),
+            ))));
 
         run_workload(upper_layer, prev_rules)
     }
@@ -274,7 +282,8 @@ mod test {
         let bops = Workload::from_vec(vec!["+", "*"]);
         let lang = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"]);
 
-        let lower_layer = lang.clone()
+        let lower_layer = lang
+            .clone()
             .plug("v", &vars)
             .plug("uop", &uops)
             .plug("bup", &bops);
@@ -283,8 +292,12 @@ mod test {
             .plug("v", &Workload::Append(vec![lower_layer, vars]))
             .plug("uop", &uops)
             .plug("bop", &bops)
-            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
-            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(exp (exp ?a))".parse().unwrap(),
+            ))))
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(log (log ?a))".parse().unwrap(),
+            ))));
 
         run_workload(upper_layer, prev_rules)
     }
@@ -295,7 +308,8 @@ mod test {
         let bops = Workload::from_vec(vec!["+", "*", "pow"]);
         let lang = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"]);
 
-        let lower_layer = lang.clone()
+        let lower_layer = lang
+            .clone()
             .plug("v", &vars)
             .plug("uop", &uops)
             .plug("bup", &bops);
@@ -304,8 +318,12 @@ mod test {
             .plug("v", &Workload::Append(vec![lower_layer, vars]))
             .plug("uop", &uops)
             .plug("bop", &bops)
-            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
-            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(exp (exp ?a))".parse().unwrap(),
+            ))))
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(log (log ?a))".parse().unwrap(),
+            ))));
 
         run_workload(upper_layer, prev_rules)
     }
@@ -316,7 +334,8 @@ mod test {
         let bops = Workload::from_vec(vec!["/"]);
         let lang = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"]);
 
-        let lower_layer = lang.clone()
+        let lower_layer = lang
+            .clone()
             .plug("v", &vars)
             .plug("uop", &uops)
             .plug("bup", &bops);
