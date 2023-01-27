@@ -1,2 +1,2 @@
 nightly:
-	nightly-script.sh
+	bash nightly-script.sh
