@@ -107,6 +107,10 @@ impl Workload {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
     }
 
+    pub fn append(self, workload: &Workload) -> Self {
+        Workload::Append(vec![self, workload.clone()])
+    }
+
     pub fn filter(self, filter: Filter) -> Self {
         if filter.is_monotonic() {
             if let Workload::Plug(wkld, name, pegs) = self {

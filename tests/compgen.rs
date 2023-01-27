@@ -1,22 +1,36 @@
-use std::{fmt::Display, str::FromStr};
-
 use itertools::Itertools;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 use ruler::*;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum Value {
+    // starts with i
     Int(i64),
+    // starts with [
+    List(Vec<Value>),
+    // starts with <
+    Vec(Vec<Value>),
+    // starts with b
     Bool(bool),
 }
 
 impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Value::Int(i) => write!(f, "{}", i),
             Value::Bool(b) => write!(f, "{}", b),
+            Value::List(l) => write!(f, "{:?}", l),
+            Value::Vec(v) => {
+                write!(
+                    f,
+                    "(Vec {})",
+                    v.iter().map(|x| format!("{}", x)).collect_vec().join(" ")
+                )
+            }
         }
     }
 }
@@ -31,42 +45,91 @@ impl FromStr for Value {
 }
 
 impl Value {
-    fn int2<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Self>
+    fn int1<F>(arg: &Self, f: F) -> Option<Value>
     where
-        F: Fn(i64, i64) -> Option<i64>,
+        F: Fn(i64) -> Value,
     {
-        if let Value::Int(i) = lhs {
-            if let Value::Int(j) = rhs {
-                if let Some(x) = f(*i, *j) {
-                    return Some(Value::Int(x));
-                }
-            }
+        if let Value::Int(val) = arg {
+            Some(f(*val))
+        } else {
+            None
         }
-        None
     }
 
-    fn int2bool<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Self>
+    fn int2<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Value>
     where
-        F: Fn(i64, i64) -> bool,
+        F: Fn(i64, i64) -> Value,
     {
-        if let Value::Int(i) = lhs {
-            if let Value::Int(j) = rhs {
-                return Some(Value::Bool(f(*i, *j)));
-            }
+        if let (Value::Int(lv), Value::Int(rv)) = (lhs, rhs) {
+            Some(f(*lv, *rv))
+        } else {
+            None
         }
-        None
     }
 
-    fn bool2<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Self>
+    fn bool2<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Value>
     where
-        F: Fn(bool, bool) -> bool,
+        F: Fn(bool, bool) -> Value,
     {
-        if let Value::Bool(lv) = lhs {
-            if let Value::Bool(rv) = rhs {
-                return Some(Value::Bool(f(*lv, *rv)));
-            }
+        if let (Value::Bool(lv), Value::Bool(rv)) = (lhs, rhs) {
+            Some(f(*lv, *rv))
+        } else {
+            None
         }
-        None
+    }
+
+    fn vec1<F>(val: &Self, f: F) -> Option<Value>
+    where
+        F: Fn(&[Value]) -> Option<Value>,
+    {
+        if let Value::Vec(v) = val {
+            f(v)
+        } else {
+            None
+        }
+    }
+
+    fn vec2<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Value>
+    where
+        F: Fn(&[Value], &[Value]) -> Option<Value>,
+    {
+        if let (Value::Vec(v1), Value::Vec(v2)) = (lhs, rhs) {
+            if v1.len() == v2.len() {
+                f(v1, v2)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn vec3<F>(v1: &Self, v2: &Self, v3: &Self, f: F) -> Option<Value>
+    where
+        F: Fn(&[Value], &[Value], &[Value]) -> Option<Value>,
+    {
+        if let (Value::Vec(v1), Value::Vec(v2), Value::Vec(v3)) = (v1, v2, v3) {
+            if v1.len() == v2.len() && v2.len() == v3.len() {
+                f(v1, v2, v3)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn vec2_op<F>(lhs: &Self, rhs: &Self, f: F) -> Option<Value>
+    where
+        F: Fn(&Value, &Value) -> Option<Value>,
+    {
+        Self::vec2(lhs, rhs, |lhs, rhs| {
+            lhs.iter()
+                .zip(rhs)
+                .map(|(l, r)| f(l, r))
+                .collect::<Option<Vec<Value>>>()
+                .map(Value::Vec)
+        })
     }
 
     fn sample(rng: &mut Pcg32, min: i64, max: i64, num_samples: usize) -> Vec<Value> {
@@ -76,50 +139,203 @@ impl Value {
     }
 }
 
+fn integer_division(a: i64, b: i64) -> Option<i64> {
+    if b == 0 {
+        None
+    } else if a == 0 {
+        Some(0)
+    } else {
+        Some(a / b)
+    }
+    // if a / b != 0
+}
+
 egg::define_language! {
   pub enum VecLang {
-    "+" = Add([Id; 2]),
-    "*" = Mul([Id; 2]),
-    "-" = Minus([Id; 2]),
-    "/" = Div([Id; 2]),
+        // Id is a key to identify EClasses within an EGraph, represents
+        // children nodes
+        "+" = Add([Id; 2]),
+        "*" = Mul([Id; 2]),
 
-    "or" = Or([Id; 2]),
-    "&&" = And([Id; 2]),
-    "ite" = Ite([Id; 3]),
-    "<" = Lt([Id; 2]),
+        "neg" = Neg([Id; 1]),
 
-    Const(Value),
-    Symbol(egg::Symbol),
-  }
+        // Lists have a variable number of elements
+        "List" = List(Box<[Id]>),
+
+        // Vectors have width elements
+        "Vec" = Vec(Box<[Id]>),
+
+        // Vector with all literals
+        "LitVec" = LitVec(Box<[Id]>),
+
+        "Get" = Get([Id; 2]),
+
+        // Used for partitioning and recombining lists
+        "Concat" = Concat([Id; 2]),
+
+        // Vector operations that take 2 vectors of inputs
+        "VecAdd" = VecAdd([Id; 2]),
+        "VecMinus" = VecMinus([Id; 2]),
+        "VecMul" = VecMul([Id; 2]),
+        "VecDiv" = VecDiv([Id; 2]),
+        "VecMulSgn" = VecMulSgn([Id; 2]),
+
+        // Vector operations that take 1 vector of inputs
+        "VecNeg" = VecNeg([Id; 1]),
+
+        // MAC takes 3 lists: acc, v1, v2
+        "VecMAC" = VecMAC([Id; 3]),
+
+    // Comment
+        Const(Value),
+
+        // language items are parsed in order, and we want symbol to
+        // be a fallback, so we put it last.
+        // `Symbol` is an egg-provided interned string type
+        Symbol(egg::Symbol),
+    }
 }
 
 impl SynthLanguage for VecLang {
     type Constant = Value;
 
-    fn eval<'a, F>(&'a self, cvec_len: usize, mut get_cvec: F) -> CVec<Self>
+    fn eval<'a, F>(&'a self, cvec_len: usize, mut get: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            VecLang::Add([l, r]) => map!(get_cvec, l, r => Value::int2(l, r, |x, y| Some(x + y))),
-            VecLang::Mul([l, r]) => map!(get_cvec, l, r => Value::int2(l, r, |x, y| Some(x * y))),
-            VecLang::Minus([l, r]) => map!(get_cvec, l, r => Value::int2(l, r, |x, y| Some(x - y))),
-            VecLang::Div([l, r]) => map!(get_cvec, l, r => Value::int2(l, r, |x, y| {
-              if y == 0 {
-                None
-              } else if x == 0 {
-                Some(0)
-              } else {
-                Some(x / y)
-              }
-            })),
-
-            VecLang::Or([l, r]) => map!(get_cvec, l, r => Value::bool2(l, r, |x, y| x || y)),
-            VecLang::And([l, r]) => map!(get_cvec, l, r => Value::bool2(l, r, |x, y| x && y)),
-            VecLang::Ite([_b, _t, _f]) => todo!(),
-            VecLang::Lt([l, r]) => map!(get_cvec, l, r => Value::int2bool(l, r, |x, y| x < y)),
-
-            VecLang::Const(n) => vec![Some(n.clone()); cvec_len],
+            VecLang::Const(i) => vec![Some(i.clone()); cvec_len],
+            VecLang::Add([l, r]) => map!(get, l, r => {
+                Value::int2(l, r, |l, r| Value::Int(l + r))
+            }),
+            VecLang::Mul([l, r]) => map!(get, l, r => {
+                Value::int2(l, r, |l, r| Value::Int(l * r))
+            }),
+            VecLang::Neg([x]) => {
+                map!(get, x => Value::int1(x, |x| Value::Int(-x)))
+            }
+            VecLang::List(l) => l
+                .iter()
+                .fold(vec![Some(vec![]); cvec_len], |mut acc, item| {
+                    acc.iter_mut().zip(get(item)).for_each(|(mut v, i)| {
+                        if let (Some(v), Some(i)) = (&mut v, i) {
+                            v.push(i.clone());
+                        } else {
+                            *v = None;
+                        }
+                    });
+                    acc
+                })
+                .into_iter()
+                .map(|acc| acc.map(Value::List))
+                .collect::<Vec<_>>(),
+            VecLang::Vec(l) => l
+                .iter()
+                .fold(vec![Some(vec![]); cvec_len], |mut acc, item| {
+                    acc.iter_mut().zip(get(item)).for_each(|(mut v, i)| {
+                        if let (Some(v), Some(i)) = (&mut v, i) {
+                            v.push(i.clone());
+                        } else {
+                            *v = None;
+                        }
+                    });
+                    acc
+                })
+                .into_iter()
+                .map(|acc| acc.map(Value::Vec))
+                .collect::<Vec<_>>(),
+            VecLang::LitVec(l) => l
+                .iter()
+                .fold(vec![Some(vec![]); cvec_len], |mut acc, item| {
+                    acc.iter_mut().zip(get(item)).for_each(|(mut v, i)| {
+                        if let (Some(v), Some(i)) = (&mut v, i) {
+                            v.push(i.clone());
+                        } else {
+                            *v = None;
+                        }
+                    });
+                    acc
+                })
+                .into_iter()
+                .map(|acc| acc.map(Value::Vec))
+                .collect::<Vec<_>>(),
+            #[rustfmt::skip]
+            VecLang::Get([l, i]) => map!(get, l, i => {
+                if let (Value::Vec(v), Value::Int(idx)) = (l, i) {
+                    // get index and clone the inner Value if there is one
+                    v.get(*idx as usize).cloned()
+                } else {
+                    None
+                }
+            }),
+            #[rustfmt::skip]
+            VecLang::Concat([l, r]) => map!(get, l, r => {
+                Value::vec2(l, r, |l, r| {
+                    Some(Value::List(
+                        l.iter().chain(r).cloned().collect::<Vec<_>>(),
+                    ))
+                })
+            }),
+            #[rustfmt::skip]
+            VecLang::VecAdd([l, r]) => map!(get, l, r => {
+                Value::vec2_op(l, r, |l, r| {
+                    Value::int2(l, r, |l, r| Value::Int(l + r))
+                })
+            }),
+            #[rustfmt::skip]
+            VecLang::VecMinus([l, r]) => map!(get, l, r => {
+                Value::vec2_op(l, r, |l, r| {
+                    Value::int2(l, r, |l, r| Value::Int(l - r))
+                })
+            }),
+            #[rustfmt::skip]
+            VecLang::VecMul([l, r]) => map!(get, l, r => {
+                Value::vec2_op(l, r, |l, r| {
+                    Value::int2(l, r, |l, r| Value::Int(l * r))
+                })
+            }),
+            #[rustfmt::skip]
+            VecLang::VecDiv([l, r]) => map!(get, l, r => {
+                Value::vec2_op(l, r, |l, r| match (l, r) {
+                    (Value::Int(a), Value::Int(b)) => {
+                        integer_division(*a, *b).map(Value::Int)
+                    }
+                    _ => None,
+                })
+            }),
+            VecLang::VecMulSgn(_) => todo!(),
+            #[rustfmt::skip]
+            VecLang::VecNeg([l]) => map!(get, l => {
+                Value::vec1(l, |l| {
+                    if l.iter().all(|x| matches!(x, Value::Int(_))) {
+                        Some(Value::Vec(
+                            l.iter()
+                                .map(|tup| match tup {
+                                    Value::Int(a) => Value::Int(-a),
+                                    x => panic!("NEG: Ill-formed: {}", x),
+                                })
+                                .collect::<Vec<_>>(),
+                        ))
+                    } else {
+                        None
+                    }
+                })
+            }),
+            #[rustfmt::skip]
+            VecLang::VecMAC([acc, v1, v2]) => map!(get, v1, v2, acc => {
+                Value::vec3(v1, v2, acc, |v1, v2, acc| {
+                    v1.iter()
+                        .zip(v2.iter())
+                        .zip(acc.iter())
+                        .map(|tup| match tup {
+                            ((Value::Int(v1), Value::Int(v2)), Value::Int(acc))
+				=> Some(Value::Int((v1 * v2) + acc)),
+                            _ => None,
+                        })
+                        .collect::<Option<Vec<Value>>>()
+                        .map(Value::Vec)
+                })
+            }),
             VecLang::Symbol(_) => vec![],
         }
     }
@@ -211,20 +427,18 @@ mod test {
     use super::*;
 
     fn iter_rat(n: usize) -> Workload {
-        Workload::iter_lang(
-            n,
-            &["-1", "0", "1"],
-            &["a", "b", "c"],
-            &[],
-            &["+", "-", "*", "/"],
-        )
+        Workload::iter_lang(n, &[], &["a", "b", "c", "d"], &[], &["+"])
+    }
+
+    fn iter_vec(n: usize) -> Workload {
+        Workload::iter_lang(n, &[], &[], &[], &["VecAdd"])
     }
 
     #[test]
     fn simple() {
         let mut rules: Ruleset<VecLang> = Ruleset::default();
         let atoms3 = iter_rat(3);
-        let rules3 = VecLang::run_workload(atoms3, rules.clone(), Limits::default());
+        let rules3 = VecLang::run_workload(atoms3.clone(), rules.clone(), Limits::default());
         rules.extend(rules3);
         let atoms4 = iter_rat(4);
         let rules4 = VecLang::run_workload(atoms4, rules.clone(), Limits::default());
@@ -232,5 +446,37 @@ mod test {
         let atoms5 = iter_rat(5);
         let rules5 = VecLang::run_workload(atoms5, rules.clone(), Limits::default());
         rules.extend(rules5);
+
+        // Vec (+ _ _) (+ _ _)
+        // VecAdd (+ _ _) (+ _ _)
+
+        // Vec (+ 1 2) (+ 3 4) --> VecAdd (Vec 1 3) (Vec 2 4)
+
+        let vec_of_adds = Workload::from_vec(vec!["(Vec x x)"]);
+        let wkld2 = vec_of_adds.plug("x", &atoms3);
+
+        let vec_add = Workload::from_vec(vec!["(VecAdd x x)"]);
+        let lit_vecs = Workload::from_vec(vec!["(Vec y y)"])
+            .plug("y", &Workload::from_vec(vec!["a", "b", "c", "d"]));
+        let wkld3 = vec_add.plug("x", &lit_vecs);
+
+        let my_wkld = wkld2.append(&wkld3);
+
+        println!("Starting rules: ");
+        for (name, _) in rules.0.clone() {
+            println!("{}", name);
+        }
+
+        let wkld = iter_vec(3);
+        // let actual_wkld = wkld.append(&wkld2);
+        for term in my_wkld.force() {
+            println!("{}", term);
+        }
+
+        println!("New rules:");
+        let vec_rules = VecLang::run_workload(my_wkld, rules.clone(), Limits::default());
+        for (name, _) in vec_rules.0 {
+            println!("{}", name);
+        }
     }
 }
