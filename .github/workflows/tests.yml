@@ -17,6 +17,10 @@ jobs:
           toolchain: 1.66
           override: true
       - run: rustup component add rustfmt
+
+      - name: "Rust Cache"
+        uses: Swatinem/rust-cache@v2
+
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -33,6 +37,10 @@ jobs:
           toolchain: 1.66
           override: true
       - run: rustup component add clippy
+    
+      - name: "Rust Cache"
+        uses: Swatinem/rust-cache@v2
+
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
@@ -52,7 +60,8 @@ jobs:
             override: true
             components: rustfmt, clippy
 
-      - uses: Swatinem/rust-cache@v1
+      - name: "Rust Cache"
+        uses: Swatinem/rust-cache@v2
 
       - name: "Build"
         run: cargo build --release
