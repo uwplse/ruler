@@ -245,8 +245,9 @@ mod test {
         let upper_layer = Workload::from_vec(vec!["(uop v)", "(bop v v)"])
             .plug("v", &lower_layer)
             .plug("uop", &Workload::from_vec(vec!["exp"]))
-            .plug("bop", &Workload::from_vec(vec!["+", "*"]));
-        // TODO: inverted filters
+            .plug("bop", &Workload::from_vec(vec!["+", "*"]))
+            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
+            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
 
         run_workload(upper_layer, prev_rules)
     }
@@ -260,8 +261,9 @@ mod test {
         let upper_layer = Workload::from_vec(vec!["(uop v)", "(bop v v)"])
             .plug("v", &lower_layer)
             .plug("uop", &Workload::from_vec(vec!["log"]))
-            .plug("bop", &Workload::from_vec(vec!["*"]));
-        // TODO: inverted filters
+            .plug("bop", &Workload::from_vec(vec!["*"]))
+            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
+            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
 
         run_workload(upper_layer, prev_rules)
     }
@@ -280,8 +282,9 @@ mod test {
         let upper_layer = lang
             .plug("v", &Workload::Append(vec![lower_layer, vars]))
             .plug("uop", &uops)
-            .plug("bop", &bops);
-        // TODO: inverted filters
+            .plug("bop", &bops)
+            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
+            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
 
         run_workload(upper_layer, prev_rules)
     }
@@ -300,8 +303,9 @@ mod test {
         let upper_layer = lang
             .plug("v", &Workload::Append(vec![lower_layer, vars]))
             .plug("uop", &uops)
-            .plug("bop", &bops);
-        // TODO: inverted filters
+            .plug("bop", &bops)
+            .filter(Filter::Invert(Box::new(Filter::Contains("(exp (exp ?a))".parse().unwrap()))))
+            .filter(Filter::Invert(Box::new(Filter::Contains("(log (log ?a))".parse().unwrap()))));
 
         run_workload(upper_layer, prev_rules)
     }
