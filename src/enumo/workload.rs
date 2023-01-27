@@ -17,6 +17,10 @@ impl Workload {
         Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
     }
 
+    pub fn from_vec_string(strs: Vec<String>) -> Self {
+        Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
+    }
+
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
         let sexps = self.force();
@@ -95,13 +99,35 @@ impl Workload {
     ) -> Self {
         let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
 
-        lang.iter_metric("expr", Metric::List, n)
+        lang.iter_metric("expr", Metric::List, n + 1)
             .filter(Filter::Contains("var".parse().unwrap()))
-            .filter(Filter::MetricLt(Metric::List, n))
+            .filter(Filter::MetricLt(Metric::List, n + 1))
             .plug("cnst", &Workload::from_vec(consts.to_vec()))
             .plug("var", &Workload::from_vec(vars.to_vec()))
             .plug("uop", &Workload::from_vec(uops.to_vec()))
             .plug("bop", &Workload::from_vec(bops.to_vec()))
+    }
+
+    pub fn make_layer_uops(        
+        e: Vec<String>,
+        uops: &[&str],
+    ) -> Self {
+        let lang = Workload::from_vec(vec!["expr_1", "(uop expr_1)"]);
+
+        lang.plug("expr_1", &Workload::from_vec_string(e))
+        .plug("uop", &Workload::from_vec(uops.to_vec()))
+    }
+
+    pub fn make_layer_bops(       
+        e_1: Vec<String>,
+        e_2: Vec<String>,
+        bops: &[&str],
+    ) -> Self {
+        let lang = Workload::from_vec(vec!["expr_2", "expr_1", "(bop expr_2 expr_1)"]);
+
+        lang.plug("expr_2", &Workload::from_vec_string(e_2))
+        .plug("expr_1", &Workload::from_vec_string(e_1))
+        .plug("bop", &Workload::from_vec(bops.to_vec()))
     }
 
     pub fn iter_lang(
@@ -123,6 +149,14 @@ impl Workload {
 
     pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
+    }
+
+    pub fn append(self, other: Workload) -> Self {
+        let mut vec = Vec::new();
+        vec.push(self);
+        vec.push(other);
+
+        Workload::Append(vec)
     }
 
     pub fn filter(self, filter: Filter) -> Self {

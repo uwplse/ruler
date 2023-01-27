@@ -1,0 +1,2 @@
+nightly:
+	nightly-script.sh

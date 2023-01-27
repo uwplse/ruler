@@ -503,7 +503,7 @@ mod test {
             &["-", "*", "*", "/"],
         );
 
-        let rules_1 = Math::run_workload(layer_1, all_rules.clone(), Limits::default());
+        let rules_1 = Math::run_workload(layer_1.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_1);
 
         let layer_2 = Workload::make_layer(2, 
@@ -513,18 +513,8 @@ mod test {
             &["-", "*", "*", "/"],
         );
 
-        let rules_2 = Math::run_workload(layer_2, all_rules.clone(), Limits::default());
+        let rules_2 = Math::run_workload(layer_2.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_2);
-
-        let layer_3 = Workload::make_layer(3, 
-            &["0", "1", "-1"],
-            &["a", "b", "c"],
-            &["~", "fabs"],
-            &["-", "*", "*", "/"],
-        );
-
-        let rules_3 = Math::run_workload(layer_3, all_rules.clone(), Limits::default());
-        all_rules.extend(rules_3);
 
         let duration = start.elapsed();
         all_rules.to_file("equivalent/rational_rules_oopsla.rules");

@@ -24,7 +24,7 @@ mod test {
             &["~", "-"],
             &["&", "|", "*", "--", "+"],
         );
-        let rules_1 = Bv::run_workload(layer_1, all_rules.clone(), Limits::default());
+        let rules_1 = Bv::run_workload(layer_1.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_1);
 
         let layer_2 = Workload::make_layer(2, 
@@ -33,18 +33,38 @@ mod test {
             &["~", "-"],
             &["&", "|", "*", "--", "+"],
         );
-        let rules_2 = Bv::run_workload(layer_2, all_rules.clone(), Limits::default());
+        let rules_2 = Bv::run_workload(layer_2.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_2);
 
-        let layer_3 = Workload::make_layer(3, 
-            &[],
-            &["a", "b", "c"],
-            &["~", "-"],
-            &["&", "|", "*", "--", "+"],
-        );
-        let rules_3 = Bv::run_workload(layer_3, all_rules.clone(), Limits::default());
-        all_rules.extend(rules_3);
+        let sexp_vec_l1 = layer_1.clone().force();
+        let sexp_vec_l2 = layer_2.clone().force();
 
+        let mut terms = OpenOptions::new().append(true).open("terms.workload").expect("Unable to open file");
+
+        let str_vec_l1: Vec<String> = sexp_vec_l1.iter().map(|se| se.to_string()).collect();
+        let str_vec_l2: Vec<String> = sexp_vec_l2.iter().map(|se| se.to_string()).collect();
+
+        let consts = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let l3_uops = Workload::make_layer_uops(str_vec_l2.clone(), &["~", "-"]);
+        let l3_bops_1 = Workload::make_layer_bops(consts.clone(), str_vec_l2.clone(), &["&", "|", "*", "--", "+"]);
+        let l3_bops_2 = Workload::make_layer_bops(str_vec_l2.clone(), consts.clone(), &["&", "|", "*", "--", "+"]);
+        let l3_bops_3 = Workload::make_layer_bops(str_vec_l1.clone(), str_vec_l1.clone(), &["&", "|", "*", "--", "+"]);
+
+        let layer_3 = Workload::from_vec(vec![]).append(l3_uops.clone())
+            .append(l3_bops_1.clone())
+            .append(l3_bops_2.clone())
+            .append(l3_bops_3.clone());
+        
+        let mut layer_3_copy = layer_3.clone().force();
+
+        terms.write_all("LAYER 3, BV32: \n".to_string().as_bytes()).expect("write failed");
+        for _n in 0..layer_3_copy.clone().len() {
+            terms.write_all(layer_3_copy.pop().unwrap().to_string().as_bytes()).expect("write failed");
+            terms.write_all("\n".to_string().as_bytes()).expect("write failed");
+        }
+
+        let rules_3 = Bv::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_3);
         let duration = start.elapsed();
         all_rules.to_file("equivalent/bv32_rules_oopsla.rules");
 

@@ -219,7 +219,7 @@ mod test {
         );
         let rules_2 = Bool::run_workload(layer_2, all_rules.clone(), Limits::default());
         all_rules.extend(rules_2);
-
+        
         let layer_3 = Workload::make_layer(3,
             &[],
             &["ba", "bb", "bc"],
@@ -228,7 +228,7 @@ mod test {
         );
         let rules_3 = Bool::run_workload(layer_3, all_rules.clone(), Limits::default());
         all_rules.extend(rules_3);
-
+        
         let duration = start.elapsed();
         all_rules.to_file("equivalent/bool_rules_oopsla.rules");
 
