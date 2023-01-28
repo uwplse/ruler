@@ -6,6 +6,7 @@ pub enum Filter {
     Contains(Pattern),
     Canon(Vec<String>),
     And(Box<Self>, Box<Self>),
+    Invert(Box<Self>),
 }
 
 impl Filter {
@@ -21,6 +22,7 @@ impl Filter {
             }
             Filter::Canon(symbols) => sexp.eq(&sexp.canon(symbols)),
             Filter::And(f1, f2) => f1.test(sexp) && f2.test(sexp),
+            Filter::Invert(f) => !f.test(sexp),
         }
     }
 
@@ -57,7 +59,7 @@ mod test {
             "(+ a (+ a b))",
             "(+ a (+ b b))",
             "(+ (+ a b) (+ a b))",
-            "(+ (+ a b) (+ b a)) ",
+            "(+ (+ a b) (+ b a))",
         ]);
         let actual = wkld
             .filter(Filter::Contains("(+ ?x ?x)".parse().unwrap()))
@@ -79,6 +81,26 @@ mod test {
             ))
             .force();
         let expected = Workload::from_vec(vec!["(x y)", "(y x)", "(x y z)"]).force();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn invert() {
+        let wkld = Workload::from_vec(vec![
+            "(+ a a)",
+            "(+ a b)",
+            "(+ a (+ a b))",
+            "(+ a (+ b b))",
+            "(+ (+ a b) (+ a b))",
+            "(+ (+ a b) (+ b a))",
+        ]);
+        let actual = wkld
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(+ ?x ?x)".parse().unwrap(),
+            ))))
+            .force();
+        let expected =
+            Workload::from_vec(vec!["(+ a b)", "(+ a (+ a b))", "(+ (+ a b) (+ b a))"]).force();
         assert_eq!(actual, expected);
     }
 }
