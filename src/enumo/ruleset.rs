@@ -1,6 +1,6 @@
 use std::{io::Write, sync::Arc, time::Duration};
 
-use egg::{AstSize, EClass, Extractor, RecExpr, Rewrite, Runner, StopReason};
+use egg::{AstSize, EClass, Extractor, Rewrite, Runner, StopReason};
 
 use crate::{
     CVec, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -62,6 +62,22 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn extend(&mut self, other: Self) {
         self.0.extend(other.0)
+    }
+
+    pub fn partition<F>(&self, f: F) -> (Self, Self)
+    where
+        F: Fn(&Equality<L>) -> bool,
+    {
+        let mut ins = Ruleset::default();
+        let mut outs = Ruleset::default();
+        for (_, eq) in &self.0 {
+            if f(eq) {
+                ins.add(eq.clone());
+            } else {
+                outs.add(eq.clone());
+            }
+        }
+        (ins, outs)
     }
 
     pub fn to_file(&self, filename: &str) {
@@ -128,21 +144,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph.rebuild();
     }
 
-    pub fn partition_sat(&self) -> (Self, Self) {
-        let mut sat = IndexMap::default();
-        let mut other = IndexMap::default();
-
-        for (name, eq) in &self.0 {
-            if eq.is_saturating() {
-                sat.insert(name.clone(), eq.clone());
-            } else {
-                other.insert(name.clone(), eq.clone());
-            }
-        }
-
-        (Ruleset(sat), Ruleset(other))
-    }
-
     fn mk_runner(egraph: EGraph<L, SynthAnalysis>, limits: Limits) -> Runner<L, SynthAnalysis> {
         Runner::default()
             .with_scheduler(egg::SimpleScheduler)
@@ -151,24 +152,6 @@ impl<L: SynthLanguage> Ruleset<L> {
             // Egg default time limit is 5 seconds. Bump up to 10 minutes to reduce variance due to timing
             .with_time_limit(Duration::from_secs(600))
             .with_egraph(egraph)
-    }
-
-    fn runner_with_roots(
-        runner: Runner<L, SynthAnalysis>,
-        lhs: &RecExpr<L>,
-        rhs: &RecExpr<L>,
-    ) -> Runner<L, SynthAnalysis> {
-        runner
-            .with_expr(lhs)
-            .with_expr(rhs)
-            .with_scheduler(egg::SimpleScheduler)
-            .with_hook(|r| {
-                if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
-                    Err("Done".to_owned())
-                } else {
-                    Ok(())
-                }
-            })
     }
 
     fn compress_egraph(
@@ -210,12 +193,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         limits: Limits,
     ) -> Self {
         // 1. Compress egraph using allowed rules
-        let mut allowed = Ruleset::default();
-        for eq in prior.0.values() {
-            if L::is_allowed_rewrite(&eq.lhs, &eq.rhs) {
-                allowed.add(eq.clone());
-            }
-        }
+        let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
+
         let (_, unions, _) = allowed.compress_egraph(egraph.clone(), limits);
         Self::apply_unions(egraph, unions);
 
@@ -397,95 +376,75 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
-        let (sat, other) = self.partition_sat();
-        let sat: Vec<Rewrite<L, SynthAnalysis>> =
-            sat.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect();
-        let other: Vec<Rewrite<L, SynthAnalysis>> =
-            other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect();
-
-        let mut derivable = IndexMap::default();
-        let mut not_derivable = IndexMap::default();
-
-        against.0.into_iter().for_each(|(_, eq)| {
-            let l = L::instantiate(&eq.lhs);
-            let r = L::instantiate(&eq.rhs);
-
-            let mut runner =
-                Self::runner_with_roots(Self::mk_runner(Default::default(), limits), &l, &r);
-            let mut l_id;
-            let mut r_id;
-            for _ in 0..limits.iter {
-                // Sat
-                runner = Self::runner_with_roots(
-                    Self::mk_runner(
-                        runner.egraph,
-                        Limits {
-                            iter: usize::MAX,
-                            node: usize::MAX,
-                        },
-                    ),
-                    &l,
-                    &r,
-                )
-                .run(&sat);
-
-                l_id = runner.egraph.find(runner.roots[0]);
-                r_id = runner.egraph.find(runner.roots[1]);
-
-                if l_id == r_id {
-                    break;
-                }
-
-                // Other
-                runner = Self::runner_with_roots(
-                    Self::mk_runner(
-                        runner.egraph,
-                        Limits {
-                            iter: 1,
-                            node: limits.node,
-                        },
-                    ),
-                    &l,
-                    &r,
-                )
-                .run(&other);
-
-                l_id = runner.egraph.find(runner.roots[0]);
-                r_id = runner.egraph.find(runner.roots[1]);
-
-                if l_id == r_id {
-                    break;
-                }
-            }
-            // One more sat
-            runner = Self::runner_with_roots(
-                Self::mk_runner(
-                    runner.egraph,
-                    Limits {
-                        iter: usize::MAX,
-                        node: usize::MAX,
-                    },
-                ),
-                &l,
-                &r,
-            )
-            .run(&sat);
-            l_id = runner.egraph.find(runner.roots[0]);
-            r_id = runner.egraph.find(runner.roots[1]);
-            if l_id == r_id {
-                derivable.insert(eq.name.clone(), eq);
-            } else {
-                not_derivable.insert(eq.name.clone(), eq);
-            }
-        });
-
-        println!(
-            "{} rules are derivable, {} are not",
-            derivable.len(),
-            not_derivable.len()
+    pub fn can_derive(&self, rule: &Equality<L>, limits: Limits) -> bool {
+        let mk_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
+            Runner::default()
+                .with_scheduler(egg::SimpleScheduler)
+                .with_iter_limit(limits.iter)
+                .with_node_limit(limits.node)
+                .with_time_limit(Duration::from_secs(600))
+                .with_egraph(egraph)
+                .with_expr(&L::instantiate(&rule.lhs))
+                .with_expr(&L::instantiate(&rule.rhs))
+                .with_hook(|r| {
+                    if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
+                        Err("Done".to_owned())
+                    } else {
+                        Ok(())
+                    }
+                })
+        };
+        let (sat, other) = self.partition(|eq| eq.is_saturating());
+        let (sat, other): (Vec<Rewrite<_, _>>, Vec<Rewrite<_, _>>) = (
+            (sat.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
+            (other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
         );
 
-        (Self(derivable), Self(not_derivable))
+        let mut runner: Runner<L, SynthAnalysis> = mk_runner(Default::default(), limits);
+
+        let mut l_id;
+        let mut r_id;
+
+        for _ in 0..limits.iter {
+            // Sat
+            runner = mk_runner(runner.egraph, Limits::max()).run(&sat);
+
+            l_id = runner.egraph.find(runner.roots[0]);
+            r_id = runner.egraph.find(runner.roots[1]);
+
+            if l_id == r_id {
+                break;
+            }
+
+            // Other
+            runner = mk_runner(
+                runner.egraph,
+                Limits {
+                    iter: 1,
+                    node: limits.node,
+                },
+            )
+            .run(&other);
+
+            l_id = runner.egraph.find(runner.roots[0]);
+            r_id = runner.egraph.find(runner.roots[1]);
+
+            if l_id == r_id {
+                break;
+            }
+        }
+
+        // One more sat
+        runner = mk_runner(runner.egraph, Limits::max()).run(&sat);
+        l_id = runner.egraph.find(runner.roots[0]);
+        r_id = runner.egraph.find(runner.roots[1]);
+
+        l_id == r_id
+    }
+
+    // Use self rules to derive against rules. That is, partition against
+    // into derivable / not-derivable with respect to self
+    pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
+        against.partition(|eq| self.can_derive(eq, limits))
     }
 }
