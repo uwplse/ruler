@@ -1,6 +1,5 @@
-use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, RecExpr, Rewrite, Runner, Subst};
+use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, RecExpr, Rewrite, Subst};
 use std::fmt::Debug;
-use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use crate::*;
@@ -103,78 +102,6 @@ impl<L: SynthLanguage> Equality<L> {
 
     pub fn score(&self) -> impl Ord + Debug {
         L::score(&self.lhs, &self.rhs)
-    }
-
-    fn mk_runner(
-        &self,
-        egraph: EGraph<L, SynthAnalysis>,
-        limits: Limits,
-    ) -> Runner<L, SynthAnalysis> {
-        Runner::default()
-            .with_scheduler(egg::SimpleScheduler)
-            .with_iter_limit(limits.iter)
-            .with_node_limit(limits.node)
-            .with_time_limit(Duration::from_secs(600))
-            .with_egraph(egraph)
-            .with_expr(&L::instantiate(&self.lhs))
-            .with_expr(&L::instantiate(&self.rhs))
-            .with_hook(|r| {
-                if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
-                    Err("Done".to_owned())
-                } else {
-                    Ok(())
-                }
-            })
-    }
-
-    pub fn is_derivable(&self, ruleset: &Ruleset<L>, limits: Limits) -> bool {
-        let (sat, other) = ruleset.partition(|eq| eq.is_saturating());
-        let (sat, other): (Vec<Rewrite<_, _>>, Vec<Rewrite<_, _>>) = (
-            (sat.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
-            (other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
-        );
-
-        let mut runner: Runner<L, SynthAnalysis> = self.mk_runner(Default::default(), limits);
-
-        let mut l_id;
-        let mut r_id;
-
-        for _ in 0..limits.iter {
-            // Sat
-            runner = self.mk_runner(runner.egraph, Limits::max()).run(&sat);
-
-            l_id = runner.egraph.find(runner.roots[0]);
-            r_id = runner.egraph.find(runner.roots[1]);
-
-            if l_id == r_id {
-                break;
-            }
-
-            // Other
-            runner = self
-                .mk_runner(
-                    runner.egraph,
-                    Limits {
-                        iter: 1,
-                        node: limits.node,
-                    },
-                )
-                .run(&other);
-
-            l_id = runner.egraph.find(runner.roots[0]);
-            r_id = runner.egraph.find(runner.roots[1]);
-
-            if l_id == r_id {
-                break;
-            }
-        }
-
-        // One more sat
-        runner = self.mk_runner(runner.egraph, Limits::max()).run(&sat);
-        l_id = runner.egraph.find(runner.roots[0]);
-        r_id = runner.egraph.find(runner.roots[1]);
-
-        l_id == r_id
     }
 }
 

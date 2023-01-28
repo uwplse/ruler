@@ -376,9 +376,75 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
+    pub fn can_derive(&self, rule: &Equality<L>, limits: Limits) -> bool {
+        let mk_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
+            Runner::default()
+                .with_scheduler(egg::SimpleScheduler)
+                .with_iter_limit(limits.iter)
+                .with_node_limit(limits.node)
+                .with_time_limit(Duration::from_secs(600))
+                .with_egraph(egraph)
+                .with_expr(&L::instantiate(&rule.lhs))
+                .with_expr(&L::instantiate(&rule.rhs))
+                .with_hook(|r| {
+                    if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
+                        Err("Done".to_owned())
+                    } else {
+                        Ok(())
+                    }
+                })
+        };
+        let (sat, other) = self.partition(|eq| eq.is_saturating());
+        let (sat, other): (Vec<Rewrite<_, _>>, Vec<Rewrite<_, _>>) = (
+            (sat.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
+            (other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
+        );
+
+        let mut runner: Runner<L, SynthAnalysis> = mk_runner(Default::default(), limits);
+
+        let mut l_id;
+        let mut r_id;
+
+        for _ in 0..limits.iter {
+            // Sat
+            runner = mk_runner(runner.egraph, Limits::max()).run(&sat);
+
+            l_id = runner.egraph.find(runner.roots[0]);
+            r_id = runner.egraph.find(runner.roots[1]);
+
+            if l_id == r_id {
+                break;
+            }
+
+            // Other
+            runner = mk_runner(
+                runner.egraph,
+                Limits {
+                    iter: 1,
+                    node: limits.node,
+                },
+            )
+            .run(&other);
+
+            l_id = runner.egraph.find(runner.roots[0]);
+            r_id = runner.egraph.find(runner.roots[1]);
+
+            if l_id == r_id {
+                break;
+            }
+        }
+
+        // One more sat
+        runner = mk_runner(runner.egraph, Limits::max()).run(&sat);
+        l_id = runner.egraph.find(runner.roots[0]);
+        r_id = runner.egraph.find(runner.roots[1]);
+
+        l_id == r_id
+    }
+
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
     pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
-        against.partition(|eq| eq.is_derivable(self, limits))
+        against.partition(|eq| self.can_derive(eq, limits))
     }
 }
