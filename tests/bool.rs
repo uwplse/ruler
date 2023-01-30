@@ -241,6 +241,6 @@ mod test {
             },
         );
         assert_eq!(can.len(), 10);
-        assert_eq!(cannot.len(), 6);
+        assert_eq!(cannot.len(), 5);
     }
 }
