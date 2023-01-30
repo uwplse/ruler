@@ -7,8 +7,6 @@ use crate::{
     SynthAnalysis, SynthLanguage, ValidationResult,
 };
 
-use super::Workload;
-
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Equality<L>>);
 
@@ -100,14 +98,72 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(eqs)
     }
 
-    fn from_unions(
+    pub fn compress(
+        &self,
         egraph: &EGraph<L, SynthAnalysis>,
-        unions: HashMap<Id, Vec<Id>>,
-        prior: &Self,
-    ) -> Self {
+        limits: Limits,
+    ) -> EGraph<L, SynthAnalysis> {
+        let mut clone = egraph.clone();
+        let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
+
+        let (out_egraph, _) = self.run_internal(egraph.clone(), limits);
+
+        // Build a map from id in out_graph to all of the ids in egraph that are equivalent
+        let mut unions = HashMap::default();
+        for id in ids {
+            let new_id = out_egraph.find(id);
+            unions.entry(new_id).or_insert_with(Vec::new).push(id);
+        }
+
+        for ids in unions.values() {
+            if ids.len() > 1 {
+                let first = ids[0];
+                for id in &ids[1..] {
+                    clone.union(first, *id);
+                }
+            }
+        }
+
+        clone.rebuild();
+        clone
+    }
+
+    pub fn crunch(
+        &self,
+        egraph: &EGraph<L, SynthAnalysis>,
+        limits: Limits,
+    ) -> EGraph<L, SynthAnalysis> {
+        let (new_egraph, _) = self.run_internal(egraph.clone(), limits);
+        new_egraph
+    }
+
+    fn run_internal(
+        &self,
+        egraph: EGraph<L, SynthAnalysis>,
+        limits: Limits,
+    ) -> (EGraph<L, SynthAnalysis>, StopReason) {
+        let mut runner = Ruleset::mk_runner(egraph, limits);
+        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
+            self.0.values().map(|eq| &eq.rewrite).collect();
+
+        runner = runner.run(rewrites);
+
+        runner.egraph.rebuild();
+        (runner.egraph, runner.stop_reason.unwrap())
+    }
+
+    fn from_egraph_diff(eg1: &EGraph<L, SynthAnalysis>, eg2: &EGraph<L, SynthAnalysis>) -> Self {
         let mut candidates = Ruleset::default();
-        let clone = egraph.clone();
+        let ids: Vec<Id> = eg1.classes().map(|c| c.id).collect();
+        let mut unions = HashMap::default();
+        for id in ids {
+            let new_id = eg2.find(id);
+            unions.entry(new_id).or_insert_with(Vec::new).push(id);
+        }
+
+        let clone = eg1.clone();
         let extract = Extractor::new(&clone, ExtractableAstSize);
+
         for ids in unions.values() {
             for id1 in ids.clone() {
                 for id2 in ids.clone() {
@@ -118,10 +174,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                     }
                     if let Some(eq) = Equality::new(&e1, &e2) {
                         if e1 != e2 {
-                            if prior.0.contains_key(&eq.name) {
-                                // We already have this rule
-                                continue;
-                            }
                             candidates.add(eq)
                         }
                     }
@@ -130,18 +182,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         candidates
-    }
-
-    pub fn apply_unions(egraph: &mut EGraph<L, SynthAnalysis>, unions: HashMap<Id, Vec<Id>>) {
-        for ids in unions.values() {
-            if ids.len() > 1 {
-                let first = ids[0];
-                for id in &ids[1..] {
-                    egraph.union(first, *id);
-                }
-            }
-        }
-        egraph.rebuild();
     }
 
     fn mk_runner(egraph: EGraph<L, SynthAnalysis>, limits: Limits) -> Runner<L, SynthAnalysis> {
@@ -154,78 +194,32 @@ impl<L: SynthLanguage> Ruleset<L> {
             .with_egraph(egraph)
     }
 
-    fn compress_egraph(
-        &self,
+    pub fn allow_forbid_actual(
         egraph: EGraph<L, SynthAnalysis>,
-        limits: Limits,
-    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
-        let mut runner = Ruleset::mk_runner(egraph, limits);
-        let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.0.values().map(|eq| &eq.rewrite).collect();
-        runner = runner.run(rewrites);
-        let stop_reason = runner.stop_reason.unwrap();
-
-        let mut found_unions = HashMap::default();
-        for id in ids {
-            let new_id = runner.egraph.find(id);
-            found_unions.entry(new_id).or_insert_with(Vec::new).push(id);
-        }
-
-        runner.egraph.rebuild();
-        (runner.egraph, found_unions, stop_reason)
-    }
-
-    pub fn compress_workload(
-        &self,
-        workload: Workload,
-        limits: Limits,
-    ) -> EGraph<L, SynthAnalysis> {
-        let mut egraph = workload.to_egraph();
-        let (_, unions, _) = self.compress_egraph(egraph.clone(), limits);
-        Self::apply_unions(&mut egraph, unions);
-        egraph
-    }
-
-    pub fn lift_rules(
-        egraph: &mut EGraph<L, SynthAnalysis>,
         prior: Ruleset<L>,
         limits: Limits,
     ) -> Self {
-        // 1. Compress egraph using allowed rules
+        /*
+         * eg_init ┌─────────┐ eg_allowed ┌────────┐ eg_denote ┌────────┐  eg_final
+         * ───────►│ allowed ├───────────►│ denote ├──────────►│  all   ├────────►
+         *         └─────────┘            └────────┘           └────────┘
+         */
+
+        let eg_init = egraph;
+        // Allowed rules: run on clone, apply unions, no candidates
         let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
+        let eg_allowed = allowed.compress(&eg_init, limits);
 
-        let (_, unions, _) = allowed.compress_egraph(egraph.clone(), limits);
-        Self::apply_unions(egraph, unions);
-
-        // 2a. Run lifting rules to saturation
+        // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = L::get_lifting_rules();
-        let (new_egraph, unions, stop_reason) = lifting_rules.compress_egraph(
-            egraph.clone(),
-            Limits {
-                iter: usize::MAX,
-                node: usize::MAX,
-            },
-        );
-        assert!(
-            matches!(stop_reason, StopReason::Saturated),
-            "lifting rules must saturate. Instead, ended due to {:?}",
-            stop_reason
-        );
-        // 2b. Extract candidates from unions
-        let mut candidates = Self::from_unions(egraph, unions, &prior);
+        let eg_denote = lifting_rules.crunch(&eg_allowed, limits);
+        let mut candidates = Self::from_egraph_diff(&eg_allowed, &eg_denote);
 
-        // 3a. Run all rules
+        // All rules: clone/no clone doesn't matter, extract candidates
         let mut all_rules = prior.clone();
         all_rules.extend(lifting_rules);
-        let (_, unions, _) = all_rules.compress_egraph(new_egraph.clone(), limits);
-        // 3b. Extract candidates from unions
-        candidates.extend(Self::from_unions(&new_egraph, unions, &prior));
-
-        assert!(candidates
-            .0
-            .iter()
-            .all(|(_, v)| L::is_allowed_rewrite(&v.lhs, &v.rhs)),);
+        let eg_final = all_rules.compress(&eg_denote, limits);
+        candidates.extend(Self::from_egraph_diff(&eg_denote, &eg_final));
 
         candidates
     }
@@ -343,7 +337,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         // 3. compress with the rules we've chosen so far
-        (egraph, _, _) = chosen.compress_egraph(egraph, limits);
+        // (egraph, _, _) = chosen.compress_egraph(egraph, limits);
+        let egraph = chosen.compress(&egraph, limits);
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates

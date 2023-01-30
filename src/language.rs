@@ -5,7 +5,8 @@ use std::{
 };
 
 use egg::{
-    Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
+    Analysis, AstSize, CostFunction, DidMerge, EGraph, ENodeOrVar, FromOp, Language, PatternAst,
+    RecExpr,
 };
 
 use crate::{enumo::Workload, *};
@@ -260,10 +261,10 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         let t = Instant::now();
 
         let mut candidates = if Self::is_rule_lifting() {
-            let mut egraph = workload.to_egraph::<Self>();
-            Ruleset::lift_rules(&mut egraph, prior_rules.clone(), limits)
+            let egraph = workload.to_egraph::<Self>();
+            Ruleset::allow_forbid_actual(egraph, prior_rules.clone(), limits)
         } else {
-            let egraph = prior_rules.compress_workload(workload, limits);
+            let egraph = prior_rules.compress(&workload.to_egraph(), limits);
             Ruleset::cvec_match(&egraph)
         };
 
