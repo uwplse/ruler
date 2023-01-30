@@ -459,8 +459,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         // 3. compress with the rules we've chosen so far
-        // (egraph, _, _) = chosen.compress_egraph(egraph, limits);
-        let egraph = chosen.compress(&egraph, limits);
+        (egraph, _, _) = chosen.compress_egraph(egraph, limits);
+        // let egraph = chosen.compress(&egraph, limits);
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
