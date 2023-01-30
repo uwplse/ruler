@@ -140,7 +140,7 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let egraph = all_rules.compress(&atoms3.to_egraph(), Limits::default());
+        let egraph = all_rules.compress_workload(atoms3, Limits::default());
         let mut candidates = Ruleset::cvec_match(&egraph);
         let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules3.len(), 14);
@@ -149,7 +149,7 @@ mod test {
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let egraph = all_rules.compress(&atoms4.to_egraph(), Limits::default());
+        let egraph = all_rules.compress_workload(atoms4, Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
         let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules4.len(), 3);
@@ -158,7 +158,7 @@ mod test {
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let egraph = all_rules.compress(&atoms5.to_egraph(), Limits::default());
+        let egraph = all_rules.compress_workload(atoms5, Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
         let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules5.len(), 15);
@@ -241,6 +241,6 @@ mod test {
             },
         );
         assert_eq!(can.len(), 10);
-        assert_eq!(cannot.len(), 5);
+        assert_eq!(cannot.len(), 6);
     }
 }
