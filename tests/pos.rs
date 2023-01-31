@@ -120,6 +120,55 @@ mod tests {
     }
 
     #[test]
+    fn rule_lifting_recipe() {
+        let nat_rules = [
+            "(+ ?b ?a) ==> (+ ?a ?b)",
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(+ Z ?a) ==> ?a",
+            "(* ?a Z) ==> Z",
+            "(S (+ ?b ?a)) ==> (+ ?b (S ?a))",
+            "(* ?a (S Z)) ==> ?a",
+            "(+ ?a (S Z)) ==> (S ?a)",
+            "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
+            "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
+            "(+ ?b (* ?b ?a)) ==> (* ?b (S ?a))",
+            "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
+            "(+ ?a ?a) ==> (* ?a (S (S Z)))",
+        ];
+
+        let prior = Ruleset::from_str_vec(&nat_rules);
+
+        let atoms3 = iter_pos(3);
+        assert_eq!(atoms3.force().len(), 51);
+
+        let limits = Limits {
+            iter: 3,
+            node: 1000000,
+        };
+
+        let eg_init = atoms3.to_egraph();
+        // Allowed rules: run on clone, apply unions, no candidates
+        let (allowed, _) = prior.partition(|eq| Pos::is_allowed_rewrite(&eq.lhs, &eq.rhs));
+        let eg_allowed = allowed.compress(&eg_init, limits);
+
+        // Translation rules: grow egraph, extract candidates, assert!(saturated)
+        let lifting_rules = Pos::get_lifting_rules();
+        let eg_denote = lifting_rules.crunch(&eg_allowed, limits);
+        let mut candidates = Ruleset::from_egraph_diff(&eg_allowed, &eg_denote);
+
+        // All rules: clone/no clone doesn't matter, extract candidates
+        let mut all_rules = prior;
+        all_rules.extend(lifting_rules);
+        let eg_final = all_rules.compress(&eg_denote, limits);
+        candidates.extend(Ruleset::from_egraph_diff(&eg_denote, &eg_final));
+
+        let rules = candidates;
+        for r in rules.0.values() {
+            println!("{}", r.name)
+        }
+    }
+
+    #[test]
     fn rule_lifting() {
         let nat_rules = [
             "(+ ?b ?a) ==> (+ ?a ?b)",

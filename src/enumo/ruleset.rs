@@ -198,7 +198,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         (runner.egraph, runner.stop_reason.unwrap())
     }
 
-    fn from_egraph_diff(eg1: &EGraph<L, SynthAnalysis>, eg2: &EGraph<L, SynthAnalysis>) -> Self {
+    pub fn from_egraph_diff(
+        eg1: &EGraph<L, SynthAnalysis>,
+        eg2: &EGraph<L, SynthAnalysis>,
+    ) -> Self {
         let mut candidates = Ruleset::default();
         let ids: Vec<Id> = eg1.classes().map(|c| c.id).collect();
         let mut unions = HashMap::default();
