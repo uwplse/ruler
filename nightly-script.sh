@@ -7,7 +7,7 @@ echo -n "]" >> rep/output.json
 
 OUTPUT=`cat rep/output.json`
 echo 
-sed "204 i var obj = ${OUTPUT};" rep/index_base.html > rep/index.html
+sed "8 i var obj = ${OUTPUT};" rep/index_base.html > rep/index.html
 echo "echo ${OUTPUT}"
 
 DIR="rep"
