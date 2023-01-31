@@ -102,6 +102,7 @@ impl Workload {
         lang.iter_metric("expr", Metric::List, n + 1)
             .filter(Filter::Contains("var".parse().unwrap()))
             .filter(Filter::MetricLt(Metric::List, n + 1))
+            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, n))))
             .plug("cnst", &Workload::from_vec(consts.to_vec()))
             .plug("var", &Workload::from_vec(vars.to_vec()))
             .plug("uop", &Workload::from_vec(uops.to_vec()))
@@ -123,11 +124,10 @@ impl Workload {
         e_2: Vec<String>,
         bops: &[&str],
     ) -> Self {
-        let lang = Workload::from_vec(vec!["expr_2", "expr_1", "(bop expr_2 expr_1)"]);
-
+        let lang = Workload::from_vec(vec!["expr_2", "expr_1", "(bop expr_2 expr_1)", "(bop expr_1 expr_2)"]);
         lang.plug("expr_2", &Workload::from_vec_string(e_2))
-        .plug("expr_1", &Workload::from_vec_string(e_1))
-        .plug("bop", &Workload::from_vec(bops.to_vec()))
+            .plug("expr_1", &Workload::from_vec_string(e_1))
+            .plug("bop", &Workload::from_vec(bops.to_vec()))
     }
 
     pub fn iter_lang(

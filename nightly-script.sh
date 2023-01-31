@@ -1,12 +1,13 @@
 #!/bin/bash
-touch output.json
-echo -n "[" >> output.json
+touch rep/output.json
+touch rep/index.html
+echo -n "[" >> rep/output.json
 cargo test
-echo -n "]" >> output.json
+echo -n "]" >> rep/output.json
 
-OUTPUT=`cat output.json`
+OUTPUT=`cat rep/output.json`
 echo 
-sed -i "204 i var obj = ${OUTPUT};" rep/index.html
+sed "204 i var obj = ${OUTPUT};" rep/index_base.html > rep/index.html
 echo "echo ${OUTPUT}"
 
 DIR="rep"
@@ -16,4 +17,4 @@ RDIR="$(date +%s):$(hostname):$B:$C"
 
 nightly-results publish --name "$RDIR" "$DIR"
 
-rm output.json
+rm rep/output.json

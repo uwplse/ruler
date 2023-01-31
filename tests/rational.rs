@@ -548,7 +548,7 @@ mod test {
 
         let stats_str = stats.to_string();
 
-        let mut file = OpenOptions::new().append(true).open("output.json").expect("Unable to open file");
+        let mut file = OpenOptions::new().append(true).open("rep/output.json").expect("Unable to open file");
         file.write_all(stats_str.as_bytes()).expect("write failed");
     }
 }
