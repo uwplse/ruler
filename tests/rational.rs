@@ -553,7 +553,7 @@ mod test {
         let stats = json!({
             "spec": "rational",
             "num_rules": num_rules,
-            "num_baseline": 52,
+            "num_baseline": 32,
             "enumo_derives_oopsla": forwards_derivable,
             "oopsla_derives_enumo": backwards_derivable,
             "time": time
