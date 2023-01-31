@@ -42,6 +42,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         Ruleset(map)
     }
 
+    pub fn to_str_vec(&self) -> Vec<String> {
+        match self {
+            Ruleset(m) => m.iter().map(|(name, _val)| name.to_string()).collect(),
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

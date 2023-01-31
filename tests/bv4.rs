@@ -71,17 +71,29 @@ mod test {
 
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
 
-        let (can, _cannot) = all_rules.derive(baseline.clone(),
+        let (can, cannot) = all_rules.derive(baseline.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
             },);
 
-        let (canr, _cannotr) = baseline.derive(all_rules.clone(),
+        let (canr, cannotr) = baseline.derive(all_rules.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
             },);
+
+        let derivability = json!({
+            "forwards derivable": can.to_str_vec(),
+            "forwards underivable": cannot.to_str_vec(),
+            "backwards derivable": canr.to_str_vec(),
+            "backwards underivable": cannotr.to_str_vec()
+        });
+
+        let derivability_str = derivability.to_string();
+
+        let mut file = OpenOptions::new().append(true).open("rep/json/bv4.json").expect("Unable to open file");     
+        file.write_all(derivability_str.as_bytes()).expect("write failed");
 
         let num_rules = &all_rules.len();
         let forwards_derivable = &can.len();
@@ -99,7 +111,7 @@ mod test {
 
         let stats_str = stats.to_string();
 
-        let mut file = OpenOptions::new().append(true).open("rep/output.json").expect("Unable to open file");
+        let mut file = OpenOptions::new().append(true).open("rep/json/output.json").expect("Unable to open file");
         file.write_all(stats_str.as_bytes()).expect("write failed");
         file.write_all(", ".as_bytes()).expect("write failed");
     }

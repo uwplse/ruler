@@ -48,7 +48,7 @@
      *  
      * @return string Converted JSON to HTML table
      */
-    function ConvertJsonToTable(parsedJson, tableId, tableClassName, linkText)
+    function ConvertJsonToTable(parsedJson, stringArrayDescriptor, tableId, tableClassName, linkText)
     {
         //Patterns for links and NULL value
         var italic = '<i>{0}</i>';
@@ -82,7 +82,7 @@
             // Create table headers from JSON data
             // If JSON data is a simple string array we create a single table header
             if(isStringArray)
-                thCon += thRow.format('value');
+                thCon += thRow.format(stringArrayDescriptor);
             else
             {
                 // If JSON data is an object array, headers are automatically computed

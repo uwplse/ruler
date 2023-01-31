@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<title>Nightlies</title>
+<h2>These are the nightlies wooooo wow incredible look at this unstyled HTML</h2>
+<center><p id="table"></p></center>
+<body>
+<script type="text/javascript">
+var obj = [{"spec":"bool","num_rules":33,"num_baseline":27,"enumo_derives_oopsla":26,"oopsla_derives_enumo":33,"time":12}, {"spec":"bv32","num_rules":56,"num_baseline":60,"enumo_derives_oopsla":53,"oopsla_derives_enumo":51,"time":185}, {"spec":"bv4","num_rules":61,"num_baseline":60,"enumo_derives_oopsla":58,"oopsla_derives_enumo":57,"time":94}, {"spec":"rational","num_rules":32,"num_baseline":52,"enumo_derives_oopsla":25,"oopsla_derives_enumo":31,"time":73}];
+    
+    window.addEventListener("load", () => {
+
+
+        var table = ConvertJsonToTable(obj);
+        document.getElementById("table").innerHTML = table;
+    });
+</script>
+<p>Individual results: <a href="bv32.html">bv32</a>, <a href="bv4.html">bv4</a>, <a href="bool.html">bool</a>, <a href="rational.html">rational</a>.</p>
+<script src="table.js"></script>
+</body>
+</html>
