@@ -500,7 +500,7 @@ mod test {
             &["0", "1", "-1"],
             &["a", "b", "c"],
             &["~", "fabs"],
-            &["-", "*", "*", "/"],
+            &["-", "+", "*", "/"],
         );
 
         let rules_1 = Math::run_workload(layer_1.clone(), all_rules.clone(), Limits::default());
@@ -510,10 +510,10 @@ mod test {
             &["0", "1", "-1"],
             &["a", "b", "c"],
             &["~", "fabs"],
-            &["-", "*", "*", "/"],
+            &["-", "+", "*", "/"],
         );
 
-        let rules_2 = Math::run_workload(layer_2.clone(), all_rules.clone(), Limits::default());
+        let rules_2 = Math::run_workload(layer_2.clone().append(layer_1), all_rules.clone(), Limits::default());
         all_rules.extend(rules_2);
 
         let duration = start.elapsed();
@@ -522,13 +522,13 @@ mod test {
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
         let (can, cannot) = all_rules.derive(baseline.clone(),
             Limits {
-                iter: 5,
+                iter: 6,
                 node: 1000000,
             },);
 
         let (canr, cannotr) = baseline.derive(all_rules.clone(),
             Limits {
-                iter: 5,
+                iter: 6,
                 node: 1000000,
             },);
 
@@ -553,7 +553,7 @@ mod test {
         let stats = json!({
             "spec": "rational",
             "num_rules": num_rules,
-            "num_baseline": 32,
+            "num_baseline": 52,
             "enumo_derives_oopsla": forwards_derivable,
             "oopsla_derives_enumo": backwards_derivable,
             "time": time

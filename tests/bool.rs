@@ -311,7 +311,7 @@ mod test {
             iter_bool(4),
             Ruleset::default(),
             Limits {
-                iter: 4,
+                iter: 10,
                 node: 1000000,
             },
         );
@@ -320,7 +320,7 @@ mod test {
         let (can, cannot) = three.derive(
             four,
             Limits {
-                iter: 4,
+                iter: 10,
                 node: 1000000,
             },
         );
