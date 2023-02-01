@@ -46,10 +46,14 @@ impl SynthLanguage for Exponential {
             let id = egraph.add(Exponential::Var(Symbol::from(v.clone())));
 
             let l_id = egraph.add(Exponential::Log(id));
-            egraph.add(Exponential::Exp(l_id));
+            let el_id = egraph.add(Exponential::Exp(l_id));
 
             let e_id = egraph.add(Exponential::Exp(id));
-            egraph.add(Exponential::Log(e_id));
+            let le_id = egraph.add(Exponential::Log(e_id));
+
+            egraph.union(id, el_id);
+            egraph.union(id, le_id);
+            egraph.rebuild();
         }
     }
 
@@ -252,7 +256,7 @@ mod test {
             .filter(Filter::Invert(Box::new(Filter::Contains(
                 "(log (log ?a))".parse().unwrap(),
             ))));
-
+        
         run_workload(upper_layer, prev_rules)
     }
 
@@ -260,12 +264,12 @@ mod test {
         let lower_layer = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"])
             .plug("v", &Workload::from_vec(vec!["a", "b", "c"]))
             .plug("uop", &Workload::from_vec(vec!["log"]))
-            .plug("bup", &Workload::from_vec(vec!["+"]));
+            .plug("bup", &Workload::from_vec(vec!["*"]));
 
         let upper_layer = Workload::from_vec(vec!["(uop v)", "(bop v v)"])
             .plug("v", &lower_layer)
             .plug("uop", &Workload::from_vec(vec!["log"]))
-            .plug("bop", &Workload::from_vec(vec!["*"]))
+            .plug("bop", &Workload::from_vec(vec!["+"]))
             .filter(Filter::Invert(Box::new(Filter::Contains(
                 "(exp (exp ?a))".parse().unwrap(),
             ))))
