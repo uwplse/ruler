@@ -1,4 +1,5 @@
 #!/bin/bash
+
 > rep/json/bool.json
 > rep/json/bv32.json
 > rep/json/bv4.json
@@ -10,6 +11,8 @@
 > rep/bv32.html
 > rep/bv4.html
 > rep/rational.html
+
+> terms.workload
 
 echo -n "[" >> rep/json/output.json
 cargo test
