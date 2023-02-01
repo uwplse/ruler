@@ -256,7 +256,7 @@ mod test {
             .filter(Filter::Invert(Box::new(Filter::Contains(
                 "(log (log ?a))".parse().unwrap(),
             ))));
-        
+
         run_workload(upper_layer, prev_rules)
     }
 
@@ -380,5 +380,91 @@ mod test {
         // div layer
         let div_rules = div_rules(&all_rules);
         all_rules.extend(div_rules);
+    }
+
+    #[test]
+    fn check_derivability() {
+        // a sandbox for derivability tests
+
+        let r1 = Ruleset::from_str_vec(&[
+            "1 ==> (sqrt 1)",
+            "(exp 0) ==> 1",
+            "(log 1) ==> 0",
+            "1 ==> (cbrt 1)",
+            "(pow 1 ?a) ==> 1",
+            "(pow ?a 1) ==> ?a",
+            "(exp (+ ?b ?a)) ==> (* (exp ?b) (exp ?a))",
+            "(+ ?c (+ (log ?b) (log ?a))) ==> (+ ?c (+ (log ?a) (log ?b)))",
+            "(sqrt (cbrt ?a)) ==> (cbrt (sqrt ?a))",
+            "(* 1/2 (log (* ?b ?a))) ==> (log (* (sqrt ?b) (sqrt ?a)))",
+            "(* 1/3 (log (* ?b ?a))) ==> (log (* (cbrt ?b) (cbrt ?a)))",
+            "(+ (log ?b) (log ?a)) ==> (log (* ?b ?a))",
+            "(cbrt (* ?b ?a)) ==> (* (cbrt ?b) (cbrt ?a))",
+            "(sqrt (* ?b ?a)) ==> (* (sqrt ?b) (sqrt ?a))",
+            "(+ (log (* ?c ?b)) (log ?a)) ==> (+ (log ?c) (log (* ?b ?a)))",
+            "(+ (log (* ?c ?b)) ?a) ==> (+ ?a (log (* ?c ?b)))",
+            "(* (log (* ?b ?b)) (log ?a)) ==> (* (log ?b) (log (* ?a ?a)))",
+            "(pow ?b (log (* ?a ?a))) ==> (pow ?a (log (* ?b ?b)))",
+            "(* ?b (log (cbrt ?a))) ==> (log (cbrt (pow ?a ?b)))",
+            "(pow (exp ?b) (log ?a)) ==> (pow ?a ?b)",
+            "(pow (exp ?b) ?a) ==> (exp (* ?b ?a))",
+            "(pow ?b (log ?a)) ==> (pow ?a (log ?b))",
+            "(pow (cbrt ?b) ?a) ==> (cbrt (pow ?b ?a))",
+            "(pow (sqrt ?b) ?a) ==> (sqrt (pow ?b ?a))",
+            "(pow ?c (+ ?b ?a)) ==> (* (pow ?c ?a) (pow ?c ?b))",
+            "(* (pow ?c ?a) (pow ?b ?a)) ==> (pow (* ?c ?b) ?a)",
+            "(pow (exp ?c) (* ?b ?a)) ==> (pow (exp ?a) (* ?b ?c))",
+            "(* (log ?c) (* ?b ?a)) ==> (* ?b (log (pow ?c ?a)))",
+            "(pow (pow ?c ?b) (log ?a)) ==> (pow (pow ?a ?b) (log ?c))",
+            "(pow (pow ?c ?b) ?a) ==> (pow ?c (* ?b ?a))",
+            "(pow (pow ?c ?b) ?a) ==> (pow (pow ?c ?a) ?b)",
+            "(* 1/2 (log (cbrt ?a))) ==> (* 1/3 (log (sqrt ?a)))",
+        ]);
+
+        let r2 = Ruleset::from_str_vec(&[
+            "1 ==> (sqrt 1)",
+            "1 ==> (cbrt 1)",
+            "(pow 1 ?a) ==> 1",
+            "(pow ?a 1) ==> ?a",
+            "(log (sqrt ?a)) ==> (* 1/2 (log ?a))",
+            "(log (cbrt ?a)) ==> (* 1/3 (log ?a))",
+            "(sqrt (cbrt ?a)) ==> (cbrt (sqrt ?a))",
+            "(cbrt (* ?b ?a)) ==> (* (cbrt ?b) (cbrt ?a))",
+            "(* (sqrt ?b) (sqrt ?a)) ==> (sqrt (* ?a ?b))",
+            "(* (log (* ?b ?b)) (log ?a)) ==> (* (log ?b) (log (* ?a ?a)))",
+            "(pow (sqrt ?b) (log ?a)) ==> (pow (sqrt ?a) (log ?b))",
+            "(pow (cbrt ?b) (log ?a)) ==> (pow (cbrt ?a) (log ?b))",
+            "(pow (exp ?b) ?a) ==> (exp (* ?b ?a))",
+            "(cbrt (pow ?b ?a)) ==> (pow (cbrt ?b) ?a)",
+            "(pow (sqrt ?b) ?a) ==> (sqrt (pow ?b ?a))",
+            "(* 2 (* (* ?c ?b) (log ?a))) ==> (* (log (* ?a ?a)) (* ?c ?b))",
+            "(* (pow ?b ?c) (pow ?b ?a)) ==> (pow ?b (+ ?c ?a))",
+            "(pow (* ?c ?b) ?a) ==> (* (pow ?c ?a) (pow ?b ?a))",
+            "(pow (exp ?c) (* ?b ?a)) ==> (pow (exp ?a) (* ?b ?c))",
+            "(* (log (pow ?c ?b)) ?a) ==> (* ?b (log (pow ?c ?a)))",
+            "(pow (pow ?c ?b) (log ?a)) ==> (pow ?a (* ?b (log ?c)))",
+            "(pow (pow ?c ?b) ?a) ==> (pow ?c (* ?a ?b))",
+            "(pow (pow ?c ?b) ?a) ==> (pow (pow ?c ?a) ?b)",
+            "(/ (sqrt ?b) (sqrt ?a)) ==> (sqrt (/ ?b ?a))",
+            "(cbrt (/ ?b ?a)) ==> (/ (cbrt ?b) (cbrt ?a))",
+        ]);
+
+        println!("Using <current lifting> to derive <definitional lifting>");
+        r1.derive(
+            r2.clone(),
+            Limits {
+                iter: 3,
+                node: 2_000_000,
+            },
+        );
+
+        println!("Using <definitional lifting> to derive <current lifting>");
+        r2.derive(
+            r1.clone(),
+            Limits {
+                iter: 3,
+                node: 2_000_000,
+            },
+        );
     }
 }
