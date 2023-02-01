@@ -522,13 +522,13 @@ mod test {
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
         let (can, cannot) = all_rules.derive(baseline.clone(),
             Limits {
-                iter: 3,
+                iter: 5,
                 node: 1000000,
             },);
 
         let (canr, cannotr) = baseline.derive(all_rules.clone(),
             Limits {
-                iter: 3,
+                iter: 5,
                 node: 1000000,
             },);
 
