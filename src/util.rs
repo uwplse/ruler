@@ -23,6 +23,23 @@ pub fn self_product<T: Clone>(ts: &[T], n: usize) -> Vec<Vec<T>> {
     res
 }
 
+/// Convience macro for defining Ruler interpreters. It automates the work of
+/// extracting the `cvec`s for  for all the children of an AST node.
+///
+/// Consider a language that has an addition operator. If you were doing this
+/// manually, you would have to look up the cvecs for each child, and then do
+/// addition for each value in the cvec.
+///
+/// With the `map!` macro, you can express this same computation with something that
+/// much more closely resembles what you would write for a standard interpreter.
+///
+/// ```rust
+/// match self {
+///     ..
+///     Lang::Add([x, y]) => map!(get, x, y => x + y)
+///     ..
+/// }
+/// ```
 #[macro_export]
 macro_rules! map {
     ($get:ident, $a:ident => $body:expr) => {

@@ -4,6 +4,11 @@ use std::{str::FromStr, sync::Arc};
 
 use crate::*;
 
+/// A equality between the patterns `lhs` and `rhs`.
+///  - `name` is a string representing this equality.
+///  - `lhs` and `rhs` are the left hand side and right hand side of the equality.
+///  - `rewrite` holds the `egg` version of the rewrite rule that this equality
+///    represents.
 #[derive(Clone, Debug)]
 pub struct Equality<L: SynthLanguage> {
     pub name: Arc<str>,
@@ -70,6 +75,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 }
 
 impl<L: SynthLanguage> Equality<L> {
+    /// Construct a new equality from two `egg::RecExpr`s.
     pub fn new(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
         let map = &mut HashMap::default();
         let l_pat = L::generalize(e1, map);
@@ -86,6 +92,12 @@ impl<L: SynthLanguage> Equality<L> {
         })
     }
 
+    /// Checks if an equality will only ever shrink, or keep constant, the number of
+    /// e-classes in an e-graph.
+    ///
+    /// This works by adding both sides of an equality to an egraph. If after unioning
+    /// the root of these two expressions, there are fewer e-classes than there were
+    /// originally, we say that this equality is saturating.
     pub fn is_saturating(&self) -> bool {
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let l_id = egraph.add_expr(&L::instantiate(&self.lhs));
