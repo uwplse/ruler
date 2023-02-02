@@ -264,7 +264,8 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
             Ruleset::lift_rules(&mut egraph, prior_rules.clone(), limits)
         } else {
             let egraph = prior_rules.compress_workload(workload, limits);
-            Ruleset::cvec_match(&egraph)
+            // Ruleset::cvec_match(&egraph)
+            Ruleset::fast_cvec_match(&egraph)
         };
 
         let chosen = candidates.minimize(prior_rules.clone(), limits);
