@@ -129,7 +129,7 @@ impl Workload {
 
 impl From<&[&str]> for Workload {
     fn from(value: &[&str]) -> Self {
-        Workload::new(value.iter().map(|x| *x))
+        Workload::new(value.iter().copied())
     }
 }
 
