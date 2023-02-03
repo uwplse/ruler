@@ -154,13 +154,13 @@ mod tests {
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = Pos::get_lifting_rules();
         let eg_denote = lifting_rules.crunch(&eg_allowed, limits);
-        let mut candidates = Ruleset::from_egraph_diff(&eg_allowed, &eg_denote);
+        let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
 
         // All rules: clone/no clone doesn't matter, extract candidates
         let mut all_rules = prior;
         all_rules.extend(lifting_rules);
         let eg_final = all_rules.compress(&eg_denote, limits);
-        candidates.extend(Ruleset::from_egraph_diff(&eg_denote, &eg_final));
+        candidates.extend(Ruleset::extract_candidates(&eg_denote, &eg_final));
 
         let rules = candidates;
         for r in rules.0.values() {

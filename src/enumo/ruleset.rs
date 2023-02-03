@@ -198,7 +198,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         (runner.egraph, runner.stop_reason.unwrap())
     }
 
-    pub fn from_egraph_diff(
+    pub fn extract_candidates(
         eg1: &EGraph<L, SynthAnalysis>,
         eg2: &EGraph<L, SynthAnalysis>,
     ) -> Self {
@@ -262,13 +262,13 @@ impl<L: SynthLanguage> Ruleset<L> {
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = L::get_lifting_rules();
         let eg_denote = lifting_rules.crunch(&eg_allowed, limits);
-        let mut candidates = Self::from_egraph_diff(&eg_allowed, &eg_denote);
+        let mut candidates = Self::extract_candidates(&eg_allowed, &eg_denote);
 
         // All rules: clone/no clone doesn't matter, extract candidates
         let mut all_rules = prior;
         all_rules.extend(lifting_rules);
         let eg_final = all_rules.compress(&eg_denote, limits);
-        candidates.extend(Self::from_egraph_diff(&eg_denote, &eg_final));
+        candidates.extend(Self::extract_candidates(&eg_denote, &eg_final));
 
         candidates
     }
