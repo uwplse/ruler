@@ -7,7 +7,7 @@ use crate::{
     SynthAnalysis, SynthLanguage, ValidationResult,
 };
 
-use super::Workload;
+use super::{Scheduler, Workload};
 
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Equality<L>>);
@@ -152,7 +152,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut clone = egraph.clone();
         let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
 
-        let (out_egraph, _) = self.run_internal(egraph.clone(), limits);
+        let (out_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
 
         // Build a map from id in out_graph to all of the ids in egraph that are equivalent
         let mut unions = HashMap::default();
@@ -179,20 +179,18 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph: &EGraph<L, SynthAnalysis>,
         limits: Limits,
     ) -> EGraph<L, SynthAnalysis> {
-        let (new_egraph, _) = self.run_internal(egraph.clone(), limits);
+        let (new_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
         new_egraph
     }
 
     fn run_internal(
         &self,
         egraph: EGraph<L, SynthAnalysis>,
-        limits: Limits,
+        scheduler: Scheduler,
     ) -> (EGraph<L, SynthAnalysis>, StopReason) {
-        let mut runner = Ruleset::mk_runner(egraph, limits);
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.0.values().map(|eq| &eq.rewrite).collect();
+        let mut runner = Ruleset::mk_runner(egraph);
 
-        runner = runner.run(rewrites);
+        runner = scheduler.run(runner, self);
 
         runner.egraph.rebuild();
         (runner.egraph, runner.stop_reason.unwrap())
@@ -233,11 +231,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    fn mk_runner(egraph: EGraph<L, SynthAnalysis>, limits: Limits) -> Runner<L, SynthAnalysis> {
+    fn mk_runner(egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis> {
         Runner::default()
             .with_scheduler(egg::SimpleScheduler)
-            .with_node_limit(limits.node)
-            .with_iter_limit(limits.iter)
             // Egg default time limit is 5 seconds. Bump up to 10 minutes to reduce variance due to timing
             .with_time_limit(Duration::from_secs(600))
             .with_egraph(egraph)
@@ -278,7 +274,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph: EGraph<L, SynthAnalysis>,
         limits: Limits,
     ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
-        let mut runner = Ruleset::mk_runner(egraph, limits);
+        let mut runner = Ruleset::mk_runner(egraph)
+            .with_iter_limit(limits.iter)
+            .with_node_limit(limits.node);
         let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
             self.0.values().map(|eq| &eq.rewrite).collect();
