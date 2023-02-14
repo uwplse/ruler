@@ -44,12 +44,6 @@ impl Workload {
         for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
-        println!(
-            "Enumerated workload representing {} terms into an egraph with {} classes and {} nodes",
-            sexps.len(),
-            egraph.number_of_classes(),
-            egraph.total_number_of_nodes()
-        );
         egraph
     }
 
