@@ -1,16 +1,14 @@
-use std::hash::BuildHasherDefault;
+use std::{fmt::Display, hash::BuildHasherDefault};
 
 pub use bv::*;
 use enumo::Ruleset;
 pub use equality::*;
-pub use interval::*;
 pub use language::*;
 pub use util::*;
 
 mod bv;
 pub mod enumo;
 mod equality;
-mod interval;
 mod language;
 mod util;
 
@@ -54,7 +52,6 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
-    pub time: u64,
     pub iter: usize,
     pub node: usize,
 }
@@ -62,9 +59,46 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            time: 30,
             iter: 3,
             node: 300000,
+        }
+    }
+}
+
+impl Limits {
+    fn max() -> Self {
+        Self {
+            iter: usize::MAX,
+            node: usize::MAX,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Interval<T> {
+    pub low: Option<T>,
+    pub high: Option<T>,
+}
+
+impl<T: Ord + Display> Interval<T> {
+    pub fn new(low: Option<T>, high: Option<T>) -> Self {
+        if let (Some(a), Some(b)) = (&low, &high) {
+            assert!(
+                a.le(b),
+                "Invalid interval: low must be less than or equal to high\n{} >= {}",
+                a,
+                b
+            );
+        }
+        Self { low, high }
+    }
+}
+
+impl<T> Default for Interval<T> {
+    fn default() -> Self {
+        Self {
+            low: None,
+            high: None,
         }
     }
 }

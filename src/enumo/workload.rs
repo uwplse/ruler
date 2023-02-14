@@ -17,9 +17,18 @@ impl Workload {
         Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
     }
 
-    pub fn get_vars<L: SynthLanguage>(&self) -> Vec<String> {
+    pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
+        let mut egraph = EGraph::default();
+        let sexps = self.force();
+
+        // Have to find all the variables first so that we can initialize
+        // their cvecs, which might require doing a multi-way cross product
+        // based on how many variables there are.
+        // We have to do this before adding any other expressions to the
+        // egraph so that the variable cvecs are properly initialized and
+        // able to be used by other expressions that contain variables
         let mut vars: HashSet<String> = HashSet::default();
-        for sexp in self.force() {
+        for sexp in sexps.iter() {
             let expr: RecExpr<L> = sexp.to_string().parse().unwrap();
             for node in expr.as_ref() {
                 if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
@@ -29,15 +38,10 @@ impl Workload {
                 }
             }
         }
-        vars.into_iter().collect()
-    }
-
-    pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
-        let mut egraph = EGraph::default();
-        let vars = self.get_vars::<L>();
+        let vars: Vec<String> = vars.into_iter().collect();
         L::initialize_vars(&mut egraph, &vars);
-        let sexps = self.force();
-        for sexp in &sexps {
+
+        for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
         println!(
