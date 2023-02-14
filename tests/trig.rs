@@ -340,7 +340,6 @@ mod test {
             terms,
             complex,
             Limits {
-                time: 150,
                 iter: 3,
                 node: 2000000,
             },
