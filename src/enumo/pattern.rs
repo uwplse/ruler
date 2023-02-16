@@ -136,8 +136,7 @@ mod test {
             .map(|x| x.parse::<Pattern>().unwrap())
             .collect();
 
-        let exprs =
-            Workload::from_vec(vec!["a", "x", "(+ x y)", "(+ y y)", "(+ (* a b) (* a b))"]).force();
+        let exprs = Workload::new(["a", "x", "(+ x y)", "(+ y y)", "(+ (* a b) (* a b))"]).force();
 
         let expected = vec![
             vec![true, true, true, true, true],
