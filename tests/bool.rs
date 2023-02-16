@@ -120,12 +120,12 @@ impl SynthLanguage for Bool {
 
 #[cfg(test)]
 mod test {
-    use ruler::enumo::{Ruleset, Workload};
     use super::*;
-    use std::time::Instant;
+    use ruler::enumo::{Ruleset, Workload};
     use serde_json::*;
     use std::fs::OpenOptions;
     use std::io::Write;
+    use std::time::Instant;
 
     fn iter_bool(n: usize) -> Workload {
         Workload::iter_lang(
@@ -202,48 +202,37 @@ mod test {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
 
-        let layer_1 = Workload::make_layer(1, 
-            &[],
-            &["ba", "bb", "bc"],
-            &["~"],
-            &["&", "|", "^"],
-        );
+        let layer_1 = Workload::make_layer(1, &[], &["ba", "bb", "bc"], &["~"], &["&", "|", "^"]);
         let rules_1 = Bool::run_workload(layer_1, all_rules.clone(), Limits::default());
         all_rules.extend(rules_1);
 
-        let layer_2 = Workload::make_layer(2,
-            &[],
-            &["ba", "bb", "bc"],
-            &["~"],
-            &["&", "|", "^"],
-        );
+        let layer_2 = Workload::make_layer(2, &[], &["ba", "bb", "bc"], &["~"], &["&", "|", "^"]);
         let rules_2 = Bool::run_workload(layer_2, all_rules.clone(), Limits::default());
         all_rules.extend(rules_2);
-        
-        let layer_3 = Workload::make_layer(3,
-            &[],
-            &["ba", "bb", "bc"],
-            &["~"],
-            &["&", "|", "^"],
-        );
+
+        let layer_3 = Workload::make_layer(3, &[], &["ba", "bb", "bc"], &["~"], &["&", "|", "^"]);
         let rules_3 = Bool::run_workload(layer_3, all_rules.clone(), Limits::default());
         all_rules.extend(rules_3);
-        
+
         let duration = start.elapsed();
-        all_rules.to_file("equivalent/bool_rules_oopsla.rules");
+        all_rules.to_file("equivalent/bool.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
-        let (can, cannot) = all_rules.derive(baseline.clone(),
+        let (can, cannot) = all_rules.derive(
+            baseline.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
-            },);
+            },
+        );
 
-        let (canr, cannotr) = baseline.derive(all_rules.clone(),
+        let (canr, cannotr) = baseline.derive(
+            all_rules.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
-            },);
+            },
+        );
 
         let derivability = json!({
             "forwards derivable": can.to_str_vec(),
@@ -251,11 +240,15 @@ mod test {
             "backwards derivable": canr.to_str_vec(),
             "backwards underivable": cannotr.to_str_vec()
         });
-    
+
         let derivability_str = derivability.to_string();
-    
-        let mut file = OpenOptions::new().append(true).open("rep/json/bool.json").expect("Unable to open file");     
-        file.write_all(derivability_str.as_bytes()).expect("write failed");
+
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open("rep/json/derivable_rules/bool.json")
+            .expect("Unable to open file");
+        file.write_all(derivability_str.as_bytes())
+            .expect("write failed");
 
         let num_rules = &all_rules.len();
         let forwards_derivable = &can.len();
@@ -265,7 +258,7 @@ mod test {
         let stats = json!({
             "spec": "bool",
             "num_rules": num_rules,
-            "num_baseline": 27,
+            "num_baseline": 51,
             "enumo_derives_oopsla": forwards_derivable,
             "oopsla_derives_enumo": backwards_derivable,
             "time": time
@@ -273,7 +266,10 @@ mod test {
 
         let stats_str = stats.to_string();
 
-        let mut file = OpenOptions::new().append(true).open("rep/json/output.json").expect("Unable to open file");
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open("rep/json/output.json")
+            .expect("Unable to open file");
         file.write_all(stats_str.as_bytes()).expect("write failed");
         file.write_all(", ".as_bytes()).expect("write failed");
     }

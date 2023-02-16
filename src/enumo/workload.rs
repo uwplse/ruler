@@ -91,7 +91,7 @@ impl Workload {
     }
 
     pub fn make_layer(
-        n: usize,         
+        n: usize,
         consts: &[&str],
         vars: &[&str],
         uops: &[&str],
@@ -109,22 +109,20 @@ impl Workload {
             .plug("bop", &Workload::from_vec(bops.to_vec()))
     }
 
-    pub fn make_layer_uops(        
-        e: Vec<String>,
-        uops: &[&str],
-    ) -> Self {
+    pub fn make_layer_uops(e: Vec<String>, uops: &[&str]) -> Self {
         let lang = Workload::from_vec(vec!["expr_1", "(uop expr_1)"]);
 
         lang.plug("expr_1", &Workload::from_vec_string(e))
-        .plug("uop", &Workload::from_vec(uops.to_vec()))
+            .plug("uop", &Workload::from_vec(uops.to_vec()))
     }
 
-    pub fn make_layer_bops(       
-        e_1: Vec<String>,
-        e_2: Vec<String>,
-        bops: &[&str],
-    ) -> Self {
-        let lang = Workload::from_vec(vec!["expr_2", "expr_1", "(bop expr_2 expr_1)", "(bop expr_1 expr_2)"]);
+    pub fn make_layer_bops(e_1: Vec<String>, e_2: Vec<String>, bops: &[&str]) -> Self {
+        let lang = Workload::from_vec(vec![
+            "expr_2",
+            "expr_1",
+            "(bop expr_2 expr_1)",
+            "(bop expr_1 expr_2)",
+        ]);
         lang.plug("expr_2", &Workload::from_vec_string(e_2))
             .plug("expr_1", &Workload::from_vec_string(e_1))
             .plug("bop", &Workload::from_vec(bops.to_vec()))

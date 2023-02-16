@@ -1,9 +1,9 @@
 #!/bin/bash
 
-> rep/json/bool.json
-> rep/json/bv32.json
-> rep/json/bv4.json
-> rep/json/rational.json
+> rep/json/derivable_rules/bool.json
+> rep/json/derivable_rules/bv32.json
+> rep/json/derivable_rules/bv4.json
+> rep/json/derivable_rules/rational.json
 > rep/json/output.json
 
 > rep/index.html
@@ -22,17 +22,14 @@ OUTPUT=`cat rep/json/output.json`
 sed "11 i var obj = ${OUTPUT};" rep/index_base.html > rep/index.html
 echo "echo ${OUTPUT}"
 
-BOOL=`cat rep/json/bool.json`
-sed "14 i var obj = ${BOOL};" rep/bool_base.html > rep/bool.html
-
-BV32=`cat rep/json/bv32.json`
-sed "14 i var obj = ${BV32};" rep/bv32_base.html > rep/bv32.html
-
-BV4=`cat rep/json/bv4.json`
-sed "14 i var obj = ${BV4};" rep/bv4_base.html > rep/bv4.html
-
-RATIONAL=`cat rep/json/bool.json`
-sed "14 i var obj = ${RATIONAL};" rep/rational_base.html > rep/rational.html
+for FILE in rep/json/derivable_rules/*.json; do
+    CONTENT=`cat ${FILE}`
+    NAME=${FILE%.json}
+    NEWFILE=rep/${NAME##*/}.html
+    cp rep/base.html ${NEWFILE}
+    sed --in-place "s|NAME|${NAME##*/}|g" ${NEWFILE}
+    sed --in-place "18 i var obj = ${CONTENT};" ${NEWFILE}
+done
 
 DIR="rep"
 B=$(git rev-parse --abbrev-ref HEAD)

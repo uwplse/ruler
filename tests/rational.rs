@@ -331,10 +331,10 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 mod test {
     use super::*;
     use ruler::enumo::{Ruleset, Workload};
-    use std::time::Instant;
     use serde_json::*;
     use std::fs::OpenOptions;
     use std::io::Write;
+    use std::time::Instant;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
@@ -496,7 +496,8 @@ mod test {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
 
-        let layer_1 = Workload::make_layer(1, 
+        let layer_1 = Workload::make_layer(
+            1,
             &["0", "1", "-1"],
             &["a", "b", "c"],
             &["~", "fabs"],
@@ -506,31 +507,40 @@ mod test {
         let rules_1 = Math::run_workload(layer_1.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_1);
 
-        let layer_2 = Workload::make_layer(2, 
+        let layer_2 = Workload::make_layer(
+            2,
             &["0", "1", "-1"],
             &["a", "b", "c"],
             &["~", "fabs"],
             &["-", "+", "*", "/"],
         );
 
-        let rules_2 = Math::run_workload(layer_2.clone().append(layer_1), all_rules.clone(), Limits::default());
+        let rules_2 = Math::run_workload(
+            layer_2.clone().append(layer_1),
+            all_rules.clone(),
+            Limits::default(),
+        );
         all_rules.extend(rules_2);
 
         let duration = start.elapsed();
-        all_rules.to_file("equivalent/rational_rules_oopsla.rules");
+        all_rules.to_file("equivalent/rational.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
-        let (can, cannot) = all_rules.derive(baseline.clone(),
+        let (can, cannot) = all_rules.derive(
+            baseline.clone(),
             Limits {
                 iter: 6,
                 node: 1000000,
-            },);
+            },
+        );
 
-        let (canr, cannotr) = baseline.derive(all_rules.clone(),
+        let (canr, cannotr) = baseline.derive(
+            all_rules.clone(),
             Limits {
                 iter: 6,
                 node: 1000000,
-            },);
+            },
+        );
 
         let derivability = json!({
             "forwards derivable": can.to_str_vec(),
@@ -541,9 +551,12 @@ mod test {
 
         let derivability_str = derivability.to_string();
 
-        let mut file = OpenOptions::new().append(true).open("rep/json/rational_unidirectional.json").expect("Unable to open file");     
-        file.write_all(derivability_str.as_bytes()).expect("write failed");
-
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open("rep/json/derivable_rules/rational.json")
+            .expect("Unable to open file");
+        file.write_all(derivability_str.as_bytes())
+            .expect("write failed");
 
         let num_rules = &all_rules.len();
         let forwards_derivable = &can.len();
@@ -561,9 +574,10 @@ mod test {
 
         let stats_str = stats.to_string();
 
-        let mut file = OpenOptions::new().append(true).open("rep/json/output.json").expect("Unable to open file");
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open("rep/json/output.json")
+            .expect("Unable to open file");
         file.write_all(stats_str.as_bytes()).expect("write failed");
     }
-
-
 }
