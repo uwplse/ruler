@@ -541,7 +541,7 @@ mod test {
 
         let derivability_str = derivability.to_string();
 
-        let mut file = OpenOptions::new().append(true).open("rep/json/rational.json").expect("Unable to open file");     
+        let mut file = OpenOptions::new().append(true).open("rep/json/rational_unidirectional.json").expect("Unable to open file");     
         file.write_all(derivability_str.as_bytes()).expect("write failed");
 
 
@@ -553,7 +553,7 @@ mod test {
         let stats = json!({
             "spec": "rational",
             "num_rules": num_rules,
-            "num_baseline": 52,
+            "num_baseline": 97,
             "enumo_derives_oopsla": forwards_derivable,
             "oopsla_derives_enumo": backwards_derivable,
             "time": time
@@ -564,4 +564,6 @@ mod test {
         let mut file = OpenOptions::new().append(true).open("rep/json/output.json").expect("Unable to open file");
         file.write_all(stats_str.as_bytes()).expect("write failed");
     }
+
+
 }
