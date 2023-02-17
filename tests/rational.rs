@@ -542,6 +542,18 @@ mod test {
             },
         );
 
+        let rules = json!({
+            "rules": all_rules.to_str_vec(),
+        });
+
+        let rules_str = rules.to_string();
+
+        let mut rules_file = OpenOptions::new()
+            .write(true)
+            .open("rep/json/rules/bool.json")
+            .expect("Unable to open file");
+        rules_file.write_all(rules_str.as_bytes()).expect("write failed");
+
         let derivability = json!({
             "forwards derivable": can.to_str_vec(),
             "forwards underivable": cannot.to_str_vec(),
@@ -551,11 +563,11 @@ mod test {
 
         let derivability_str = derivability.to_string();
 
-        let mut file = OpenOptions::new()
-            .append(true)
-            .open("rep/json/derivable_rules/rational.json")
+        let mut derivability_file = OpenOptions::new()
+            .write(true)
+            .open("rep/json/derivable_rules/bool.json")
             .expect("Unable to open file");
-        file.write_all(derivability_str.as_bytes())
+        derivability_file.write_all(derivability_str.as_bytes())
             .expect("write failed");
 
         let num_rules = &all_rules.len();
