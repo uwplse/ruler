@@ -150,8 +150,7 @@ impl Workload {
     }
 
     pub fn append(self, other: Workload) -> Self {
-        let mut vec = Vec::new();
-        vec.push(self);
+        let mut vec = vec![self];
         vec.push(other);
 
         Workload::Append(vec)
