@@ -355,11 +355,6 @@ mod test {
 
         let add = Workload::new(["(+ e e)", "(- e e)"]);
 
-        let _sum_terms = add.clone().plug(
-            "e",
-            &Workload::Append(vec![squares.clone(), simple_terms.clone()]),
-        );
-
         let sum_of_squares = add.plug("e", &squares);
 
         let mut all = complex;
