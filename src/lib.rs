@@ -65,6 +65,15 @@ impl Default for Limits {
     }
 }
 
+impl Limits {
+    fn max() -> Self {
+        Self {
+            iter: usize::MAX,
+            node: usize::MAX,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Interval<T> {
     pub low: Option<T>,

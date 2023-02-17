@@ -13,8 +13,8 @@ pub enum Workload {
 }
 
 impl Workload {
-    pub fn from_vec(strs: Vec<&str>) -> Self {
-        Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
+    pub fn new<'a>(vals: impl IntoIterator<Item = &'a str>) -> Self {
+        Self::Set(vals.into_iter().map(|x| x.parse().unwrap()).collect())
     }
 
     pub fn from_vec_string(strs: Vec<String>) -> Self {
@@ -82,7 +82,7 @@ impl Workload {
             Self::Set(vec![])
         } else {
             let rec = self.clone().iter(atom, n - 1);
-            self.plug(atom, &rec)
+            self.plug(atom, rec)
         }
     }
 
@@ -135,18 +135,22 @@ impl Workload {
         uops: &[&str],
         bops: &[&str],
     ) -> Self {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
 
         lang.iter_metric("expr", Metric::Atoms, n)
             .filter(Filter::Contains("var".parse().unwrap()))
-            .plug("cnst", &Workload::from_vec(consts.to_vec()))
-            .plug("var", &Workload::from_vec(vars.to_vec()))
-            .plug("uop", &Workload::from_vec(uops.to_vec()))
-            .plug("bop", &Workload::from_vec(bops.to_vec()))
+            .plug("cnst", consts)
+            .plug("var", vars)
+            .plug("uop", uops)
+            .plug("bop", bops)
     }
 
-    pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
-        Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
+    pub fn plug(self, name: impl Into<String>, workload: impl Into<Workload>) -> Self {
+        Workload::Plug(Box::new(self), name.into(), Box::new(workload.into()))
+    }
+
+    pub fn append(self, workload: impl Into<Workload>) -> Self {
+        Workload::Append(vec![self, workload.into()])
     }
 
     pub fn append(self, other: Workload) -> Self {
@@ -172,13 +176,19 @@ impl Workload {
     }
 }
 
+impl From<&[&str]> for Workload {
+    fn from(value: &[&str]) -> Self {
+        Workload::new(value.iter().copied())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn iter() {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let actual2 = lang.clone().iter("expr", 2).force();
         assert_eq!(actual2.len(), 8);
 
@@ -188,7 +198,7 @@ mod test {
 
     #[test]
     fn iter_metric() {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let actual2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
         assert_eq!(actual2.len(), 4);
 
@@ -199,14 +209,14 @@ mod test {
     #[test]
     fn iter_metric_fast() {
         // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let six = lang.iter_metric("expr", Metric::Atoms, 6);
         assert_eq!(six.force().len(), 188);
     }
 
     #[test]
     fn contains() {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
 
         let actual3 = lang
             .clone()
@@ -214,7 +224,7 @@ mod test {
             .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
-        let expected3 = Workload::from_vec(vec![
+        let expected3 = Workload::new([
             "var",
             "(uop var)",
             "(uop (uop var))",
@@ -231,7 +241,7 @@ mod test {
             .filter(Filter::Contains("var".parse().unwrap()))
             .force();
 
-        let expected4 = Workload::from_vec(vec![
+        let expected4 = Workload::new([
             "var",
             "(uop var)",
             "(uop (uop var))",
