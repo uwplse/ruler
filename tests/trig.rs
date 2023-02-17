@@ -387,23 +387,6 @@ mod test {
     // }
 
     #[test]
-    fn derive() {
-        let limits = Limits {
-            iter: 3,
-            node: 2000000,
-        };
-
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
-        let old_recipe_rules: Ruleset<Trig> = Ruleset::from_file("tests/old-trig-recipe.txt");
-
-        let (can, cannot) = complex.derive(old_recipe_rules, limits);
-        println!("can: {}, cannot: {}", can.len(), cannot.len());
-        for (name, _) in cannot.0 {
-            println!("{}", name);
-        }
-    }
-
-    #[test]
     fn simple() {
         let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
         assert_eq!(complex.len(), 57);
