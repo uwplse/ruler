@@ -213,7 +213,7 @@ mod test {
         let wkld = Workload::new(["(a b)", "(a)", "(b)"]);
         let a_s = Workload::new(["1", "2", "3"]);
         let b_s = Workload::new(["x", "y"]);
-        let actual = wkld.plug("a", a_s).plug("b", b_s).force();
+        let actual = wkld.plug("a", &a_s).plug("b", &b_s).force();
         let expected = Workload::new([
             "(1 x)", "(1 y)", "(2 x)", "(2 y)", "(3 x)", "(3 y)", "(1)", "(2)", "(3)", "(x)", "(y)",
         ])

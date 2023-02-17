@@ -314,18 +314,106 @@ impl SynthLanguage for Trig {
 #[cfg(test)]
 mod test {
     use ruler::{
-        enumo::{Ruleset, Workload},
+        enumo::{Filter, Ruleset, Workload},
         Limits, SynthLanguage,
     };
 
     use crate::Trig;
 
     #[test]
+    fn og_recipe() {
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let limits = Limits {
+            iter: 3,
+            node: 2000000,
+        };
+
+        let t_ops = Workload::new(["sin", "cos", "tan"]);
+        let consts = Workload::new([
+            "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
+        ]);
+        let app = Workload::new(["(op v)"]);
+        let trig_constants =
+            app.clone()
+                .plug("op", &t_ops)
+                .plug("v", &consts)
+                .filter(Filter::Invert(Box::new(Filter::Contains(
+                    "(tan (/ PI 2))".parse().unwrap(),
+                ))));
+
+        let simple_terms = app.clone().plug("op", &t_ops).plug(
+            "v",
+            &Workload::new(["a", "(~ a)", "(+ PI a)", "(- PI a)", "(+ a a)"]),
+        );
+
+        let neg_terms = Workload::new(["(~ x)"]).plug("x", &simple_terms);
+
+        let squares = Workload::new(["(sqr x)"])
+            .plug("x", &app)
+            .plug("op", &t_ops)
+            .plug("v", &Workload::new(["a", "b"]));
+
+        let add = Workload::new(["(+ e e)", "(- e e)"]);
+
+        let _sum_terms = add.clone().plug(
+            "e",
+            &Workload::Append(vec![squares.clone(), simple_terms.clone()]),
+        );
+
+        let sum_of_squares = add.plug("e", &squares);
+
+        let mut all = complex;
+
+        let wkld1 = trig_constants;
+        println!("Starting 1");
+        let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
+        all.extend(rules1);
+
+        let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
+        println!("Starting 2");
+        let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
+        all.extend(rules2);
+
+        let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
+        println!("Starting 3");
+        let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
+        all.extend(rules3);
+
+        let wkld4 = Workload::Append(vec![wkld2, squares, sum_of_squares]);
+        println!("Starting 4");
+        let rules4 = Trig::run_workload(wkld4, all.clone(), limits);
+        all.extend(rules4);
+
+        let (can, cannot) = all.derive(Ruleset::from_file("tests/old-trig-recipe.txt"), limits);
+        println!("can: {}, cannot: {}", can.len(), cannot.len());
+        for (name, _) in cannot.0 {
+            println!("{}", name);
+        }
+    }
+
+    #[test]
+    fn derive() {
+        let limits = Limits {
+            iter: 3,
+            node: 2000000,
+        };
+
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let old_recipe_rules: Ruleset<Trig> = Ruleset::from_file("tests/old-trig-recipe.txt");
+
+        let (can, cannot) = complex.derive(old_recipe_rules, limits);
+        println!("can: {}, cannot: {}", can.len(), cannot.len());
+        for (name, _) in cannot.0 {
+            println!("{}", name);
+        }
+    }
+
+    #[test]
     fn simple() {
         let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
         assert_eq!(complex.len(), 57);
 
-        let terms = Workload::from_vec(vec![
+        let terms = Workload::new([
             "(sin 0)",
             "(sin (/ PI 6))",
             "(sin (/ PI 4))",
