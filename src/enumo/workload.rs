@@ -17,6 +17,10 @@ impl Workload {
         Self::Set(vals.into_iter().map(|x| x.parse().unwrap()).collect())
     }
 
+    pub fn from_vec(strs: Vec<&str>) -> Self {
+        Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
+    }
+
     pub fn from_vec_string(strs: Vec<String>) -> Self {
         Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
     }
@@ -82,50 +86,12 @@ impl Workload {
             Self::Set(vec![])
         } else {
             let rec = self.clone().iter(atom, n - 1);
-            self.plug(atom, rec)
+            self.plug(atom, &rec)
         }
     }
 
     pub fn iter_metric(self, atom: &str, met: Metric, n: usize) -> Self {
         self.iter(atom, n).filter(Filter::MetricLt(met, n + 1))
-    }
-
-    pub fn make_layer(
-        n: usize,
-        consts: &[&str],
-        vars: &[&str],
-        uops: &[&str],
-        bops: &[&str],
-    ) -> Self {
-        let lang = Workload::from_vec(vec!["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-
-        lang.iter_metric("expr", Metric::List, n + 1)
-            .filter(Filter::Contains("var".parse().unwrap()))
-            .filter(Filter::MetricLt(Metric::List, n + 1))
-            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, n))))
-            .plug("cnst", &Workload::from_vec(consts.to_vec()))
-            .plug("var", &Workload::from_vec(vars.to_vec()))
-            .plug("uop", &Workload::from_vec(uops.to_vec()))
-            .plug("bop", &Workload::from_vec(bops.to_vec()))
-    }
-
-    pub fn make_layer_uops(e: Vec<String>, uops: &[&str]) -> Self {
-        let lang = Workload::from_vec(vec!["expr_1", "(uop expr_1)"]);
-
-        lang.plug("expr_1", &Workload::from_vec_string(e))
-            .plug("uop", &Workload::from_vec(uops.to_vec()))
-    }
-
-    pub fn make_layer_bops(e_1: Vec<String>, e_2: Vec<String>, bops: &[&str]) -> Self {
-        let lang = Workload::from_vec(vec![
-            "expr_2",
-            "expr_1",
-            "(bop expr_2 expr_1)",
-            "(bop expr_1 expr_2)",
-        ]);
-        lang.plug("expr_2", &Workload::from_vec_string(e_2))
-            .plug("expr_1", &Workload::from_vec_string(e_1))
-            .plug("bop", &Workload::from_vec(bops.to_vec()))
     }
 
     pub fn iter_lang(
@@ -139,25 +105,18 @@ impl Workload {
 
         lang.iter_metric("expr", Metric::Atoms, n)
             .filter(Filter::Contains("var".parse().unwrap()))
-            .plug("cnst", consts)
-            .plug("var", vars)
-            .plug("uop", uops)
-            .plug("bop", bops)
+            .plug("cnst", &consts.into())
+            .plug("var", &vars.into())
+            .plug("uop", &uops.into())
+            .plug("bop", &bops.into())
     }
 
-    pub fn plug(self, name: impl Into<String>, workload: impl Into<Workload>) -> Self {
-        Workload::Plug(Box::new(self), name.into(), Box::new(workload.into()))
+    pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
+        Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {
         Workload::Append(vec![self, workload.into()])
-    }
-
-    pub fn append(self, other: Workload) -> Self {
-        let mut vec = vec![self];
-        vec.push(other);
-
-        Workload::Append(vec)
     }
 
     pub fn filter(self, filter: Filter) -> Self {
@@ -173,6 +132,44 @@ impl Workload {
         } else {
             Workload::Filter(filter, Box::new(self))
         }
+    }
+
+    pub fn make_layer(
+        n: usize,
+        consts: &[&str],
+        vars: &[&str],
+        uops: &[&str],
+        bops: &[&str],
+    ) -> Self {
+        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
+
+        lang.iter_metric("expr", Metric::List, n + 1)
+            .filter(Filter::Contains("var".parse().unwrap()))
+            .filter(Filter::MetricLt(Metric::List, n + 1))
+            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, n))))
+            .plug("cnst", &Workload::from_vec(consts.to_vec()))
+            .plug("var", &Workload::from_vec(vars.to_vec()))
+            .plug("uop", &Workload::from_vec(uops.to_vec()))
+            .plug("bop", &Workload::from_vec(bops.to_vec()))
+    }
+
+    pub fn make_layer_uops(e: Vec<String>, uops: &[&str]) -> Self {
+        let lang = Workload::new(["expr_1", "(uop expr_1)"]);
+
+        lang.plug("expr_1", &Workload::from_vec_string(e))
+            .plug("uop", &Workload::from_vec(uops.to_vec()))
+    }
+
+    pub fn make_layer_bops(e_1: Vec<String>, e_2: Vec<String>, bops: &[&str]) -> Self {
+        let lang = Workload::new([
+            "expr_2",
+            "expr_1",
+            "(bop expr_2 expr_1)",
+            "(bop expr_1 expr_2)",
+        ]);
+        lang.plug("expr_2", &Workload::from_vec_string(e_2))
+            .plug("expr_1", &Workload::from_vec_string(e_1))
+            .plug("bop", &Workload::from_vec(bops.to_vec()))
     }
 }
 
