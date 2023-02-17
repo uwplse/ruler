@@ -7,7 +7,7 @@ use crate::{
     SynthAnalysis, SynthLanguage, ValidationResult,
 };
 
-use super::Workload;
+use super::{Scheduler, Workload};
 
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Equality<L>>);
@@ -152,7 +152,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut clone = egraph.clone();
         let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
 
-        let (out_egraph, _) = self.run_internal(egraph.clone(), limits);
+        let (out_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
 
         // Build a map from id in out_graph to all of the ids in egraph that are equivalent
         let mut unions = HashMap::default();
@@ -179,20 +179,16 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph: &EGraph<L, SynthAnalysis>,
         limits: Limits,
     ) -> EGraph<L, SynthAnalysis> {
-        let (new_egraph, _) = self.run_internal(egraph.clone(), limits);
+        let (new_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
         new_egraph
     }
 
     fn run_internal(
         &self,
         egraph: EGraph<L, SynthAnalysis>,
-        limits: Limits,
+        scheduler: Scheduler,
     ) -> (EGraph<L, SynthAnalysis>, StopReason) {
-        let mut runner = Ruleset::mk_runner(egraph, limits);
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.0.values().map(|eq| &eq.rewrite).collect();
-
-        runner = runner.run(rewrites);
+        let mut runner = scheduler.run(egraph, self);
 
         runner.egraph.rebuild();
         (runner.egraph, runner.stop_reason.unwrap())
@@ -233,11 +229,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    fn mk_runner(egraph: EGraph<L, SynthAnalysis>, limits: Limits) -> Runner<L, SynthAnalysis> {
+    fn mk_runner(egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis> {
         Runner::default()
             .with_scheduler(egg::SimpleScheduler)
-            .with_node_limit(limits.node)
-            .with_iter_limit(limits.iter)
             // Egg default time limit is 5 seconds. Bump up to 10 minutes to reduce variance due to timing
             .with_time_limit(Duration::from_secs(600))
             .with_egraph(egraph)
@@ -278,7 +272,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph: EGraph<L, SynthAnalysis>,
         limits: Limits,
     ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
-        let mut runner = Ruleset::mk_runner(egraph, limits);
+        let mut runner = Ruleset::mk_runner(egraph)
+            .with_iter_limit(limits.iter)
+            .with_node_limit(limits.node);
         let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
         let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
             self.0.values().map(|eq| &eq.rewrite).collect();
@@ -497,68 +493,22 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn can_derive(&self, rule: &Equality<L>, limits: Limits) -> bool {
-        let mk_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
-            Runner::default()
-                .with_scheduler(egg::SimpleScheduler)
-                .with_iter_limit(limits.iter)
-                .with_node_limit(limits.node)
-                .with_time_limit(Duration::from_secs(600))
-                .with_egraph(egraph)
-                .with_expr(&L::instantiate(&rule.lhs))
-                .with_expr(&L::instantiate(&rule.rhs))
-                .with_hook(|r| {
-                    if r.egraph.find(r.roots[0]) == r.egraph.find(r.roots[1]) {
-                        Err("Done".to_owned())
-                    } else {
-                        Ok(())
-                    }
-                })
-        };
-        let (sat, other) = self.partition(|eq| eq.is_saturating());
-        let (sat, other): (Vec<Rewrite<_, _>>, Vec<Rewrite<_, _>>) = (
-            (sat.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
-            (other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
-        );
+        let scheduler = Scheduler::Saturating(limits);
+        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
+        let lexpr = &L::instantiate(&rule.lhs);
+        let rexpr = &L::instantiate(&rule.rhs);
+        egraph.add_expr(lexpr);
+        egraph.add_expr(rexpr);
+        let runner = scheduler.run(egraph, self);
 
-        let mut runner: Runner<L, SynthAnalysis> = mk_runner(Default::default(), limits);
-
-        let mut l_id;
-        let mut r_id;
-
-        for _ in 0..limits.iter {
-            // Sat
-            runner = mk_runner(runner.egraph, Limits::max()).run(&sat);
-
-            l_id = runner.egraph.find(runner.roots[0]);
-            r_id = runner.egraph.find(runner.roots[1]);
-
-            if l_id == r_id {
-                break;
-            }
-
-            // Other
-            runner = mk_runner(
-                runner.egraph,
-                Limits {
-                    iter: 1,
-                    node: limits.node,
-                },
-            )
-            .run(&other);
-
-            l_id = runner.egraph.find(runner.roots[0]);
-            r_id = runner.egraph.find(runner.roots[1]);
-
-            if l_id == r_id {
-                break;
-            }
-        }
-
-        // One more sat
-        runner = mk_runner(runner.egraph, Limits::max()).run(&sat);
-        l_id = runner.egraph.find(runner.roots[0]);
-        r_id = runner.egraph.find(runner.roots[1]);
-
+        let l_id = runner
+            .egraph
+            .lookup_expr(lexpr)
+            .unwrap_or_else(|| panic!("Did not find {}", lexpr));
+        let r_id = runner
+            .egraph
+            .lookup_expr(rexpr)
+            .unwrap_or_else(|| panic!("Did not find {}", rexpr));
         l_id == r_id
     }
 
