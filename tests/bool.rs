@@ -244,7 +244,9 @@ mod test {
             .write(true)
             .open("rep/json/rules/bool.json")
             .expect("Unable to open file");
-        rules_file.write_all(rules_str.as_bytes()).expect("write failed");
+        rules_file
+            .write_all(rules_str.as_bytes())
+            .expect("write failed");
 
         let derivability = json!({
             "forwards derivable": can.to_str_vec(),
@@ -259,7 +261,8 @@ mod test {
             .write(true)
             .open("rep/json/derivable_rules/bool.json")
             .expect("Unable to open file");
-        derivability_file.write_all(derivability_str.as_bytes())
+        derivability_file
+            .write_all(derivability_str.as_bytes())
             .expect("write failed");
 
         let num_rules = &all_rules.len();
