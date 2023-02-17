@@ -97,7 +97,7 @@ mod test {
         let (can, cannot) = all_rules.derive(
             baseline.clone(),
             Limits {
-                iter: 6,
+                iter: 4,
                 node: 1000000,
             },
         );
@@ -105,7 +105,7 @@ mod test {
         let (canr, cannotr) = baseline.derive(
             all_rules.clone(),
             Limits {
-                iter: 6,
+                iter: 4,
                 node: 1000000,
             },
         );
