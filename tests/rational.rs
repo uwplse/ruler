@@ -550,7 +550,7 @@ mod test {
 
         let mut rules_file = OpenOptions::new()
             .write(true)
-            .open("rep/json/rules/bool.json")
+            .open("rep/json/rules/rational.json")
             .expect("Unable to open file");
         rules_file
             .write_all(rules_str.as_bytes())
@@ -567,7 +567,7 @@ mod test {
 
         let mut derivability_file = OpenOptions::new()
             .write(true)
-            .open("rep/json/derivable_rules/bool.json")
+            .open("rep/json/derivable_rules/rational.json")
             .expect("Unable to open file");
         derivability_file
             .write_all(derivability_str.as_bytes())

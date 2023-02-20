@@ -1,1 +1,1 @@
-[{"spec":"bool","num_rules":33,"num_baseline":51,"enumo_derives_oopsla":49,"oopsla_derives_enumo":33,"time":25}, {"spec":"bv32","num_rules":56,"num_baseline":110,"enumo_derives_oopsla":94,"oopsla_derives_enumo":56,"time":193}, {"spec":"bv4","num_rules":61,"num_baseline":110,"enumo_derives_oopsla":108,"oopsla_derives_enumo":61,"time":118}, {"spec":"rational","num_rules":45,"num_baseline":97,"enumo_derives_oopsla":63,"oopsla_derives_enumo":45,"time":62}]
+[{"spec":"bool","num_rules":33,"num_baseline":51,"enumo_derives_oopsla":49,"oopsla_derives_enumo":33,"time":24}, ]

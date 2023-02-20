@@ -27,8 +27,8 @@ for FILE in rep/json/derivable_rules/*.json; do
     NAME=${FILE%.json}
     NEWFILE=rep/${NAME##*/}.html
     cp rep/base.html ${NEWFILE}
-    sed --in-place "s|NAME|${NAME##*/}|g" ${NEWFILE}
-    sed --in-place "18 i var obj = ${CONTENT};" ${NEWFILE}
+    sed -i "s|NAME|${NAME##*/}|g" ${NEWFILE}
+    sed -i "18 i var obj = ${CONTENT};" ${NEWFILE}
 done
 
 DIR="rep"
