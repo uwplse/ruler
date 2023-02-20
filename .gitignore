@@ -1,4 +1,5 @@
 # Top level
+Cargo.toml
 /target
 /out
 /*.json
@@ -12,6 +13,7 @@ scripts/herbie-rational/output/*
 scripts/**/*.json
 
 # Rust
+Cargo.toml
 Cargo.lock
 
 # Mac
@@ -23,6 +25,7 @@ out/
 *.txt
 *.pdf
 *.bak
+terms.workload
 
 # Racket
 *.dep
