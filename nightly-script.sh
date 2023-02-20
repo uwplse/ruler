@@ -12,8 +12,6 @@
 > rep/bv4.html
 > rep/rational.html
 
-> terms.workload
-
 echo -n "[" >> rep/json/output.json
 cargo test
 echo -n "]" >> rep/json/output.json

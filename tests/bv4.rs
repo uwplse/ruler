@@ -74,19 +74,6 @@ mod test {
             .append(layer_2.clone())
             .append(Workload::from_vec(consts_str.clone()));
 
-        let mut layer_3_copy = layer_3.clone().force();
-        terms
-            .write_all("LAYER 3, BV4: \n".to_string().as_bytes())
-            .expect("write failed");
-        for _n in 0..layer_3_copy.clone().len() {
-            terms
-                .write_all(layer_3_copy.pop().unwrap().to_string().as_bytes())
-                .expect("write failed");
-            terms
-                .write_all("\n".to_string().as_bytes())
-                .expect("write failed");
-        }
-
         let rules_3 = Bv::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_3);
         let duration = start.elapsed();
