@@ -4,6 +4,40 @@ use crate::{HashSet, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
+/// A `Workload` compactly and lazily describes the set of terms that the initial
+/// egraph will be seeded with. Terms are described in a top-down manner. For
+/// example, you can start with the following pattern:
+///
+/// ```lisp
+/// (binop expr expr)
+/// ```
+///
+/// By itself, this only describes a single term. However, you can "plug" in other
+/// workloads to any atom in the pattern. So if you have a workload that describes
+/// the terms: `[+, -]`. You can plug that in for `binop` to get the terms:
+///
+/// ```lisp
+/// (+ expr expr)
+/// (- expr expr)
+/// ```
+///
+/// You can now expand `expr` to get more expressions. You can plug in the workload
+/// `[0, 1, a, b]` for `expr` to get the terms:
+///
+/// ```lisp
+/// (+ 0 0) (+ 1 0) (+ a 0) (+ b 0)
+/// (+ 0 1) (+ 1 1) (+ a 1) (+ b 1)
+/// (+ 0 a) (+ 1 a) (+ a a) (+ b a)
+/// (+ 0 b) (+ 1 b) (+ a b) (+ b b)
+///
+/// (- 0 0) (- 1 0) (- a 0) (- b 0)
+/// (- 0 1) (- 1 1) (- a 1) (- b 1)
+/// (- 0 a) (- 1 a) (- a a) (- b a)
+/// (- 0 b) (- 1 b) (- a b) (- b b)
+/// ```
+///
+/// This simple mechanism allows you to express a large number of terms through
+/// the composition of smaller workloads.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Workload {
     Set(Vec<Sexp>),
@@ -13,10 +47,12 @@ pub enum Workload {
 }
 
 impl Workload {
+    /// Construct a new workload from anything that can iterator over `&str`.
     pub fn new<'a>(vals: impl IntoIterator<Item = &'a str>) -> Self {
         Self::Set(vals.into_iter().map(|x| x.parse().unwrap()).collect())
     }
 
+    /// Construct an `EGraph` from the terms represented by this workload.
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
         let sexps = self.force();
@@ -47,6 +83,7 @@ impl Workload {
         egraph
     }
 
+    /// Force the construction of all the terms represented in this workload.
     pub fn force(&self) -> Vec<Sexp> {
         match self {
             Workload::Set(set) => set.clone(),
@@ -73,6 +110,31 @@ impl Workload {
         }
     }
 
+    /// Recursively expands `self` to a depth of `n` by plugging in `self` for `atom`.
+    ///
+    /// For the workload:
+    /// ```
+    /// let wkld = Workload::new(["x", "(bop expr expr)"]);
+    /// ```
+    ///
+    /// `wkld.iter("expr", 2)` generates
+    ///
+    /// ```
+    /// x
+    /// (uop x x)
+    /// ```
+    ///
+    /// and `wkld.iter("expr", 3)` generates
+    ///
+    /// ```
+    /// x
+    /// (uop x x)
+    /// (uop x (uop x x))
+    /// (uop (uop x x) x)
+    /// (uop (uop x x) (uop x x))
+    /// ```
+    ///
+    ///
     fn iter(self, atom: &str, n: usize) -> Self {
         if n == 0 {
             Self::Set(vec![])
@@ -82,10 +144,31 @@ impl Workload {
         }
     }
 
+    /// Expands the workload at `atom` up to a depth of `n` and then filters by `met`.
     pub fn iter_metric(self, atom: &str, met: Metric, n: usize) -> Self {
         self.iter(atom, n).filter(Filter::MetricLt(met, n + 1))
     }
 
+    /// A convenience function to quickly create a workload for a standard language.
+    ///  - `n`: The depth of terms to generate in the language
+    ///  - `consts`: The constant expressions in the language
+    ///  - `vars`: The variables in the language
+    ///  - `uops`: The unary operators in the language
+    ///  - `bops`: The binary operators in the language
+    ///
+    /// The following workload:
+    ///
+    /// ```rust
+    /// Workload::iter_lang(
+    ///   3,
+    ///   &["0", "1"],
+    ///   &["x", "y"],
+    ///   &["~"],
+    ///   &["+", "-"]
+    /// )
+    /// ```
+    ///
+    /// will generate terms in a simple arithmetic language.
     pub fn iter_lang(
         n: usize,
         consts: &[&str],
@@ -103,14 +186,18 @@ impl Workload {
             .plug("bop", bops)
     }
 
+    /// Compose two workloads together by replacing every instance of `name` with
+    /// `workload`.
     pub fn plug(self, name: impl Into<String>, workload: impl Into<Workload>) -> Self {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload.into()))
     }
 
+    /// Append to workloads together.
     pub fn append(self, workload: impl Into<Workload>) -> Self {
         Workload::Append(vec![self, workload.into()])
     }
 
+    /// Modify a workload by excluding all the terms matched by `filter`.
     pub fn filter(self, filter: Filter) -> Self {
         if filter.is_monotonic() {
             if let Workload::Plug(wkld, name, pegs) = self {

@@ -33,8 +33,8 @@ pub enum ValidationResult {
     Unknown,
 }
 
-// Cost function for ast size in the domain
-// Penalizes ops not in the domain
+/// Cost function for ast size in the domain.
+/// Penalizes ops not in the domain (ops where `is_allowed_op()` returns false).
 pub struct ExtractableAstSize;
 impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
     type Cost = usize;
@@ -50,6 +50,7 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
     }
 }
 
+/// Limits for the rule synthesis phase
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     pub iter: usize,
