@@ -8,9 +8,6 @@ ruler::impl_bv!(32);
 mod test {
     use super::*;
     use ruler::enumo::{Filter, Metric, Ruleset, Workload};
-    use serde_json::*;
-    use std::fs::OpenOptions;
-    use std::io::Write;
     use std::time::Instant;
 
     #[test]
@@ -41,11 +38,6 @@ mod test {
         let sexp_vec_l1 = layer_1.clone().force();
         let sexp_vec_l2 = layer_2.clone().force();
 
-        let mut terms = OpenOptions::new()
-            .append(true)
-            .open("terms.workload")
-            .expect("Unable to open file");
-
         let str_vec_l1: Vec<String> = sexp_vec_l1.iter().map(|se| se.to_string()).collect();
         let str_vec_l2: Vec<String> = sexp_vec_l2.iter().map(|se| se.to_string()).collect();
         let consts = vec!["a".to_string(), "b".to_string(), "c".to_string()];
@@ -74,82 +66,17 @@ mod test {
             .append(layer_2.clone())
             .append(Workload::from_vec(consts_str.clone()));
 
-        let mut layer_3_copy = layer_3.clone().force();
-
         let rules_3 = Bv::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_3);
         let duration = start.elapsed();
         all_rules.to_file("equivalent/bv32.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
-
-        let (can, cannot) = all_rules.derive(
-            baseline.clone(),
-            Limits {
-                iter: 5,
-                node: 1000000,
-            },
-        );
-
-        let (canr, cannotr) = baseline.derive(
-            all_rules.clone(),
-            Limits {
-                iter: 5,
-                node: 1000000,
-            },
-        );
-        let rules = json!({
-            "rules": all_rules.to_str_vec(),
-        });
-
-        let rules_str = rules.to_string();
-
-        let mut rules_file = OpenOptions::new()
-            .write(true)
-            .open("rep/json/rules/bv32.json")
-            .expect("Unable to open file");
-        rules_file
-            .write_all(rules_str.as_bytes())
-            .expect("write failed");
-
-        let derivability = json!({
-            "forwards derivable": can.to_str_vec(),
-            "forwards underivable": cannot.to_str_vec(),
-            "backwards derivable": canr.to_str_vec(),
-            "backwards underivable": cannotr.to_str_vec()
-        });
-
-        let derivability_str = derivability.to_string();
-
-        let mut derivability_file = OpenOptions::new()
-            .write(true)
-            .open("rep/json/derivable_rules/bv32.json")
-            .expect("Unable to open file");
-        derivability_file
-            .write_all(derivability_str.as_bytes())
-            .expect("write failed");
-
-        let num_rules = &all_rules.len();
-        let forwards_derivable = &can.len();
-        let backwards_derivable = &canr.len();
-        let time = &duration.as_secs();
-
-        let stats = json!({
-            "spec": "bv32",
-            "num_rules": num_rules,
-            "num_baseline": 110,
-            "enumo_derives_oopsla": forwards_derivable,
-            "oopsla_derives_enumo": backwards_derivable,
-            "time": time
-        });
-
-        let stats_str = stats.to_string();
-
-        let mut file = OpenOptions::new()
-            .append(true)
-            .open("rep/json/output.json")
-            .expect("Unable to open file");
-        file.write_all(stats_str.as_bytes()).expect("write failed");
-        file.write_all(", ".as_bytes()).expect("write failed");
+        
+        all_rules.write_json_rules("bv32.json");
+        all_rules.write_json_equiderivability(baseline.clone(), 110, "bv32.json", Limits {
+            iter: 4,
+            node: 1000000,
+        }, duration.clone());
     }
 }

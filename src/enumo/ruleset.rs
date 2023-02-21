@@ -1,5 +1,6 @@
 use std::{io::Write, sync::Arc, time::Duration};
-
+use std::fs::*;
+use serde_json::*;
 use egg::{AstSize, EClass, Extractor, Rewrite, Runner, StopReason};
 
 use crate::{
@@ -104,6 +105,87 @@ impl<L: SynthLanguage> Ruleset<L> {
             eqs.insert(eq.name.clone(), eq);
         }
         Self(eqs)
+    }
+
+    pub fn write_json_rules(&self, filename: &str) {
+        let mut filepath = "rep/json/".to_owned();
+        filepath.push_str(filename);
+        let mut file = std::fs::File::create(filepath.clone())
+            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath));
+        let rules = json!({
+            "rules": &self.to_str_vec(),
+        }).to_string();
+        file.write_all(rules.as_bytes())
+            .expect("Unable to write to file");
+    }
+
+    pub fn write_json_equiderivability(&self, baseline: Self, len_baseline: usize, name: &str, limit: Limits, duration: Duration) {
+        let mut filepath = "rep/json/derivable_rules/".to_owned();
+        filepath.push_str(name);
+        let mut file = std::fs::File::create(filepath.clone())
+            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
+
+        let (can_f, cannot_f) = self.derive(
+            baseline.clone(),
+            limit,
+        );
+
+        let (can_b, cannot_b) = baseline.derive(
+            self.clone(),
+            limit,
+        );
+
+        let derivability_results = json!({
+            "forwards derivable": &can_f.to_str_vec(),
+            "forwards underivable": &cannot_f.to_str_vec(),
+            "backwards derivable": &can_b.to_str_vec(),
+            "backwards underivable": &cannot_b.to_str_vec(),
+        }).to_string();
+
+        file.write_all(derivability_results.as_bytes())
+            .expect("Unable to write to file");
+
+        let num_rules = &self.len();
+        let forwards_derivable = &can_f.len();
+        let backwards_derivable = &can_b.len();
+        let time = &duration.as_secs();
+
+        let outfile = std::fs::read_to_string("rep/json/output.json").expect("Unable to read file");
+        
+        let mut json_arr = vec![];
+
+        if !(outfile.len() == 0) {
+            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile).unwrap();
+        }
+
+        let stats = json!({
+            "spec": name,
+            "num_rules": num_rules,
+            "num_baseline": len_baseline,
+            "enumo_derives_oopsla": forwards_derivable,
+            "oopsla_derives_enumo": backwards_derivable,
+            "time": time
+        });
+        json_arr.push(stats);
+
+        let mut file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open("rep/json/output.json")
+            .expect("Unable to open file");
+        file.write_all("[".as_bytes()).expect("write failed");
+
+        let arr_str = json_arr.to_vec();
+
+        for (object, is_last_element) in arr_str.iter().enumerate()
+        .map(|(i, w)| (w, i == arr_str.len() - 1)) {
+            file.write_all(object.to_string().as_bytes()).expect("write failed");
+            if !(is_last_element) {
+                file.write_all(", ".as_bytes()).expect("write failed");
+            }
+        }
+        file.write_all("]".as_bytes()).expect("write failed");
     }
 
     fn from_unions(

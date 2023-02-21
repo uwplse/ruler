@@ -12,9 +12,7 @@
 > rep/bv4.html
 > rep/rational.html
 
-echo -n "[" >> rep/json/output.json
 cargo test
-echo -n "]" >> rep/json/output.json
 
 OUTPUT=`cat rep/json/output.json`
 sed "11 i var obj = ${OUTPUT};" rep/index_base.html > rep/index.html

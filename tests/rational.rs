@@ -331,9 +331,6 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 mod test {
     use super::*;
     use ruler::enumo::{Ruleset, Workload};
-    use serde_json::*;
-    use std::fs::OpenOptions;
-    use std::io::Write;
     use std::time::Instant;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -526,73 +523,11 @@ mod test {
         all_rules.to_file("equivalent/rational.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
-        let (can, cannot) = all_rules.derive(
-            baseline.clone(),
-            Limits {
-                iter: 4,
-                node: 1000000,
-            },
-        );
 
-        let (canr, cannotr) = baseline.derive(
-            all_rules.clone(),
-            Limits {
-                iter: 4,
-                node: 1000000,
-            },
-        );
-
-        let rules = json!({
-            "rules": all_rules.to_str_vec(),
-        });
-
-        let rules_str = rules.to_string();
-
-        let mut rules_file = OpenOptions::new()
-            .write(true)
-            .open("rep/json/rules/rational.json")
-            .expect("Unable to open file");
-        rules_file
-            .write_all(rules_str.as_bytes())
-            .expect("write failed");
-
-        let derivability = json!({
-            "forwards derivable": can.to_str_vec(),
-            "forwards underivable": cannot.to_str_vec(),
-            "backwards derivable": canr.to_str_vec(),
-            "backwards underivable": cannotr.to_str_vec()
-        });
-
-        let derivability_str = derivability.to_string();
-
-        let mut derivability_file = OpenOptions::new()
-            .write(true)
-            .open("rep/json/derivable_rules/rational.json")
-            .expect("Unable to open file");
-        derivability_file
-            .write_all(derivability_str.as_bytes())
-            .expect("write failed");
-
-        let num_rules = &all_rules.len();
-        let forwards_derivable = &can.len();
-        let backwards_derivable = &canr.len();
-        let time = &duration.as_secs();
-
-        let stats = json!({
-            "spec": "rational",
-            "num_rules": num_rules,
-            "num_baseline": 97,
-            "enumo_derives_oopsla": forwards_derivable,
-            "oopsla_derives_enumo": backwards_derivable,
-            "time": time
-        });
-
-        let stats_str = stats.to_string();
-
-        let mut file = OpenOptions::new()
-            .append(true)
-            .open("rep/json/output.json")
-            .expect("Unable to open file");
-        file.write_all(stats_str.as_bytes()).expect("write failed");
+        all_rules.write_json_rules("rational.json");
+        all_rules.write_json_equiderivability(baseline.clone(), 97, "rational.json", Limits {
+            iter: 4,
+            node: 1000000,
+        }, duration.clone());
     }
 }
