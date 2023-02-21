@@ -72,11 +72,17 @@ mod test {
         all_rules.to_file("equivalent/bv4.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-        
+
         all_rules.write_json_rules("bv4.json");
-        all_rules.write_json_equiderivability(baseline.clone(), 110, "bv4.json", Limits {
-            iter: 4,
-            node: 1000000,
-        }, duration.clone());
+        all_rules.write_json_equiderivability(
+            baseline.clone(),
+            110,
+            "bv4.json",
+            Limits {
+                iter: 4,
+                node: 1000000,
+            },
+            duration.clone(),
+        );
     }
 }

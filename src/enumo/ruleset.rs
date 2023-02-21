@@ -1,7 +1,7 @@
-use std::{io::Write, sync::Arc, time::Duration};
-use std::fs::*;
-use serde_json::*;
 use egg::{AstSize, EClass, Extractor, Rewrite, Runner, StopReason};
+use serde_json::*;
+use std::fs::*;
+use std::{io::Write, sync::Arc, time::Duration};
 
 use crate::{
     CVec, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -114,33 +114,36 @@ impl<L: SynthLanguage> Ruleset<L> {
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath));
         let rules = json!({
             "rules": &self.to_str_vec(),
-        }).to_string();
+        })
+        .to_string();
         file.write_all(rules.as_bytes())
             .expect("Unable to write to file");
     }
 
-    pub fn write_json_equiderivability(&self, baseline: Self, len_baseline: usize, name: &str, limit: Limits, duration: Duration) {
+    pub fn write_json_equiderivability(
+        &self,
+        baseline: Self,
+        len_baseline: usize,
+        name: &str,
+        limit: Limits,
+        duration: Duration,
+    ) {
         let mut filepath = "rep/json/derivable_rules/".to_owned();
         filepath.push_str(name);
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        let (can_f, cannot_f) = self.derive(
-            baseline.clone(),
-            limit,
-        );
+        let (can_f, cannot_f) = self.derive(baseline.clone(), limit);
 
-        let (can_b, cannot_b) = baseline.derive(
-            self.clone(),
-            limit,
-        );
+        let (can_b, cannot_b) = baseline.derive(self.clone(), limit);
 
         let derivability_results = json!({
             "forwards derivable": &can_f.to_str_vec(),
             "forwards underivable": &cannot_f.to_str_vec(),
             "backwards derivable": &can_b.to_str_vec(),
             "backwards underivable": &cannot_b.to_str_vec(),
-        }).to_string();
+        })
+        .to_string();
 
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
@@ -151,10 +154,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         let time = &duration.as_secs();
 
         let outfile = std::fs::read_to_string("rep/json/output.json").expect("Unable to read file");
-        
+
         let mut json_arr = vec![];
 
-        if !(outfile.len() == 0) {
+        if !(outfile.is_empty()) {
             json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile).unwrap();
         }
 
@@ -178,9 +181,13 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         let arr_str = json_arr.to_vec();
 
-        for (object, is_last_element) in arr_str.iter().enumerate()
-        .map(|(i, w)| (w, i == arr_str.len() - 1)) {
-            file.write_all(object.to_string().as_bytes()).expect("write failed");
+        for (object, is_last_element) in arr_str
+            .iter()
+            .enumerate()
+            .map(|(i, w)| (w, i == arr_str.len() - 1))
+        {
+            file.write_all(object.to_string().as_bytes())
+                .expect("write failed");
             if !(is_last_element) {
                 file.write_all(", ".as_bytes()).expect("write failed");
             }

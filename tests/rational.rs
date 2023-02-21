@@ -525,9 +525,15 @@ mod test {
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
 
         all_rules.write_json_rules("rational.json");
-        all_rules.write_json_equiderivability(baseline.clone(), 97, "rational.json", Limits {
-            iter: 4,
-            node: 1000000,
-        }, duration.clone());
+        all_rules.write_json_equiderivability(
+            baseline.clone(),
+            97,
+            "rational.json",
+            Limits {
+                iter: 4,
+                node: 1000000,
+            },
+            duration.clone(),
+        );
     }
 }
