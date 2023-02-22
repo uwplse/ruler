@@ -1,17 +1,9 @@
 #!/bin/bash
 
-> rep/json/derivable_rules/bool.json
-> rep/json/derivable_rules/bv32.json
-> rep/json/derivable_rules/bv4.json
-> rep/json/derivable_rules/rational.json
-> rep/json/output.json
+rm rep/json/*
+rm rep/json/derivable_rules/*
 
-> rep/index.html
-> rep/bool.html
-> rep/bv32.html
-> rep/bv4.html
-> rep/rational.html
-
+touch rep/json/output.json
 cargo test
 
 OUTPUT=`cat rep/json/output.json`

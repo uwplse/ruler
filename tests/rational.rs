@@ -529,10 +529,7 @@ mod test {
             baseline.clone(),
             97,
             "rational.json",
-            Limits {
-                iter: 4,
-                node: 1000000,
-            },
+            Limits::default(),
             duration.clone(),
         );
     }

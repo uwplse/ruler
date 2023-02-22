@@ -221,10 +221,7 @@ mod test {
             baseline.clone(),
             51,
             "bool.json",
-            Limits {
-                iter: 4,
-                node: 1000000,
-            },
+            Limits::default(),
             duration.clone(),
         );
     }

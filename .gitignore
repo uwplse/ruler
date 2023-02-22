@@ -23,7 +23,6 @@ out/
 *.txt
 *.pdf
 *.bak
-terms.workload
 
 # Racket
 *.dep

@@ -78,10 +78,7 @@ mod test {
             baseline.clone(),
             110,
             "bv4.json",
-            Limits {
-                iter: 4,
-                node: 1000000,
-            },
+            Limits::default(),
             duration.clone(),
         );
     }
