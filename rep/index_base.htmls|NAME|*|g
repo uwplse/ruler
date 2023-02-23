@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="stylesheet.css" type="text/css" charset="utf-8"/>
+<html>
+<title>Nightlies</title>
+<h2>These are the nightlies wooooo wow incredible look at this unstyled HTML</h2>
+<center><p id="table"></p></center>
+<body>
+<script type="text/javascript">
+    
+    window.addEventListener("load", () => {
+
+
+        var table = ConvertJsonToTable(obj);
+        document.getElementById("table").innerHTML = table;
+    });
+</script>
+<p>Individual results: <a href="bv32.html">bv32</a>, <a href="bv4.html">bv4</a>, <a href="bool.html">bool</a>, <a href="rational.html">rational</a>.</p>
+<script src="table.js"></script>
+</body>
+</html>

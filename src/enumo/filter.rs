@@ -6,6 +6,7 @@ pub enum Filter {
     Contains(Pattern),
     Canon(Vec<String>),
     And(Box<Self>, Box<Self>),
+    Or(Box<Self>, Box<Self>),
     Invert(Box<Self>),
 }
 
@@ -22,6 +23,7 @@ impl Filter {
             }
             Filter::Canon(symbols) => sexp.eq(&sexp.canon(symbols)),
             Filter::And(f1, f2) => f1.test(sexp) && f2.test(sexp),
+            Filter::Or(f1, f2) => f1.test(sexp) || f2.test(sexp),
             Filter::Invert(f) => !f.test(sexp),
         }
     }

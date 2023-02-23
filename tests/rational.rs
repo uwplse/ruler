@@ -330,7 +330,9 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ruler::enumo::{Ruleset, Workload};
+    use ruler::enumo::{Filter, Metric, Ruleset, Workload};
+    use std::fs::OpenOptions;
+    use std::io::Write;
     use std::time::Instant;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -493,32 +495,65 @@ mod test {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
 
-        let layer_1 = Workload::make_layer(
-            1,
-            &["0", "1", "-1"],
-            &["a", "b", "c"],
-            &["~", "fabs"],
-            &["-", "+", "*", "/"],
-        );
+        let initial_vals = Workload::new(["a", "b", "c", "0", "-1", "1"]);
+        let layer_1 =
+            Workload::make_layer(initial_vals.clone(), &["~", "fabs"], &["-", "+", "*", "/"])
+                .filter(Filter::MetricLt(Metric::List, 2));
+        let terms_1 = layer_1.clone().append(initial_vals.clone());
+        let rules_1 = Math::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_1.clone());
 
-        let rules_1 = Math::run_workload(layer_1.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_1);
+        let layer_2 = Workload::make_layer(layer_1.clone(), &["~", "fabs"], &["-", "+", "*", "/"])
+            .filter(Filter::Or(
+                Box::new(Filter::Contains("a".parse().unwrap())),
+                Box::new(Filter::Or(
+                    Box::new(Filter::Contains("b".parse().unwrap())),
+                    Box::new(Filter::Contains("c".parse().unwrap())),
+                )),
+            ));
+        let terms_2 = layer_2.clone().append(terms_1.clone());
+        let rules_2 = Math::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_2.clone());
+        /*
+        let uops = Workload::make_layer_uops(
+            layer_2.clone(),
+            &["~", "fabs"]);
+        let bops_1 = Workload::make_layer_bops(
+            layer_2.clone(),
+            initial_vals.clone(),
+            &["-", "+", "*", "/"]);
+        let bops_2 = Workload::make_layer_bops(
+            layer_1.clone(),
+            layer_1.clone(),
+            &["-", "+", "*", "/"]);
+        let layer_3 = uops
+            .append(bops_1)
+            .append(bops_2)
+            .filter(Filter::MetricLt(Metric::List, 4))
+            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, 2))))
+            .filter(Filter::Or(
+                Box::new(Filter::Contains("a".parse().unwrap())),
+                Box::new(
+                Filter::Or(
+                Box::new(Filter::Contains("b".parse().unwrap())),
+                Box::new(Filter::Contains("c".parse().unwrap())),
+            ))))
+            .append(terms_2.clone());
 
-        let layer_2 = Workload::make_layer(
-            2,
-            &["0", "1", "-1"],
-            &["a", "b", "c"],
-            &["~", "fabs"],
-            &["-", "+", "*", "/"],
-        );
-
-        let rules_2 = Math::run_workload(
-            layer_2.clone().append(layer_1),
+        let terms : Vec<String> = layer_2.clone().force().iter().map(|se| se.to_string()).collect();
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open("terms_rat.txt")
+            .expect("Unable to open file");
+        terms.iter().for_each(|t| {file.write_all(t.as_bytes()).expect("Unable to write to file"); file.write_all("\n".as_bytes()).expect("Unable to write to file");});
+        let rules_3 = Math::run_workload(
+            layer_3.clone(),
             all_rules.clone(),
-            Limits::default(),
-        );
-        all_rules.extend(rules_2);
-
+            Limits::default());
+        all_rules.extend(rules_3.clone());
+        */
         let duration = start.elapsed();
 
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");

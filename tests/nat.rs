@@ -172,6 +172,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
 
 #[cfg(test)]
 mod test {
+
     use ruler::enumo::{Ruleset, Workload};
 
     use super::*;
@@ -179,53 +180,51 @@ mod test {
     fn iter_nat(n: usize) -> Workload {
         Workload::iter_lang(n, &["Z"], &["a", "b", "c"], &["S"], &["+", "*"])
     }
-    /*
-        #[test]
-        fn simple() {
-            let mut all_rules = Ruleset::default();
-            let atoms3 = iter_nat(3);
-            assert_eq!(atoms3.force().len(), 39);
+    #[test]
+    fn simple() {
+        let mut all_rules = Ruleset::default();
+        let atoms3 = iter_nat(3);
+        assert_eq!(atoms3.force().len(), 39);
 
-            let rules3 = Nat::run_workload(
-                atoms3,
-                all_rules.clone(),
-                Limits {
-                    iter: 3,
-                    node: 1000000,
-                },
-            );
-            assert_eq!(rules3.len(), 4);
-            all_rules.extend(rules3);
+        let rules3 = Nat::run_workload(
+            atoms3,
+            all_rules.clone(),
+            Limits {
+                iter: 3,
+                node: 1000000,
+            },
+        );
+        assert_eq!(rules3.len(), 4);
+        all_rules.extend(rules3);
 
-            let atoms4 = iter_nat(4);
-            assert_eq!(atoms4.force().len(), 132);
+        let atoms4 = iter_nat(4);
+        assert_eq!(atoms4.force().len(), 132);
 
-            let rules4 = Nat::run_workload(
-                atoms4,
-                all_rules.clone(),
-                Limits {
-                    iter: 3,
-                    node: 1000000,
-                },
-            );
-            assert_eq!(rules4.len(), 3);
-            all_rules.extend(rules4);
+        let rules4 = Nat::run_workload(
+            atoms4,
+            all_rules.clone(),
+            Limits {
+                iter: 3,
+                node: 1000000,
+            },
+        );
+        assert_eq!(rules4.len(), 3);
+        all_rules.extend(rules4);
 
-            let atoms5 = iter_nat(5);
-            assert_eq!(atoms5.force().len(), 819);
+        let atoms5 = iter_nat(5);
+        assert_eq!(atoms5.force().len(), 819);
 
-            let rules5 = Nat::run_workload(
-                atoms5,
-                all_rules.clone(),
-                Limits {
-                    iter: 3,
-                    node: 1000000,
-                },
-            );
-            assert_eq!(rules5.len(), 5);
-            all_rules.extend(rules5);
+        let rules5 = Nat::run_workload(
+            atoms5,
+            all_rules.clone(),
+            Limits {
+                iter: 3,
+                node: 1000000,
+            },
+        );
+        assert_eq!(rules5.len(), 5);
+        all_rules.extend(rules5);
 
-            assert_eq!(all_rules.len(), 12);
-        }
-    */
+        assert_eq!(all_rules.len(), 12);
+    }
 }
