@@ -1,7 +1,8 @@
 #!/bin/bash
 
-rm rep/json/*
-rm rep/json/derivable_rules/*
+mkdir rep/json
+mkdir rep/json/derivable_rules
+
 touch rep/json/output.json
 
 cargo test --release
