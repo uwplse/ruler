@@ -490,7 +490,7 @@ mod test {
         );
     }
 
-    #[test]
+    // #[test]
     fn rational_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();

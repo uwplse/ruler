@@ -47,11 +47,7 @@ mod test {
             layer_1.clone(),
             &["&", "|", "*", "--", "+"],
         );
-        let layer_3 = uops
-            .append(bops_1)
-            .append(bops_2)
-            .filter(Filter::MetricLt(Metric::List, 4))
-            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, 2))));
+        let layer_3 = uops.append(bops_1).append(bops_2);
         let terms_3 = layer_3.clone().append(terms_2.clone());
         let rules_3 = Bv::run_workload(terms_3.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_3.clone());
@@ -83,7 +79,10 @@ mod test {
             baseline.clone(),
             110,
             "bv32.json",
-            Limits::default(),
+            Limits {
+                iter: 5,
+                node: 100000,
+            },
             duration.clone(),
         );
     }

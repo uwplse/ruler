@@ -1,4 +1,7 @@
 #!/bin/bash
+rm rep/json/*
+rm rep/json/derivable_rules/*
+
 cargo test --release
 
 OUTPUT=`cat rep/json/output.json`
@@ -20,6 +23,3 @@ C=$(git rev-parse HEAD | sed 's/\(..........\).*/\1/')
 RDIR="$(date +%s):$(hostname):$B:$C"
 
 nightly-results publish --name "$RDIR" "$DIR"
-
-rm rep/json/derivable_rules/*
-rm rep/json/*

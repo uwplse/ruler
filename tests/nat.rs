@@ -181,7 +181,7 @@ mod test {
         Workload::iter_lang(n, &["Z"], &["a", "b", "c"], &["S"], &["+", "*"])
     }
 
-    // #[test]
+    #[test]
     fn simple() {
         let mut all_rules = Ruleset::default();
         let atoms3 = iter_nat(3);
