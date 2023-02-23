@@ -4,7 +4,7 @@ rm rep/json/*
 rm rep/json/derivable_rules/*
 
 touch rep/json/output.json
-cargo test
+cargo test --release
 
 OUTPUT=`cat rep/json/output.json`
 sed "11 i var obj = ${OUTPUT};" rep/index_base.html > rep/index.html

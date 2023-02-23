@@ -588,7 +588,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn can_derive(&self, rule: &Equality<L>, limits: Limits) -> bool {
-        let scheduler = Scheduler::Simple(limits);
+        let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
         let rexpr = &L::instantiate(&rule.rhs);
