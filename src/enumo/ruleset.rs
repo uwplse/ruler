@@ -1,13 +1,13 @@
-use std::{io::Write, sync::Arc, time::Duration};
+use std::{io::Write, sync::Arc};
 
-use egg::{AstSize, EClass, Extractor, Rewrite, Runner, StopReason};
+use egg::{AstSize, EClass, Extractor, StopReason};
 
 use crate::{
     CVec, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
     SynthAnalysis, SynthLanguage, ValidationResult,
 };
 
-use super::{Scheduler, Workload};
+use super::Scheduler;
 
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Equality<L>>);
@@ -100,50 +100,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(eqs)
     }
 
-    fn from_unions(
-        egraph: &EGraph<L, SynthAnalysis>,
-        unions: HashMap<Id, Vec<Id>>,
-        prior: &Self,
-    ) -> Self {
-        let mut candidates = Ruleset::default();
-        let clone = egraph.clone();
-        let extract = Extractor::new(&clone, ExtractableAstSize);
-        for ids in unions.values() {
-            for id1 in ids.clone() {
-                for id2 in ids.clone() {
-                    let (c1, e1) = extract.find_best(id1);
-                    let (c2, e2) = extract.find_best(id2);
-                    if c1 == usize::MAX || c2 == usize::MAX {
-                        continue;
-                    }
-                    if let Some(eq) = Equality::new(&e1, &e2) {
-                        if e1 != e2 {
-                            if prior.0.contains_key(&eq.name) {
-                                // We already have this rule
-                                continue;
-                            }
-                            candidates.add(eq)
-                        }
-                    }
-                }
-            }
-        }
-
-        candidates
-    }
-
-    pub fn apply_unions(egraph: &mut EGraph<L, SynthAnalysis>, unions: HashMap<Id, Vec<Id>>) {
-        for ids in unions.values() {
-            if ids.len() > 1 {
-                let first = ids[0];
-                for id in &ids[1..] {
-                    egraph.union(first, *id);
-                }
-            }
-        }
-        egraph.rebuild();
-    }
-
     pub fn compress(
         &self,
         egraph: &EGraph<L, SynthAnalysis>,
@@ -229,14 +185,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    fn mk_runner(egraph: EGraph<L, SynthAnalysis>) -> Runner<L, SynthAnalysis> {
-        Runner::default()
-            .with_scheduler(egg::SimpleScheduler)
-            // Egg default time limit is 5 seconds. Bump up to 10 minutes to reduce variance due to timing
-            .with_time_limit(Duration::from_secs(600))
-            .with_egraph(egraph)
-    }
-
     pub fn allow_forbid_actual(
         egraph: EGraph<L, SynthAnalysis>,
         prior: Ruleset<L>,
@@ -263,84 +211,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         all_rules.extend(lifting_rules);
         let eg_final = all_rules.compress(&eg_denote, limits);
         candidates.extend(Self::extract_candidates(&eg_denote, &eg_final));
-
-        candidates
-    }
-
-    fn compress_egraph(
-        &self,
-        egraph: EGraph<L, SynthAnalysis>,
-        limits: Limits,
-    ) -> (EGraph<L, SynthAnalysis>, HashMap<Id, Vec<Id>>, StopReason) {
-        let mut runner = Ruleset::mk_runner(egraph)
-            .with_iter_limit(limits.iter)
-            .with_node_limit(limits.node);
-        let ids: Vec<Id> = runner.egraph.classes().map(|c| c.id).collect();
-        let rewrites: Vec<&Rewrite<L, SynthAnalysis>> =
-            self.0.values().map(|eq| &eq.rewrite).collect();
-        runner = runner.run(rewrites);
-        let stop_reason = runner.stop_reason.unwrap();
-
-        let mut found_unions = HashMap::default();
-        for id in ids {
-            let new_id = runner.egraph.find(id);
-            found_unions.entry(new_id).or_insert_with(Vec::new).push(id);
-        }
-
-        runner.egraph.rebuild();
-        (runner.egraph, found_unions, stop_reason)
-    }
-
-    pub fn compress_workload(
-        &self,
-        workload: Workload,
-        limits: Limits,
-    ) -> EGraph<L, SynthAnalysis> {
-        let mut egraph = workload.to_egraph();
-        let (_, unions, _) = self.compress_egraph(egraph.clone(), limits);
-        Self::apply_unions(&mut egraph, unions);
-        egraph
-    }
-
-    pub fn lift_rules(
-        egraph: &mut EGraph<L, SynthAnalysis>,
-        prior: Ruleset<L>,
-        limits: Limits,
-    ) -> Self {
-        // 1. Compress egraph using allowed rules
-        let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
-
-        let (_, unions, _) = allowed.compress_egraph(egraph.clone(), limits);
-        Self::apply_unions(egraph, unions);
-
-        // 2a. Run lifting rules to saturation
-        let lifting_rules = L::get_lifting_rules();
-        let (new_egraph, unions, stop_reason) = lifting_rules.compress_egraph(
-            egraph.clone(),
-            Limits {
-                iter: usize::MAX,
-                node: usize::MAX,
-            },
-        );
-        assert!(
-            matches!(stop_reason, StopReason::Saturated),
-            "lifting rules must saturate. Instead, ended due to {:?}",
-            stop_reason
-        );
-        // 2b. Extract candidates from unions
-        let mut candidates = Self::from_unions(egraph, unions, &prior);
-
-        // 3a. Run all rules
-        let mut all_rules = prior.clone();
-        all_rules.extend(lifting_rules);
-        let (_, unions, _) = all_rules.compress_egraph(new_egraph.clone(), limits);
-        // 3b. Extract candidates from unions
-        candidates.extend(Self::from_unions(&new_egraph, unions, &prior));
-
-        assert!(candidates
-            .0
-            .iter()
-            .all(|(_, v)| L::is_allowed_rewrite(&v.lhs, &v.rhs)),);
 
         candidates
     }
@@ -458,8 +328,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         // 3. compress with the rules we've chosen so far
-        (egraph, _, _) = chosen.compress_egraph(egraph, limits);
-        // let egraph = chosen.compress(&egraph, limits);
+        let egraph = chosen.compress(&egraph, limits);
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
