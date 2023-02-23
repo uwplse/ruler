@@ -110,8 +110,12 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn write_json_rules(&self, filename: &str) {
         let mut filepath = "rep/json/".to_owned();
         filepath.push_str(filename);
-        let mut file = std::fs::File::create(filepath.clone())
-            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath));
+        let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open("rep/json/output.json")
+        .expect("Unable to open file");
         let rules = json!({
             "rules": &self.to_str_vec(),
         })

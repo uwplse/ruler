@@ -24,6 +24,3 @@ C=$(git rev-parse HEAD | sed 's/\(..........\).*/\1/')
 RDIR="$(date +%s):$(hostname):$B:$C"
 
 nightly-results publish --name "$RDIR" "$DIR"
-
-rm rep/json/*
-rm rep/json/derivable_rules/*
