@@ -23,6 +23,7 @@ out/
 *.txt
 *.pdf
 *.bak
+.z3-trace
 
 # Racket
 *.dep

@@ -212,7 +212,6 @@ mod test {
         all_rules.extend(rules_3);
 
         let duration = start.elapsed();
-        all_rules.to_file("equivalent/bool.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 

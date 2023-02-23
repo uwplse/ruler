@@ -520,7 +520,6 @@ mod test {
         all_rules.extend(rules_2);
 
         let duration = start.elapsed();
-        all_rules.to_file("equivalent/rational.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
 

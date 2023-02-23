@@ -69,7 +69,6 @@ mod test {
         let rules_3 = Bv::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_3);
         let duration = start.elapsed();
-        all_rules.to_file("equivalent/bv4.rules");
 
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
 
