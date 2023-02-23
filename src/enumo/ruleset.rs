@@ -153,12 +153,19 @@ impl<L: SynthLanguage> Ruleset<L> {
         let backwards_derivable = &can_b.len();
         let time = &duration.as_secs();
 
-        let outfile = std::fs::read_to_string("rep/json/output.json").expect("Unable to read file");
+        let _outfile = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open("rep/json/output.json")
+            .expect("Unable to open file");
 
+        let outfile_string =
+            std::fs::read_to_string("rep/json/output.json").expect("Unable to read file");
         let mut json_arr = vec![];
 
-        if !(outfile.is_empty()) {
-            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile).unwrap();
+        if !(outfile_string.is_empty()) {
+            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile_string).unwrap();
         }
 
         let stats = json!({
