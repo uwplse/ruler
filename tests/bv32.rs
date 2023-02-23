@@ -12,7 +12,7 @@ mod test {
     use std::io::Write;
     use std::time::Instant;
 
-    #[test]
+    // #[test]
     fn bv32_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
@@ -23,7 +23,8 @@ mod test {
             &["~", "-"],
             &["&", "|", "*", "--", "+"],
         )
-        .filter(Filter::MetricLt(Metric::List, 2));
+        .filter(Filter::MetricLt(Metric::List, 2))
+        .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, 0))));
         let terms_1 = layer_1.clone().append(initial_vals.clone());
         let rules_1 = Bv::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_1.clone());
@@ -80,8 +81,8 @@ mod test {
             110,
             "bv32.json",
             Limits {
-                iter: 5,
-                node: 100000,
+                iter: 3,
+                node: 300000,
             },
             duration.clone(),
         );

@@ -3,6 +3,7 @@
 /out
 /*.json
 /*.sh
+/rep/json/*
 
 # Scripts
 scripts/ablation/output/*

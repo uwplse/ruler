@@ -490,7 +490,7 @@ mod test {
         );
     }
 
-    // #[test]
+    #[test]
     fn rational_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
@@ -541,7 +541,6 @@ mod test {
         });
 
         let duration = start.elapsed();
-
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
 
         all_rules.write_json_rules("rational.json");

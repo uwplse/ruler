@@ -1,1 +1,0 @@
-[{"spec":"bv32.json","num_rules":60,"num_baseline":110,"enumo_derives_oopsla":100,"oopsla_derives_enumo":60,"time":65}, {"spec":"bv32.json","num_rules":60,"num_baseline":110,"enumo_derives_oopsla":95,"oopsla_derives_enumo":60,"time":62}, {"spec":"bv32.json","num_rules":56,"num_baseline":110,"enumo_derives_oopsla":97,"oopsla_derives_enumo":56,"time":73}]
