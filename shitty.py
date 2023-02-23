@@ -1,6 +1,6 @@
 rules = []
 num_rules = 0
-with open("old_recipe.rules") as f:
+with open("rules.txt") as f:
   lines = f.readlines()
   num_rules = len(lines)
   uni = 0
@@ -17,5 +17,5 @@ with open("old_recipe.rules") as f:
 
 assert(len(rules) == uni + bi*2)
 
-with open("old_recipe.txt", "w") as f:
+with open("out.rules", "w") as f:
   f.writelines(line + '\n' for line in rules)
