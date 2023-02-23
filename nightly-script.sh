@@ -3,7 +3,6 @@
 rm rep/json/*
 rm rep/json/derivable_rules/*
 
-touch rep/json/output.json
 cargo test --release
 
 OUTPUT=`cat rep/json/output.json`
