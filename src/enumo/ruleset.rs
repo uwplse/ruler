@@ -109,13 +109,17 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn write_json_rules(&self, filename: &str) {
         let mut filepath = "rep/json/".to_owned();
+
+        std::fs::create_dir_all(filepath.clone())
+            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+
         filepath.push_str(filename);
         let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(filepath)
-        .expect("Unable to open file");
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(filepath)
+            .expect("Unable to open file");
         let rules = json!({
             "rules": &self.to_str_vec(),
         })
@@ -133,6 +137,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         duration: Duration,
     ) {
         let mut filepath = "rep/json/derivable_rules/".to_owned();
+
+        std::fs::create_dir_all(filepath.clone())
+            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+
         filepath.push_str(name);
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));

@@ -1,10 +1,4 @@
 #!/bin/bash
-
-mkdir rep/json
-mkdir rep/json/derivable_rules
-
-touch rep/json/output.json
-
 cargo test --release
 
 OUTPUT=`cat rep/json/output.json`
@@ -27,5 +21,5 @@ RDIR="$(date +%s):$(hostname):$B:$C"
 
 nightly-results publish --name "$RDIR" "$DIR"
 
-rm rep/json/*
 rm rep/json/derivable_rules/*
+rm rep/json/*
