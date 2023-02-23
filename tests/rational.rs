@@ -490,7 +490,80 @@ mod test {
         );
     }
 
-    // #[test]
+    #[test]
+    fn old_terms() {
+        let limits = Limits::default();
+        let mut all_rules = Ruleset::default();
+        let wkld1 = Workload::from_file("l1.terms");
+        let r1 = Math::run_workload(wkld1, all_rules.clone(), limits);
+        all_rules.extend(r1);
+
+        let wkld2 = Workload::from_file("l2.terms");
+        let r2 = Math::run_workload(wkld2, all_rules.clone(), limits);
+        all_rules.extend(r2);
+
+        all_rules.to_file("old_terms.rules");
+
+        let baseline: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+        let (can, cannot) = all_rules.derive(baseline, Limits::default());
+        println!("{} can, {} cannot", can.len(), cannot.len());
+    }
+
+    #[test]
+    fn replicate_recipe() {
+        let limits = Limits::default();
+        let mut all_rules = Ruleset::default();
+        let inits = Workload::new(["a", "b", "c", "-1", "0", "1"]);
+
+        let contains = Filter::Or(
+            Box::new(Filter::Contains("a".parse().unwrap())),
+            Box::new(Filter::Or(
+                Box::new(Filter::Contains("b".parse().unwrap())),
+                Box::new(Filter::Contains("c".parse().unwrap())),
+            )),
+        );
+
+        let uops = Workload::new(["~", "fabs"]);
+        let bops = Workload::new(["+", "-", "*", "/"]);
+
+        let mk_layer = |wkld: Workload| {
+            Workload::new(["(uop expr)", "(bop expr expr)"])
+                .plug("uop", &uops)
+                .plug("bop", &bops)
+                .plug("expr", &wkld)
+        };
+
+        let wl1 = mk_layer(inits.clone()).filter(contains.clone());
+        wl1.to_file("wl1.terms");
+
+        let r1 = Math::run_workload(wl1.clone(), all_rules.clone(), limits);
+        all_rules.extend(r1);
+
+        // let wl2 = mk_layer(inits.append(wl1)).filter(contains);
+        // let r2 = Math::run_workload(wl2, all_rules.clone(), limits);
+        // all_rules.extend(r2);
+
+        all_rules.to_file("anjali.rules");
+
+        let baseline: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+        let (can, cannot) = all_rules.derive(baseline, Limits::default());
+        println!("{} can, {} cannot", can.len(), cannot.len());
+
+        let old_recipe_ruleset: Ruleset<Math> = Ruleset::from_file("old_recipe.txt");
+        let (can, cannot) = all_rules.derive(old_recipe_ruleset, Limits::default());
+        println!("{} can, {} cannot", can.len(), cannot.len());
+    }
+
+    #[test]
+    fn old_recipe_equiv() {
+        let old_recipe_ruleset: Ruleset<Math> = Ruleset::from_file("old_recipe.txt");
+        let baseline: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+
+        let (can, cannot) = old_recipe_ruleset.derive(baseline, Limits::default());
+        println!("{} can, {} cannot", can.len(), cannot.len());
+    }
+
+    #[test]
     fn rational_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
@@ -507,6 +580,7 @@ mod test {
                 ));
         let terms_1 = layer_1.clone().append(initial_vals.clone());
         let rules_1 = Math::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
+        rules_1.to_file("thia1.rules");
         all_rules.extend(rules_1.clone());
 
         let layer_2 = Workload::make_layer(layer_1.clone(), &["~", "fabs"], &["-", "+", "*", "/"])
@@ -519,6 +593,7 @@ mod test {
             ));
         let terms_2 = layer_2.clone().append(terms_1.clone());
         let rules_2 = Math::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
+        rules_2.to_file("thia2.rules");
         all_rules.extend(rules_2.clone());
 
         let terms: Vec<String> = terms_2
