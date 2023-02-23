@@ -51,12 +51,12 @@ mod test {
             .append(bops_1)
             .append(bops_2)
             .filter(Filter::MetricLt(Metric::List, 4))
-            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, 2))))
-            .append(terms_2.clone());
-        let rules_3 = Bv::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
+            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, 2))));
+        let terms_3 = layer_3.clone().append(terms_2.clone());
+        let rules_3 = Bv::run_workload(terms_3.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_3.clone());
 
-        let terms: Vec<String> = layer_3
+        let terms: Vec<String> = terms_3
             .clone()
             .force()
             .iter()
