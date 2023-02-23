@@ -78,7 +78,7 @@ impl Workload {
             Self::Set(vec![])
         } else {
             let rec = self.clone().iter(atom, n - 1);
-            self.plug(atom, rec)
+            self.plug(atom, &rec)
         }
     }
 
@@ -97,14 +97,14 @@ impl Workload {
 
         lang.iter_metric("expr", Metric::Atoms, n)
             .filter(Filter::Contains("var".parse().unwrap()))
-            .plug("cnst", consts)
-            .plug("var", vars)
-            .plug("uop", uops)
-            .plug("bop", bops)
+            .plug("cnst", &consts.into())
+            .plug("var", &vars.into())
+            .plug("uop", &uops.into())
+            .plug("bop", &bops.into())
     }
 
-    pub fn plug(self, name: impl Into<String>, workload: impl Into<Workload>) -> Self {
-        Workload::Plug(Box::new(self), name.into(), Box::new(workload.into()))
+    pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
+        Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {

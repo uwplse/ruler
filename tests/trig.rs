@@ -1,5 +1,6 @@
 use num::rational::Ratio;
 use num::BigInt;
+use num::{Signed, Zero};
 use ruler::enumo::Ruleset;
 use ruler::*;
 use std::fmt;
@@ -100,6 +101,18 @@ impl Debug for Variable {
     }
 }
 
+fn extract_constant(nodes: &[Trig]) -> Option<Rational> {
+    for n in nodes {
+        if let Trig::RealConst(v) = n {
+            if let Ok(r) = v.as_str().parse() {
+                return Some(r);
+            }
+        }
+    }
+
+    None
+}
+
 egg::define_language! {
   pub enum Trig {
     // trig operators
@@ -169,7 +182,6 @@ impl SynthLanguage for Trig {
             "(cis 0) ==> 1",
             "(cis (/ PI 2)) ==> I",
             // cis identities
-            "(cis (~ ?a)) ==> (/ 1 (cis ?a))",
             "(cis (+ ?a ?b)) ==> (* (cis ?a) (cis ?b))",
             "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (~ ?b)))",
             "(* (cis ?a) (cis (~ ?a))) ==> 1",
@@ -213,7 +225,192 @@ impl SynthLanguage for Trig {
         Trig::RealConst(c)
     }
 
+    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+        if egraph[id]
+            .nodes
+            .iter()
+            .any(|x| matches!(x, Trig::RealConst(_)))
+        {
+            return;
+        }
+
+        let mut to_add: Option<Trig> = None;
+        for n in &egraph[id].nodes {
+            match n {
+                Trig::Neg(i) => {
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        let r = Real::from((-x).to_string());
+                        to_add = Some(Self::mk_constant(r, egraph));
+                        break;
+                    }
+                }
+                Trig::Add([i, j]) => {
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            let r = Real::from((x + y).to_string());
+                            to_add = Some(Self::mk_constant(r, egraph));
+                            break;
+                        }
+                    }
+                }
+                Trig::Sub([i, j]) => {
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            let r = Real::from((x - y).to_string());
+                            to_add = Some(Self::mk_constant(r, egraph));
+                            break;
+                        }
+                    }
+                }
+                Trig::Mul([i, j]) => {
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            let r = Real::from((x * y).to_string());
+                            to_add = Some(Self::mk_constant(r, egraph));
+                            break;
+                        }
+                    }
+                }
+                Trig::Div([i, j]) => {
+                    if let Some(x) = extract_constant(&egraph[*i].nodes) {
+                        if let Some(y) = extract_constant(&egraph[*j].nodes) {
+                            if !y.is_zero() {
+                                let r = Real::from((x / y).to_string());
+                                to_add = Some(Self::mk_constant(r, egraph));
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if let Some(v) = to_add {
+            // add (~ v) if v is negative
+            if let Trig::RealConst(n) = v {
+                if let Ok(x) = n.as_str().parse::<Rational>() {
+                    if x.is_negative() {
+                        let pos_id = egraph.add(Self::mk_constant(
+                            Real::from((-x).to_string()),
+                            &mut egraph.clone(),
+                        ));
+                        let neg_id = egraph.add(Trig::Neg(pos_id));
+                        egraph.union(neg_id, id);
+                    }
+                }
+            }
+
+            let cnst_id = egraph.add(v);
+            egraph.union(cnst_id, id);
+        }
+    }
+
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use ruler::{
+        enumo::{Ruleset, Workload},
+        Limits, SynthLanguage,
+    };
+
+    use crate::Trig;
+
+    // #[test]
+    // fn og_recipe() {
+    //     let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+    //     let limits = Limits {
+    //         iter: 3,
+    //         node: 2000000,
+    //     };
+
+    //     let t_ops = Workload::new(["sin", "cos", "tan"]);
+    //     let consts = Workload::new([
+    //         "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
+    //     ]);
+    //     let app = Workload::new(["(op v)"]);
+    //     let trig_constants =
+    //         app.clone()
+    //             .plug("op", &t_ops)
+    //             .plug("v", &consts)
+    //             .filter(Filter::Invert(Box::new(Filter::Contains(
+    //                 "(tan (/ PI 2))".parse().unwrap(),
+    //             ))));
+
+    //     let simple_terms = app.clone().plug("op", &t_ops).plug(
+    //         "v",
+    //         &Workload::new(["a", "(~ a)", "(+ PI a)", "(- PI a)", "(+ a a)"]),
+    //     );
+
+    //     let neg_terms = Workload::new(["(~ x)"]).plug("x", &simple_terms);
+
+    //     let squares = Workload::new(["(sqr x)"])
+    //         .plug("x", &app)
+    //         .plug("op", &t_ops)
+    //         .plug("v", &Workload::new(["a", "b"]));
+
+    //     let add = Workload::new(["(+ e e)", "(- e e)"]);
+
+    //     let sum_of_squares = add.plug("e", &squares);
+
+    //     let mut all = complex;
+
+    //     let wkld1 = trig_constants;
+    //     println!("Starting 1");
+    //     let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
+    //     all.extend(rules1);
+
+    //     let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
+    //     println!("Starting 2");
+    //     let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
+    //     all.extend(rules2);
+
+    //     let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
+    //     println!("Starting 3");
+    //     let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
+    //     all.extend(rules3);
+
+    //     let wkld4 = Workload::Append(vec![wkld2, squares, sum_of_squares]);
+    //     println!("Starting 4");
+    //     let rules4 = Trig::run_workload(wkld4, all.clone(), limits);
+    //     all.extend(rules4);
+
+    //     let (can, cannot) = all.derive(Ruleset::from_file("tests/old-trig-recipe.txt"), limits);
+    //     println!("can: {}, cannot: {}", can.len(), cannot.len());
+    //     for (name, _) in cannot.0 {
+    //         println!("{}", name);
+    //     }
+    // }
+
+    #[test]
+    fn simple() {
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        assert_eq!(complex.len(), 57);
+
+        let terms = Workload::new([
+            "(sin 0)",
+            "(sin (/ PI 6))",
+            "(sin (/ PI 4))",
+            "(sin (/ PI 3))",
+            "(sin (/ PI 2))",
+            "(sin PI)",
+            "(sin (* PI 2))",
+        ]);
+        assert_eq!(terms.force().len(), 7);
+
+        let rules = Trig::run_workload(
+            terms,
+            complex,
+            Limits {
+                iter: 3,
+                node: 2000000,
+            },
+        );
+
+        assert_eq!(rules.len(), 2);
     }
 }
