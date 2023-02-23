@@ -114,7 +114,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         .read(true)
         .write(true)
         .create(true)
-        .open("rep/json/output.json")
+        .open(filepath)
         .expect("Unable to open file");
         let rules = json!({
             "rules": &self.to_str_vec(),
