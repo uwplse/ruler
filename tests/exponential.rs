@@ -96,16 +96,6 @@ impl SynthLanguage for Exponential {
             "(exp (* ?b (log ?a))) ==> (pow ?a ?b)",
             "(pow ?a 1/2) ==> (sqrt ?a)",
             "(pow ?a 1/3) ==> (cbrt ?a)",
-            // exponential properties (expand)
-            "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
-            "(exp (~ ?a)) ==> (/ 1 (exp ?a))",
-            // exponential properties (simplify)
-            "(* (exp ?a) (exp ?b)) ==> (exp (+ ?a ?b))",
-            "(/ 1 (exp ?a)) ==> (exp (~ ?a))",
-            "(exp 0) ==> 1",
-            // inverse properties
-            "(log (exp ?a)) ==> ?a",
-            "(exp (log ?a)) ==> ?a",
         ])
     }
 
@@ -130,6 +120,18 @@ mod test {
     // TODO: actually derive these rules
     fn rational_rules() -> Ruleset {
         Ruleset::from_str_vec(&[
+            // exponential properties (expand)
+            "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
+            "(exp (~ ?a)) ==> (/ 1 (exp ?a))",
+            // exponential properties (simplify)
+            "(* (exp ?a) (exp ?b)) ==> (exp (+ ?a ?b))",
+            "(/ 1 (exp ?a)) ==> (exp (~ ?a))",
+            "(exp 0) ==> 1",
+            // inverse properties
+            "(log (exp ?a)) ==> ?a",
+            "(exp (log ?a)) ==> ?a",
+
+            // rational rules
             "(* ?c (* ?b ?a)) ==> (* ?b (* ?a ?c))",
             "(* ?b (* ?a ?c)) ==> (* ?c (* ?b ?a))",
             "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
@@ -227,7 +229,7 @@ mod test {
     }
 
     fn constant_rules(prev_rules: &Ruleset) -> Ruleset {
-        let terms = Workload::from_vec(vec![
+        let terms = Workload::new(vec![
             "(exp 0)",
             "(exp 1)",
             "(log 1)",
@@ -241,15 +243,15 @@ mod test {
     }
 
     fn exp_rules(prev_rules: &Ruleset) -> Ruleset {
-        let lower_layer = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"])
-            .plug("v", &Workload::from_vec(vec!["a", "b", "c"]))
-            .plug("uop", &Workload::from_vec(vec!["exp"]))
-            .plug("bup", &Workload::from_vec(vec!["+", "*"]));
+        let lower_layer = Workload::new(vec!["v", "(uop v)", "(bop v v)"])
+            .plug("v", &Workload::new(vec!["a", "b", "c"]))
+            .plug("uop", &Workload::new(vec!["exp"]))
+            .plug("bup", &Workload::new(vec!["+", "*"]));
 
-        let upper_layer = Workload::from_vec(vec!["(uop v)", "(bop v v)"])
+        let upper_layer = Workload::new(vec!["(uop v)", "(bop v v)"])
             .plug("v", &lower_layer)
-            .plug("uop", &Workload::from_vec(vec!["exp"]))
-            .plug("bop", &Workload::from_vec(vec!["+", "*"]))
+            .plug("uop", &Workload::new(vec!["exp"]))
+            .plug("bop", &Workload::new(vec!["+", "*"]))
             .filter(Filter::Invert(Box::new(Filter::Contains(
                 "(exp (exp ?a))".parse().unwrap(),
             ))))
@@ -261,15 +263,15 @@ mod test {
     }
 
     fn log_rules(prev_rules: &Ruleset) -> Ruleset {
-        let lower_layer = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"])
-            .plug("v", &Workload::from_vec(vec!["a", "b", "c"]))
-            .plug("uop", &Workload::from_vec(vec!["log"]))
-            .plug("bup", &Workload::from_vec(vec!["*"]));
+        let lower_layer = Workload::new(vec!["v", "(uop v)", "(bop v v)"])
+            .plug("v", &Workload::new(vec!["a", "b", "c"]))
+            .plug("uop", &Workload::new(vec!["log"]))
+            .plug("bup", &Workload::new(vec!["*"]));
 
-        let upper_layer = Workload::from_vec(vec!["(uop v)", "(bop v v)"])
+        let upper_layer = Workload::new(vec!["(uop v)", "(bop v v)"])
             .plug("v", &lower_layer)
-            .plug("uop", &Workload::from_vec(vec!["log"]))
-            .plug("bop", &Workload::from_vec(vec!["+"]))
+            .plug("uop", &Workload::new(vec!["log"]))
+            .plug("bop", &Workload::new(vec!["+"]))
             .filter(Filter::Invert(Box::new(Filter::Contains(
                 "(exp (exp ?a))".parse().unwrap(),
             ))))
@@ -281,10 +283,10 @@ mod test {
     }
 
     fn no_pow_rules(prev_rules: &Ruleset) -> Ruleset {
-        let vars = Workload::from_vec(vec!["a", "b", "c"]);
-        let uops = Workload::from_vec(vec!["exp", "log", "sqrt", "cbrt"]);
-        let bops = Workload::from_vec(vec!["+", "*"]);
-        let lang = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"]);
+        let vars = Workload::new(vec!["a", "b", "c"]);
+        let uops = Workload::new(vec!["exp", "log", "sqrt", "cbrt"]);
+        let bops = Workload::new(vec!["+", "*"]);
+        let lang = Workload::new(vec!["v", "(uop v)", "(bop v v)"]);
 
         let lower_layer = lang
             .clone()
@@ -307,10 +309,10 @@ mod test {
     }
 
     fn simple_rules(prev_rules: &Ruleset) -> Ruleset {
-        let vars = Workload::from_vec(vec!["a", "b", "c"]);
-        let uops = Workload::from_vec(vec!["exp", "log", "sqrt", "cbrt"]);
-        let bops = Workload::from_vec(vec!["+", "*", "pow"]);
-        let lang = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"]);
+        let vars = Workload::new(vec!["a", "b", "c"]);
+        let uops = Workload::new(vec!["exp", "log", "sqrt", "cbrt"]);
+        let bops = Workload::new(vec!["+", "*", "pow"]);
+        let lang = Workload::new(vec!["v", "(uop v)", "(bop v v)"]);
 
         let lower_layer = lang
             .clone()
@@ -333,10 +335,10 @@ mod test {
     }
 
     fn div_rules(prev_rules: &Ruleset) -> Ruleset {
-        let vars = Workload::from_vec(vec!["a", "b"]);
-        let uops = Workload::from_vec(vec!["sqrt", "cbrt"]);
-        let bops = Workload::from_vec(vec!["/"]);
-        let lang = Workload::from_vec(vec!["v", "(uop v)", "(bop v v)"]);
+        let vars = Workload::new(vec!["a", "b"]);
+        let uops = Workload::new(vec!["sqrt", "cbrt"]);
+        let bops = Workload::new(vec!["/"]);
+        let lang = Workload::new(vec!["v", "(uop v)", "(bop v v)"]);
 
         let lower_layer = lang
             .clone()
