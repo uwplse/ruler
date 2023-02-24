@@ -12,7 +12,7 @@ mod test {
     use std::io::Write;
     use std::time::Instant;
 
-    // #[test]
+    #[test]
     fn bv4_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();

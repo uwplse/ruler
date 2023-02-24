@@ -196,7 +196,7 @@ mod test {
         assert_eq!(all_rules.len(), 32);
     }
 
-    // #[test]
+    #[test]
     fn bool_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
