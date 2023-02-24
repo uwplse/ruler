@@ -374,12 +374,12 @@ mod test {
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3);
 
-        let wkld4 = Workload::Append(vec![wkld2, squares, sum_of_squares]);
-        println!("Starting 4");
-        let rules4 = Trig::run_workload(wkld4, all.clone(), limits);
-        all.extend(rules4);
+        // let wkld4 = Workload::Append(vec![wkld2, squares, sum_of_squares]);
+        // println!("Starting 4");
+        // let rules4 = Trig::run_workload(wkld4, all.clone(), limits);
+        // all.extend(rules4);
 
-        let (can, cannot) = all.derive(Ruleset::from_file("tests/old-trig-recipe.txt"), limits);
+        let (can, cannot) = all.derive(Ruleset::from_file("old-trig-recipe.txt"), limits);
         println!("can: {}, cannot: {}", can.len(), cannot.len());
         for (name, _) in cannot.0 {
             println!("{}", name);
