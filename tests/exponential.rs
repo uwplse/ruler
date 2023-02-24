@@ -130,7 +130,6 @@ mod test {
             // inverse properties
             "(log (exp ?a)) ==> ?a",
             "(exp (log ?a)) ==> ?a",
-
             // rational rules
             "(* ?c (* ?b ?a)) ==> (* ?b (* ?a ?c))",
             "(* ?b (* ?a ?c)) ==> (* ?c (* ?b ?a))",
