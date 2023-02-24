@@ -299,11 +299,11 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     ) -> Ruleset<Self> {
         let t = Instant::now();
 
+        let egraph = workload.to_egraph::<Self>();
         let mut candidates = if Self::is_rule_lifting() {
-            let mut egraph = workload.to_egraph::<Self>();
-            Ruleset::lift_rules(&mut egraph, prior_rules.clone(), limits)
+            Ruleset::allow_forbid_actual(egraph, prior_rules.clone(), limits)
         } else {
-            let egraph = prior_rules.compress_workload(workload, limits);
+            let egraph = prior_rules.compress(&egraph, limits);
             Ruleset::fast_cvec_match(&egraph)
         };
 
