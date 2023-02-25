@@ -331,8 +331,6 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 mod test {
     use super::*;
     use ruler::enumo::{Filter, Ruleset, Workload};
-    use std::fs::OpenOptions;
-    use std::io::Write;
     use std::time::Instant;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -490,57 +488,48 @@ mod test {
         );
     }
 
+    fn filter_sound(wl: Workload) -> Workload {
+        wl.filter(Filter::Or(
+            Box::new(Filter::Contains("a".parse().unwrap())),
+            Box::new(Filter::Or(
+                Box::new(Filter::Contains("b".parse().unwrap())),
+                Box::new(Filter::Contains("c".parse().unwrap())),
+            )),
+        ))
+        .filter(Filter::Invert(Box::new(Filter::Contains(
+            "( / * 0)".parse().unwrap(),
+        ))))
+    }
+
     #[test]
     fn rational_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
 
         let initial_vals = Workload::new(["a", "b", "c", "0", "-1", "1"]);
-        let layer_1 =
-            Workload::make_layer(initial_vals.clone(), &["~", "fabs"], &["-", "+", "*", "/"])
-                .filter(Filter::Or(
-                    Box::new(Filter::Contains("a".parse().unwrap())),
-                    Box::new(Filter::Or(
-                        Box::new(Filter::Contains("b".parse().unwrap())),
-                        Box::new(Filter::Contains("c".parse().unwrap())),
-                    )),
-                ));
+        let uops = Workload::new(["~", "fabs"]);
+        let bops = Workload::new(["-", "+", "*", "/"]);
+
+        let layer_1 = filter_sound(Workload::make_layer(
+            initial_vals.clone(),
+            uops.clone(),
+            bops.clone(),
+        ));
         let terms_1 = layer_1.clone().append(initial_vals.clone());
         let rules_1 = Math::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_1.clone());
 
-        let layer_2 = Workload::make_layer(layer_1.clone(), &["~", "fabs"], &["-", "+", "*", "/"])
-            .filter(Filter::Or(
-                Box::new(Filter::Contains("a".parse().unwrap())),
-                Box::new(Filter::Or(
-                    Box::new(Filter::Contains("b".parse().unwrap())),
-                    Box::new(Filter::Contains("c".parse().unwrap())),
-                )),
-            ));
+        let layer_2 = filter_sound(Workload::make_layer(
+            layer_1.clone(),
+            uops.clone(),
+            bops.clone(),
+        ));
         let terms_2 = layer_2.clone().append(terms_1.clone());
         let rules_2 = Math::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_2.clone());
-
-        let terms: Vec<String> = terms_2
-            .clone()
-            .force()
-            .iter()
-            .map(|se| se.to_string())
-            .collect();
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open("terms_rat.txt")
-            .expect("Unable to open file");
-        terms.iter().for_each(|t| {
-            file.write_all(t.as_bytes())
-                .expect("Unable to write to file");
-            file.write_all("\n".as_bytes())
-                .expect("Unable to write to file");
-        });
-
         let duration = start.elapsed();
+
+        terms_2.write_terms_to_file("terms_rat.txt");
         let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
 
         all_rules.write_json_rules("rational.json");
@@ -548,7 +537,10 @@ mod test {
             baseline.clone(),
             97,
             "rational.json",
-            Limits::default(),
+            Limits {
+                iter: 3,
+                node: 300000,
+            },
             duration.clone(),
         );
     }

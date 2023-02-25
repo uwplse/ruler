@@ -1,8 +1,8 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
 
-use crate::{HashSet, SynthAnalysis, SynthLanguage};
-
 use super::*;
+use crate::{HashSet, SynthAnalysis, SynthLanguage};
+use std::{fs::OpenOptions, io::Write};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Workload {
@@ -15,14 +15,6 @@ pub enum Workload {
 impl Workload {
     pub fn new<'a>(vals: impl IntoIterator<Item = &'a str>) -> Self {
         Self::Set(vals.into_iter().map(|x| x.parse().unwrap()).collect())
-    }
-
-    pub fn from_vec(strs: Vec<&str>) -> Self {
-        Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
-    }
-
-    pub fn from_vec_string(strs: Vec<String>) -> Self {
-        Self::Set(strs.iter().map(|x| x.parse().unwrap()).collect())
     }
 
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
@@ -134,31 +126,62 @@ impl Workload {
         }
     }
 
-    pub fn make_layer(exprs: Workload, uops: &[&str], bops: &[&str]) -> Self {
+    pub fn make_layer(exprs: Workload, uops: Workload, bops: Workload) -> Self {
         let lang = Workload::new(["expr", "(uop expr)", "(bop expr expr)"]);
 
         lang.plug("expr", &exprs)
-            .plug("uop", &Workload::from_vec(uops.to_vec()))
-            .plug("bop", &Workload::from_vec(bops.to_vec()))
+            .plug("uop", &uops)
+            .plug("bop", &bops)
     }
 
-    pub fn make_layer_uops(exprs: Workload, uops: &[&str]) -> Self {
-        let lang = Workload::new(["expr", "(uop expr)"]);
-
-        lang.plug("expr", &exprs)
-            .plug("uop", &Workload::from_vec(uops.to_vec()))
-    }
-
-    pub fn make_layer_bops(e_1: Workload, e_2: Workload, bops: &[&str]) -> Self {
+    pub fn make_layer_clever(
+        l0: Workload,
+        l1: Workload,
+        l2: Workload,
+        uops: Workload,
+        bops: Workload,
+        list_len: usize,
+    ) -> Self {
         let lang = Workload::new([
-            "expr_2",
-            "expr_1",
-            "(bop expr_2 expr_1)",
-            "(bop expr_1 expr_2)",
+            "l0",
+            "l1",
+            "l2",
+            "(uop l2)",
+            "(bop l1 l1)",
+            "(bop l0 l2)",
+            "(bop l2 l0)",
         ]);
-        lang.plug("expr_2", &e_1)
-            .plug("expr_1", &e_2)
-            .plug("bop", &Workload::from_vec(bops.to_vec()))
+        lang.plug("uop", &uops)
+            .plug("bop", &bops)
+            .plug("l0", &l0)
+            .plug("l1", &l1)
+            .plug("l2", &l2)
+            .filter(Filter::MetricLt(Metric::List, list_len + 1))
+            .filter(Filter::Invert(Box::new(Filter::MetricLt(
+                Metric::List,
+                std::cmp::max(0, list_len - 1),
+            ))))
+    }
+
+    pub fn write_terms_to_file(&self, filename: &str) {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(filename)
+            .expect("Unable to open file");
+        let terms: Vec<String> = self
+            .clone()
+            .force()
+            .iter()
+            .map(|se| se.to_string())
+            .collect();
+        terms.iter().for_each(|t| {
+            file.write_all(t.as_bytes())
+                .expect("Unable to write to file");
+            file.write_all("\n".as_bytes())
+                .expect("Unable to write to file");
+        });
     }
 }
 

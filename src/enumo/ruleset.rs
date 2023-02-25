@@ -1,7 +1,7 @@
-use egg::{AstSize, EClass, Extractor, Rewrite, Runner, StopReason};
+use egg::{AstSize, EClass, Extractor, StopReason};
 use serde_json::*;
 use std::fs::*;
-use std::{io::Write, sync::Arc, time::Duration};
+use std::{io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
     CVec, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -107,6 +107,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(eqs)
     }
 
+    // Writes the ruleset to the json/ subdirectory, to be uploaded to the
+    // nightly server. The ruleset is written as a json object with a single
+    // field, "rules".
     pub fn write_json_rules(&self, filename: &str) {
         let mut filepath = "rep/json/".to_owned();
 
@@ -128,6 +131,13 @@ impl<L: SynthLanguage> Ruleset<L> {
             .expect("Unable to write to file");
     }
 
+    // Given two rulesets, computes bidirectional derivability between them
+    // and writes the results to the json/derivable_rules/ subdirectory,
+    // to be uploaded to the nightly server. The results are formatted as a
+    // json object with four fields: "forwards derivable", "forwards underivable",
+    // "backwards derivable", and "backwards underivable". Also updates the
+    // "output.json" file in the json/ subdirectory with the the derivability results
+    // and statistics about runtime and the number of rules in each ruleset.
     pub fn write_json_equiderivability(
         &self,
         baseline: Self,
@@ -165,15 +175,17 @@ impl<L: SynthLanguage> Ruleset<L> {
         let backwards_derivable = &can_b.len();
         let time = &duration.as_secs();
 
-        let _outfile = OpenOptions::new()
+        let mut outfile = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open("rep/json/output.json")
             .expect("Unable to open file");
 
-        let outfile_string =
-            std::fs::read_to_string("rep/json/output.json").expect("Unable to read file");
+        let mut outfile_string = String::new();
+        outfile
+            .read_to_string(&mut outfile_string)
+            .expect("Unable to read file");
         let mut json_arr = vec![];
 
         if !(outfile_string.is_empty()) {
@@ -212,38 +224,6 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
         file.write_all("]".as_bytes()).expect("write failed");
-    }
-
-    fn from_unions(
-        egraph: &EGraph<L, SynthAnalysis>,
-        unions: HashMap<Id, Vec<Id>>,
-        prior: &Self,
-    ) -> Self {
-        let mut candidates = Ruleset::default();
-        let clone = egraph.clone();
-        let extract = Extractor::new(&clone, ExtractableAstSize);
-        for ids in unions.values() {
-            for id1 in ids.clone() {
-                for id2 in ids.clone() {
-                    let (c1, e1) = extract.find_best(id1);
-                    let (c2, e2) = extract.find_best(id2);
-                    if c1 == usize::MAX || c2 == usize::MAX {
-                        continue;
-                    }
-                    if let Some(eq) = Equality::new(&e1, &e2) {
-                        if e1 != e2 {
-                            if prior.0.contains_key(&eq.name) {
-                                // We already have this rule
-                                continue;
-                            }
-                            candidates.add(eq)
-                        }
-                    }
-                }
-            }
-        }
-
-        candidates
     }
 
     pub fn apply_unions(egraph: &mut EGraph<L, SynthAnalysis>, unions: HashMap<Id, Vec<Id>>) {
