@@ -17,6 +17,24 @@ impl Workload {
         Self::Set(vals.into_iter().map(|x| x.parse().unwrap()).collect())
     }
 
+    pub fn to_file(&self, filename: &str) {
+        let mut file = std::fs::File::create(filename)
+            .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
+        for name in &self.force() {
+            writeln!(file, "{}", name).expect("Unable to write");
+        }
+    }
+
+    pub fn from_file(filename: &str) -> Self {
+        let infile = std::fs::File::open(filename).expect("can't open file");
+        let reader = std::io::BufReader::new(infile);
+        let mut sexps = vec![];
+        for line in std::io::BufRead::lines(reader) {
+            sexps.push(line.unwrap().parse().unwrap());
+        }
+        Self::Set(sexps)
+    }
+
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
         let sexps = self.force();
