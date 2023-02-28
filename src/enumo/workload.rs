@@ -13,8 +13,12 @@ pub enum Workload {
 }
 
 impl Workload {
-    pub fn new<'a>(vals: impl IntoIterator<Item = &'a str>) -> Self {
-        Self::Set(vals.into_iter().map(|x| x.parse().unwrap()).collect())
+    pub fn new<I>(vals: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        Self::Set(vals.into_iter().map(|x| x.as_ref().parse().unwrap()).collect())
     }
 
     pub fn to_file(&self, filename: &str) {
