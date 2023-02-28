@@ -51,7 +51,7 @@ impl SynthLanguage for Pos {
     }
 
     fn get_lifting_rules() -> Ruleset<Self> {
-        Ruleset::from_str_vec(&[
+        Ruleset::new(&[
             "XH ==> (S Z)",
             "(S Z) ==> XH",
             "(XO ?a) ==> (+ ?a ?a)",
@@ -136,7 +136,7 @@ mod tests {
             "(+ ?a ?a) ==> (* ?a (S (S Z)))",
         ];
 
-        let prior = Ruleset::from_str_vec(&nat_rules);
+        let prior = Ruleset::new(&nat_rules);
 
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
@@ -186,7 +186,7 @@ mod tests {
         ];
 
         let mut all_rules = Ruleset::default();
-        all_rules.extend(Ruleset::from_str_vec(&nat_rules));
+        all_rules.extend(Ruleset::new(&nat_rules));
 
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);

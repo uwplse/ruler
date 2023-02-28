@@ -150,7 +150,7 @@ impl SynthLanguage for Trig {
     }
 
     fn get_lifting_rules() -> Ruleset<Self> {
-        Ruleset::from_str_vec(&[
+        Ruleset::new(&[
             // definition of sine, cosine, tangent
             "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",
             "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)",

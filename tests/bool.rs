@@ -247,7 +247,7 @@ mod test {
 
     #[test]
     fn round_trip_to_file() {
-        let rules: Ruleset<Bool> = Ruleset::from_str_vec(&[
+        let rules: Ruleset<Bool> = Ruleset::new(&[
             "(^ ?b ?a) ==> (^ ?a ?b)",
             "(& ?b ?a) ==> (& ?a ?b)",
             "(| ?b ?a) ==> (| ?a ?b)",
