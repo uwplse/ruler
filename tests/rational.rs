@@ -28,6 +28,7 @@ egg::define_language! {
     "*" = Mul([Id; 2]),
     "/" = Div([Id; 2]),
     "~" = Neg(Id),
+    "fabs" = Abs(Id),
     Lit(Constant),
     Var(egg::Symbol),
   }
@@ -52,6 +53,7 @@ impl SynthLanguage for Math {
               }
             }),
             Math::Neg(x) => map!(get_cvec, x => Some(-x)),
+            Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
         }
@@ -65,6 +67,7 @@ impl SynthLanguage for Math {
             Math::Lit(n) => Interval::new(Some(n.clone()), Some(n.clone())),
             Math::Var(_) => Interval::default(),
             Math::Neg(x) => neg(get_interval(x)),
+            Math::Abs(a) => abs(get_interval(a)),
             Math::Add([x, y]) => add(get_interval(x), get_interval(y)),
             Math::Sub([x, y]) => add(get_interval(x), &neg(get_interval(y))),
             Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
@@ -158,6 +161,15 @@ fn egg_to_z3<'a>(
                 ))
             }
             Math::Neg(x) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*x)])),
+            Math::Abs(a) => {
+                let inner = &buf[usize::from(*a)].clone();
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Real::le(inner, &zero),
+                    &z3::ast::Real::unary_minus(inner),
+                    &inner,
+                ));
+            }
             Math::Lit(c) => buf.push(z3::ast::Real::from_real(
                 ctx,
                 (c.numer()).to_i32().unwrap(),
@@ -210,6 +222,44 @@ fn neg(interval: &Interval<Constant>) -> Interval<Constant> {
     let low = interval.low.clone();
     let high = interval.high.clone();
     Interval::new(high.map(|x| -x), low.map(|x| -x))
+}
+
+fn abs(interval: &Interval<Constant>) -> Interval<Constant> {
+    let low = interval.low.clone();
+    let high = interval.high.clone();
+
+    match (low, high) {
+        (None, None) => Interval::new(None, None),
+        (Some(x), None) => {
+            if x.is_negative() {
+                Interval::new(Some(-x), None)
+            } else {
+                Interval::new(Some(x), None)
+            }
+        }
+        (None, Some(y)) => {
+            if y.is_negative() {
+                Interval::new(None, Some(-y))
+            } else {
+                Interval::new(None, Some(y))
+            }
+        }
+        (Some(x), Some(y)) => {
+            if x.is_negative() {
+                if y.is_negative() {
+                    Interval::new(Some(-x), Some(-y))
+                } else {
+                    Interval::new(Some(-x), Some(y))
+                }
+            } else {
+                if y.is_negative() {
+                    Interval::new(Some(x), Some(-y))
+                } else {
+                    Interval::new(Some(x), Some(y))
+                }
+            }
+        }
+    }
 }
 
 fn add(a: &Interval<Constant>, b: &Interval<Constant>) -> Interval<Constant> {
@@ -280,6 +330,8 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ruler::enumo::{Filter, Ruleset, Workload};
+    use std::time::Instant;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
@@ -433,6 +485,63 @@ mod test {
                     (-10).to_bigint().unwrap()
                 )),
             )
+        );
+    }
+
+    fn filter_sound(wl: Workload) -> Workload {
+        wl.filter(Filter::Or(
+            Box::new(Filter::Contains("a".parse().unwrap())),
+            Box::new(Filter::Or(
+                Box::new(Filter::Contains("b".parse().unwrap())),
+                Box::new(Filter::Contains("c".parse().unwrap())),
+            )),
+        ))
+        .filter(Filter::Invert(Box::new(Filter::Contains(
+            "( / * 0)".parse().unwrap(),
+        ))))
+    }
+
+    #[test]
+    fn rational_oopsla_equiv() {
+        let mut all_rules = Ruleset::default();
+        let start = Instant::now();
+
+        let initial_vals = Workload::new(["a", "b", "c", "0", "-1", "1"]);
+        let uops = Workload::new(["~", "fabs"]);
+        let bops = Workload::new(["-", "+", "*", "/"]);
+
+        let layer_1 = filter_sound(Workload::make_layer(
+            initial_vals.clone(),
+            uops.clone(),
+            bops.clone(),
+        ));
+        let terms_1 = layer_1.clone().append(initial_vals.clone());
+        let rules_1 = Math::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_1.clone());
+
+        let layer_2 = filter_sound(Workload::make_layer(
+            layer_1.clone(),
+            uops.clone(),
+            bops.clone(),
+        ));
+        let terms_2 = layer_2.clone().append(terms_1.clone());
+        let rules_2 = Math::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_2.clone());
+        let duration = start.elapsed();
+
+        terms_2.write_terms_to_file("terms_rat.txt");
+        let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
+
+        all_rules.write_json_rules("rational.json");
+        all_rules.write_json_equiderivability(
+            baseline.clone(),
+            97,
+            "rational.json",
+            Limits {
+                iter: 3,
+                node: 300000,
+            },
+            duration.clone(),
         );
     }
 }
