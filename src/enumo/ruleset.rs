@@ -34,6 +34,15 @@ impl<L: SynthLanguage> Default for Ruleset<L> {
 }
 
 impl<L: SynthLanguage> Ruleset<L> {
+    pub fn new<'a>(vals: impl IntoIterator<Item = &'a str>) -> Self {
+        let mut map = IndexMap::default();
+        let eqs: Vec<Equality<L>> = vals.into_iter().map(|x| x.parse().unwrap()).collect();
+        for eq in eqs {
+            map.insert(eq.name.clone(), eq);
+        }
+        Ruleset(map)
+    }
+
     pub fn from_str_vec(ss: &[&str]) -> Self {
         let mut map = IndexMap::default();
         let eqs: Vec<Equality<L>> = ss.iter().map(|s| s.parse().unwrap()).collect();
