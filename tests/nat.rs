@@ -172,6 +172,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
 
 #[cfg(test)]
 mod test {
+
     use ruler::enumo::{Ruleset, Workload};
 
     use super::*;

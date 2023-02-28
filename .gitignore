@@ -3,6 +3,7 @@
 /out
 /*.json
 /*.sh
+/rep/json/*
 
 # Scripts
 scripts/ablation/output/*
@@ -23,6 +24,7 @@ out/
 *.txt
 *.pdf
 *.bak
+.z3-trace
 
 # Racket
 *.dep

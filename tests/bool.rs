@@ -120,9 +120,9 @@ impl SynthLanguage for Bool {
 
 #[cfg(test)]
 mod test {
-    use ruler::enumo::{Ruleset, Workload};
-
     use super::*;
+    use ruler::enumo::{Filter, Metric, Ruleset, Workload};
+    use std::time::Instant;
 
     fn iter_bool(n: usize) -> Workload {
         Workload::iter_lang(
@@ -195,6 +195,57 @@ mod test {
     }
 
     #[test]
+    fn bool_oopsla_equiv() {
+        let mut all_rules = Ruleset::default();
+        let start = Instant::now();
+
+        let initial_vals = Workload::new(["ba", "bb", "bc"]);
+        let uops = Workload::new(["~"]);
+        let bops = Workload::new(["&", "|", "^"]);
+
+        let layer_1 = Workload::make_layer(initial_vals.clone(), uops.clone(), bops.clone())
+            .filter(Filter::MetricLt(Metric::List, 2));
+        let terms_1 = layer_1.clone().append(initial_vals.clone());
+        let rules_1 = Bool::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_1.clone());
+
+        let layer_2 = Workload::make_layer(layer_1.clone(), uops.clone(), bops.clone())
+            .filter(Filter::MetricLt(Metric::List, 3))
+            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, 1))));
+        let terms_2 = layer_2.clone().append(terms_1.clone());
+        let rules_2 = Bool::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_2.clone());
+
+        let layer_3 = Workload::make_layer_clever(
+            initial_vals,
+            layer_1,
+            layer_2,
+            uops.clone(),
+            bops.clone(),
+            3,
+        );
+        let terms_3 = layer_3.clone().append(terms_2.clone());
+        let rules_3 = Bool::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
+        all_rules.extend(rules_3.clone());
+        let duration = start.elapsed();
+
+        terms_3.write_terms_to_file("terms_bool.txt");
+        let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
+
+        all_rules.write_json_rules("bool.json");
+        all_rules.write_json_equiderivability(
+            baseline.clone(),
+            51,
+            "bool.json",
+            Limits {
+                iter: 3,
+                node: 300000,
+            },
+            duration.clone(),
+        );
+    }
+
+    #[test]
     fn round_trip_to_file() {
         let rules: Ruleset<Bool> = Ruleset::from_str_vec(&[
             "(^ ?b ?a) ==> (^ ?a ?b)",
@@ -217,7 +268,7 @@ mod test {
             iter_bool(3),
             Ruleset::default(),
             Limits {
-                iter: 3,
+                iter: 4,
                 node: 1000000,
             },
         );
@@ -227,7 +278,7 @@ mod test {
             iter_bool(4),
             Ruleset::default(),
             Limits {
-                iter: 3,
+                iter: 4,
                 node: 1000000,
             },
         );
@@ -236,7 +287,7 @@ mod test {
         let (can, cannot) = three.derive(
             four,
             Limits {
-                iter: 2,
+                iter: 10,
                 node: 1000000,
             },
         );
