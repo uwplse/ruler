@@ -396,7 +396,7 @@ mod test {
         all_rules.extend(div_rules.clone());
         new_rules.extend(div_rules);
 
-        // only upload new rules 
+        // only upload new rules
         new_rules.write_json_rules("exponential.json");
     }
 }
