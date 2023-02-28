@@ -8,7 +8,10 @@ use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
 };
 
-use crate::{enumo::Workload, *};
+use crate::{
+    enumo::{Scheduler, Workload},
+    *,
+};
 
 #[derive(Clone)]
 pub struct SynthAnalysis {
@@ -303,7 +306,9 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         let mut candidates = if Self::is_rule_lifting() {
             Ruleset::allow_forbid_actual(egraph, prior_rules.clone(), limits)
         } else {
-            let egraph = prior_rules.compress(&egraph, limits);
+            println!("Starting size: {}", egraph.number_of_classes());
+            let egraph = prior_rules.run(&egraph, Scheduler::KStep(limits));
+            println!("Ending size: {}", egraph.number_of_classes());
             Ruleset::fast_cvec_match(&egraph)
         };
 

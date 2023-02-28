@@ -1,4 +1,4 @@
-use egg::{AstSize, EClass, Extractor, StopReason};
+use egg::{AstSize, EClass, Extractor};
 use serde_json::*;
 use std::fs::*;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
@@ -238,54 +238,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph.rebuild();
     }
 
-    pub fn compress(
+    pub fn run(
         &self,
         egraph: &EGraph<L, SynthAnalysis>,
-        limits: Limits,
-    ) -> EGraph<L, SynthAnalysis> {
-        let mut clone = egraph.clone();
-        let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
-
-        let (out_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
-
-        // Build a map from id in out_graph to all of the ids in egraph that are equivalent
-        let mut unions = HashMap::default();
-        for id in ids {
-            let new_id = out_egraph.find(id);
-            unions.entry(new_id).or_insert_with(Vec::new).push(id);
-        }
-
-        for ids in unions.values() {
-            if ids.len() > 1 {
-                let first = ids[0];
-                for id in &ids[1..] {
-                    clone.union(first, *id);
-                }
-            }
-        }
-
-        clone.rebuild();
-        clone
-    }
-
-    pub fn crunch(
-        &self,
-        egraph: &EGraph<L, SynthAnalysis>,
-        limits: Limits,
-    ) -> EGraph<L, SynthAnalysis> {
-        let (new_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
-        new_egraph
-    }
-
-    fn run_internal(
-        &self,
-        egraph: EGraph<L, SynthAnalysis>,
         scheduler: Scheduler,
-    ) -> (EGraph<L, SynthAnalysis>, StopReason) {
-        let mut runner = scheduler.run(egraph, self);
-
-        runner.egraph.rebuild();
-        (runner.egraph, runner.stop_reason.unwrap())
+    ) -> EGraph<L, SynthAnalysis> {
+        scheduler.run(egraph.clone(), self)
     }
 
     pub fn extract_candidates(
@@ -337,17 +295,17 @@ impl<L: SynthLanguage> Ruleset<L> {
         let eg_init = egraph;
         // Allowed rules: run on clone, apply unions, no candidates
         let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
-        let eg_allowed = allowed.compress(&eg_init, limits);
+        let eg_allowed = allowed.run(&eg_init, Scheduler::KStep(limits));
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = L::get_lifting_rules();
-        let eg_denote = lifting_rules.crunch(&eg_allowed, limits);
+        let eg_denote = lifting_rules.run(&eg_allowed, Scheduler::Simple(limits));
         let mut candidates = Self::extract_candidates(&eg_allowed, &eg_denote);
 
         // All rules: clone/no clone doesn't matter, extract candidates
         let mut all_rules = prior;
         all_rules.extend(lifting_rules);
-        let eg_final = all_rules.compress(&eg_denote, limits);
+        let eg_final = all_rules.run(&eg_denote, Scheduler::KStep(limits));
         candidates.extend(Self::extract_candidates(&eg_denote, &eg_final));
 
         candidates
@@ -466,7 +424,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         // 3. compress with the rules we've chosen so far
-        let egraph = chosen.compress(&egraph, limits);
+        let egraph = chosen.run(&egraph, Scheduler::KStep(limits));
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
@@ -506,14 +464,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         let rexpr = &L::instantiate(&rule.rhs);
         egraph.add_expr(lexpr);
         egraph.add_expr(rexpr);
-        let runner = scheduler.run(egraph, self);
+        let egraph = scheduler.run(egraph, self);
 
-        let l_id = runner
-            .egraph
+        let l_id = egraph
             .lookup_expr(lexpr)
             .unwrap_or_else(|| panic!("Did not find {}", lexpr));
-        let r_id = runner
-            .egraph
+        let r_id = egraph
             .lookup_expr(rexpr)
             .unwrap_or_else(|| panic!("Did not find {}", rexpr));
         l_id == r_id
