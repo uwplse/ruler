@@ -1,5 +1,5 @@
 use egg::{AstSize, EClass, Extractor, StopReason};
-use indexmap::map::{Iter, IterMut, Values, ValuesMut, IntoIter};
+use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use serde_json::*;
 use std::fs::*;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
@@ -68,7 +68,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         I::Item: AsRef<str>,
     {
         let mut map = IndexMap::default();
-        let eqs: Vec<Equality<L>> = vals.into_iter().map(|x| x.as_ref().parse().unwrap()).collect();
+        let eqs: Vec<Equality<L>> = vals
+            .into_iter()
+            .map(|x| x.as_ref().parse().unwrap())
+            .collect();
         for eq in eqs {
             map.insert(eq.name.clone(), eq);
         }

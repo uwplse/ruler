@@ -18,7 +18,11 @@ impl Workload {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        Self::Set(vals.into_iter().map(|x| x.as_ref().parse().unwrap()).collect())
+        Self::Set(
+            vals.into_iter()
+                .map(|x| x.as_ref().parse().unwrap())
+                .collect(),
+        )
     }
 
     pub fn to_file(&self, filename: &str) {
