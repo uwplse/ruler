@@ -313,12 +313,11 @@ impl SynthLanguage for Trig {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use ruler::{
         enumo::{Filter, Ruleset, Workload},
         Limits, SynthLanguage,
     };
-
-    use crate::Trig;
 
     #[test]
     fn og_recipe() {
@@ -358,26 +357,31 @@ mod test {
         let sum_of_squares = add.plug("e", &squares);
 
         let mut all = complex;
+        let mut new = Ruleset::<Trig>::default();
 
         let wkld1 = trig_constants;
         println!("Starting 1");
         let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
         all.extend(rules1.clone());
+        new.extend(rules1.clone());
         assert_eq!(rules1.len(), 11);
 
         let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
         println!("Starting 2");
         let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
         all.extend(rules2.clone());
+        new.extend(rules2.clone());
         assert_eq!(rules2.len(), 6);
 
         let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
         println!("Starting 3");
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3.clone());
+        new.extend(rules3.clone());
         assert_eq!(rules3.len(), 3);
 
-        all.write_json_rules("trig.json");
+        // Only new rules should be uploaded!
+        new.write_json_rules("trig.json");
     }
 
     #[test]
