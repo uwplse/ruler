@@ -377,16 +377,7 @@ mod test {
         all.extend(rules3.clone());
         assert_eq!(rules3.len(), 3);
 
-        // let wkld4 = Workload::Append(vec![wkld2, squares, sum_of_squares]);
-        // println!("Starting 4");
-        // let rules4 = Trig::run_workload(wkld4, all.clone(), limits);
-        // all.extend(rules4);
-
-        // let (can, cannot) = all.derive(Ruleset::from_file("old-trig-recipe.txt"), limits);
-        // println!("can: {}, cannot: {}", can.len(), cannot.len());
-        // for (name, _) in cannot.0 {
-        //     println!("{}", name);
-        // }
+        all.write_json_rules("trig.json");
     }
 
     #[test]
