@@ -117,8 +117,7 @@ mod test {
         ($($x:expr),*) => (vec![$($x.to_string()),*]);
     }
 
-    // TODO: actually derive these rules
-    fn rational_rules() -> Ruleset {
+    fn starting_exponential_rules() -> Ruleset {
         Ruleset::from_str_vec(&[
             // exponential properties (expand)
             "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
@@ -130,7 +129,12 @@ mod test {
             // inverse properties
             "(log (exp ?a)) ==> ?a",
             "(exp (log ?a)) ==> ?a",
-            // rational rules
+        ])
+    }
+
+    // TODO: actually derive these rules
+    fn rational_rules() -> Ruleset {
+        Ruleset::from_str_vec(&[
             "(* ?c (* ?b ?a)) ==> (* ?b (* ?a ?c))",
             "(* ?b (* ?a ?c)) ==> (* ?c (* ?b ?a))",
             "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
@@ -357,32 +361,42 @@ mod test {
     #[test]
     fn make_rules() {
         let mut all_rules = rational_rules();
+        let mut new_rules = Ruleset::default();
+
+        all_rules.extend(starting_exponential_rules());
+        new_rules.extend(starting_exponential_rules());
 
         // Constant layer
         let const_rules = constant_rules(&all_rules);
-        all_rules.extend(const_rules);
+        all_rules.extend(const_rules.clone());
+        new_rules.extend(const_rules);
 
         // Exponential layer
         let exp_rules = exp_rules(&all_rules);
-        all_rules.extend(exp_rules);
+        all_rules.extend(exp_rules.clone());
+        new_rules.extend(exp_rules);
 
         // Logarithm layer
         let log_rules = log_rules(&all_rules);
-        all_rules.extend(log_rules);
+        all_rules.extend(log_rules.clone());
+        new_rules.extend(log_rules);
 
         // No `pow` layer
         let no_pow_rules = no_pow_rules(&all_rules);
-        all_rules.extend(no_pow_rules);
+        all_rules.extend(no_pow_rules.clone());
+        new_rules.extend(no_pow_rules);
 
         // Simple layer
         let simple_rules = simple_rules(&all_rules);
-        all_rules.extend(simple_rules);
+        all_rules.extend(simple_rules.clone());
+        new_rules.extend(simple_rules);
 
         // div layer
         let div_rules = div_rules(&all_rules);
-        all_rules.extend(div_rules);
+        all_rules.extend(div_rules.clone());
+        new_rules.extend(div_rules);
 
-        // write
-        all_rules.write_json_rules("exponential.json");
+        // only upload new rules 
+        new_rules.write_json_rules("exponential.json");
     }
 }
