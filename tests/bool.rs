@@ -1,5 +1,8 @@
-use ruler::*;
-use std::ops::*;
+use ruler::{
+    enumo::{Ruleset, Workload},
+    *,
+};
+use std::{ops::*, time::Instant};
 
 egg::define_language! {
   pub enum Bool {
@@ -115,6 +118,33 @@ impl SynthLanguage for Bool {
 
     fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Bool::Lit(c)
+    }
+}
+
+impl Bool {
+    fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+
+        let mut candidates = Ruleset::cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
     }
 }
 

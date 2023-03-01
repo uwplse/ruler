@@ -1,7 +1,10 @@
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
-use ruler::*;
-use std::ops::*;
+use ruler::{
+    enumo::{Ruleset, Workload},
+    *,
+};
+use std::{ops::*, time::Instant};
 use z3::ast::Ast;
 
 /// define `Constant` for rationals.
@@ -76,8 +79,6 @@ impl SynthLanguage for Math {
     }
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
-        println!("initializing vars: {:?}", vars);
-
         let consts = vec![Some(mk_rat(-1, 1)), Some(mk_rat(0, 1)), Some(mk_rat(1, 1))];
         let cvecs = self_product(&consts, vars.len());
 
@@ -124,6 +125,61 @@ impl SynthLanguage for Math {
 
     fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Math::Lit(c)
+    }
+}
+
+impl Math {
+    fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+
+        let mut candidates = Ruleset::cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+
+    fn run_workload_fast_match(
+        workload: Workload,
+        prior: Ruleset<Self>,
+        limits: Limits,
+    ) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+        let mut candidates = Ruleset::fast_cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
     }
 }
 
@@ -331,7 +387,6 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 mod test {
     use super::*;
     use ruler::enumo::{Filter, Ruleset, Workload};
-    use std::time::Instant;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
@@ -488,60 +543,54 @@ mod test {
         );
     }
 
-    fn filter_sound(wl: Workload) -> Workload {
-        wl.filter(Filter::Or(
-            Box::new(Filter::Contains("a".parse().unwrap())),
-            Box::new(Filter::Or(
-                Box::new(Filter::Contains("b".parse().unwrap())),
-                Box::new(Filter::Contains("c".parse().unwrap())),
-            )),
-        ))
-        .filter(Filter::Invert(Box::new(Filter::Contains(
-            "( / * 0)".parse().unwrap(),
-        ))))
-    }
-
     #[test]
     fn rational_oopsla_equiv() {
-        let mut all_rules = Ruleset::default();
-        let start = Instant::now();
+        let mut rules = Ruleset::default();
+        let limits = Limits::default();
 
-        let initial_vals = Workload::new(["a", "b", "c", "0", "-1", "1"]);
+        let vars = Workload::new(["a", "b", "c"]);
+        let consts = Workload::new(["0", "-1", "1"]);
         let uops = Workload::new(["~", "fabs"]);
-        let bops = Workload::new(["-", "+", "*", "/"]);
+        let bops = Workload::new(["+", "-", "*", "/"]);
 
-        let layer_1 = filter_sound(Workload::make_layer(
-            initial_vals.clone(),
-            uops.clone(),
-            bops.clone(),
-        ));
-        let terms_1 = layer_1.clone().append(initial_vals.clone());
-        let rules_1 = Math::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_1.clone());
+        let init_synth = vars.clone().append(consts);
 
-        let layer_2 = filter_sound(Workload::make_layer(
-            layer_1.clone(),
-            uops.clone(),
-            bops.clone(),
-        ));
-        let terms_2 = layer_2.clone().append(terms_1.clone());
-        let rules_2 = Math::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_2.clone());
-        let duration = start.elapsed();
+        let layer = Workload::new(["(uop expr)", "(bop expr expr)"])
+            .plug("uop", &uops)
+            .plug("bop", &bops);
 
-        terms_2.write_terms_to_file("terms_rat.txt");
-        let baseline = Ruleset::<_>::from_file("baseline/rational.rules");
+        let contains_var_filter = Filter::Or(vec![
+            Filter::Contains("a".parse().unwrap()),
+            Filter::Contains("b".parse().unwrap()),
+            Filter::Contains("c".parse().unwrap()),
+        ]);
 
-        all_rules.write_json_rules("rational.json");
-        all_rules.write_json_equiderivability(
-            baseline.clone(),
-            97,
-            "rational.json",
-            Limits {
-                iter: 3,
-                node: 300000,
-            },
-            duration.clone(),
-        );
+        let layer1 = layer
+            .clone()
+            .plug("expr", &init_synth)
+            .append(init_synth)
+            .filter(contains_var_filter.clone());
+        let rules1 = Math::run_workload_fast_match(layer1.clone(), rules.clone(), limits);
+        rules.extend(rules1);
+
+        let iter1_rules: Ruleset<Math> =
+            Ruleset::from_file("baseline/oopsla21-aec/cargo-rational-iters-1-use-smt-unidir");
+        let (can, cannot) = rules.derive(iter1_rules, limits);
+        println!("{} can, {} cannot", can.len(), cannot.len());
+
+        let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
+        let rules2 = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
+        rules.extend(rules2);
+        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/oopsla21-aec/lev-unidir");
+        let (can, cannot) = rules.derive(iter2_rules.clone(), limits);
+        println!("{} can, {} cannot", can.len(), cannot.len());
+        cannot.pretty_print();
+
+        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
+        rules.extend(Math::run_workload(div, rules.clone(), Limits::default()));
+
+        let (can, cannot) = rules.derive(iter2_rules.clone(), limits);
+        println!("{} can, {} cannot", can.len(), cannot.len());
+        cannot.pretty_print();
     }
 }

@@ -1,8 +1,13 @@
+use std::time::Instant;
+
 use num::{BigInt, Zero};
 use num_bigint::ToBigInt;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
-use ruler::*;
+use ruler::{
+    enumo::{Ruleset, Workload},
+    *,
+};
 use z3::ast::Ast;
 
 egg::define_language! {
@@ -145,6 +150,33 @@ impl SynthLanguage for Nat {
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
         }
+    }
+}
+
+impl Nat {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+
+        let mut candidates = Ruleset::cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
     }
 }
 

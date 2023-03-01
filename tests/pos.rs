@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 /**
  * Pos is a datatype representing the strictly positive integers in a binary way.
  * XH represents 1
@@ -6,7 +8,10 @@
  * Example: 6 is represented as (XO (XI XH))
  * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
  */
-use ruler::{enumo::Ruleset, *};
+use ruler::{
+    enumo::{Ruleset, Workload},
+    *,
+};
 
 egg::define_language! {
  pub enum Pos {
@@ -106,6 +111,31 @@ impl SynthLanguage for Pos {
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
+    }
+}
+
+impl Pos {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let num_prior = prior.len();
+        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
     }
 }
 

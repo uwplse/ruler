@@ -1,14 +1,13 @@
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
-    time::Instant,
 };
 
 use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
 };
 
-use crate::{enumo::Workload, *};
+use crate::*;
 
 #[derive(Clone)]
 pub struct SynthAnalysis {
@@ -291,36 +290,4 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
-
-    fn run_workload(
-        workload: Workload,
-        prior_rules: Ruleset<Self>,
-        limits: Limits,
-    ) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let mut candidates = if Self::is_rule_lifting() {
-            Ruleset::allow_forbid_actual(egraph, prior_rules.clone(), limits)
-        } else {
-            let egraph = prior_rules.compress(&egraph, limits);
-            Ruleset::fast_cvec_match(&egraph)
-        };
-
-        let chosen = candidates.minimize(prior_rules.clone(), limits);
-
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            prior_rules.len()
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
 }
