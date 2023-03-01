@@ -57,6 +57,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.len()
     }
 
+    pub fn contains(&self, eq: &Equality<L>) -> bool {
+        self.0.contains_key(&eq.name)
+    }
+
     pub fn add(&mut self, eq: Equality<L>) {
         self.0.insert(eq.name.clone(), eq);
     }
@@ -311,7 +315,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                     if c1 == usize::MAX || c2 == usize::MAX {
                         continue;
                     }
-                    if let Some(eq) = Equality::new(&e1, &e2) {
+                    if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
                         if e1 != e2 {
                             candidates.add(eq)
                         }
@@ -386,10 +390,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                 if compare(&class1.data.cvec, &class2.data.cvec) {
                     let (_, e1) = extract.find_best(class1.id);
                     let (_, e2) = extract.find_best(class2.id);
-                    if let Some(eq) = Equality::new(&e1, &e2) {
+                    if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
                         candidates.add(eq);
                     }
-                    if let Some(eq) = Equality::new(&e2, &e1) {
+                    if let Some(eq) = Equality::from_recexprs(&e2, &e1) {
                         candidates.add(eq);
                     }
                 }
@@ -417,10 +421,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
-                    if let Some(eq) = Equality::new(e1, e2) {
+                    if let Some(eq) = Equality::from_recexprs(e1, e2) {
                         candidates.add(eq);
                     }
-                    if let Some(eq) = Equality::new(e2, e1) {
+                    if let Some(eq) = Equality::from_recexprs(e2, e1) {
                         candidates.add(eq);
                     }
                 }
@@ -440,7 +444,17 @@ impl<L: SynthLanguage> Ruleset<L> {
             let popped = self.0.pop();
             if let Some((_, eq)) = popped {
                 if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
-                    selected.add(eq);
+                    selected.add(eq.clone());
+                }
+
+                // If reverse direction is also in candidates, add it at the same time
+                let reverse = Equality::new(eq.rhs, eq.lhs);
+                if let Some(reverse) = reverse {
+                    if self.contains(&reverse) {
+                        if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
+                            selected.add(reverse);
+                        }
+                    }
                 }
             } else {
                 break;
@@ -479,7 +493,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
             let (_, left) = extract.find_best(l_id);
             let (_, right) = extract.find_best(r_id);
-            if let Some(eq) = Equality::new(&left, &right) {
+            if let Some(eq) = Equality::from_recexprs(&left, &right) {
                 self.add(eq);
             }
         }
