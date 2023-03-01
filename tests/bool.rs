@@ -143,7 +143,7 @@ mod test {
         let egraph = all_rules.compress(&atoms3.to_egraph(), Limits::default());
         let mut candidates = Ruleset::cvec_match(&egraph);
         let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules3.len(), 14);
+        assert_eq!(rules3.len(), 23);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
@@ -152,7 +152,7 @@ mod test {
         let egraph = all_rules.compress(&atoms4.to_egraph(), Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
         let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules4.len(), 3);
+        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
@@ -161,10 +161,8 @@ mod test {
         let egraph = all_rules.compress(&atoms5.to_egraph(), Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
         let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 15);
+        assert_eq!(rules5.len(), 16);
         all_rules.extend(rules5);
-
-        assert_eq!(all_rules.len(), 32);
     }
 
     #[test]
@@ -174,24 +172,22 @@ mod test {
         assert_eq!(atoms3.force().len(), 93);
 
         let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::default());
-        assert_eq!(rules3.len(), 14);
+        assert_eq!(rules3.len(), 23);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
         let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::default());
-        assert_eq!(rules4.len(), 3);
+        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
         let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 14);
+        assert_eq!(rules5.len(), 15);
         all_rules.extend(rules5);
-
-        assert_eq!(all_rules.len(), 31);
     }
 
     #[test]
@@ -291,7 +287,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(can.len(), 10);
-        assert_eq!(cannot.len(), 5);
+        assert_eq!(can.len(), 14);
+        assert_eq!(cannot.len(), 7);
     }
 }

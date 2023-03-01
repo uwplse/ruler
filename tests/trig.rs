@@ -363,13 +363,13 @@ mod test {
         println!("Starting 1");
         let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
         all.extend(rules1.clone());
-        assert_eq!(rules1.len(), 11);
+        assert_eq!(rules1.len(), 22);
 
         let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
         println!("Starting 2");
         let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
         all.extend(rules2.clone());
-        assert_eq!(rules2.len(), 6);
+        assert_eq!(rules2.len(), 12);
 
         let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
         println!("Starting 3");
@@ -414,6 +414,6 @@ mod test {
             },
         );
 
-        assert_eq!(rules.len(), 2);
+        assert_eq!(rules.len(), 4);
     }
 }

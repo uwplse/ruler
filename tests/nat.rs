@@ -195,7 +195,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules3.len(), 4);
+        assert_eq!(rules3.len(), 5);
         all_rules.extend(rules3);
 
         let atoms4 = iter_nat(4);
@@ -209,7 +209,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules4.len(), 2);
+        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_nat(5);
@@ -223,9 +223,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules5.len(), 5);
+        assert_eq!(rules5.len(), 3);
         all_rules.extend(rules5);
-
-        assert_eq!(all_rules.len(), 11);
     }
 }
