@@ -42,7 +42,7 @@ impl Scheduler {
             }
             Scheduler::KStep(limits) => {
                 let rewrites = ruleset.0.values().map(|eq| &eq.rewrite);
-                let mut egraph = egraph.clone();
+                let mut egraph = egraph;
                 let mut fixpoint = false;
                 while !fixpoint {
                     let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
