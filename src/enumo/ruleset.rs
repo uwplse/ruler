@@ -57,6 +57,20 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.len()
     }
 
+    pub fn bidir_len(&self) -> usize {
+        let mut bidir = 0;
+        let mut unidir = 0;
+        for (_, eq) in &self.0 {
+            let reverse = Equality::new(eq.rhs.clone(), eq.lhs.clone());
+            if reverse.is_some() && self.contains(&reverse.unwrap()) {
+                bidir += 1;
+            } else {
+                unidir += 1;
+            }
+        }
+        unidir + (bidir / 2)
+    }
+
     pub fn contains(&self, eq: &Equality<L>) -> bool {
         self.0.contains_key(&eq.name)
     }
@@ -109,6 +123,25 @@ impl<L: SynthLanguage> Ruleset<L> {
             eqs.insert(eq.name.clone(), eq);
         }
         Self(eqs)
+    }
+
+    pub fn pretty_print(&self) {
+        let mut strs = vec![];
+        for (name, eq) in &self.0 {
+            let reverse = Equality::new(eq.rhs.clone(), eq.lhs.clone());
+            if reverse.is_some() && self.contains(&reverse.unwrap()) {
+                let reverse_name = format!("{} <=> {}", eq.rhs, eq.lhs);
+                if !strs.contains(&reverse_name) {
+                    strs.push(format!("{} <=> {}", eq.lhs, eq.rhs));
+                }
+            } else {
+                strs.push(name.to_string());
+            }
+        }
+
+        for s in strs {
+            println!("{s}");
+        }
     }
 
     // Writes the ruleset to the json/ subdirectory, to be uploaded to the

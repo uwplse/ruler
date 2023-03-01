@@ -312,15 +312,14 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         let time = t.elapsed().as_secs_f64();
 
         println!(
-            "Learned {} new rewrites in {} using {} prior rewrites",
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
             chosen.len(),
             time,
             prior_rules.len()
         );
 
-        for (name, eq) in &chosen.0 {
-            println!("{:?}      {}", eq.score(), name);
-        }
+        chosen.pretty_print();
 
         chosen
     }
