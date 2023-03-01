@@ -216,7 +216,7 @@ mod test {
         assert_eq!(atoms5.force().len(), 4599);
 
         let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 15);
+        assert_eq!(rules5.len(), 16);
         all_rules.extend(rules5);
     }
 
@@ -317,7 +317,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(can.len(), 14);
+        assert_eq!(can.len(), 16);
         assert_eq!(cannot.len(), 7);
     }
 }
