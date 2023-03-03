@@ -2,8 +2,11 @@
     Exponential functions from arithmetic
 !*/
 
+use std::time::Instant;
+
 use num::rational::Ratio;
 use num::BigInt;
+use ruler::enumo::{Ruleset, Workload};
 use ruler::*;
 
 mod rational;
@@ -108,6 +111,33 @@ impl SynthLanguage for Exponential {
     }
 }
 
+impl Exponential {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+
+        let mut candidates = Ruleset::cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -137,7 +167,7 @@ mod test {
     }
 
     fn rational_rules() -> Ruleset {
-        let (rules, _) = rational::test::rational_rules();
+        let rules = rational::test::rational_rules();
         let rule_strs = rules.to_str_vec();
         let rule_strs: Vec<&str> = rule_strs.iter().map(|x| &**x).collect();
         Ruleset::from_str_vec(&rule_strs)

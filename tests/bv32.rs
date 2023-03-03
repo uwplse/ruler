@@ -2,7 +2,38 @@
 32 bit implementation of Bitvectors.
 !*/
 
+use std::time::Instant;
+
+use ruler::enumo::{Ruleset, Workload};
+
 ruler::impl_bv!(32);
+
+impl Bv {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+
+        let mut candidates = Ruleset::cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -51,7 +82,6 @@ mod test {
         all_rules.write_json_rules("bv32.json");
         all_rules.write_json_equiderivability(
             baseline.clone(),
-            110,
             "bv32.json",
             Limits {
                 iter: 3,
