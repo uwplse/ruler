@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use num::rational::Ratio;
 use num::BigInt;
-use ruler::enumo::{Ruleset, Workload};
+use ruler::enumo::{Ruleset, Scheduler, Workload};
 use ruler::*;
 
 mod rational;
@@ -116,7 +116,7 @@ impl Exponential {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
-        let compressed = prior.compress(&egraph, limits);
+        let compressed = prior.run(&egraph, Scheduler::KStep(limits));
 
         let mut candidates = Ruleset::cvec_match(&compressed);
 
