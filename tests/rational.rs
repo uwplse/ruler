@@ -328,7 +328,7 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
     use ruler::enumo::{Filter, Ruleset, Workload};
     use std::time::Instant;
@@ -501,11 +501,8 @@ mod test {
         ))))
     }
 
-    #[test]
-    fn rational_oopsla_equiv() {
+    pub fn rational_rules() -> (Ruleset<Math>, Workload) {
         let mut all_rules = Ruleset::default();
-        let start = Instant::now();
-
         let initial_vals = Workload::new(["a", "b", "c", "0", "-1", "1"]);
         let uops = Workload::new(["~", "fabs"]);
         let bops = Workload::new(["-", "+", "*", "/"]);
@@ -527,6 +524,14 @@ mod test {
         let terms_2 = layer_2.clone().append(terms_1.clone());
         let rules_2 = Math::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_2.clone());
+
+        (all_rules, terms_2)
+    }
+
+    #[test]
+    fn rational_oopsla_equiv() {
+        let start = Instant::now();
+        let (all_rules, terms_2) = rational_rules();
         let duration = start.elapsed();
 
         terms_2.write_terms_to_file("terms_rat.txt");
