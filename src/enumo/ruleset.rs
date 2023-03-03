@@ -88,8 +88,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 results.1.add(eq.clone());
             }
         });
-        let results = results.into_inner().unwrap();
-        results
+        results.into_inner().unwrap()
     }
 
     pub fn to_file(&self, filename: &str) {
