@@ -348,8 +348,11 @@ impl<L: SynthLanguage> Ruleset<L> {
                     if c1 == usize::MAX || c2 == usize::MAX {
                         continue;
                     }
-                    if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
-                        if e1 != e2 {
+                    if e1 != e2 {
+                        if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
+                            candidates.add(eq)
+                        }
+                        if let Some(eq) = Equality::from_recexprs(&e2, &e1) {
                             candidates.add(eq)
                         }
                     }

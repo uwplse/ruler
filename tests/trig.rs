@@ -339,12 +339,11 @@ impl Trig {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use ruler::{
         enumo::{Filter, Ruleset, Workload},
         Limits,
     };
-
-    use crate::Trig;
 
     #[test]
     fn og_recipe() {
@@ -384,35 +383,31 @@ mod test {
         let sum_of_squares = add.plug("e", &squares);
 
         let mut all = complex;
+        let mut new = Ruleset::<Trig>::default();
 
         let wkld1 = trig_constants;
         println!("Starting 1");
         let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
         all.extend(rules1.clone());
+        new.extend(rules1.clone());
         assert_eq!(rules1.len(), 22);
 
         let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
         println!("Starting 2");
         let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
         all.extend(rules2.clone());
+        new.extend(rules2.clone());
         assert_eq!(rules2.len(), 12);
 
         let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
         println!("Starting 3");
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3.clone());
+        new.extend(rules3.clone());
         assert_eq!(rules3.len(), 3);
 
-        // let wkld4 = Workload::Append(vec![wkld2, squares, sum_of_squares]);
-        // println!("Starting 4");
-        // let rules4 = Trig::run_workload(wkld4, all.clone(), limits);
-        // all.extend(rules4);
-
-        // let (can, cannot) = all.derive(Ruleset::from_file("old-trig-recipe.txt"), limits);
-        // println!("can: {}, cannot: {}", can.len(), cannot.len());
-        // for (name, _) in cannot.0 {
-        //     println!("{}", name);
-        // }
+        // Only new rules should be uploaded!
+        new.write_json_rules("trig.json");
     }
 
     #[test]

@@ -384,7 +384,7 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
     use ruler::enumo::{Filter, Ruleset, Workload};
 
@@ -543,8 +543,7 @@ mod test {
         );
     }
 
-    #[test]
-    fn rational_oopsla_equiv() {
+    pub fn rational_rules() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
         let limits = Limits::default();
 
@@ -576,7 +575,6 @@ mod test {
         let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
         let rules2 = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
         rules.extend(rules2);
-        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
         rules.extend(Math::run_workload(div, rules.clone(), Limits::default()));
@@ -588,6 +586,14 @@ mod test {
         let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
         rules.extend(fabs_rules);
 
+        rules
+    }
+
+    #[test]
+    fn rational_oopsla_equiv() {
+        let rules = rational_rules();
+        let limits = Limits::default();
+        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let (can, cannot) = rules.derive(iter2_rules.clone(), limits);
         println!(
             "Using enumo to derive oopsla: {} can, {} cannot. Missing:",
