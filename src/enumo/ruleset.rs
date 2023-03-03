@@ -178,7 +178,6 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn write_json_equiderivability(
         &self,
         baseline: Self,
-        len_baseline: usize,
         name: &str,
         limit: Limits,
         duration: Duration,
@@ -232,7 +231,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let stats = json!({
             "spec": name,
             "num_rules": num_rules,
-            "num_baseline": len_baseline,
+            "num_baseline": baseline.len(),
             "enumo_derives_oopsla": forwards_derivable,
             "oopsla_derives_enumo": backwards_derivable,
             "time": time

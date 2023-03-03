@@ -591,23 +591,13 @@ pub mod test {
 
     #[test]
     fn rational_oopsla_equiv() {
+        let start = Instant::now();
         let rules = rational_rules();
+        let duration = start.elapsed();
         let limits = Limits::default();
         let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-        let (can, cannot) = rules.derive(iter2_rules.clone(), limits);
-        println!(
-            "Using enumo to derive oopsla: {} can, {} cannot. Missing:",
-            can.len(),
-            cannot.len()
-        );
-        cannot.pretty_print();
 
-        let (can, cannot) = iter2_rules.derive(rules.clone(), limits);
-        println!(
-            "Using oopsla to derive enumo: {} can, {} cannot. Missing:",
-            can.len(),
-            cannot.len()
-        );
-        cannot.pretty_print();
+        rules.write_json_rules("rational.json");
+        rules.write_json_equiderivability(iter2_rules.clone(), "rational.json", limits, duration)
     }
 }
