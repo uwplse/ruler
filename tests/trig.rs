@@ -1,11 +1,12 @@
 use num::rational::Ratio;
 use num::BigInt;
 use num::{Signed, Zero};
-use ruler::enumo::Ruleset;
+use ruler::enumo::{Ruleset, Workload};
 use ruler::*;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
+use std::time::Instant;
 
 pub type Rational = Ratio<BigInt>;
 
@@ -311,14 +312,38 @@ impl SynthLanguage for Trig {
     }
 }
 
+impl Trig {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let num_prior = prior.len();
+        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use super::*;
     use ruler::{
         enumo::{Filter, Ruleset, Workload},
-        Limits, SynthLanguage,
+        Limits,
     };
-
-    use crate::Trig;
 
     #[test]
     fn og_recipe() {
@@ -358,35 +383,31 @@ mod test {
         let sum_of_squares = add.plug("e", &squares);
 
         let mut all = complex;
+        let mut new = Ruleset::<Trig>::default();
 
         let wkld1 = trig_constants;
         println!("Starting 1");
         let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
         all.extend(rules1.clone());
-        assert_eq!(rules1.len(), 11);
+        new.extend(rules1.clone());
+        assert_eq!(rules1.len(), 22);
 
         let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
         println!("Starting 2");
         let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
         all.extend(rules2.clone());
-        assert_eq!(rules2.len(), 6);
+        new.extend(rules2.clone());
+        assert_eq!(rules2.len(), 12);
 
         let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
         println!("Starting 3");
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3.clone());
+        new.extend(rules3.clone());
         assert_eq!(rules3.len(), 3);
 
-        // let wkld4 = Workload::Append(vec![wkld2, squares, sum_of_squares]);
-        // println!("Starting 4");
-        // let rules4 = Trig::run_workload(wkld4, all.clone(), limits);
-        // all.extend(rules4);
-
-        // let (can, cannot) = all.derive(Ruleset::from_file("old-trig-recipe.txt"), limits);
-        // println!("can: {}, cannot: {}", can.len(), cannot.len());
-        // for (name, _) in cannot.0 {
-        //     println!("{}", name);
-        // }
+        // Only new rules should be uploaded!
+        new.write_json_rules("trig.json");
     }
 
     #[test]
@@ -414,6 +435,6 @@ mod test {
             },
         );
 
-        assert_eq!(rules.len(), 2);
+        assert_eq!(rules.len(), 4);
     }
 }
