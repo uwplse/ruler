@@ -1,4 +1,5 @@
 use egg::{AstSize, EClass, Extractor, StopReason};
+use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use serde_json::*;
 use std::fs::*;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
@@ -33,14 +34,56 @@ impl<L: SynthLanguage> Default for Ruleset<L> {
     }
 }
 
+impl<L: SynthLanguage> IntoIterator for Ruleset<L> {
+    type Item = (Arc<str>, Equality<L>);
+    type IntoIter = IntoIter<Arc<str>, Equality<L>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, L: SynthLanguage> IntoIterator for &'a Ruleset<L> {
+    type Item = (&'a Arc<str>, &'a Equality<L>);
+    type IntoIter = Iter<'a, Arc<str>, Equality<L>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a, L: SynthLanguage> IntoIterator for &'a mut Ruleset<L> {
+    type Item = (&'a Arc<str>, &'a mut Equality<L>);
+    type IntoIter = IterMut<'a, Arc<str>, Equality<L>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
 impl<L: SynthLanguage> Ruleset<L> {
-    pub fn from_str_vec(ss: &[&str]) -> Self {
+    pub fn new<I>(vals: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
         let mut map = IndexMap::default();
-        let eqs: Vec<Equality<L>> = ss.iter().map(|s| s.parse().unwrap()).collect();
+        let eqs: Vec<Equality<L>> = vals
+            .into_iter()
+            .map(|x| x.as_ref().parse().unwrap())
+            .collect();
         for eq in eqs {
             map.insert(eq.name.clone(), eq);
         }
         Ruleset(map)
+    }
+
+    pub fn iter(&self) -> Values<'_, Arc<str>, Equality<L>> {
+        self.0.values()
+    }
+
+    pub fn iter_mut(&mut self) -> ValuesMut<'_, Arc<str>, Equality<L>> {
+        self.0.values_mut()
     }
 
     pub fn to_str_vec(&self) -> Vec<String> {

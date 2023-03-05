@@ -40,7 +40,7 @@ impl SynthLanguage for BvBool {
     }
 
     fn get_lifting_rules() -> Ruleset<Self> {
-        let mut rules = Ruleset::from_str_vec(&[
+        let mut rules = Ruleset::new(&[
             "(first (not ?a)) ==> (~ (first ?a))",
             "(second (not ?a)) ==> (~ (second ?a))",
             "(first (and ?a ?b)) ==> (& (first ?a) (first ?b))",
