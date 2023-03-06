@@ -2,13 +2,14 @@ use std::time::Duration;
 
 use egg::{Rewrite, Runner};
 
-use crate::{EGraph, Limits, SynthAnalysis, SynthLanguage};
+use crate::{EGraph, Id, Limits, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
 pub enum Scheduler {
     Simple(Limits),
     Saturating(Limits),
+    Compress(Limits),
 }
 
 impl Scheduler {
@@ -66,6 +67,30 @@ impl Scheduler {
                 let mut runner = Self::mk_runner(runner.egraph, &Limits::max()).run(&sat);
                 runner.egraph.rebuild();
                 runner.egraph
+            }
+            Scheduler::Compress(limits) => {
+                let mut clone = egraph.clone();
+                let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
+
+                let out = Self::Simple(*limits).run(egraph, ruleset);
+
+                // Build a map from id in out to all of the ids in egraph that are equivalent
+                let mut unions = HashMap::default();
+                for id in ids {
+                    let new_id = out.find(id);
+                    unions.entry(new_id).or_insert_with(Vec::new).push(id);
+                }
+
+                for ids in unions.values() {
+                    if ids.len() > 1 {
+                        let first = ids[0];
+                        for id in &ids[1..] {
+                            clone.union(first, *id);
+                        }
+                    }
+                }
+                clone.rebuild();
+                clone
             }
         }
     }

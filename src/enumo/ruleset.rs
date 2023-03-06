@@ -317,36 +317,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph.rebuild();
     }
 
-    pub fn compress(
-        &self,
-        egraph: &EGraph<L, SynthAnalysis>,
-        limits: Limits,
-    ) -> EGraph<L, SynthAnalysis> {
-        let mut clone = egraph.clone();
-        let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
-
-        let out_egraph = Scheduler::Simple(limits).run(&egraph, self);
-
-        // Build a map from id in out_graph to all of the ids in egraph that are equivalent
-        let mut unions = HashMap::default();
-        for id in ids {
-            let new_id = out_egraph.find(id);
-            unions.entry(new_id).or_insert_with(Vec::new).push(id);
-        }
-
-        for ids in unions.values() {
-            if ids.len() > 1 {
-                let first = ids[0];
-                for id in &ids[1..] {
-                    clone.union(first, *id);
-                }
-            }
-        }
-
-        clone.rebuild();
-        clone
-    }
-
     pub fn extract_candidates(
         eg1: &EGraph<L, SynthAnalysis>,
         eg2: &EGraph<L, SynthAnalysis>,
@@ -399,7 +369,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let eg_init = egraph;
         // Allowed rules: run on clone, apply unions, no candidates
         let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
-        let eg_allowed = allowed.compress(&eg_init, limits);
+        let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = L::get_lifting_rules();
@@ -409,7 +379,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         // All rules: clone/no clone doesn't matter, extract candidates
         let mut all_rules = prior;
         all_rules.extend(lifting_rules);
-        let eg_final = all_rules.compress(&eg_denote, limits);
+        let eg_final = Scheduler::Compress(limits).run(&eg_denote, &all_rules);
         candidates.extend(Self::extract_candidates(&eg_denote, &eg_final));
 
         candidates
@@ -538,7 +508,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         // 3. compress with the rules we've chosen so far
-        let egraph = chosen.compress(&egraph, limits);
+        let egraph = Scheduler::Compress(limits).run(&egraph, chosen);
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates

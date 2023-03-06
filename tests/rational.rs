@@ -1,7 +1,7 @@
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use ruler::{
-    enumo::{Ruleset, Workload},
+    enumo::{Ruleset, Scheduler, Workload},
     *,
 };
 use std::{ops::*, time::Instant};
@@ -133,7 +133,7 @@ impl Math {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
-        let compressed = prior.compress(&egraph, limits);
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 
         let mut candidates = Ruleset::cvec_match(&compressed);
 
@@ -162,7 +162,7 @@ impl Math {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
-        let compressed = prior.compress(&egraph, limits);
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
         let mut candidates = Ruleset::fast_cvec_match(&compressed);
 
         let num_prior = prior.len();

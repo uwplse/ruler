@@ -5,7 +5,7 @@ use num_bigint::ToBigInt;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use ruler::{
-    enumo::{Ruleset, Workload},
+    enumo::{Ruleset, Scheduler, Workload},
     *,
 };
 use z3::ast::Ast;
@@ -158,7 +158,7 @@ impl Nat {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
-        let compressed = prior.compress(&egraph, limits);
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 
         let mut candidates = Ruleset::cvec_match(&compressed);
 

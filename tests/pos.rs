@@ -179,7 +179,7 @@ mod tests {
         let eg_init = atoms3.to_egraph();
         // Allowed rules: run on clone, apply unions, no candidates
         let (allowed, _) = prior.partition(|eq| Pos::is_allowed_rewrite(&eq.lhs, &eq.rhs));
-        let eg_allowed = allowed.compress(&eg_init, limits);
+        let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = Pos::get_lifting_rules();
@@ -189,7 +189,7 @@ mod tests {
         // All rules: clone/no clone doesn't matter, extract candidates
         let mut all_rules = prior;
         all_rules.extend(lifting_rules);
-        let eg_final = all_rules.compress(&eg_denote, limits);
+        let eg_final = Scheduler::Compress(limits).run(&eg_denote, &all_rules);
         candidates.extend(Ruleset::extract_candidates(&eg_denote, &eg_final));
 
         let rules = candidates;
