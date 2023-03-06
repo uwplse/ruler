@@ -325,7 +325,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut clone = egraph.clone();
         let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
 
-        let out_egraph = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
+        let out_egraph = self.run(&egraph, Scheduler::Simple(limits));
 
         // Build a map from id in out_graph to all of the ids in egraph that are equivalent
         let mut unions = HashMap::default();
@@ -347,17 +347,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         clone
     }
 
-    pub fn crunch(
+    pub fn run(
         &self,
         egraph: &EGraph<L, SynthAnalysis>,
-        limits: Limits,
-    ) -> EGraph<L, SynthAnalysis> {
-        self.run_internal(egraph.clone(), Scheduler::Simple(limits))
-    }
-
-    fn run_internal(
-        &self,
-        egraph: EGraph<L, SynthAnalysis>,
         scheduler: Scheduler,
     ) -> EGraph<L, SynthAnalysis> {
         scheduler.run(egraph, self)
@@ -419,7 +411,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = L::get_lifting_rules();
-        let eg_denote = lifting_rules.crunch(&eg_allowed, limits);
+        let eg_denote = lifting_rules.run(&eg_allowed, Scheduler::Simple(limits));
         let mut candidates = Self::extract_candidates(&eg_allowed, &eg_denote);
 
         // All rules: clone/no clone doesn't matter, extract candidates
@@ -594,7 +586,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let rexpr = &L::instantiate(&rule.rhs);
         egraph.add_expr(lexpr);
         egraph.add_expr(rexpr);
-        let out_egraph = scheduler.run(egraph, self);
+        let out_egraph = scheduler.run(&egraph, self);
 
         let l_id = out_egraph
             .lookup_expr(lexpr)

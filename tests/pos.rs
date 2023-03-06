@@ -141,7 +141,7 @@ impl Pos {
 
 #[cfg(test)]
 mod tests {
-    use ruler::enumo::{Ruleset, Workload};
+    use ruler::enumo::{Ruleset, Scheduler, Workload};
 
     use super::*;
 
@@ -183,7 +183,7 @@ mod tests {
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = Pos::get_lifting_rules();
-        let eg_denote = lifting_rules.crunch(&eg_allowed, limits);
+        let eg_denote = Scheduler::Simple(limits).run(&eg_allowed, &lifting_rules);
         let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
 
         // All rules: clone/no clone doesn't matter, extract candidates

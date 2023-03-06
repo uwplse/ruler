@@ -26,13 +26,13 @@ impl Scheduler {
 
     pub fn run<L: SynthLanguage>(
         &self,
-        egraph: EGraph<L, SynthAnalysis>,
+        egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
     ) -> EGraph<L, SynthAnalysis> {
         match self {
             Scheduler::Simple(limits) => {
                 let rewrites = ruleset.0.values().map(|eq| &eq.rewrite);
-                let mut runner = Self::mk_runner(egraph, limits)
+                let mut runner = Self::mk_runner(egraph.clone(), limits)
                     .with_iter_limit(limits.iter)
                     .with_node_limit(limits.node)
                     .with_scheduler(egg::SimpleScheduler)
@@ -47,7 +47,7 @@ impl Scheduler {
                     (other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
                 );
 
-                let mut runner = Self::mk_runner(egraph, limits);
+                let mut runner = Self::mk_runner(egraph.clone(), limits);
 
                 for _ in 0..limits.iter {
                     // Sat
