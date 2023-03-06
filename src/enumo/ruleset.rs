@@ -325,7 +325,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut clone = egraph.clone();
         let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
 
-        let out_egraph = self.run(&egraph, Scheduler::Simple(limits));
+        let out_egraph = Scheduler::Simple(limits).run(&egraph, self);
 
         // Build a map from id in out_graph to all of the ids in egraph that are equivalent
         let mut unions = HashMap::default();
@@ -345,14 +345,6 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         clone.rebuild();
         clone
-    }
-
-    pub fn run(
-        &self,
-        egraph: &EGraph<L, SynthAnalysis>,
-        scheduler: Scheduler,
-    ) -> EGraph<L, SynthAnalysis> {
-        scheduler.run(egraph, self)
     }
 
     pub fn extract_candidates(
@@ -411,7 +403,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
         let lifting_rules = L::get_lifting_rules();
-        let eg_denote = lifting_rules.run(&eg_allowed, Scheduler::Simple(limits));
+        let eg_denote = Scheduler::Simple(limits).run(&eg_allowed, &lifting_rules);
         let mut candidates = Self::extract_candidates(&eg_allowed, &eg_denote);
 
         // All rules: clone/no clone doesn't matter, extract candidates
