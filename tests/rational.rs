@@ -576,14 +576,14 @@ pub mod test {
 
         // The steps:
         //  [Name]         [Origin]
-        //  atoms3         old enumo
-        //  atoms5         old enumo
-        //  distribute     old enumo
-        //  div5           old enumo
         //  layer1         PR #108
         //  layer2         PR #108
         //  div            PR #113
         //  nested fabs    PR #113
+        //  atoms3         old enumo
+        //  atoms5         old enumo
+        //  distribute     old enumo
+        //  div5           old enumo
         //
         // Definitely some overlap in the workloads since
         // they are from different eras of Ruler/Enumo.
@@ -599,12 +599,52 @@ pub mod test {
         let uops = Workload::new(["~", "fabs"]);
         let bops = Workload::new(["+", "-", "*", "/"]);
 
+        // Layer 1
+        println!("layer1");
+        let init_layer = vars.clone().append(consts);
+        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
+            .plug("uop", &uops)
+            .plug("bop", &bops);
+
+        let layer1 = op_layer
+            .clone()
+            .plug("expr", &init_layer)
+            .append(init_layer)
+            .filter(safe_filter.clone());
+
+        let layer1_rules = Math::run_workload_fast_match(layer1.clone(), rules.clone(), limits);
+        rules.extend(layer1_rules);
+
+        // Layer 2
+        println!("layer2");
+        let layer2 = op_layer
+            .clone()
+            .plug("expr", &layer1)
+            .filter(safe_filter.clone())
+            .filter(contains_var_filter.clone());
+
+        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
+        rules.extend(layer2_rules);
+
+        // Div
+        println!("div");
+        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
+        let div_rules = Math::run_workload(div, rules.clone(), limits);
+        rules.extend(div_rules);
+
+        // Nested fabs
+        println!("nested fabs");
+        let layer2_abs = layer2.filter(contains_abs_filter);
+        let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2_abs);
+        let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
+        rules.extend(nested_abs_rules);
+
         // Atoms 3
         println!("atoms3");
         let atoms3 = iter_rational(3)
             .filter(safe_filter.clone())
             .filter(contains_var_filter.clone());
-        let atoms3_rules = Math::run_workload_fast_match(atoms3, Ruleset::default(), limits);
+        let atoms3_rules = Math::run_workload_fast_match(atoms3, rules.clone(), limits);
         rules.extend(atoms3_rules);
 
         // Atoms 5
@@ -642,46 +682,6 @@ pub mod test {
             .plug("x", &atoms5.filter(canon_filter));
         let div5_rules = Math::run_workload_fast_match(div5, rules.clone(), limits);
         rules.extend(div5_rules);
-
-        // Layer 1
-        println!("layer1");
-        let init_layer = vars.clone().append(consts);
-        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-            .plug("uop", &uops)
-            .plug("bop", &bops);
-
-        let layer1 = op_layer
-            .clone()
-            .plug("expr", &init_layer)
-            .append(init_layer)
-            .filter(safe_filter.clone());
-
-        let layer1_rules = Math::run_workload_fast_match(layer1.clone(), rules.clone(), limits);
-        rules.extend(layer1_rules);
-
-        // Layer 2
-        println!("layer2");
-        let layer2 = op_layer
-            .clone()
-            .plug("expr", &layer1)
-            .filter(safe_filter.clone())
-            .filter(contains_var_filter.clone());
-
-        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
-        rules.extend(layer2_rules);
-
-        // Div
-        println!("div");
-        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-        let div_rules = Math::run_workload_fast_match(div, rules.clone(), limits);
-        rules.extend(div_rules);
-
-        // Nested fabs
-        println!("nested fabs");
-        let layer2_abs = layer2.filter(contains_abs_filter);
-        let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2_abs);
-        let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
-        rules.extend(nested_abs_rules);
 
         rules
     }
