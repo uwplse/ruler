@@ -318,7 +318,7 @@ mod test {
         let mut all_rules = rational_rules();
         let mut new_rules = Ruleset::default();
 
-        all_rules.extend(starting_exponential_rules());
+        // all_rules.extend(starting_exponential_rules());
         new_rules.extend(starting_exponential_rules());
 
         // Constant layer
