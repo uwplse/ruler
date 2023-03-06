@@ -94,7 +94,7 @@ impl SynthLanguage for Exponential {
     }
 
     fn get_lifting_rules() -> enumo::Ruleset<Self> {
-        enumo::Ruleset::from_str_vec(&[
+        enumo::Ruleset::new(&[
             // definitions (denote)
             "(pow ?a ?b) ==> (exp (* ?b (log ?a)))",
             "(sqrt ?a) ==> (pow ?a 1/2)",
@@ -152,7 +152,7 @@ mod test {
     }
 
     fn starting_exponential_rules() -> Ruleset {
-        Ruleset::from_str_vec(&[
+        Ruleset::new(&[
             // exponential properties (expand)
             "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
             "(exp (~ ?a)) ==> (/ 1 (exp ?a))",
@@ -170,7 +170,7 @@ mod test {
         let rules = rational::test::rational_rules();
         let rule_strs = rules.to_str_vec();
         let rule_strs: Vec<&str> = rule_strs.iter().map(|x| &**x).collect();
-        Ruleset::from_str_vec(&rule_strs)
+        Ruleset::new(&rule_strs)
     }
 
     fn run_workload(terms: Workload, prev_rules: &Ruleset) -> Ruleset {
