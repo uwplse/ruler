@@ -1,4 +1,4 @@
-use egg::{AstSize, EClass, Extractor, StopReason};
+use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use serde_json::*;
 use std::fs::*;
@@ -325,7 +325,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut clone = egraph.clone();
         let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
 
-        let (out_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
+        let out_egraph = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
 
         // Build a map from id in out_graph to all of the ids in egraph that are equivalent
         let mut unions = HashMap::default();
@@ -352,19 +352,15 @@ impl<L: SynthLanguage> Ruleset<L> {
         egraph: &EGraph<L, SynthAnalysis>,
         limits: Limits,
     ) -> EGraph<L, SynthAnalysis> {
-        let (new_egraph, _) = self.run_internal(egraph.clone(), Scheduler::Simple(limits));
-        new_egraph
+        self.run_internal(egraph.clone(), Scheduler::Simple(limits))
     }
 
     fn run_internal(
         &self,
         egraph: EGraph<L, SynthAnalysis>,
         scheduler: Scheduler,
-    ) -> (EGraph<L, SynthAnalysis>, StopReason) {
-        let mut runner = scheduler.run(egraph, self);
-
-        runner.egraph.rebuild();
-        (runner.egraph, runner.stop_reason.unwrap())
+    ) -> EGraph<L, SynthAnalysis> {
+        scheduler.run(egraph, self)
     }
 
     pub fn extract_candidates(
@@ -598,14 +594,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         let rexpr = &L::instantiate(&rule.rhs);
         egraph.add_expr(lexpr);
         egraph.add_expr(rexpr);
-        let runner = scheduler.run(egraph, self);
+        let out_egraph = scheduler.run(egraph, self);
 
-        let l_id = runner
-            .egraph
+        let l_id = out_egraph
             .lookup_expr(lexpr)
             .unwrap_or_else(|| panic!("Did not find {}", lexpr));
-        let r_id = runner
-            .egraph
+        let r_id = out_egraph
             .lookup_expr(rexpr)
             .unwrap_or_else(|| panic!("Did not find {}", rexpr));
         l_id == r_id

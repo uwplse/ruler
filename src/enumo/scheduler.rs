@@ -28,15 +28,17 @@ impl Scheduler {
         &self,
         egraph: EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
-    ) -> Runner<L, SynthAnalysis> {
+    ) -> EGraph<L, SynthAnalysis> {
         match self {
             Scheduler::Simple(limits) => {
                 let rewrites = ruleset.0.values().map(|eq| &eq.rewrite);
-                Self::mk_runner(egraph, limits)
+                let mut runner = Self::mk_runner(egraph, limits)
                     .with_iter_limit(limits.iter)
                     .with_node_limit(limits.node)
                     .with_scheduler(egg::SimpleScheduler)
-                    .run(rewrites)
+                    .run(rewrites);
+                runner.egraph.rebuild();
+                runner.egraph
             }
             Scheduler::Saturating(limits) => {
                 let (sat, other) = ruleset.partition(|eq| eq.is_saturating());
@@ -61,7 +63,9 @@ impl Scheduler {
                     )
                     .run(&other);
                 }
-                Self::mk_runner(runner.egraph, &Limits::max()).run(&sat)
+                let mut runner = Self::mk_runner(runner.egraph, &Limits::max()).run(&sat);
+                runner.egraph.rebuild();
+                runner.egraph
             }
         }
     }
