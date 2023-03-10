@@ -573,7 +573,7 @@ pub mod test {
         let uops = Workload::new(["~", "fabs"]);
         let bops = Workload::new(["+", "-", "*", "/"]);
 
-        let init_layer = vars.clone().append(consts).append(Workload::new(["2"]));
+        let init_layer = vars.clone().append(consts);
         let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
             .plug("uop", &uops)
             .plug("bop", &bops);
