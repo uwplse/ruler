@@ -543,16 +543,6 @@ pub mod test {
         );
     }
 
-    fn iter_rational(n: usize) -> Workload {
-        Workload::iter_lang(
-            n,
-            &["-1", "0", "1", "2"],
-            &["a", "b", "c"],
-            &["~"], // omits `fabs`
-            &["+", "-", "*", "/"],
-        )
-    }
-
     pub fn rational_rules() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
         let limits = Limits::default();
@@ -570,28 +560,12 @@ pub mod test {
         // Contains abs filter
         let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
 
-        // Canon filter
-        // let canon_filter =
-        //     Filter::Canon(vec!["a", "b", "c"].iter().map(|s| s.to_string()).collect());
-
         // The steps:
         //  [Name]         [Origin]
         //  layer1         PR #108
         //  layer2         PR #108
         //  div            PR #113
         //  nested fabs    PR #113
-        //  atoms3         old enumo
-        //  atoms5         old enumo
-        //  distribute     old enumo
-        //  div5           old enumo
-        //
-        // Definitely some overlap in the workloads since
-        // they are from different eras of Ruler/Enumo.
-        // Hopefully they are constructed/ordered to get
-        // around limits and scheduling.
-        //
-        // As of PR #115, workloads from PR #108 and PR #113 are
-        // sufficient to derive the OOPSLA '21 ruleset.
         //
 
         let vars = Workload::new(["a", "b", "c"]);
@@ -599,13 +573,28 @@ pub mod test {
         let uops = Workload::new(["~", "fabs"]);
         let bops = Workload::new(["+", "-", "*", "/"]);
 
-        // Layer 1
-        println!("layer1");
         let init_layer = vars.clone().append(consts).append(Workload::new(["2"]));
         let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
             .plug("uop", &uops)
             .plug("bop", &bops);
 
+        // Layer 1
+        println!("layer1");
+        
+        let init_layer_with_2 = init_layer.clone().append(Workload::new(["2"]));
+        let layer1 = op_layer
+            .clone()
+            .plug("expr", &init_layer_with_2)
+            .append(init_layer_with_2)
+            .filter(contains_var_filter.clone())
+            .filter(safe_filter.clone());
+
+        let layer1_rules = Math::run_workload(layer1, rules.clone(), limits);
+        rules.extend(layer1_rules);
+
+        // Layer 2
+        println!("layer2");
+        
         let layer1 = op_layer
             .clone()
             .plug("expr", &init_layer)
@@ -613,11 +602,6 @@ pub mod test {
             .filter(contains_var_filter.clone())
             .filter(safe_filter.clone());
 
-        let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
-        rules.extend(layer1_rules);
-
-        // Layer 2
-        println!("layer2");
         let layer2 = op_layer
             .clone()
             .plug("expr", &layer1)
@@ -639,50 +623,6 @@ pub mod test {
         let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2_abs);
         let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
         rules.extend(nested_abs_rules);
-
-        // Atoms 3
-        // println!("atoms3");
-        // let atoms3 = iter_rational(3)
-        //     .filter(safe_filter.clone())
-        //     .filter(contains_var_filter.clone());
-        // let atoms3_rules = Math::run_workload_fast_match(atoms3, rules.clone(), limits);
-        // rules.extend(atoms3_rules);
-
-        // Atoms 5
-        println!("atoms5");
-        let atoms5 = iter_rational(5)
-            .filter(safe_filter.clone())
-            .filter(contains_var_filter.clone());
-        let atoms5_rules = Math::run_workload_fast_match(atoms5.clone(), rules.clone(), limits);
-        rules.extend(atoms5_rules);
-
-        // Distribute
-        // let var_layer = Workload::new(["var"]);
-        // let add_layer = Workload::new(["(+ add add)", "(- add add)", "var"]);
-        // let mul_layer = Workload::new(["(* mul mul)", "(/ mul mul)", "var"]);
-        // let mul_add_layer = mul_layer
-        //     .clone()
-        //     .plug("mul", &add_layer)
-        //     .plug("add", &var_layer)
-        //     .plug("var", &vars);
-        // let add_mul_layer = add_layer
-        //     .clone()
-        //     .plug("add", &mul_layer)
-        //     .plug("mul", &var_layer)
-        //     .plug("var", &vars);
-        
-        // println!("distribute");
-        // let distrib = mul_add_layer.append(add_mul_layer);
-        // let distrib_rules = Math::run_workload_fast_match(distrib, rules.clone(), limits);
-        // rules.extend(distrib_rules);
-
-        // Div 5
-        // println!("div5");
-        // let div5 = Workload::new(["(/ v x)", "(/ x v)"])
-        //     .plug("v", &vars)
-        //     .plug("x", &atoms5.filter(canon_filter));
-        // let div5_rules = Math::run_workload_fast_match(div5, rules.clone(), limits);
-        // rules.extend(div5_rules);
 
         rules
     }
