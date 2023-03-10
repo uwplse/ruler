@@ -543,6 +543,13 @@ pub mod test {
         );
     }
 
+    #[test]
+    fn simple() {
+        let terms = Workload::new(["1", "(/ a a)"]);
+        let limits = Limits::default();
+        Math::run_workload(terms, Ruleset::default(), limits);
+    }
+
     fn iter_rational(n: usize) -> Workload {
         Workload::iter_lang(
             n,
@@ -610,9 +617,10 @@ pub mod test {
             .clone()
             .plug("expr", &init_layer)
             .append(init_layer)
+            .filter(contains_var_filter.clone())
             .filter(safe_filter.clone());
 
-        let layer1_rules = Math::run_workload_fast_match(layer1.clone(), rules.clone(), limits);
+        let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
         rules.extend(layer1_rules);
 
         // Layer 2
