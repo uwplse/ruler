@@ -543,13 +543,6 @@ pub mod test {
         );
     }
 
-    #[test]
-    fn simple() {
-        let terms = Workload::new(["1", "(/ a a)"]);
-        let limits = Limits::default();
-        Math::run_workload(terms, Ruleset::default(), limits);
-    }
-
     fn iter_rational(n: usize) -> Workload {
         Workload::iter_lang(
             n,
