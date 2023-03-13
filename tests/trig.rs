@@ -1,11 +1,12 @@
 use num::rational::Ratio;
 use num::BigInt;
 use num::{Signed, Zero};
-use ruler::enumo::Ruleset;
+use ruler::enumo::{Ruleset, Workload};
 use ruler::*;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
+use std::time::Instant;
 
 pub type Rational = Ratio<BigInt>;
 
@@ -150,7 +151,7 @@ impl SynthLanguage for Trig {
     }
 
     fn get_lifting_rules() -> Ruleset<Self> {
-        Ruleset::from_str_vec(&[
+        Ruleset::new(&[
             // definition of sine, cosine, tangent
             "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",
             "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)",
@@ -311,12 +312,37 @@ impl SynthLanguage for Trig {
     }
 }
 
+impl Trig {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let num_prior = prior.len();
+        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use ruler::{
         enumo::{Filter, Ruleset, Workload},
-        Limits, SynthLanguage,
+        Limits,
     };
 
     #[test]
@@ -364,14 +390,14 @@ mod test {
         let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
         all.extend(rules1.clone());
         new.extend(rules1.clone());
-        assert_eq!(rules1.len(), 11);
+        assert_eq!(rules1.len(), 22);
 
         let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
         println!("Starting 2");
         let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
         all.extend(rules2.clone());
         new.extend(rules2.clone());
-        assert_eq!(rules2.len(), 6);
+        assert_eq!(rules2.len(), 12);
 
         let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
         println!("Starting 3");
@@ -409,6 +435,6 @@ mod test {
             },
         );
 
-        assert_eq!(rules.len(), 2);
+        assert_eq!(rules.len(), 4);
     }
 }

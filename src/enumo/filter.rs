@@ -5,8 +5,8 @@ pub enum Filter {
     MetricLt(Metric, usize),
     Contains(Pattern),
     Canon(Vec<String>),
-    And(Box<Self>, Box<Self>),
-    Or(Box<Self>, Box<Self>),
+    And(Vec<Self>),
+    Or(Vec<Self>),
     Invert(Box<Self>),
 }
 
@@ -22,8 +22,8 @@ impl Filter {
                     }
             }
             Filter::Canon(symbols) => sexp.eq(&sexp.canon(symbols)),
-            Filter::And(f1, f2) => f1.test(sexp) && f2.test(sexp),
-            Filter::Or(f1, f2) => f1.test(sexp) || f2.test(sexp),
+            Filter::And(fs) => fs.iter().all(|f| f.test(sexp)),
+            Filter::Or(fs) => fs.iter().any(|f| f.test(sexp)),
             Filter::Invert(f) => !f.test(sexp),
         }
     }
@@ -74,10 +74,10 @@ mod test {
     fn and() {
         let wkld = Workload::new(["x", "y", "(x y)", "(y x)", "(x x x)", "(y y z)", "(x y z)"]);
         let actual = wkld
-            .filter(Filter::And(
-                Box::new(Filter::Contains("x".parse().unwrap())),
-                Box::new(Filter::Contains("y".parse().unwrap())),
-            ))
+            .filter(Filter::And(vec![
+                Filter::Contains("x".parse().unwrap()),
+                Filter::Contains("y".parse().unwrap()),
+            ]))
             .force();
         let expected = Workload::new(["(x y)", "(y x)", "(x y z)"]).force();
         assert_eq!(actual, expected);

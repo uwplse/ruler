@@ -1,8 +1,13 @@
+use std::time::Instant;
+
 use num::{BigInt, Zero};
 use num_bigint::ToBigInt;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
-use ruler::*;
+use ruler::{
+    enumo::{Ruleset, Workload},
+    *,
+};
 use z3::ast::Ast;
 
 egg::define_language! {
@@ -148,6 +153,33 @@ impl SynthLanguage for Nat {
     }
 }
 
+impl Nat {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+
+        let mut candidates = Ruleset::cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
+
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
     let mut buf = vec![];
     let zero = z3::ast::Int::from_i64(ctx, 0);
@@ -195,7 +227,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules3.len(), 4);
+        assert_eq!(rules3.len(), 5);
         all_rules.extend(rules3);
 
         let atoms4 = iter_nat(4);
@@ -209,7 +241,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules4.len(), 2);
+        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_nat(5);
@@ -223,9 +255,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules5.len(), 5);
+        assert_eq!(rules5.len(), 3);
         all_rules.extend(rules5);
-
-        assert_eq!(all_rules.len(), 11);
     }
 }

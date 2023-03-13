@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 /**
  * Pos is a datatype representing the strictly positive integers in a binary way.
  * XH represents 1
@@ -6,7 +8,10 @@
  * Example: 6 is represented as (XO (XI XH))
  * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
  */
-use ruler::{enumo::Ruleset, *};
+use ruler::{
+    enumo::{Ruleset, Workload},
+    *,
+};
 
 egg::define_language! {
  pub enum Pos {
@@ -51,7 +56,7 @@ impl SynthLanguage for Pos {
     }
 
     fn get_lifting_rules() -> Ruleset<Self> {
-        Ruleset::from_str_vec(&[
+        Ruleset::new(&[
             "XH ==> (S Z)",
             "(S Z) ==> XH",
             "(XO ?a) ==> (+ ?a ?a)",
@@ -109,6 +114,31 @@ impl SynthLanguage for Pos {
     }
 }
 
+impl Pos {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let num_prior = prior.len();
+        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruler::enumo::{Ruleset, Workload};
@@ -136,7 +166,7 @@ mod tests {
             "(+ ?a ?a) ==> (* ?a (S (S Z)))",
         ];
 
-        let prior = Ruleset::from_str_vec(&nat_rules);
+        let prior = Ruleset::new(&nat_rules);
 
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
@@ -186,7 +216,7 @@ mod tests {
         ];
 
         let mut all_rules = Ruleset::default();
-        all_rules.extend(Ruleset::from_str_vec(&nat_rules));
+        all_rules.extend(Ruleset::new(&nat_rules));
 
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
@@ -199,7 +229,7 @@ mod tests {
                 node: 1000000,
             },
         );
-        assert_eq!(rules3.len(), 3);
+        assert_eq!(rules3.len(), 6);
         all_rules.extend(rules3);
 
         let atoms4 = iter_pos(4);
@@ -213,7 +243,7 @@ mod tests {
                 node: 1000000,
             },
         );
-        assert_eq!(rules4.len(), 4);
+        assert_eq!(rules4.len(), 2);
         all_rules.extend(rules4);
 
         let atoms5 = iter_pos(5);
@@ -227,6 +257,6 @@ mod tests {
                 node: 1000000,
             },
         );
-        assert_eq!(rules4.len(), 8);
+        assert_eq!(rules4.len(), 1);
     }
 }

@@ -1,5 +1,8 @@
-use ruler::*;
-use std::ops::*;
+use ruler::{
+    enumo::{Ruleset, Workload},
+    *,
+};
+use std::{ops::*, time::Instant};
 
 egg::define_language! {
   pub enum Bool {
@@ -118,6 +121,33 @@ impl SynthLanguage for Bool {
     }
 }
 
+impl Bool {
+    fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = prior.compress(&egraph, limits);
+
+        let mut candidates = Ruleset::cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -143,7 +173,7 @@ mod test {
         let egraph = all_rules.compress(&atoms3.to_egraph(), Limits::default());
         let mut candidates = Ruleset::cvec_match(&egraph);
         let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules3.len(), 14);
+        assert_eq!(rules3.len(), 23);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
@@ -152,7 +182,7 @@ mod test {
         let egraph = all_rules.compress(&atoms4.to_egraph(), Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
         let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules4.len(), 3);
+        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
@@ -161,10 +191,8 @@ mod test {
         let egraph = all_rules.compress(&atoms5.to_egraph(), Limits::default());
         candidates = Ruleset::cvec_match(&egraph);
         let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 15);
+        assert_eq!(rules5.len(), 16);
         all_rules.extend(rules5);
-
-        assert_eq!(all_rules.len(), 32);
     }
 
     #[test]
@@ -174,24 +202,22 @@ mod test {
         assert_eq!(atoms3.force().len(), 93);
 
         let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::default());
-        assert_eq!(rules3.len(), 14);
+        assert_eq!(rules3.len(), 23);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
         let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::default());
-        assert_eq!(rules4.len(), 3);
+        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
         let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 14);
+        assert_eq!(rules5.len(), 16);
         all_rules.extend(rules5);
-
-        assert_eq!(all_rules.len(), 31);
     }
 
     #[test]
@@ -235,7 +261,6 @@ mod test {
         all_rules.write_json_rules("bool.json");
         all_rules.write_json_equiderivability(
             baseline.clone(),
-            51,
             "bool.json",
             Limits {
                 iter: 3,
@@ -247,7 +272,7 @@ mod test {
 
     #[test]
     fn round_trip_to_file() {
-        let rules: Ruleset<Bool> = Ruleset::from_str_vec(&[
+        let rules: Ruleset<Bool> = Ruleset::new(&[
             "(^ ?b ?a) ==> (^ ?a ?b)",
             "(& ?b ?a) ==> (& ?a ?b)",
             "(| ?b ?a) ==> (| ?a ?b)",
@@ -291,7 +316,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(can.len(), 10);
-        assert_eq!(cannot.len(), 5);
+        assert_eq!(can.len(), 16);
+        assert_eq!(cannot.len(), 7);
     }
 }

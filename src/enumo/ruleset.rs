@@ -1,4 +1,5 @@
 use egg::{AstSize, EClass, Extractor, StopReason};
+use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use serde_json::*;
 use std::fs::*;
@@ -35,14 +36,56 @@ impl<L: SynthLanguage> Default for Ruleset<L> {
     }
 }
 
+impl<L: SynthLanguage> IntoIterator for Ruleset<L> {
+    type Item = (Arc<str>, Equality<L>);
+    type IntoIter = IntoIter<Arc<str>, Equality<L>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, L: SynthLanguage> IntoIterator for &'a Ruleset<L> {
+    type Item = (&'a Arc<str>, &'a Equality<L>);
+    type IntoIter = Iter<'a, Arc<str>, Equality<L>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a, L: SynthLanguage> IntoIterator for &'a mut Ruleset<L> {
+    type Item = (&'a Arc<str>, &'a mut Equality<L>);
+    type IntoIter = IterMut<'a, Arc<str>, Equality<L>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
 impl<L: SynthLanguage> Ruleset<L> {
-    pub fn from_str_vec(ss: &[&str]) -> Self {
+    pub fn new<I>(vals: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
         let mut map = IndexMap::default();
-        let eqs: Vec<Equality<L>> = ss.iter().map(|s| s.parse().unwrap()).collect();
+        let eqs: Vec<Equality<L>> = vals
+            .into_iter()
+            .map(|x| x.as_ref().parse().unwrap())
+            .collect();
         for eq in eqs {
             map.insert(eq.name.clone(), eq);
         }
         Ruleset(map)
+    }
+
+    pub fn iter(&self) -> Values<'_, Arc<str>, Equality<L>> {
+        self.0.values()
+    }
+
+    pub fn iter_mut(&mut self) -> ValuesMut<'_, Arc<str>, Equality<L>> {
+        self.0.values_mut()
     }
 
     pub fn to_str_vec(&self) -> Vec<String> {
@@ -57,6 +100,24 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn bidir_len(&self) -> usize {
+        let mut bidir = 0;
+        let mut unidir = 0;
+        for (_, eq) in &self.0 {
+            let reverse = Equality::new(eq.rhs.clone(), eq.lhs.clone());
+            if reverse.is_some() && self.contains(&reverse.unwrap()) {
+                bidir += 1;
+            } else {
+                unidir += 1;
+            }
+        }
+        unidir + (bidir / 2)
+    }
+
+    pub fn contains(&self, eq: &Equality<L>) -> bool {
+        self.0.contains_key(&eq.name)
     }
 
     pub fn add(&mut self, eq: Equality<L>) {
@@ -111,6 +172,25 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(eqs)
     }
 
+    pub fn pretty_print(&self) {
+        let mut strs = vec![];
+        for (name, eq) in &self.0 {
+            let reverse = Equality::new(eq.rhs.clone(), eq.lhs.clone());
+            if reverse.is_some() && self.contains(&reverse.unwrap()) {
+                let reverse_name = format!("{} <=> {}", eq.rhs, eq.lhs);
+                if !strs.contains(&reverse_name) {
+                    strs.push(format!("{} <=> {}", eq.lhs, eq.rhs));
+                }
+            } else {
+                strs.push(name.to_string());
+            }
+        }
+
+        for s in strs {
+            println!("{s}");
+        }
+    }
+
     // Writes the ruleset to the json/ subdirectory, to be uploaded to the
     // nightly server. The ruleset is written as a json object with a single
     // field, "rules".
@@ -145,7 +225,6 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn write_json_equiderivability(
         &self,
         baseline: Self,
-        len_baseline: usize,
         name: &str,
         limit: Limits,
         duration: Duration,
@@ -199,7 +278,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let stats = json!({
             "spec": name,
             "num_rules": num_rules,
-            "num_baseline": len_baseline,
+            "num_baseline": baseline.len(),
             "enumo_derives_oopsla": forwards_derivable,
             "oopsla_derives_enumo": backwards_derivable,
             "time": time
@@ -316,10 +395,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                         continue;
                     }
                     if e1 != e2 {
-                        if let Some(eq) = Equality::new(&e1, &e2) {
+                        if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
                             candidates.add(eq)
                         }
-                        if let Some(eq) = Equality::new(&e2, &e1) {
+                        if let Some(eq) = Equality::from_recexprs(&e2, &e1) {
                             candidates.add(eq)
                         }
                     }
@@ -393,10 +472,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                 if compare(&class1.data.cvec, &class2.data.cvec) {
                     let (_, e1) = extract.find_best(class1.id);
                     let (_, e2) = extract.find_best(class2.id);
-                    if let Some(eq) = Equality::new(&e1, &e2) {
+                    if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
                         candidates.add(eq);
                     }
-                    if let Some(eq) = Equality::new(&e2, &e1) {
+                    if let Some(eq) = Equality::from_recexprs(&e2, &e1) {
                         candidates.add(eq);
                     }
                 }
@@ -424,10 +503,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
-                    if let Some(eq) = Equality::new(e1, e2) {
+                    if let Some(eq) = Equality::from_recexprs(e1, e2) {
                         candidates.add(eq);
                     }
-                    if let Some(eq) = Equality::new(e2, e1) {
+                    if let Some(eq) = Equality::from_recexprs(e2, e1) {
                         candidates.add(eq);
                     }
                 }
@@ -447,7 +526,17 @@ impl<L: SynthLanguage> Ruleset<L> {
             let popped = self.0.pop();
             if let Some((_, eq)) = popped {
                 if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
-                    selected.add(eq);
+                    selected.add(eq.clone());
+                }
+
+                // If reverse direction is also in candidates, add it at the same time
+                let reverse = Equality::new(eq.rhs, eq.lhs);
+                if let Some(reverse) = reverse {
+                    if self.contains(&reverse) {
+                        if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
+                            selected.add(reverse);
+                        }
+                    }
                 }
             } else {
                 break;
@@ -486,7 +575,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
             let (_, left) = extract.find_best(l_id);
             let (_, right) = extract.find_best(r_id);
-            if let Some(eq) = Equality::new(&left, &right) {
+            if let Some(eq) = Equality::from_recexprs(&left, &right) {
                 self.add(eq);
             }
         }

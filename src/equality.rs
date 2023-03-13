@@ -70,10 +70,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 }
 
 impl<L: SynthLanguage> Equality<L> {
-    pub fn new(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
-        let map = &mut HashMap::default();
-        let l_pat = L::generalize(e1, map);
-        let r_pat = L::generalize(e2, map);
+    pub fn new(l_pat: Pattern<L>, r_pat: Pattern<L>) -> Option<Self> {
         let name = format!("{} ==> {}", l_pat, r_pat);
         let rhs = Rhs { rhs: r_pat.clone() };
         let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
@@ -84,6 +81,13 @@ impl<L: SynthLanguage> Equality<L> {
             rhs: r_pat,
             rewrite: rw,
         })
+    }
+
+    pub fn from_recexprs(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
+        let map = &mut HashMap::default();
+        let l_pat = L::generalize(e1, map);
+        let r_pat = L::generalize(e2, map);
+        Self::new(l_pat, r_pat)
     }
 
     pub fn is_saturating(&self) -> bool {

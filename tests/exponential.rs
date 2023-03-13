@@ -2,8 +2,11 @@
     Exponential functions from arithmetic
 !*/
 
+use std::time::Instant;
+
 use num::rational::Ratio;
 use num::BigInt;
+use ruler::enumo::{Ruleset, Workload};
 use ruler::*;
 
 mod rational;
@@ -91,7 +94,7 @@ impl SynthLanguage for Exponential {
     }
 
     fn get_lifting_rules() -> enumo::Ruleset<Self> {
-        enumo::Ruleset::from_str_vec(&[
+        enumo::Ruleset::new(&[
             // definitions (denote)
             "(pow ?a ?b) ==> (exp (* ?b (log ?a)))",
             "(sqrt ?a) ==> (pow ?a 1/2)",
@@ -105,6 +108,31 @@ impl SynthLanguage for Exponential {
 
     fn is_allowed_op(&self) -> bool {
         true
+    }
+}
+
+impl Exponential {
+    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let num_prior = prior.len();
+        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
     }
 }
 
@@ -122,7 +150,7 @@ mod test {
     }
 
     fn starting_exponential_rules() -> Ruleset {
-        Ruleset::from_str_vec(&[
+        Ruleset::new(&[
             // exponential properties (expand)
             "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
             "(exp (~ ?a)) ==> (/ 1 (exp ?a))",
@@ -137,10 +165,10 @@ mod test {
     }
 
     fn rational_rules() -> Ruleset {
-        let (rules, _) = rational::test::rational_rules();
+        let rules = rational::test::rational_rules();
         let rule_strs = rules.to_str_vec();
         let rule_strs: Vec<&str> = rule_strs.iter().map(|x| &**x).collect();
-        Ruleset::from_str_vec(&rule_strs)
+        Ruleset::new(&rule_strs)
     }
 
     fn run_workload(terms: Workload, prev_rules: &Ruleset) -> Ruleset {
