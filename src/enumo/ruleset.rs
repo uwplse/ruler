@@ -1,7 +1,9 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use serde_json::*;
 use std::fs::*;
+use std::sync::Mutex;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
@@ -134,18 +136,20 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn partition<F>(&self, f: F) -> (Self, Self)
     where
-        F: Fn(&Equality<L>) -> bool,
+        F: Fn(&Equality<L>) -> bool + std::marker::Sync,
     {
-        let mut ins = Ruleset::default();
-        let mut outs = Ruleset::default();
-        for (_, eq) in &self.0 {
-            if f(eq) {
-                ins.add(eq.clone());
+        let results = Mutex::new((Ruleset::default(), Ruleset::default()));
+        let eqs: Vec<&Equality<L>> = self.0.values().collect();
+        eqs.into_par_iter().for_each(|eq| {
+            let f_eq = f(eq);
+            let mut results = results.lock().unwrap();
+            if f_eq {
+                results.0.add(eq.clone());
             } else {
-                outs.add(eq.clone());
+                results.1.add(eq.clone());
             }
-        }
-        (ins, outs)
+        });
+        results.into_inner().unwrap()
     }
 
     pub fn to_file(&self, filename: &str) {
