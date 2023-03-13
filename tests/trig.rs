@@ -153,10 +153,19 @@ impl SynthLanguage for Trig {
     fn get_lifting_rules() -> Ruleset<Self> {
         Ruleset::new(&[
             // definition of sine, cosine, tangent
+            // (sine)
             "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",
             "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)",
+            // (sine, alternatively)
+            "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)",
+            "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) => (sin ?a)",
+            // (cosine)
             "(cos ?a) ==> (/ (+ (cis ?a) (cis (~ ?a))) 2)",
             "(/ (+ (cis ?a) (cis (~ ?a))) 2) ==> (cos ?a)",
+            // (cosine, alternatively)
+            "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))",
+            "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)",
+            // (tangent, alternatively)
             "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
             "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
             // definition of cosecant, secant, cotangent
@@ -179,14 +188,19 @@ impl SynthLanguage for Trig {
             "(* ?a ?a) ==> (sqr ?a)",
             // constant folding for PI
             "(+ PI PI) ==> (* 2 PI)",
+            "(* 2 PI) ==> (+ PI PI)",
             // constant folding for cis
             "(cis 0) ==> 1",
             "(cis (/ PI 2)) ==> I",
+            "(cis (~ (/ PI 2))) ==> (~ I)",
+            "(cis PI) ==> -1",
             // cis identities
             "(cis (+ ?a ?b)) ==> (* (cis ?a) (cis ?b))",
             "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (~ ?b)))",
             "(* (cis ?a) (cis (~ ?a))) ==> 1",
-            // definition of cis
+            "(cis (~ ?a)) ==> (/ 1 (cis ?a))",
+            // constant folding I
+            "(/ 1 I) ==> (~ I)",
             "(* I I) ==> -1",
         ])
     }
@@ -436,5 +450,74 @@ mod test {
         );
 
         assert_eq!(rules.len(), 4);
+    }
+
+    #[test]
+    fn sandbox() {
+        let complex_rules: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let prior_rules: Ruleset<Trig> = Ruleset::new([
+            "(cos (/ PI 2)) ==> 0",
+            "0 ==> (cos (/ PI 2))",
+            "0 ==> (sin (* PI 2))",
+            "(sin (* PI 2)) ==> 0",
+            "1 ==> (sin (/ PI 2))",
+            "(sin (/ PI 2)) ==> 1",
+            "0 ==> (tan (* PI 2))",
+            "(tan (* PI 2)) ==> 0",
+            "1 ==> (cos (* PI 2))",
+            "(cos (* PI 2)) ==> 1",
+            "(tan 0) ==> 0",
+            "0 ==> (tan 0)",
+            "0 ==> (sin 0)",
+            "(sin 0) ==> 0",
+            "1 ==> (cos 0)",
+            "(cos 0) ==> 1",
+            "0 ==> (sin PI)",
+            "(sin PI) ==> 0",
+            "-1 ==> (cos PI)",
+            "(cos PI) ==> -1",
+            "(tan PI) ==> (sin PI)",
+            "(sin PI) ==> (tan PI)",
+            "(~ (cos ?a)) ==> (cos (- PI ?a))",
+            "(cos (- PI ?a)) ==> (~ (cos ?a))",
+            "(sin (- PI ?a)) ==> (sin ?a)",
+            "(sin ?a) ==> (sin (- PI ?a))",
+            "(tan ?a) ==> (tan (+ PI ?a))",
+            "(tan (+ PI ?a)) ==> (tan ?a)",
+            "(~ (sin ?a)) ==> (sin (~ ?a))",
+            "(sin (~ ?a)) ==> (~ (sin ?a))",
+            "(tan (~ ?a)) ==> (~ (tan ?a))",
+            "(~ (tan ?a)) ==> (tan (~ ?a))",
+            "(cos (~ ?a)) ==> (cos ?a)",
+            "(cos ?a) ==> (cos (~ ?a))",
+            "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
+            "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
+            "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
+        ]);
+
+        let limits = Limits {
+            iter: 3,
+            node: 2000000,
+        };
+
+        let mut rules = prior_rules.clone();
+        rules.extend(complex_rules);
+
+        // Layer
+        let wkld = Workload::new([
+            "(cos (- (/ PI 2) x))",
+            "(sin x)",
+            "(* (sin x) (sin x))",
+            "(/ (- 1 (cos (* 2 x))) 2)",
+            "(* (cos x) (cos x))",
+            "(/ (+ 1 (cos (* 2 x))) 2)",
+            "(* (cos x) (cos y))",
+            "(/ (+ (cos (- x y)) (cos (+ x y))) 2)",
+            "(* (sin x) (sin y))",
+            "(/ (- (cos (- x y)) (cos (+ x y))) 2)",
+        ]);
+
+        let new_rules = Trig::run_workload(wkld, rules.clone(), limits);
+        rules.extend(new_rules);
     }
 }
