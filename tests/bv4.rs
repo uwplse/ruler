@@ -4,7 +4,7 @@
 
 use std::time::Instant;
 
-use ruler::enumo::{Ruleset, Workload};
+use ruler::enumo::{Ruleset, Scheduler, Workload};
 
 ruler::impl_bv!(4);
 
@@ -13,7 +13,7 @@ impl Bv {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
-        let compressed = prior.compress(&egraph, limits);
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 
         let mut candidates = Ruleset::cvec_match(&compressed);
 

@@ -1,5 +1,5 @@
 use ruler::{
-    enumo::{Ruleset, Workload},
+    enumo::{Ruleset, Scheduler, Workload},
     *,
 };
 use std::{ops::*, time::Instant};
@@ -126,7 +126,7 @@ impl Bool {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
-        let compressed = prior.compress(&egraph, limits);
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 
         let mut candidates = Ruleset::cvec_match(&compressed);
 
@@ -170,7 +170,7 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let egraph = all_rules.compress(&atoms3.to_egraph(), Limits::default());
+        let egraph = Scheduler::Compress(Limits::default()).run(&atoms3.to_egraph(), &all_rules);
         let mut candidates = Ruleset::cvec_match(&egraph);
         let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules3.len(), 23);
@@ -179,7 +179,7 @@ mod test {
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let egraph = all_rules.compress(&atoms4.to_egraph(), Limits::default());
+        let egraph = Scheduler::Compress(Limits::default()).run(&atoms4.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
         let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules4.len(), 4);
@@ -188,7 +188,7 @@ mod test {
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let egraph = all_rules.compress(&atoms5.to_egraph(), Limits::default());
+        let egraph = Scheduler::Compress(Limits::default()).run(&atoms5.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
         let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
         assert_eq!(rules5.len(), 16);
