@@ -369,18 +369,25 @@ mod test {
     }
 
     fn og_recipe(prior: &Ruleset<Trig>, limits: Limits) -> Ruleset<Trig> {
+        let no_trig_2x = Filter::Invert(Box::new(Filter::Or(vec![
+            Filter::Contains("(sin (+ ?a ?a))".parse().unwrap()),
+            Filter::Contains("(cos (+ ?a ?a))".parse().unwrap()),
+            Filter::Contains("(tan (+ ?a ?a))".parse().unwrap()),
+        ])));
+        let valid_trig = Filter::Invert(Box::new(Filter::Contains(
+            "(tan (/ PI 2))".parse().unwrap(),
+        )));
+
         let t_ops = Workload::new(["sin", "cos", "tan"]);
         let consts = Workload::new([
             "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
         ]);
         let app = Workload::new(["(op v)"]);
-        let trig_constants =
-            app.clone()
-                .plug("op", &t_ops)
-                .plug("v", &consts)
-                .filter(Filter::Invert(Box::new(Filter::Contains(
-                    "(tan (/ PI 2))".parse().unwrap(),
-                ))));
+        let trig_constants = app
+            .clone()
+            .plug("op", &t_ops)
+            .plug("v", &consts)
+            .filter(valid_trig);
 
         let simple_terms = app.clone().plug("op", &t_ops).plug(
             "v",
@@ -415,12 +422,13 @@ mod test {
         new.extend(rules2.clone());
         assert_eq!(rules2.len(), 12);
 
-        let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
+        let trimmed_wkld2 = wkld2.clone().filter(no_trig_2x);
+        let wkld3 = Workload::Append(vec![trimmed_wkld2.clone(), sum_of_squares.clone()]);
         println!("Starting 3");
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3.clone());
         new.extend(rules3.clone());
-        assert_eq!(rules3.len(), 5);
+        assert_eq!(rules3.len(), 3);
 
         new
     }
