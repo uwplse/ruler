@@ -465,39 +465,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    fn select(&mut self, step_size: usize) -> Self {
-        let mut chosen = Self::default();
-        self.0
-            .sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
-
-        // 2. insert step_size best candidates into self.new_rws
-        let mut selected: Ruleset<L> = Default::default();
-        while selected.len() < step_size {
-            let popped = self.0.pop();
-            if let Some((_, eq)) = popped {
-                if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
-                    selected.add(eq.clone());
-                }
-
-                // If reverse direction is also in candidates, add it at the same time
-                let reverse = Equality::new(eq.rhs, eq.lhs);
-                if let Some(reverse) = reverse {
-                    if self.contains(&reverse) {
-                        if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
-                            selected.add(reverse);
-                        }
-                    }
-                }
-            } else {
-                break;
-            }
-        }
-        chosen.extend(selected);
-
-        // 3. return chosen candidates
-        chosen
-    }
-
     fn shrink(&mut self, chosen: &Self, limits: Limits) {
         // 1. make new egraph
         // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
@@ -533,11 +500,27 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn minimize(&mut self, prior: Ruleset<L>, limits: Limits) -> Self {
         let mut chosen = prior.clone();
-        let step_size = 1;
+        self.0
+            .sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
         while !self.is_empty() {
-            let selected = self.select(step_size);
-            chosen.extend(selected.clone());
-            self.shrink(&chosen, limits);
+            if let Some((_, best)) = self.0.pop() {
+                if let ValidationResult::Valid = L::validate(&best.lhs, &best.rhs) {
+                    chosen.add(best.clone());
+                }
+
+                // If reverse direction is also in candidates, add it at the same time
+                let reverse = Equality::new(best.rhs, best.lhs);
+                if let Some(reverse) = reverse {
+                    if self.contains(&reverse) {
+                        if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
+                            self.0.remove(&reverse.name);
+                            chosen.add(reverse);
+                        }
+                    }
+                }
+
+                self.shrink(&chosen, limits);
+            }
         }
         // Return only the new rules
         chosen.remove_all(prior);
