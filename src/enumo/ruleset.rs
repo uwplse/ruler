@@ -500,8 +500,16 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn minimize(&mut self, prior: Ruleset<L>, limits: Limits) -> Self {
         let mut chosen = prior.clone();
+
+        // Sort candidates by score
         self.0
             .sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
+
+        // Go through candidates, picking best one each time
+        // If validation succeeds, add it to the final ruleset
+        // If reverse direction is also in candidates, add it at the same time
+        // Then go through the rest of the candidates, removing any that are
+        // derivable using the newly selected rule
         while !self.is_empty() {
             if let Some((_, best)) = self.0.pop() {
                 if let ValidationResult::Valid = L::validate(&best.lhs, &best.rhs) {
@@ -522,9 +530,9 @@ impl<L: SynthLanguage> Ruleset<L> {
                 self.shrink(&chosen, limits);
             }
         }
+
         // Return only the new rules
         chosen.remove_all(prior);
-
         chosen
     }
 

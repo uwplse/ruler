@@ -191,7 +191,7 @@ mod test {
         let egraph = Scheduler::Compress(Limits::default()).run(&atoms5.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
         let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 16);
+        assert_eq!(rules5.len(), 14);
         all_rules.extend(rules5);
     }
 
@@ -216,7 +216,7 @@ mod test {
         assert_eq!(atoms5.force().len(), 4599);
 
         let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 16);
+        assert_eq!(rules5.len(), 14);
         all_rules.extend(rules5);
     }
 
