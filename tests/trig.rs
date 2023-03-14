@@ -425,6 +425,20 @@ mod test {
         let mut all = prior.clone();
         let mut new = Ruleset::<Trig>::default();
 
+        let non_square_filter = Filter::Invert(Box::new(Filter::Or(vec![
+            Filter::Contains("(* (cos ?x) (cos ?x))".parse().unwrap()),
+            Filter::Contains("(* (sin ?x) (sin ?x))".parse().unwrap()),
+        ])));
+
+        let two_x_filter = Filter::Invert(Box::new(
+            Filter::Contains("(+ ?x ?x)".parse().unwrap()),
+        ));
+
+        let trivial_trig_filter = Filter::Invert(Box::new(Filter::Or(vec![
+            Filter::Contains("(cos (?op ?a ?b))".parse().unwrap()),
+            Filter::Contains("(sin (?op ?a ?b))".parse().unwrap()),
+        ])));
+
         let t_ops = Workload::new(["sin", "cos"]);
         let app = Workload::new(["(op v)"]);
         let shift = Workload::new(["x", "(- 1 x)", "(+ 1 x)"]);
@@ -449,16 +463,16 @@ mod test {
             .plug("y", &two_var);
         let prod_two_vars = Workload::new(["(* x y)"])
             .plug("x", &two_var)
-            .plug("y", &two_var);
+            .plug("y", &two_var)
+            .filter(non_square_filter);
 
-        let filtered_sum_prod = Workload::Append(vec![sum_two_vars.clone(), prod_two_vars.clone()])
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(* (cos ?x) (cos ?x))".parse().unwrap(),
-            ))))
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(* (sin ?x) (sin ?x))".parse().unwrap(),
-            ))));
+        let sum_of_prod = Workload::new(["(+ x y)", "(- x y)"])
+            .plug("x", &prod_two_vars)
+            .plug("y", &prod_two_vars)
+            .filter(two_x_filter)
+            .filter(trivial_trig_filter);
 
+        let sum_and_prod = Workload::Append(vec![sum_two_vars.clone(), prod_two_vars.clone()]);
         let shifted = shift.clone().plug("x", &simple);
 
         // Coangles
@@ -476,13 +490,13 @@ mod test {
         new.extend(rules2.clone());
 
         // Product-to-sum
-        let wkld3 = scale.clone().plug("x", &filtered_sum_prod);
+        let wkld3 = scale.clone().plug("x", &sum_and_prod);
         let rules3 = Trig::run_workload(wkld3.clone(), all.clone(), limits);
         all.extend(rules3.clone());
         new.extend(rules3.clone());
 
         // Sums
-        let wkld4 = Workload::Append(vec![wkld3, sum_two_vars, prod_two_vars, two_var]);
+        let wkld4 = Workload::Append(vec![two_var, sum_of_prod]);
         let rules4 = Trig::run_workload(wkld4.clone(), all.clone(), limits);
         all.extend(rules4.clone());
         new.extend(rules4.clone());
@@ -505,46 +519,46 @@ mod test {
         all.extend(prior_forbidden_rules());
 
         // Run original Enumo recipe
-        let rules = og_recipe(&all, limits);
-        // let rules = Ruleset::new([
-        //     "(cos (/ PI 2)) ==> 0",
-        //     "0 ==> (cos (/ PI 2))",
-        //     "0 ==> (sin (* PI 2))",
-        //     "(sin (* PI 2)) ==> 0",
-        //     "1 ==> (sin (/ PI 2))",
-        //     "(sin (/ PI 2)) ==> 1",
-        //     "0 ==> (tan (* PI 2))",
-        //     "(tan (* PI 2)) ==> 0",
-        //     "1 ==> (cos (* PI 2))",
-        //     "(cos (* PI 2)) ==> 1",
-        //     "(tan 0) ==> 0",
-        //     "0 ==> (tan 0)",
-        //     "0 ==> (sin 0)",
-        //     "(sin 0) ==> 0",
-        //     "1 ==> (cos 0)",
-        //     "(cos 0) ==> 1",
-        //     "0 ==> (sin PI)",
-        //     "(sin PI) ==> 0",
-        //     "-1 ==> (cos PI)",
-        //     "(cos PI) ==> -1",
-        //     "(tan PI) ==> (sin PI)",
-        //     "(sin PI) ==> (tan PI)",
-        //     "(~ (cos ?a)) ==> (cos (- PI ?a))",
-        //     "(cos (- PI ?a)) ==> (~ (cos ?a))",
-        //     "(sin (- PI ?a)) ==> (sin ?a)",
-        //     "(sin ?a) ==> (sin (- PI ?a))",
-        //     "(tan ?a) ==> (tan (+ PI ?a))",
-        //     "(tan (+ PI ?a)) ==> (tan ?a)",
-        //     "(~ (sin ?a)) ==> (sin (~ ?a))",
-        //     "(sin (~ ?a)) ==> (~ (sin ?a))",
-        //     "(tan (~ ?a)) ==> (~ (tan ?a))",
-        //     "(~ (tan ?a)) ==> (tan (~ ?a))",
-        //     "(cos (~ ?a)) ==> (cos ?a)",
-        //     "(cos ?a) ==> (cos (~ ?a))",
-        //     "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
-        //     "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
-        //     "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
-        // ]);
+        // let rules = og_recipe(&all, limits);
+        let rules = Ruleset::new([
+            "(cos (/ PI 2)) ==> 0",
+            "0 ==> (cos (/ PI 2))",
+            "0 ==> (sin (* PI 2))",
+            "(sin (* PI 2)) ==> 0",
+            "1 ==> (sin (/ PI 2))",
+            "(sin (/ PI 2)) ==> 1",
+            "0 ==> (tan (* PI 2))",
+            "(tan (* PI 2)) ==> 0",
+            "1 ==> (cos (* PI 2))",
+            "(cos (* PI 2)) ==> 1",
+            "(tan 0) ==> 0",
+            "0 ==> (tan 0)",
+            "0 ==> (sin 0)",
+            "(sin 0) ==> 0",
+            "1 ==> (cos 0)",
+            "(cos 0) ==> 1",
+            "0 ==> (sin PI)",
+            "(sin PI) ==> 0",
+            "-1 ==> (cos PI)",
+            "(cos PI) ==> -1",
+            "(tan PI) ==> (sin PI)",
+            "(sin PI) ==> (tan PI)",
+            "(~ (cos ?a)) ==> (cos (- PI ?a))",
+            "(cos (- PI ?a)) ==> (~ (cos ?a))",
+            "(sin (- PI ?a)) ==> (sin ?a)",
+            "(sin ?a) ==> (sin (- PI ?a))",
+            "(tan ?a) ==> (tan (+ PI ?a))",
+            "(tan (+ PI ?a)) ==> (tan ?a)",
+            "(~ (sin ?a)) ==> (sin (~ ?a))",
+            "(sin (~ ?a)) ==> (~ (sin ?a))",
+            "(tan (~ ?a)) ==> (~ (tan ?a))",
+            "(~ (tan ?a)) ==> (tan (~ ?a))",
+            "(cos (~ ?a)) ==> (cos ?a)",
+            "(cos ?a) ==> (cos (~ ?a))",
+            "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
+            "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
+            "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
+        ]);
 
         all.extend(rules.clone());
         new.extend(rules);
@@ -583,7 +597,7 @@ mod test {
         all.extend(prior_forbidden_rules());
 
         let rules = Trig::run_workload(terms, all, limits);
-        assert_eq!(rules.len(), 4);
+        assert_eq!(rules.len(), 6);
     }
 
     #[test]
@@ -627,6 +641,16 @@ mod test {
             "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
             "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
             "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
+            "(cos (- (/ PI 2) ?a)) ==> (sin ?a)",
+            "(sin ?a) ==> (cos (- (/ PI 2) ?a))",
+            "(/ (- 1 (cos (+ ?a ?a))) 2) ==> (* (sin ?a) (sin ?a))",
+            "(* (sin ?a) (sin ?a)) ==> (/ (- 1 (cos (+ ?a ?a))) 2)",
+            "(/ (+ 1 (cos (+ ?a ?a))) 2) ==> (* (cos ?a) (cos ?a))",
+            "(* (cos ?a) (cos ?a)) ==> (/ (+ 1 (cos (+ ?a ?a))) 2)",
+            "(* (sin ?b) (sin ?a)) ==> (/ (- (cos (- ?a ?b)) (cos (+ ?b ?a))) 2)",
+            "(/ (- (cos (- ?a ?b)) (cos (+ ?b ?a))) 2) ==> (* (sin ?b) (sin ?a))",
+            "(* (cos ?b) (cos ?a)) ==> (/ (+ (cos (+ ?a ?b)) (cos (- ?b ?a))) 2)",
+            "(/ (+ (cos (+ ?a ?b)) (cos (- ?b ?a))) 2) ==> (* (cos ?b) (cos ?a))",
         ]);
 
         let limits = Limits {
@@ -641,17 +665,7 @@ mod test {
         // Layer
         let wkld = Workload::new([
             "(cos (+ x y))",
-            "(cos (- x y))",
-            "(- (* (cos x) (cos y)) (* (sin x) (sin y)))",
-            "(+ (* (cos x) (cos y)) (* (sin x) (sin y)))",
-            "(/ (- (cos (- x y)) (cos (+ x y))) 2)",
-            "(/ (+ (cos (+ x y)) (cos (- x y))) 2)",
-            "(/ (- (cos (- y x)) (cos (+ y x))) 2)",
-            "(/ (+ (cos (+ y x)) (cos (- y x))) 2)",
-            "(- (cos (- x y)) (cos (+ x y)))",
-            "(+ (cos (+ x y)) (cos (- x y)))",
-            "(* (cos x) (cos y))",
-            "(* (sin x) (sin y)))",
+            "(- (* (cos x) (cos y)) (* (sin x) (sin y)))"
         ]);
 
         let new_rules = Trig::run_workload(wkld, rules.clone(), limits);

@@ -370,6 +370,11 @@ impl<L: SynthLanguage> Ruleset<L> {
          *         └─────────┘            └────────┘           └────────┘
          */
 
+        println!(
+            "starting allow/forbid rule synthesis with {} eclasses",
+            egraph.number_of_classes()
+        );
+
         let eg_init = egraph;
         // Allowed rules: run on clone, apply unions, no candidates
         let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
@@ -386,17 +391,21 @@ impl<L: SynthLanguage> Ruleset<L> {
         let eg_final = Scheduler::Compress(limits).run(&eg_denote, &all_rules);
         candidates.extend(Self::extract_candidates(&eg_denote, &eg_final));
 
-        // let extractor = Extractor::new(&eg_final, AstSize);
-        // let mut ids = eg_final.classes().map(|c| c.id).collect::<Vec<Id>>();
-        // ids.sort();
-        // for id in ids {
-        //     println!(
-        //         "{}: {:?} {}",
-        //         id,
-        //         eg_final[id].nodes,
-        //         extractor.find_best(id).1.to_string()
-        //     );
-        // }
+        let extractor = Extractor::new(&eg_final, AstSize);
+        let mut ids = eg_final.classes().map(|c| c.id).collect::<Vec<Id>>();
+        ids.sort();
+        for id in ids {
+            println!(
+                "{}: {:?} {}",
+                id,
+                eg_final[id].nodes,
+                extractor.find_best(id).1.to_string()
+            );
+        }
+
+        for (_, eq) in &candidates {
+            println!("candidate {}", eq.name);
+        }
 
         candidates
     }
