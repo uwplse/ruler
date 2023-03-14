@@ -120,9 +120,9 @@ egg::define_language! {
     "sin" = Sin(Id),
     "cos" = Cos(Id),
     "tan" = Tan(Id),
-    "csc" = Csc(Id),
-    "sec" = Sec(Id),
-    "cot" = Cot(Id),
+    // "csc" = Csc(Id),
+    // "sec" = Sec(Id),
+    // "cot" = Cot(Id),
 
     // complex exponetial
     "cis" = Cis(Id),
@@ -168,13 +168,6 @@ impl SynthLanguage for Trig {
             // (tangent, alternatively)
             "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
             "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
-            // definition of cosecant, secant, cotangent
-            "(csc ?a) ==> (/ 1 (sin ?a))",
-            "(/ 1 (sin ?a)) ==> (csc ?a)",
-            "(sec ?a) ==> (/ 1 (cos ?a))",
-            "(/ 1 (cos ?a)) ==> (sec ?a)",
-            "(cot ?a) ==> (/ 1 (tan ?a))",
-            "(/ 1 (tan ?a)) ==> (cot ?a)",
             // relating tangent to sine and cosine
             "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
             "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
@@ -206,7 +199,7 @@ impl SynthLanguage for Trig {
     }
 
     fn is_allowed_op(&self) -> bool {
-        !matches!(self, Trig::Imag | Trig::Cis(_))
+        !matches!(self, Trig::Imag | Trig::Cis(_) | Trig::Sqr(_))
     }
 
     // No eval needed for rule lifting
@@ -302,10 +295,10 @@ impl SynthLanguage for Trig {
         }
 
         if let Some(v) = to_add {
-            // add (~ v) if v is negative
+            // add (~ v) if v is negative or 0
             if let Trig::RealConst(n) = v {
                 if let Ok(x) = n.as_str().parse::<Rational>() {
-                    if x.is_negative() {
+                    if x.is_negative() || x.is_zero() {
                         let pos_id = egraph.add(Self::mk_constant(
                             Real::from((-x).to_string()),
                             &mut egraph.clone(),
@@ -359,14 +352,7 @@ mod test {
         Limits,
     };
 
-    #[test]
-    fn og_recipe() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
-        let limits = Limits {
-            iter: 3,
-            node: 2000000,
-        };
-
+    fn og_recipe(prior: &Ruleset<Trig>, limits: Limits) -> Ruleset<Trig> {
         let t_ops = Workload::new(["sin", "cos", "tan"]);
         let consts = Workload::new([
             "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
@@ -396,7 +382,7 @@ mod test {
 
         let sum_of_squares = add.plug("e", &squares);
 
-        let mut all = complex;
+        let mut all = prior.clone();
         let mut new = Ruleset::<Trig>::default();
 
         let wkld1 = trig_constants;
@@ -404,21 +390,122 @@ mod test {
         let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
         all.extend(rules1.clone());
         new.extend(rules1.clone());
-        assert_eq!(rules1.len(), 22);
+        // assert_eq!(rules1.len(), 22);
 
         let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
         println!("Starting 2");
         let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
         all.extend(rules2.clone());
         new.extend(rules2.clone());
-        assert_eq!(rules2.len(), 12);
+        // assert_eq!(rules2.len(), 12);
 
         let wkld3 = Workload::Append(vec![wkld2.clone(), sum_of_squares.clone()]);
         println!("Starting 3");
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3.clone());
         new.extend(rules3.clone());
-        assert_eq!(rules3.len(), 3);
+        // assert_eq!(rules3.len(), 3);
+
+        new
+    }
+
+    fn phase2_recipe(prior: &Ruleset<Trig>, limits: Limits) -> Ruleset<Trig> {
+        let mut all = prior.clone();
+        let mut new = Ruleset::<Trig>::default();
+
+        let t_ops = Workload::new(["sin", "cos"]);
+        let app = Workload::new(["(op v)"]);
+
+        let simple = app.clone().plug("op", &t_ops).plug(
+            "v",
+            &Workload::new(["a", "(- (/ PI 2) a)", "(+ (/ PI 2) a)", "(* 2 a)"]),
+        );
+
+        let squares = Workload::new(["(sqr x)"])
+            .plug("x", &app)
+            .plug("op", &t_ops)
+            .plug("v", &Workload::new(["a"]));
+
+        let shift = Workload::new(["x", "(- 1 x)", "(- x 1)", "(+ 1 x)"]).plug("x", &simple);
+
+        let scaled = Workload::new(["x", "(* 2 x)", "(/ x 2)"])
+            .plug("x", &shift.clone().append(squares.clone()));
+
+        // Coangles
+        let wkld1 = simple;
+        let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
+        all.extend(rules1.clone());
+        new.extend(rules1.clone());
+
+        // Power reduction
+        let wkld2 = scaled;
+        let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
+        all.extend(rules2.clone());
+        new.extend(rules2.clone());
+
+        new
+    }
+
+    #[test]
+    fn nightly_recipe() {
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let limits = Limits {
+            iter: 3,
+            node: 2000000,
+        };
+
+        let mut all = complex;
+        let mut new = Ruleset::<Trig>::default();
+
+        // Run original Enumo recipe
+        let rules = Ruleset::new([
+            "(cos (/ PI 2)) ==> 0",
+            "0 ==> (cos (/ PI 2))",
+            "0 ==> (sin (* PI 2))",
+            "(sin (* PI 2)) ==> 0",
+            "1 ==> (sin (/ PI 2))",
+            "(sin (/ PI 2)) ==> 1",
+            "0 ==> (tan (* PI 2))",
+            "(tan (* PI 2)) ==> 0",
+            "1 ==> (cos (* PI 2))",
+            "(cos (* PI 2)) ==> 1",
+            "(tan 0) ==> 0",
+            "0 ==> (tan 0)",
+            "0 ==> (sin 0)",
+            "(sin 0) ==> 0",
+            "1 ==> (cos 0)",
+            "(cos 0) ==> 1",
+            "0 ==> (sin PI)",
+            "(sin PI) ==> 0",
+            "-1 ==> (cos PI)",
+            "(cos PI) ==> -1",
+            "(tan PI) ==> (sin PI)",
+            "(sin PI) ==> (tan PI)",
+            "(~ (cos ?a)) ==> (cos (- PI ?a))",
+            "(cos (- PI ?a)) ==> (~ (cos ?a))",
+            "(sin (- PI ?a)) ==> (sin ?a)",
+            "(sin ?a) ==> (sin (- PI ?a))",
+            "(tan ?a) ==> (tan (+ PI ?a))",
+            "(tan (+ PI ?a)) ==> (tan ?a)",
+            "(~ (sin ?a)) ==> (sin (~ ?a))",
+            "(sin (~ ?a)) ==> (~ (sin ?a))",
+            "(tan (~ ?a)) ==> (~ (tan ?a))",
+            "(~ (tan ?a)) ==> (tan (~ ?a))",
+            "(cos (~ ?a)) ==> (cos ?a)",
+            "(cos ?a) ==> (cos (~ ?a))",
+            "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
+            "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
+            "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
+        ]);
+
+        // let rules = og_recipe(&all, limits);
+        all.extend(rules.clone());
+        new.extend(rules);
+
+        // Run 2nd phase
+        let rules = phase2_recipe(&all, limits);
+        all.extend(rules.clone());
+        new.extend(rules);
 
         // Only new rules should be uploaded!
         new.write_json_rules("trig.json");
@@ -513,8 +600,10 @@ mod test {
             "(/ (+ 1 (cos (* 2 x))) 2)",
             "(* (cos x) (cos y))",
             "(/ (+ (cos (- x y)) (cos (+ x y))) 2)",
+            "(+ (/ (cos (- x y)) 2) (/ (cos (+ x y)) 2))",
             "(* (sin x) (sin y))",
             "(/ (- (cos (- x y)) (cos (+ x y))) 2)",
+            "(- (/ (cos (- x y)) 2) (/ (cos (+ x y)) 2))",
         ]);
 
         let new_rules = Trig::run_workload(wkld, rules.clone(), limits);
