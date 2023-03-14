@@ -2,13 +2,14 @@ use std::time::Duration;
 
 use egg::{Rewrite, Runner};
 
-use crate::{EGraph, Limits, SynthAnalysis, SynthLanguage};
+use crate::{EGraph, Id, Limits, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
 pub enum Scheduler {
     Simple(Limits),
     Saturating(Limits),
+    Compress(Limits),
 }
 
 impl Scheduler {
@@ -26,17 +27,19 @@ impl Scheduler {
 
     pub fn run<L: SynthLanguage>(
         &self,
-        egraph: EGraph<L, SynthAnalysis>,
+        egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
-    ) -> Runner<L, SynthAnalysis> {
+    ) -> EGraph<L, SynthAnalysis> {
         match self {
             Scheduler::Simple(limits) => {
                 let rewrites = ruleset.0.values().map(|eq| &eq.rewrite);
-                Self::mk_runner(egraph, limits)
+                let mut runner = Self::mk_runner(egraph.clone(), limits)
                     .with_iter_limit(limits.iter)
                     .with_node_limit(limits.node)
                     .with_scheduler(egg::SimpleScheduler)
-                    .run(rewrites)
+                    .run(rewrites);
+                runner.egraph.rebuild();
+                runner.egraph
             }
             Scheduler::Saturating(limits) => {
                 let (sat, other) = ruleset.partition(|eq| eq.is_saturating());
@@ -45,7 +48,7 @@ impl Scheduler {
                     (other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
                 );
 
-                let mut runner = Self::mk_runner(egraph, limits);
+                let mut runner = Self::mk_runner(egraph.clone(), limits);
 
                 for _ in 0..limits.iter {
                     // Sat
@@ -61,7 +64,33 @@ impl Scheduler {
                     )
                     .run(&other);
                 }
-                Self::mk_runner(runner.egraph, &Limits::max()).run(&sat)
+                let mut runner = Self::mk_runner(runner.egraph, &Limits::max()).run(&sat);
+                runner.egraph.rebuild();
+                runner.egraph
+            }
+            Scheduler::Compress(limits) => {
+                let mut clone = egraph.clone();
+                let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
+
+                let out = Self::Simple(*limits).run(egraph, ruleset);
+
+                // Build a map from id in out to all of the ids in egraph that are equivalent
+                let mut unions = HashMap::default();
+                for id in ids {
+                    let new_id = out.find(id);
+                    unions.entry(new_id).or_insert_with(Vec::new).push(id);
+                }
+
+                for ids in unions.values() {
+                    if ids.len() > 1 {
+                        let first = ids[0];
+                        for id in &ids[1..] {
+                            clone.union(first, *id);
+                        }
+                    }
+                }
+                clone.rebuild();
+                clone
             }
         }
     }
