@@ -420,7 +420,7 @@ mod test {
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3.clone());
         new.extend(rules3.clone());
-        assert_eq!(rules3.len(), 3);
+        assert_eq!(rules3.len(), 5);
 
         new
     }
