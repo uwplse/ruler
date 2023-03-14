@@ -573,19 +573,16 @@ pub mod test {
         let uops = Workload::new(["~", "fabs"]);
         let bops = Workload::new(["+", "-", "*", "/"]);
 
-        let init_layer = vars.clone().append(consts);
+        let init_layer = Workload::Append(vec![vars.clone(), consts]);
         let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
             .plug("uop", &uops)
             .plug("bop", &bops);
 
         // Layer 1
         println!("layer1");
-        
-        let init_layer_with_2 = init_layer.clone().append(Workload::new(["2"]));
-        let layer1 = op_layer
-            .clone()
-            .plug("expr", &init_layer_with_2)
-            .append(init_layer_with_2)
+        let init_layer_with_2 = Workload::Append(vec![init_layer.clone(), Workload::new(["2"])]);
+        let app_layer1 = op_layer.clone().plug("expr", &init_layer_with_2);
+        let layer1 = Workload::Append(vec![app_layer1, init_layer_with_2])
             .filter(contains_var_filter.clone())
             .filter(safe_filter.clone());
 
@@ -594,17 +591,10 @@ pub mod test {
 
         // Layer 2
         println!("layer2");
-        
-        let layer1 = op_layer
-            .clone()
-            .plug("expr", &init_layer)
-            .append(init_layer)
-            .filter(contains_var_filter.clone())
-            .filter(safe_filter.clone());
-
-        let layer2 = op_layer
-            .clone()
-            .plug("expr", &layer1)
+        let app_layer1 = op_layer.clone().plug("expr", &init_layer);
+        let layer1 = Workload::Append(vec![app_layer1, init_layer.clone()]);
+        let app_layer2 = op_layer.clone().plug("expr", &layer1);
+        let layer2 = app_layer2
             .filter(safe_filter.clone())
             .filter(contains_var_filter.clone());
 
@@ -629,12 +619,13 @@ pub mod test {
 
     #[test]
     fn rational_oopsla_equiv() {
+        let limits = Limits::default();
+
         let start = Instant::now();
         let rules = rational_rules();
         let duration = start.elapsed();
-        let limits = Limits::default();
-        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
+        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         rules.write_json_rules("rational.json");
         rules.write_json_equiderivability(iter2_rules.clone(), "rational.json", limits, duration)
     }
