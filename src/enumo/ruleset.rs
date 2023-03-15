@@ -391,22 +391,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         let eg_final = Scheduler::Compress(limits).run(&eg_denote, &all_rules);
         candidates.extend(Self::extract_candidates(&eg_denote, &eg_final));
 
-        // let extractor = Extractor::new(&eg_final, AstSize);
-        // let mut ids = eg_final.classes().map(|c| c.id).collect::<Vec<Id>>();
-        // ids.sort();
-        // for id in ids {
-        //     println!(
-        //         "{}: {:?} {}",
-        //         id,
-        //         eg_final[id].nodes,
-        //         extractor.find_best(id).1.to_string()
-        //     );
-        // }
-
-        // for (_, eq) in &candidates {
-        //     println!("candidate {}", eq.name);
-        // }
-
         candidates
     }
 

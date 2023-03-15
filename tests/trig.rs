@@ -169,8 +169,8 @@ impl SynthLanguage for Trig {
             "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
             "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
             // relating tangent to sine and cosine
-            "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
-            "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
+            // "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
+            // "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
             // definition of cos^2(a) and sin^2(a)
             // TODO: are these redundant?
             "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)",
@@ -641,81 +641,5 @@ mod test {
 
         let rules = Trig::run_workload(terms, all, limits);
         assert_eq!(rules.len(), 6);
-    }
-
-    #[test]
-    fn sandbox() {
-        let complex_rules: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
-        let prior_rules: Ruleset<Trig> = Ruleset::new([
-            "(cos (/ PI 2)) ==> 0",
-            "0 ==> (cos (/ PI 2))",
-            "0 ==> (sin (* PI 2))",
-            "(sin (* PI 2)) ==> 0",
-            "1 ==> (sin (/ PI 2))",
-            "(sin (/ PI 2)) ==> 1",
-            "0 ==> (tan (* PI 2))",
-            "(tan (* PI 2)) ==> 0",
-            "1 ==> (cos (* PI 2))",
-            "(cos (* PI 2)) ==> 1",
-            "(tan 0) ==> 0",
-            "0 ==> (tan 0)",
-            "0 ==> (sin 0)",
-            "(sin 0) ==> 0",
-            "1 ==> (cos 0)",
-            "(cos 0) ==> 1",
-            "0 ==> (sin PI)",
-            "(sin PI) ==> 0",
-            "-1 ==> (cos PI)",
-            "(cos PI) ==> -1",
-            "(tan PI) ==> (sin PI)",
-            "(sin PI) ==> (tan PI)",
-            "(~ (cos ?a)) ==> (cos (- PI ?a))",
-            "(cos (- PI ?a)) ==> (~ (cos ?a))",
-            "(sin (- PI ?a)) ==> (sin ?a)",
-            "(sin ?a) ==> (sin (- PI ?a))",
-            "(tan ?a) ==> (tan (+ PI ?a))",
-            "(tan (+ PI ?a)) ==> (tan ?a)",
-            "(~ (sin ?a)) ==> (sin (~ ?a))",
-            "(sin (~ ?a)) ==> (~ (sin ?a))",
-            "(tan (~ ?a)) ==> (~ (tan ?a))",
-            "(~ (tan ?a)) ==> (tan (~ ?a))",
-            "(cos (~ ?a)) ==> (cos ?a)",
-            "(cos ?a) ==> (cos (~ ?a))",
-            "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
-            "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
-            "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
-            // phase 2
-            "(cos (- (/ PI 2) ?a)) ==> (sin ?a)",
-            "(sin ?a) ==> (cos (- (/ PI 2) ?a))",
-            "(/ (- 1 (cos (+ ?a ?a))) 2) ==> (* (sin ?a) (sin ?a))",
-            "(* (sin ?a) (sin ?a)) ==> (/ (- 1 (cos (+ ?a ?a))) 2)",
-            "(/ (+ 1 (cos (+ ?a ?a))) 2) ==> (* (cos ?a) (cos ?a))",
-            "(* (cos ?a) (cos ?a)) ==> (/ (+ 1 (cos (+ ?a ?a))) 2)",
-            "(* (sin ?b) (sin ?a)) ==> (/ (- (cos (- ?a ?b)) (cos (+ ?b ?a))) 2)",
-            "(/ (- (cos (- ?a ?b)) (cos (+ ?b ?a))) 2) ==> (* (sin ?b) (sin ?a))",
-            "(* (cos ?b) (cos ?a)) ==> (/ (+ (cos (+ ?a ?b)) (cos (- ?b ?a))) 2)",
-            "(/ (+ (cos (+ ?a ?b)) (cos (- ?b ?a))) 2) ==> (* (cos ?b) (cos ?a))",
-            "(- (* (cos ?b) (cos ?a)) (* (sin ?b) (sin ?a))) ==> (cos (+ ?a ?b))",
-            "(+ (* (sin ?b) (sin ?a)) (* (cos ?b) (cos ?a))) ==> (cos (- ?b ?a))",
-            "(cos (- ?b ?a)) ==> (+ (* (sin ?b) (sin ?a)) (* (cos ?b) (cos ?a)))",
-        ]);
-
-        let limits = Limits {
-            iter: 3,
-            node: 2000000,
-        };
-
-        let mut rules = prior_rules.clone();
-        rules.extend(complex_rules);
-        rules.extend(prior_forbidden_rules());
-
-        // Layer
-        let wkld = Workload::new([
-            "(/ (+ (sin x) (sin y)) 2)",
-            "(* (sin (+ (/ x 2) (/ y 2))) (cos (- (/ x 2) (/ y 2))))",
-        ]);
-
-        let new_rules = Trig::run_workload(wkld, rules.clone(), limits);
-        rules.extend(new_rules);
     }
 }
