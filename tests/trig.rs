@@ -562,46 +562,7 @@ mod test {
         all.extend(prior_rules());
 
         // Run original Enumo recipe
-        // let rules = og_recipe(&all, limits);
-        let rules = Ruleset::new([
-            "(cos (/ PI 2)) ==> 0",
-            "0 ==> (cos (/ PI 2))",
-            "0 ==> (sin (* PI 2))",
-            "(sin (* PI 2)) ==> 0",
-            "1 ==> (sin (/ PI 2))",
-            "(sin (/ PI 2)) ==> 1",
-            "0 ==> (tan (* PI 2))",
-            "(tan (* PI 2)) ==> 0",
-            "1 ==> (cos (* PI 2))",
-            "(cos (* PI 2)) ==> 1",
-            "(tan 0) ==> 0",
-            "0 ==> (tan 0)",
-            "0 ==> (sin 0)",
-            "(sin 0) ==> 0",
-            "1 ==> (cos 0)",
-            "(cos 0) ==> 1",
-            "0 ==> (sin PI)",
-            "(sin PI) ==> 0",
-            "-1 ==> (cos PI)",
-            "(cos PI) ==> -1",
-            "(tan PI) ==> (sin PI)",
-            "(sin PI) ==> (tan PI)",
-            "(~ (cos ?a)) ==> (cos (- PI ?a))",
-            "(cos (- PI ?a)) ==> (~ (cos ?a))",
-            "(sin (- PI ?a)) ==> (sin ?a)",
-            "(sin ?a) ==> (sin (- PI ?a))",
-            "(tan ?a) ==> (tan (+ PI ?a))",
-            "(tan (+ PI ?a)) ==> (tan ?a)",
-            "(~ (sin ?a)) ==> (sin (~ ?a))",
-            "(sin (~ ?a)) ==> (~ (sin ?a))",
-            "(tan (~ ?a)) ==> (~ (tan ?a))",
-            "(~ (tan ?a)) ==> (tan (~ ?a))",
-            "(cos (~ ?a)) ==> (cos ?a)",
-            "(cos ?a) ==> (cos (~ ?a))",
-            "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
-            "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
-            "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
-        ]);
+        let rules = og_recipe(&all, limits);
 
         all.extend(rules.clone());
         new.extend(rules);
