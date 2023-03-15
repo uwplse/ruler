@@ -156,27 +156,15 @@ impl SynthLanguage for Trig {
             // (sine)
             "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",
             "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)",
-            // (sine, alternatively)
-            "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)",
-            "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) => (sin ?a)",
             // (cosine)
             "(cos ?a) ==> (/ (+ (cis ?a) (cis (~ ?a))) 2)",
             "(/ (+ (cis ?a) (cis (~ ?a))) 2) ==> (cos ?a)",
-            // (cosine, alternatively)
-            "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))",
-            "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)",
-            // (tangent, alternatively)
+            // (tangent)
             "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
             "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
             // relating tangent to sine and cosine
-            // "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
-            // "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
-            // definition of cos^2(a) and sin^2(a)
-            // TODO: are these redundant?
-            "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)",
-            "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
-            "(* (sin ?a) (sin ?a)) ==> (~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))",
-            "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
+            "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
+            "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
             // definition of cos(a)*cos(b) and sin(a)*sin(b)
             "(* (cos ?a) (cos ?b)) ==> (/ (+ (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)",
             "(* (sin ?a) (sin ?b)) ==> (/ (- (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)",
@@ -186,6 +174,18 @@ impl SynthLanguage for Trig {
             // definition of square
             "(sqr ?a) ==> (* ?a ?a)",
             "(* ?a ?a) ==> (sqr ?a)",
+            // [Redundant, but left here so we don't have to compute them again]
+            // definition of cos^2(a) and sin^2(a)
+            // "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)",
+            // "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
+            // "(* (sin ?a) (sin ?a)) ==> (~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))",
+            // "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
+            // (sine, alternatively)
+            // "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)",
+            // "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) => (sin ?a)",
+            // (cosine, alternatively)
+            // "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))",
+            // "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)",
         ])
     }
 
@@ -344,7 +344,7 @@ mod test {
     };
 
     // Extra rules about `cis` and `I` to "fast-forward" rule synthesis
-    fn prior_forbidden_rules() -> Ruleset<Trig> {
+    fn prior_rules() -> Ruleset<Trig> {
         Ruleset::new([
             // constant folding for PI
             "(+ PI PI) ==> (* 2 PI)",
@@ -558,50 +558,50 @@ mod test {
         let mut all = complex;
         let mut new = Ruleset::<Trig>::default();
 
-        // Add prior forbidden rules
-        all.extend(prior_forbidden_rules());
+        // Add prior rules
+        all.extend(prior_rules());
 
         // Run original Enumo recipe
-        let rules = og_recipe(&all, limits);
-        // let rules = Ruleset::new([
-        //     "(cos (/ PI 2)) ==> 0",
-        //     "0 ==> (cos (/ PI 2))",
-        //     "0 ==> (sin (* PI 2))",
-        //     "(sin (* PI 2)) ==> 0",
-        //     "1 ==> (sin (/ PI 2))",
-        //     "(sin (/ PI 2)) ==> 1",
-        //     "0 ==> (tan (* PI 2))",
-        //     "(tan (* PI 2)) ==> 0",
-        //     "1 ==> (cos (* PI 2))",
-        //     "(cos (* PI 2)) ==> 1",
-        //     "(tan 0) ==> 0",
-        //     "0 ==> (tan 0)",
-        //     "0 ==> (sin 0)",
-        //     "(sin 0) ==> 0",
-        //     "1 ==> (cos 0)",
-        //     "(cos 0) ==> 1",
-        //     "0 ==> (sin PI)",
-        //     "(sin PI) ==> 0",
-        //     "-1 ==> (cos PI)",
-        //     "(cos PI) ==> -1",
-        //     "(tan PI) ==> (sin PI)",
-        //     "(sin PI) ==> (tan PI)",
-        //     "(~ (cos ?a)) ==> (cos (- PI ?a))",
-        //     "(cos (- PI ?a)) ==> (~ (cos ?a))",
-        //     "(sin (- PI ?a)) ==> (sin ?a)",
-        //     "(sin ?a) ==> (sin (- PI ?a))",
-        //     "(tan ?a) ==> (tan (+ PI ?a))",
-        //     "(tan (+ PI ?a)) ==> (tan ?a)",
-        //     "(~ (sin ?a)) ==> (sin (~ ?a))",
-        //     "(sin (~ ?a)) ==> (~ (sin ?a))",
-        //     "(tan (~ ?a)) ==> (~ (tan ?a))",
-        //     "(~ (tan ?a)) ==> (tan (~ ?a))",
-        //     "(cos (~ ?a)) ==> (cos ?a)",
-        //     "(cos ?a) ==> (cos (~ ?a))",
-        //     "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
-        //     "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
-        //     "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
-        // ]);
+        // let rules = og_recipe(&all, limits);
+        let rules = Ruleset::new([
+            "(cos (/ PI 2)) ==> 0",
+            "0 ==> (cos (/ PI 2))",
+            "0 ==> (sin (* PI 2))",
+            "(sin (* PI 2)) ==> 0",
+            "1 ==> (sin (/ PI 2))",
+            "(sin (/ PI 2)) ==> 1",
+            "0 ==> (tan (* PI 2))",
+            "(tan (* PI 2)) ==> 0",
+            "1 ==> (cos (* PI 2))",
+            "(cos (* PI 2)) ==> 1",
+            "(tan 0) ==> 0",
+            "0 ==> (tan 0)",
+            "0 ==> (sin 0)",
+            "(sin 0) ==> 0",
+            "1 ==> (cos 0)",
+            "(cos 0) ==> 1",
+            "0 ==> (sin PI)",
+            "(sin PI) ==> 0",
+            "-1 ==> (cos PI)",
+            "(cos PI) ==> -1",
+            "(tan PI) ==> (sin PI)",
+            "(sin PI) ==> (tan PI)",
+            "(~ (cos ?a)) ==> (cos (- PI ?a))",
+            "(cos (- PI ?a)) ==> (~ (cos ?a))",
+            "(sin (- PI ?a)) ==> (sin ?a)",
+            "(sin ?a) ==> (sin (- PI ?a))",
+            "(tan ?a) ==> (tan (+ PI ?a))",
+            "(tan (+ PI ?a)) ==> (tan ?a)",
+            "(~ (sin ?a)) ==> (sin (~ ?a))",
+            "(sin (~ ?a)) ==> (~ (sin ?a))",
+            "(tan (~ ?a)) ==> (~ (tan ?a))",
+            "(~ (tan ?a)) ==> (tan (~ ?a))",
+            "(cos (~ ?a)) ==> (cos ?a)",
+            "(cos ?a) ==> (cos (~ ?a))",
+            "(+ (sqr (sin ?a)) (sqr (cos ?a))) ==> 1",
+            "(- (sqr (cos ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (sin ?b)))",
+            "(- (sqr (sin ?b)) (sqr (cos ?a))) ==> (- (sqr (sin ?a)) (sqr (cos ?b)))",
+        ]);
 
         all.extend(rules.clone());
         new.extend(rules);
@@ -637,7 +637,7 @@ mod test {
         assert_eq!(terms.force().len(), 7);
 
         let mut all = complex;
-        all.extend(prior_forbidden_rules());
+        all.extend(prior_rules());
 
         let rules = Trig::run_workload(terms, all, limits);
         assert_eq!(rules.len(), 6);
