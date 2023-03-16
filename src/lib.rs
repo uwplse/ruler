@@ -109,3 +109,46 @@ impl<T> Default for Interval<T> {
         }
     }
 }
+
+// Very minimal implementation of SynthLanguage for SymbolLang just so that we
+// can write domain-agnostic tests
+impl SynthLanguage for egg::SymbolLang {
+    type Constant = usize;
+
+    fn eval<'a, F>(&'a self, _cvec_len: usize, _get_cvec: F) -> CVec<Self>
+    where
+        F: FnMut(&'a Id) -> &'a CVec<Self>,
+    {
+        vec![]
+    }
+
+    fn initialize_vars(_egraph: &mut EGraph<Self, SynthAnalysis>, _vars: &[String]) {
+        todo!()
+    }
+
+    fn to_var(&self) -> Option<Symbol> {
+        None
+    }
+
+    fn mk_var(sym: Symbol) -> Self {
+        Self {
+            op: sym,
+            children: vec![],
+        }
+    }
+
+    fn is_constant(&self) -> bool {
+        false
+    }
+
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
+        Self {
+            op: Symbol::from(c.to_string()),
+            children: vec![],
+        }
+    }
+
+    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
+        ValidationResult::Invalid
+    }
+}
