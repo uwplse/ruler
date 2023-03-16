@@ -370,6 +370,11 @@ impl<L: SynthLanguage> Ruleset<L> {
          *         └─────────┘            └────────┘           └────────┘
          */
 
+        println!(
+            "starting allow/forbid rule synthesis with {} eclasses",
+            egraph.number_of_classes()
+        );
+
         let eg_init = egraph;
         // Allowed rules: run on clone, apply unions, no candidates
         let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
