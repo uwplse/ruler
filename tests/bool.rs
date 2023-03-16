@@ -260,6 +260,7 @@ mod test {
 
         all_rules.write_json_rules("bool.json");
         all_rules.write_json_equiderivability(
+            DeriveType::Lhs,
             baseline.clone(),
             "bool.json",
             Limits {
@@ -310,6 +311,7 @@ mod test {
         four.to_file("four.txt");
 
         let (can, cannot) = three.derive(
+            DeriveType::LhsAndRhs,
             four,
             Limits {
                 iter: 10,

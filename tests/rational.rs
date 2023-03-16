@@ -206,11 +206,12 @@ fn egg_to_z3<'a>(
             Math::Div([x, y]) => {
                 let denom = &buf[usize::from(*y)];
                 let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                let neg = z3::ast::Real::lt(denom, &zero);
-                let pos = z3::ast::Real::gt(denom, &zero);
-                // Assume y is nonzero (either negative or positive)
-                let assume = z3::ast::Bool::or(ctx, &[&neg, &pos]);
-                assumes.push(assume);
+                
+                // Ruler 1 assumed y nonzero, but this is very unsound
+                //let neg = z3::ast::Real::lt(denom, &zero);
+                //let pos = z3::ast::Real::gt(denom, &zero);
+                // let assume = z3::ast::Bool::or(ctx, &[&neg, &pos]);
+                // assumes.push(assume);
                 buf.push(z3::ast::Real::div(
                     &buf[usize::from(*x)],
                     &buf[usize::from(*y)],
@@ -589,15 +590,29 @@ pub mod test {
         rules
     }
 
-    #[test]
-    fn rational_oopsla_equiv() {
+    fn rational_oopsla_equiv(derive_type: DeriveType, out: &str) {
         let start = Instant::now();
         let rules = rational_rules();
         let duration = start.elapsed();
         let limits = Limits::default();
         let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
-        rules.write_json_rules("rational.json");
-        rules.write_json_equiderivability(iter2_rules.clone(), "rational.json", limits, duration)
+        rules.write_json_rules(out);
+        rules.write_json_equiderivability(derive_type, iter2_rules.clone(), out, limits, duration)
+    }
+
+    #[test]
+    fn rational_oopsla_equiv_lhs() {
+        rational_oopsla_equiv(DeriveType::Lhs, "rational_lhs.json")
+    }
+
+    #[test]
+    fn rational_oopsla_equiv_rhs() {
+        rational_oopsla_equiv(DeriveType::LhsAndRhs, "rational_lhsandrhs.json")
+    }
+
+    #[test]
+    fn rational_oopsla_equiv_both() {
+        rational_oopsla_equiv(DeriveType::AllRules, "rational_allrules.json")
     }
 }

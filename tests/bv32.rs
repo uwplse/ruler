@@ -81,6 +81,7 @@ mod test {
 
         all_rules.write_json_rules("bv32.json");
         all_rules.write_json_equiderivability(
+            DeriveType::Lhs,
             baseline.clone(),
             "bv32.json",
             Limits {

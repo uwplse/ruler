@@ -7,8 +7,8 @@ use std::sync::Mutex;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
-    CVec, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
-    SynthAnalysis, SynthLanguage, ValidationResult,
+    CVec, DeriveType, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Limits,
+    Signature, SynthAnalysis, SynthLanguage, ValidationResult,
 };
 
 use super::Scheduler;
@@ -224,6 +224,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     // and statistics about runtime and the number of rules in each ruleset.
     pub fn write_json_equiderivability(
         &self,
+        derive_type: DeriveType,
         baseline: Self,
         name: &str,
         limit: Limits,
@@ -238,15 +239,15 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        let (can_f, cannot_f) = self.derive(baseline.clone(), limit);
+        let (can_f, cannot_f) = self.derive(derive_type, baseline.clone(), limit);
 
-        let (can_b, cannot_b) = baseline.derive(self.clone(), limit);
+        let (can_b, cannot_b) = baseline.derive(derive_type, self.clone(), limit);
 
         let derivability_results = json!({
-            "forwards derivable": &can_f.to_str_vec(),
-            "forwards underivable": &cannot_f.to_str_vec(),
-            "backwards derivable": &can_b.to_str_vec(),
-            "backwards underivable": &cannot_b.to_str_vec(),
+            "enumo -> oopsla derivable": &can_f.to_str_vec(),
+            "enumo -> oopsla underivable": &cannot_f.to_str_vec(),
+            "oopsla -> enumo derivable": &can_b.to_str_vec(),
+            "oopsla -> enumo underivable": &cannot_b.to_str_vec(),
         })
         .to_string();
 
@@ -283,6 +284,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             "oopsla_derives_enumo": backwards_derivable,
             "time": time
         });
+
         json_arr.push(stats);
 
         let mut file = OpenOptions::new()
@@ -291,14 +293,13 @@ impl<L: SynthLanguage> Ruleset<L> {
             .create(true)
             .open("rep/json/output.json")
             .expect("Unable to open file");
+
         file.write_all("[".as_bytes()).expect("write failed");
 
-        let arr_str = json_arr.to_vec();
-
-        for (object, is_last_element) in arr_str
+        for (object, is_last_element) in json_arr
             .iter()
             .enumerate()
-            .map(|(i, w)| (w, i == arr_str.len() - 1))
+            .map(|(i, w)| (w, i == json_arr.len() - 1))
         {
             file.write_all(object.to_string().as_bytes())
                 .expect("write failed");
@@ -355,7 +356,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-
+        candidates.to_file("candidates.txt");
         candidates
     }
 
@@ -369,11 +370,6 @@ impl<L: SynthLanguage> Ruleset<L> {
          * ───────►│ allowed ├───────────►│ denote ├──────────►│  all   ├────────►
          *         └─────────┘            └────────┘           └────────┘
          */
-
-        println!(
-            "starting allow/forbid rule synthesis with {} eclasses",
-            egraph.number_of_classes()
-        );
 
         let eg_init = egraph;
         // Allowed rules: run on clone, apply unions, no candidates
@@ -436,6 +432,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
+        candidates.to_file("candidates.txt");
         candidates
     }
 
@@ -467,6 +464,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
+        candidates.to_file("candidates.txt");
         candidates
     }
 
@@ -550,27 +548,52 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    pub fn can_derive(&self, rule: &Equality<L>, limits: Limits) -> bool {
+    pub fn can_derive(
+        &self,
+        derive_type: DeriveType,
+        rule: &Equality<L>,
+        allrules: Self,
+        limits: Limits,
+    ) -> bool {
         let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
         let rexpr = &L::instantiate(&rule.rhs);
-        egraph.add_expr(lexpr);
-        egraph.add_expr(rexpr);
+
+        match derive_type {
+            DeriveType::Lhs => {
+                egraph.add_expr(lexpr);
+            }
+            DeriveType::LhsAndRhs => {
+                egraph.add_expr(lexpr);
+                egraph.add_expr(rexpr);
+            }
+            DeriveType::AllRules => {
+                for eq in allrules.0.values() {
+                    let lhs = &L::instantiate(&eq.lhs);
+                    let rhs = &L::instantiate(&eq.rhs);
+                    egraph.add_expr(lhs);
+                    egraph.add_expr(rhs);
+                }
+            }
+        }
+
         let out_egraph = scheduler.run(&egraph, self);
 
         let l_id = out_egraph
             .lookup_expr(lexpr)
             .unwrap_or_else(|| panic!("Did not find {}", lexpr));
-        let r_id = out_egraph
-            .lookup_expr(rexpr)
-            .unwrap_or_else(|| panic!("Did not find {}", rexpr));
-        l_id == r_id
+        let r_id = out_egraph.lookup_expr(rexpr);
+        if let Some(r_id) = r_id {
+            l_id == r_id
+        } else {
+            false
+        }
     }
 
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
-    pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
-        against.partition(|eq| self.can_derive(eq, limits))
+    pub fn derive(&self, derive_type: DeriveType, against: Self, limits: Limits) -> (Self, Self) {
+        against.partition(|eq| self.can_derive(derive_type, eq, against.clone(), limits))
     }
 }

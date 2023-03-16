@@ -56,6 +56,13 @@ pub struct Limits {
     pub node: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum DeriveType {
+    Lhs,
+    LhsAndRhs,
+    AllRules,
+}
+
 impl Default for Limits {
     fn default() -> Self {
         Self {
