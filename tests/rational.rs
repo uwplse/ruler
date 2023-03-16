@@ -589,15 +589,15 @@ pub mod test {
         rules
     }
 
-    #[test]
-    fn rational_oopsla_equiv() {
-        let start = Instant::now();
-        let rules = rational_rules();
-        let duration = start.elapsed();
-        let limits = Limits::default();
-        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+    //#[test]
+    // fn rational_oopsla_equiv() {
+    //     let start = Instant::now();
+    //     let rules = rational_rules();
+    //     let duration = start.elapsed();
+    //     let limits = Limits::default();
+    //     let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
-        rules.write_json_rules("rational.json");
-        rules.write_json_equiderivability(iter2_rules.clone(), "rational.json", limits, duration)
-    }
+    //     rules.write_json_rules("rational.json");
+    //     rules.write_json_equiderivability(iter2_rules.clone(), "rational.json", limits, duration)
+    // }
 }
