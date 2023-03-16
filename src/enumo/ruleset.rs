@@ -309,18 +309,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all("]".as_bytes()).expect("write failed");
     }
 
-    pub fn apply_unions(egraph: &mut EGraph<L, SynthAnalysis>, unions: HashMap<Id, Vec<Id>>) {
-        for ids in unions.values() {
-            if ids.len() > 1 {
-                let first = ids[0];
-                for id in &ids[1..] {
-                    egraph.union(first, *id);
-                }
-            }
-        }
-        egraph.rebuild();
-    }
-
     pub fn extract_candidates(
         eg1: &EGraph<L, SynthAnalysis>,
         eg2: &EGraph<L, SynthAnalysis>,
