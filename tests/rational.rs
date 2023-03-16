@@ -206,7 +206,7 @@ fn egg_to_z3<'a>(
             Math::Div([x, y]) => {
                 let denom = &buf[usize::from(*y)];
                 let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                
+
                 // Ruler 1 assumed y nonzero, but this is very unsound
                 //let neg = z3::ast::Real::lt(denom, &zero);
                 //let pos = z3::ast::Real::gt(denom, &zero);
