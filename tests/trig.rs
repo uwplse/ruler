@@ -162,6 +162,12 @@ impl SynthLanguage for Trig {
             // (tangent)
             "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
             "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
+            // (sine, alternatively)
+            "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)",
+            "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) => (sin ?a)",
+            // (cosine, alternatively)
+            "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))",
+            "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)",
             // relating tangent to sine and cosine
             "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
             "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
@@ -180,12 +186,6 @@ impl SynthLanguage for Trig {
             // "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
             // "(* (sin ?a) (sin ?a)) ==> (~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))",
             // "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
-            // (sine, alternatively)
-            // "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)",
-            // "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) => (sin ?a)",
-            // (cosine, alternatively)
-            // "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))",
-            // "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)",
         ])
     }
 
@@ -563,7 +563,6 @@ mod test {
 
         // Run original Enumo recipe
         let rules = og_recipe(&all, limits);
-
         all.extend(rules.clone());
         new.extend(rules);
 
