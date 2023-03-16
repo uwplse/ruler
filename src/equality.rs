@@ -147,3 +147,33 @@ fn apply_pat<L: Language, A: Analysis<L>>(
 
     *ids.last().unwrap()
 }
+
+#[cfg(test)]
+mod test {
+    use crate::Equality;
+
+    #[test]
+    fn parse() {
+        // Unidirectional rule with => delimeter
+        let (forwards, backwards) = Equality::<egg::SymbolLang>::from_string("(* a b) => (* c d)")
+            .ok()
+            .unwrap();
+        assert!(backwards.is_none());
+        assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+
+        // Unidirectional rule with ==> delimeter
+        let (forwards, backwards) = Equality::<egg::SymbolLang>::from_string("(* a b) ==> (* c d)")
+            .ok()
+            .unwrap();
+        assert!(backwards.is_none());
+        assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+
+        // Bidirectional rule <=>
+        let (forwards, backwards) = Equality::<egg::SymbolLang>::from_string("(* a b) <=> (* c d)")
+            .ok()
+            .unwrap();
+        assert!(backwards.is_some());
+        assert_eq!(backwards.unwrap().name.to_string(), "(* c d) ==> (* a b)");
+        assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+    }
+}
