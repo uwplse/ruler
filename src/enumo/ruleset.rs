@@ -475,39 +475,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    fn shrink(&mut self, chosen: &Self, limits: Limits) {
-        // 1. make new egraph
-        // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
-        let mut egraph = EGraph::default();
-
-        let mut initial = vec![];
-        // 2. insert lhs and rhs of all candidates as roots
-        for eq in self.0.values() {
-            let lhs = egraph.add_expr(&L::instantiate(&eq.lhs));
-            let rhs = egraph.add_expr(&L::instantiate(&eq.rhs));
-            initial.push((lhs, rhs));
-        }
-
-        // 3. compress with the rules we've chosen so far
-        let egraph = Scheduler::Compress(limits).run(&egraph, chosen);
-
-        // 4. go through candidates and if they have merged, then
-        // they are no longer candidates
-        let extract = Extractor::new(&egraph, AstSize);
-        self.0 = Default::default();
-        for (l_id, r_id) in initial {
-            if egraph.find(l_id) == egraph.find(r_id) {
-                // candidate has merged (derivable from other rewrites)
-                continue;
-            }
-            let (_, left) = extract.find_best(l_id);
-            let (_, right) = extract.find_best(r_id);
-            if let Some(eq) = Equality::from_recexprs(&left, &right) {
-                self.add(eq);
-            }
-        }
-    }
-
     pub fn minimize(&mut self, prior: Ruleset<L>, limits: Limits) -> Self {
         let mut chosen = prior.clone();
 
@@ -537,7 +504,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                     }
                 }
 
-                self.shrink(&chosen, limits);
+                // Find the rules that can be derived from the chosen rules and remove them
+                // from candidates
+                let (can, _) = chosen.derive(self.clone(), limits);
+                self.remove_all(can);
             }
         }
 
