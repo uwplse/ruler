@@ -231,7 +231,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         &self,
         baseline: Self,
         name: &str,
-        limit: Limits,
+        limits: Limits,
         duration: Duration,
     ) {
         let mut filepath = "rep/json/derivable_rules/".to_owned();
@@ -243,9 +243,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        let (can_f, cannot_f) = self.derive(baseline.clone(), limit);
+        let (can_f, cannot_f) = self.derive(baseline.clone(), limits);
 
-        let (can_b, cannot_b) = baseline.derive(self.clone(), limit);
+        let (can_b, cannot_b) = baseline.derive(self.clone(), limits);
 
         let derivability_results = json!({
             "forwards derivable": &can_f.to_str_vec(),
