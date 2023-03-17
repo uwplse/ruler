@@ -413,14 +413,12 @@ mod test {
         let rules1 = Trig::run_workload(wkld1.clone(), all.clone(), limits);
         all.extend(rules1.clone());
         new.extend(rules1.clone());
-        assert_eq!(rules1.len(), 22);
 
         let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
         println!("Starting 2");
         let rules2 = Trig::run_workload(wkld2.clone(), all.clone(), limits);
         all.extend(rules2.clone());
         new.extend(rules2.clone());
-        assert_eq!(rules2.len(), 12);
 
         let trimmed_wkld2 = wkld2.clone().filter(no_trig_2x);
         let wkld3 = Workload::Append(vec![trimmed_wkld2.clone(), sum_of_squares.clone()]);
@@ -428,7 +426,32 @@ mod test {
         let rules3 = Trig::run_workload(wkld3, all.clone(), limits);
         all.extend(rules3.clone());
         new.extend(rules3.clone());
-        assert_eq!(rules3.len(), 3);
+
+        let expected: Ruleset<Trig> = Ruleset::new(&[
+            "(sin (/ PI 4)) <=> (cos (/ PI 4))",
+            "(tan (/ PI 4)) <=> (cos 0)",
+            "(sin (/ PI 2)) <=> (cos 0)",
+            "(cos 0) <=> (cos (* PI 2))",
+            "0 <=> (cos (/ PI 2))",
+            "(tan (* PI 2)) <=> 0",
+            "0 <=> (sin (* PI 2))",
+            "(sin 0) <=> 0",
+            "0 <=> (tan 0)",
+            "0 <=> (sin PI)",
+            "(sin PI) <=> (tan PI)",
+            "(~ (cos ?a)) <=> (cos (- PI ?a))",
+            "(sin (- PI ?a)) <=> (sin ?a)",
+            "(tan ?a) <=> (tan (+ PI ?a))",
+            "(~ (sin ?a)) <=> (sin (~ ?a))",
+            "(tan (~ ?a)) <=> (~ (tan ?a))",
+            "(cos (~ ?a)) <=> (cos ?a)",
+            "(+ (* (sin ?a) (sin ?a)) (* (cos ?a) (cos ?a))) ==> (cos 0)",
+            "(- (* (cos ?b) (cos ?b)) (* (cos ?a) (cos ?a))) ==> (- (* (sin ?a) (sin ?a)) (* (sin ?b) (sin ?b)))",
+            "(- (* (sin ?b) (sin ?b)) (* (cos ?a) (cos ?a))) ==> (- (* (sin ?a) (sin ?a)) (* (cos ?b) (cos ?b)))",
+        ]);
+        let (can, cannot) = all.derive(expected.clone(), Limits::default());
+        assert_eq!(can.len(), expected.len());
+        assert_eq!(cannot.len(), 0);
 
         new
     }
@@ -600,6 +623,11 @@ mod test {
         all.extend(prior_rules());
 
         let rules = Trig::run_workload(terms, all, limits);
-        assert_eq!(rules.len(), 6);
+
+        let expected: Ruleset<Trig> =
+            Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);
+        let (can, cannot) = rules.derive(expected.clone(), Limits::default());
+        assert_eq!(can.len(), expected.len());
+        assert_eq!(cannot.len(), 0);
     }
 }
