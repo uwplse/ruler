@@ -107,12 +107,10 @@ impl SynthLanguage for Math {
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
         let solver = z3::Solver::new(&ctx);
-        let (lexpr, mut lassumes) = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-        let (rexpr, mut rassumes) = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        lassumes.append(&mut rassumes);
-        let all = &lassumes[..];
+        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check_assumptions(all) {
+        match solver.check() {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
@@ -183,12 +181,8 @@ impl Math {
     }
 }
 
-fn egg_to_z3<'a>(
-    ctx: &'a z3::Context,
-    expr: &[Math],
-) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
     let mut buf: Vec<z3::ast::Real> = vec![];
-    let mut assumes: Vec<z3::ast::Bool> = vec![];
     for node in expr.as_ref().iter() {
         match node {
             Math::Add([x, y]) => buf.push(z3::ast::Real::add(
@@ -204,14 +198,7 @@ fn egg_to_z3<'a>(
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
             Math::Div([x, y]) => {
-                let denom = &buf[usize::from(*y)];
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-
-                // Ruler 1 assumed y nonzero, but this is very unsound
-                //let neg = z3::ast::Real::lt(denom, &zero);
-                //let pos = z3::ast::Real::gt(denom, &zero);
-                // let assume = z3::ast::Bool::or(ctx, &[&neg, &pos]);
-                // assumes.push(assume);
+                // Do NOT assume denominator is non-zero
                 buf.push(z3::ast::Real::div(
                     &buf[usize::from(*x)],
                     &buf[usize::from(*y)],
@@ -235,7 +222,7 @@ fn egg_to_z3<'a>(
             Math::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
         }
     }
-    (buf.pop().unwrap(), assumes)
+    buf.pop().unwrap()
 }
 
 // Interval helpers
@@ -590,29 +577,15 @@ pub mod test {
         rules
     }
 
-    fn rational_oopsla_equiv(derive_type: DeriveType, out: &str) {
+    #[test]
+    fn rational_oopsla_equiv() {
         let start = Instant::now();
         let rules = rational_rules();
         let duration = start.elapsed();
         let limits = Limits::default();
         let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
-        rules.write_json_rules(out);
-        rules.write_json_equiderivability(derive_type, iter2_rules.clone(), out, limits, duration)
-    }
-
-    #[test]
-    fn rational_oopsla_equiv_lhs() {
-        rational_oopsla_equiv(DeriveType::Lhs, "rational_lhs.json")
-    }
-
-    #[test]
-    fn rational_oopsla_equiv_rhs() {
-        rational_oopsla_equiv(DeriveType::LhsAndRhs, "rational_lhsandrhs.json")
-    }
-
-    #[test]
-    fn rational_oopsla_equiv_both() {
-        rational_oopsla_equiv(DeriveType::AllRules, "rational_allrules.json")
+        rules.write_json_rules("rational.json");
+        rules.write_json_equiderivability(iter2_rules.clone(), "rational.json", limits, duration)
     }
 }
