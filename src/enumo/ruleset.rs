@@ -70,12 +70,13 @@ impl<L: SynthLanguage> Ruleset<L> {
         I::Item: AsRef<str>,
     {
         let mut map = IndexMap::default();
-        let eqs: Vec<Rule<L>> = vals
-            .into_iter()
-            .map(|x| x.as_ref().parse().unwrap())
-            .collect();
-        for eq in eqs {
-            map.insert(eq.name.clone(), eq);
+        for v in vals {
+            if let Ok((forwards, backwards)) = Rule::from_string(v.as_ref()) {
+                map.insert(forwards.name.clone(), forwards);
+                if let Some(backwards) = backwards {
+                    map.insert(backwards.name.clone(), backwards);
+                }
+            }
         }
         Ruleset(map)
     }
@@ -163,13 +164,17 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn from_file(filename: &str) -> Self {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
-        let mut eqs = IndexMap::default();
+        let mut all_eqs = IndexMap::default();
         for line in std::io::BufRead::lines(reader) {
             let line = line.unwrap();
-            let eq = line.parse::<Rule<L>>().unwrap();
-            eqs.insert(eq.name.clone(), eq);
+            if let Ok((forwards, backwards)) = Rule::from_string(&line) {
+                all_eqs.insert(forwards.name.clone(), forwards);
+                if let Some(backwards) = backwards {
+                    all_eqs.insert(backwards.name.clone(), backwards);
+                }
+            }
         }
-        Self(eqs)
+        Self(all_eqs)
     }
 
     pub fn pretty_print(&self) {

@@ -107,12 +107,10 @@ impl SynthLanguage for Math {
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
         let solver = z3::Solver::new(&ctx);
-        let (lexpr, mut lassumes) = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-        let (rexpr, mut rassumes) = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        lassumes.append(&mut rassumes);
-        let all = &lassumes[..];
+        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check_assumptions(all) {
+        match solver.check() {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
@@ -183,12 +181,8 @@ impl Math {
     }
 }
 
-fn egg_to_z3<'a>(
-    ctx: &'a z3::Context,
-    expr: &[Math],
-) -> (z3::ast::Real<'a>, Vec<z3::ast::Bool<'a>>) {
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
     let mut buf: Vec<z3::ast::Real> = vec![];
-    let mut assumes: Vec<z3::ast::Bool> = vec![];
     for node in expr.as_ref().iter() {
         match node {
             Math::Add([x, y]) => buf.push(z3::ast::Real::add(
@@ -204,13 +198,7 @@ fn egg_to_z3<'a>(
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
             Math::Div([x, y]) => {
-                let denom = &buf[usize::from(*y)];
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                let neg = z3::ast::Real::lt(denom, &zero);
-                let pos = z3::ast::Real::gt(denom, &zero);
-                // Assume y is nonzero (either negative or positive)
-                let assume = z3::ast::Bool::or(ctx, &[&neg, &pos]);
-                assumes.push(assume);
+                // Do NOT assume denominator is non-zero
                 buf.push(z3::ast::Real::div(
                     &buf[usize::from(*x)],
                     &buf[usize::from(*y)],
@@ -234,7 +222,7 @@ fn egg_to_z3<'a>(
             Math::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
         }
     }
-    (buf.pop().unwrap(), assumes)
+    buf.pop().unwrap()
 }
 
 // Interval helpers

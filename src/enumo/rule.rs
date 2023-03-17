@@ -1,6 +1,6 @@
 use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, RecExpr, Rewrite, Subst};
 use std::fmt::Debug;
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use crate::*;
 
@@ -12,24 +12,42 @@ pub struct Rule<L: SynthLanguage> {
     pub rewrite: Rewrite<L, SynthAnalysis>,
 }
 
-impl<L: SynthLanguage> FromStr for Rule<L> {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl<L: SynthLanguage> Rule<L> {
+    pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
         if let Some((l, r)) = s.split_once("=>") {
             let l_pat: Pattern<L> = l.parse().unwrap();
             let r_pat: Pattern<L> = r.parse().unwrap();
-            let name = format!("{} ==> {}", l_pat, r_pat);
-            let rhs = Rhs { rhs: r_pat.clone() };
 
-            Ok(Self {
-                name: name.clone().into(),
+            let forwards = Self {
+                name: format!("{} ==> {}", l_pat, r_pat).into(),
                 lhs: l_pat.clone(),
-                rhs: r_pat,
-                rewrite: Rewrite::new(name, l_pat, rhs).unwrap(),
-            })
+                rhs: r_pat.clone(),
+                rewrite: Rewrite::new(
+                    format!("{} ==> {}", l_pat, r_pat),
+                    l_pat.clone(),
+                    Rhs { rhs: r_pat.clone() },
+                )
+                .unwrap(),
+            };
+
+            if s.contains("<=>") {
+                let backwards = Self {
+                    name: format!("{} ==> {}", r_pat, l_pat).into(),
+                    lhs: r_pat.clone(),
+                    rhs: l_pat.clone(),
+                    rewrite: Rewrite::new(
+                        format!("{} ==> {}", r_pat, l_pat),
+                        r_pat,
+                        Rhs { rhs: l_pat },
+                    )
+                    .unwrap(),
+                };
+                Ok((forwards, Some(backwards)))
+            } else {
+                Ok((forwards, None))
+            }
         } else {
-            Err(format!("Failed to split {}", s))
+            Err(format!("Failed to parse {}", s))
         }
     }
 }
@@ -128,4 +146,34 @@ fn apply_pat<L: Language, A: Analysis<L>>(
     }
 
     *ids.last().unwrap()
+}
+
+#[cfg(test)]
+mod test {
+    use crate::enumo::Rule;
+
+    #[test]
+    fn parse() {
+        // Unidirectional rule with => delimeter
+        let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) => (* c d)")
+            .ok()
+            .unwrap();
+        assert!(backwards.is_none());
+        assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+
+        // Unidirectional rule with ==> delimeter
+        let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) ==> (* c d)")
+            .ok()
+            .unwrap();
+        assert!(backwards.is_none());
+        assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+
+        // Bidirectional rule <=>
+        let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) <=> (* c d)")
+            .ok()
+            .unwrap();
+        assert!(backwards.is_some());
+        assert_eq!(backwards.unwrap().name.to_string(), "(* c d) ==> (* a b)");
+        assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+    }
 }
