@@ -7,14 +7,14 @@ use std::sync::Mutex;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
-    CVec, EGraph, Equality, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
-    SynthAnalysis, SynthLanguage, ValidationResult,
+    CVec, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature, SynthAnalysis,
+    SynthLanguage, ValidationResult,
 };
 
-use super::Scheduler;
+use super::{Rule, Scheduler};
 
 #[derive(Clone, Debug)]
-pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Equality<L>>);
+pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Rule<L>>);
 
 impl<L: SynthLanguage> PartialEq for Ruleset<L> {
     fn eq(&self, other: &Self) -> bool {
@@ -37,8 +37,8 @@ impl<L: SynthLanguage> Default for Ruleset<L> {
 }
 
 impl<L: SynthLanguage> IntoIterator for Ruleset<L> {
-    type Item = (Arc<str>, Equality<L>);
-    type IntoIter = IntoIter<Arc<str>, Equality<L>>;
+    type Item = (Arc<str>, Rule<L>);
+    type IntoIter = IntoIter<Arc<str>, Rule<L>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -46,8 +46,8 @@ impl<L: SynthLanguage> IntoIterator for Ruleset<L> {
 }
 
 impl<'a, L: SynthLanguage> IntoIterator for &'a Ruleset<L> {
-    type Item = (&'a Arc<str>, &'a Equality<L>);
-    type IntoIter = Iter<'a, Arc<str>, Equality<L>>;
+    type Item = (&'a Arc<str>, &'a Rule<L>);
+    type IntoIter = Iter<'a, Arc<str>, Rule<L>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
@@ -55,8 +55,8 @@ impl<'a, L: SynthLanguage> IntoIterator for &'a Ruleset<L> {
 }
 
 impl<'a, L: SynthLanguage> IntoIterator for &'a mut Ruleset<L> {
-    type Item = (&'a Arc<str>, &'a mut Equality<L>);
-    type IntoIter = IterMut<'a, Arc<str>, Equality<L>>;
+    type Item = (&'a Arc<str>, &'a mut Rule<L>);
+    type IntoIter = IterMut<'a, Arc<str>, Rule<L>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter_mut()
@@ -70,7 +70,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         I::Item: AsRef<str>,
     {
         let mut map = IndexMap::default();
-        let eqs: Vec<Equality<L>> = vals
+        let eqs: Vec<Rule<L>> = vals
             .into_iter()
             .map(|x| x.as_ref().parse().unwrap())
             .collect();
@@ -80,11 +80,11 @@ impl<L: SynthLanguage> Ruleset<L> {
         Ruleset(map)
     }
 
-    pub fn iter(&self) -> Values<'_, Arc<str>, Equality<L>> {
+    pub fn iter(&self) -> Values<'_, Arc<str>, Rule<L>> {
         self.0.values()
     }
 
-    pub fn iter_mut(&mut self) -> ValuesMut<'_, Arc<str>, Equality<L>> {
+    pub fn iter_mut(&mut self) -> ValuesMut<'_, Arc<str>, Rule<L>> {
         self.0.values_mut()
     }
 
@@ -106,7 +106,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut bidir = 0;
         let mut unidir = 0;
         for (_, eq) in &self.0 {
-            let reverse = Equality::new(eq.rhs.clone(), eq.lhs.clone());
+            let reverse = Rule::new(eq.rhs.clone(), eq.lhs.clone());
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
                 bidir += 1;
             } else {
@@ -116,11 +116,11 @@ impl<L: SynthLanguage> Ruleset<L> {
         unidir + (bidir / 2)
     }
 
-    pub fn contains(&self, eq: &Equality<L>) -> bool {
+    pub fn contains(&self, eq: &Rule<L>) -> bool {
         self.0.contains_key(&eq.name)
     }
 
-    pub fn add(&mut self, eq: Equality<L>) {
+    pub fn add(&mut self, eq: Rule<L>) {
         self.0.insert(eq.name.clone(), eq);
     }
 
@@ -136,10 +136,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn partition<F>(&self, f: F) -> (Self, Self)
     where
-        F: Fn(&Equality<L>) -> bool + std::marker::Sync,
+        F: Fn(&Rule<L>) -> bool + std::marker::Sync,
     {
         let results = Mutex::new((Ruleset::default(), Ruleset::default()));
-        let eqs: Vec<&Equality<L>> = self.0.values().collect();
+        let eqs: Vec<&Rule<L>> = self.0.values().collect();
         eqs.into_par_iter().for_each(|eq| {
             let f_eq = f(eq);
             let mut results = results.lock().unwrap();
@@ -166,7 +166,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut eqs = IndexMap::default();
         for line in std::io::BufRead::lines(reader) {
             let line = line.unwrap();
-            let eq = line.parse::<Equality<L>>().unwrap();
+            let eq = line.parse::<Rule<L>>().unwrap();
             eqs.insert(eq.name.clone(), eq);
         }
         Self(eqs)
@@ -175,7 +175,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn pretty_print(&self) {
         let mut strs = vec![];
         for (name, eq) in &self.0 {
-            let reverse = Equality::new(eq.rhs.clone(), eq.lhs.clone());
+            let reverse = Rule::new(eq.rhs.clone(), eq.lhs.clone());
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
                 let reverse_name = format!("{} <=> {}", eq.rhs, eq.lhs);
                 if !strs.contains(&reverse_name) {
@@ -333,10 +333,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                         continue;
                     }
                     if e1 != e2 {
-                        if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
+                        if let Some(eq) = Rule::from_recexprs(&e1, &e2) {
                             candidates.add(eq)
                         }
-                        if let Some(eq) = Equality::from_recexprs(&e2, &e1) {
+                        if let Some(eq) = Rule::from_recexprs(&e2, &e1) {
                             candidates.add(eq)
                         }
                     }
@@ -415,10 +415,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                 if compare(&class1.data.cvec, &class2.data.cvec) {
                     let (_, e1) = extract.find_best(class1.id);
                     let (_, e2) = extract.find_best(class2.id);
-                    if let Some(eq) = Equality::from_recexprs(&e1, &e2) {
+                    if let Some(eq) = Rule::from_recexprs(&e1, &e2) {
                         candidates.add(eq);
                     }
-                    if let Some(eq) = Equality::from_recexprs(&e2, &e1) {
+                    if let Some(eq) = Rule::from_recexprs(&e2, &e1) {
                         candidates.add(eq);
                     }
                 }
@@ -446,10 +446,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
-                    if let Some(eq) = Equality::from_recexprs(e1, e2) {
+                    if let Some(eq) = Rule::from_recexprs(e1, e2) {
                         candidates.add(eq);
                     }
-                    if let Some(eq) = Equality::from_recexprs(e2, e1) {
+                    if let Some(eq) = Rule::from_recexprs(e2, e1) {
                         candidates.add(eq);
                     }
                 }
@@ -473,7 +473,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
 
                 // If reverse direction is also in candidates, add it at the same time
-                let reverse = Equality::new(eq.rhs, eq.lhs);
+                let reverse = Rule::new(eq.rhs, eq.lhs);
                 if let Some(reverse) = reverse {
                     if self.contains(&reverse) {
                         if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
@@ -518,7 +518,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
             let (_, left) = extract.find_best(l_id);
             let (_, right) = extract.find_best(r_id);
-            if let Some(eq) = Equality::from_recexprs(&left, &right) {
+            if let Some(eq) = Rule::from_recexprs(&left, &right) {
                 self.add(eq);
             }
         }
@@ -538,7 +538,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    pub fn can_derive(&self, rule: &Equality<L>, limits: Limits) -> bool {
+    pub fn can_derive(&self, rule: &Rule<L>, limits: Limits) -> bool {
         let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
