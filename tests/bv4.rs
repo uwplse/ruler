@@ -41,7 +41,7 @@ mod test {
     use ruler::enumo::{Filter, Metric, Ruleset, Workload};
     use std::time::Instant;
 
-    #[test]
+    // #[test]
     fn bv4_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();

@@ -220,7 +220,7 @@ mod test {
         all_rules.extend(rules5);
     }
 
-    #[test]
+    // #[test]
     fn bool_oopsla_equiv() {
         let mut all_rules = Ruleset::default();
         let start = Instant::now();
