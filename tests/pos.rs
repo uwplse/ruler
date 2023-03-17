@@ -229,7 +229,6 @@ mod tests {
                 node: 1000000,
             },
         );
-        assert_eq!(rules3.len(), 6);
         all_rules.extend(rules3);
 
         let atoms4 = iter_pos(4);
@@ -243,7 +242,6 @@ mod tests {
                 node: 1000000,
             },
         );
-        assert_eq!(rules4.len(), 2);
         all_rules.extend(rules4);
 
         let atoms5 = iter_pos(5);
@@ -257,6 +255,28 @@ mod tests {
                 node: 1000000,
             },
         );
-        assert_eq!(rules4.len(), 1);
+        all_rules.extend(rules4);
+
+        let expected: Ruleset<Pos> = Ruleset::new(&[
+            "(+ ?b ?a) ==> (+ ?a ?b)",
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(+ Z ?a) ==> ?a",
+            "(* ?a Z) ==> Z",
+            "(S (+ ?b ?a)) ==> (+ ?b (S ?a))",
+            "(* ?a (S Z)) ==> ?a",
+            "(+ ?a (S Z)) ==> (S ?a)",
+            "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
+            "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
+            "(+ ?b (* ?b ?a)) ==> (* ?b (S ?a))",
+            "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
+            "(+ ?a ?a) ==> (* ?a (S (S Z)))",
+            "(XI ?a) <=> (+ (XO ?a) XH)",
+            "?a <=> (* ?a XH)",
+            "(XO ?a) <=> (+ ?a ?a)",
+            "(+ ?a (XO ?a)) <=> (* ?a (XI XH))",
+        ]);
+        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        assert_eq!(can.len(), expected.len());
+        assert_eq!(cannot.len(), 0);
     }
 }
