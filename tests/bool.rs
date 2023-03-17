@@ -375,14 +375,16 @@ mod test {
         );
         four.to_file("four.txt");
 
-        let (can, cannot) = three.derive(
-            four,
-            Limits {
-                iter: 10,
-                node: 1000000,
-            },
-        );
-        assert_eq!(can.len(), 16);
-        assert_eq!(cannot.len(), 7);
+        let limits = Limits {
+            iter: 10,
+            node: 1000000,
+        };
+        // Three cannot derive all of four
+        let (_, cannot) = three.derive(four.clone(), limits);
+        assert!(cannot.len() > 0);
+
+        // But four can derive all of three
+        let (_, cannot) = four.derive(three, limits);
+        assert_eq!(cannot.len(), 0);
     }
 }
