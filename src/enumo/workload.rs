@@ -182,9 +182,9 @@ impl Workload {
             .plug("l0", &l0)
             .plug("l1", &l1)
             .plug("l2", &l2)
-            .filter(Filter::MetricLt(Metric::List, list_len + 1))
+            .filter(Filter::MetricLt(Metric::Lists, list_len + 1))
             .filter(Filter::Invert(Box::new(Filter::MetricLt(
-                Metric::List,
+                Metric::Lists,
                 std::cmp::max(0, list_len - 1),
             ))))
     }
