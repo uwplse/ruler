@@ -557,29 +557,37 @@ pub mod test {
             .plug("expr", &init_synth)
             .append(init_synth)
             .filter(contains_var_filter.clone());
-        let rules1 = Math::run_workload_fast_match(layer1.clone(), rules.clone(), Limits {
-            iter: 2,
-            node: 150000,
-        });
+        let rules1 = Math::run_workload_fast_match(
+            layer1.clone(),
+            rules.clone(),
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+        );
         rules.extend(rules1);
 
         let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
-        let rules2 = Math::run_workload_fast_match(layer2.clone(), rules.clone(), Limits {
-            iter: 2,
-            node: 150000,
-        });
-        rules.extend(rules2);
-/*
-        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-        rules.extend(Math::run_workload(div, rules.clone(), Limits::default()));
-
-        let nested_fabs = Workload::new(["(fabs e)"]).plug(
-            "e",
-            &layer2.filter(Filter::Contains("fabs".parse().unwrap())),
+        let rules2 = Math::run_workload_fast_match(
+            layer2.clone(),
+            rules.clone(),
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
         );
-        let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
-        rules.extend(fabs_rules);
-*/
+        rules.extend(rules2);
+        /*
+                let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
+                rules.extend(Math::run_workload(div, rules.clone(), Limits::default()));
+
+                let nested_fabs = Workload::new(["(fabs e)"]).plug(
+                    "e",
+                    &layer2.filter(Filter::Contains("fabs".parse().unwrap())),
+                );
+                let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
+                rules.extend(fabs_rules);
+        */
         rules
     }
 
@@ -592,11 +600,29 @@ pub mod test {
         let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         rules.write_json_rules("rational.json");
-        rules.write_json_equiderivability(DeriveType::Lhs, iter2_rules.clone(), "rational_lhs.json", limits, duration);
-        rules.write_json_equiderivability(DeriveType::LhsAndRhs, iter2_rules.clone(), "rational_lhs_rhs.json", limits, duration);
-        rules.write_json_equiderivability(DeriveType::AllRules, iter2_rules.clone(), "rational_all_rules.json", Limits {
-            iter: 2,
-            node: 150000,
-        }, duration)
+        rules.write_json_equiderivability(
+            DeriveType::Lhs,
+            iter2_rules.clone(),
+            "rational_lhs.json",
+            limits,
+            duration,
+        );
+        rules.write_json_equiderivability(
+            DeriveType::LhsAndRhs,
+            iter2_rules.clone(),
+            "rational_lhs_rhs.json",
+            limits,
+            duration,
+        );
+        rules.write_json_equiderivability(
+            DeriveType::AllRules,
+            iter2_rules.clone(),
+            "rational_all_rules.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        )
     }
 }
