@@ -5,14 +5,14 @@ use std::sync::Arc;
 use crate::*;
 
 #[derive(Clone, Debug)]
-pub struct Equality<L: SynthLanguage> {
+pub struct Rule<L: SynthLanguage> {
     pub name: Arc<str>,
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
     pub rewrite: Rewrite<L, SynthAnalysis>,
 }
 
-impl<L: SynthLanguage> Equality<L> {
+impl<L: SynthLanguage> Rule<L> {
     pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
         if let Some((l, r)) = s.split_once("=>") {
             let l_pat: Pattern<L> = l.parse().unwrap();
@@ -87,13 +87,13 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
     }
 }
 
-impl<L: SynthLanguage> Equality<L> {
+impl<L: SynthLanguage> Rule<L> {
     pub fn new(l_pat: Pattern<L>, r_pat: Pattern<L>) -> Option<Self> {
         let name = format!("{} ==> {}", l_pat, r_pat);
         let rhs = Rhs { rhs: r_pat.clone() };
         let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
 
-        rewrite.map(|rw| Equality {
+        rewrite.map(|rw| Rule {
             name: name.into(),
             lhs: l_pat,
             rhs: r_pat,
@@ -150,26 +150,26 @@ fn apply_pat<L: Language, A: Analysis<L>>(
 
 #[cfg(test)]
 mod test {
-    use crate::Equality;
+    use crate::enumo::Rule;
 
     #[test]
     fn parse() {
         // Unidirectional rule with => delimeter
-        let (forwards, backwards) = Equality::<egg::SymbolLang>::from_string("(* a b) => (* c d)")
+        let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) => (* c d)")
             .ok()
             .unwrap();
         assert!(backwards.is_none());
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
 
         // Unidirectional rule with ==> delimeter
-        let (forwards, backwards) = Equality::<egg::SymbolLang>::from_string("(* a b) ==> (* c d)")
+        let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) ==> (* c d)")
             .ok()
             .unwrap();
         assert!(backwards.is_none());
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
 
         // Bidirectional rule <=>
-        let (forwards, backwards) = Equality::<egg::SymbolLang>::from_string("(* a b) <=> (* c d)")
+        let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) <=> (* c d)")
             .ok()
             .unwrap();
         assert!(backwards.is_some());

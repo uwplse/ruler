@@ -102,12 +102,12 @@ impl Sexp {
     pub(crate) fn measure(&self, metric: Metric) -> usize {
         match self {
             Sexp::Atom(_) => match metric {
-                Metric::List => 0,
+                Metric::Lists => 0,
                 Metric::Atoms | Metric::Depth => 1,
             },
             Sexp::List(s) => match metric {
                 Metric::Atoms => s.iter().map(|x| x.measure(metric)).sum::<usize>(),
-                Metric::List => s.iter().map(|x| x.measure(metric)).sum::<usize>() + 1,
+                Metric::Lists => s.iter().map(|x| x.measure(metric)).sum::<usize>() + 1,
                 Metric::Depth => s.iter().map(|x| x.measure(metric)).max().unwrap() + 1,
             },
         }
@@ -163,7 +163,7 @@ mod test {
             ("(a (b c) (d e))", 3),
         ];
         for (expr, size) in exprs {
-            assert_eq!(expr.parse::<Sexp>().unwrap().measure(Metric::List), size);
+            assert_eq!(expr.parse::<Sexp>().unwrap().measure(Metric::Lists), size);
         }
     }
 
