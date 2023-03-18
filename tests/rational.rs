@@ -564,7 +564,7 @@ pub mod test {
             rules.clone(),
             Limits {
                 iter: 2,
-                node: 150000,
+                node: 1000000000,
             },
         );
         rules.extend(rules1);
@@ -575,7 +575,7 @@ pub mod test {
             rules.clone(),
             Limits {
                 iter: 2,
-                node: 150000,
+                node: 100000000,
             },
         );
         rules.extend(rules2);
@@ -615,7 +615,7 @@ pub mod test {
             "rational_all_rules.json",
             Limits {
                 iter: 2,
-                node: 150000,
+                node: 1_000_000,
             },
             duration,
         )
