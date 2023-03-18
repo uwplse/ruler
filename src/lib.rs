@@ -2,13 +2,11 @@ use std::{fmt::Display, hash::BuildHasherDefault};
 
 pub use bv::*;
 use enumo::Ruleset;
-pub use equality::*;
 pub use language::*;
 pub use util::*;
 
 mod bv;
 pub mod enumo;
-mod equality;
 mod language;
 mod util;
 

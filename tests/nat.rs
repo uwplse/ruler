@@ -227,7 +227,6 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules3.len(), 5);
         all_rules.extend(rules3);
 
         let atoms4 = iter_nat(4);
@@ -241,7 +240,6 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_nat(5);
@@ -255,7 +253,21 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(rules5.len(), 3);
         all_rules.extend(rules5);
+
+        let expected: Ruleset<Nat> = Ruleset::new(&[
+            "(+ ?b ?a) ==> (+ ?a ?b)",
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(+ Z ?a) <=> ?a",
+            "(* Z ?a) ==> Z",
+            "?a <=> (* ?a (S Z))",
+            "(+ ?b (S ?a)) <=> (S (+ ?b ?a))",
+            "(+ ?b (* ?b ?a)) ==> (* ?b (S ?a))",
+            "(* ?c (* ?b ?a)) ==> (* ?a (* ?b ?c))",
+            "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
+        ]);
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, expected.clone(), Limits::default());
+        assert_eq!(can.len(), expected.len());
+        assert_eq!(cannot.len(), 0);
     }
 }

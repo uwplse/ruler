@@ -1,5 +1,8 @@
 use egg::Subst;
-use ruler::{enumo::Ruleset, *};
+use ruler::{
+    enumo::{Rule, Ruleset},
+    *,
+};
 use std::ops::*;
 
 egg::define_language! {
@@ -51,7 +54,7 @@ impl SynthLanguage for BvBool {
             "(second (xor ?a ?b)) ==> (^ (second ?a) (second ?b))",
         ]);
 
-        rules.add(Equality {
+        rules.add(Rule {
             name: "def-bv".into(),
             lhs: "?a".parse().unwrap(),
             rhs: "(bv (first ?a) (second ?a))".parse().unwrap(),
