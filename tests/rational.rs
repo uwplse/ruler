@@ -593,26 +593,26 @@ pub mod test {
         rules
     }
 
-    fn baseline_compare_to(rules: Ruleset<Math>, baseline: Ruleset<Math>, duration: Duration) {
+    fn baseline_compare_to(rules: Ruleset<Math>, baseline: Ruleset<Math>, baseline_name: &str, duration: Duration) {
         let limits = Limits::default();
         rules.write_json_equiderivability(
             DeriveType::Lhs,
             baseline.clone(),
-            "rational_lhs.json",
+            &format!("{}_rational_lhs.json", baseline_name),
             limits,
             duration,
         );
         rules.write_json_equiderivability(
             DeriveType::LhsAndRhs,
             baseline.clone(),
-            "rational_lhs_rhs.json",
+            &format!("{}_rational_lhs_rhs.json", baseline_name),
             limits,
             duration,
         );
         rules.write_json_equiderivability(
             DeriveType::AllRules,
             baseline.clone(),
-            "rational_all_rules.json",
+            &format!("{}_rational_allrules.json", baseline_name),
             Limits {
                 iter: 2,
                 node: 1_000_000,
@@ -631,7 +631,8 @@ pub mod test {
 
         // Only the herbie test writes the rational rules
         rules.write_json_rules("rational.json");
-        baseline_compare_to(rules, herbie, duration);
+        println!("Comparing rational to herbie...");
+        baseline_compare_to(rules, herbie, "herbie", duration);
     }
 
     #[test]
@@ -642,6 +643,8 @@ pub mod test {
 
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
-        baseline_compare_to(rules, ruler1, duration);
+        println!("Comparing rational to ruler1...");
+        baseline_compare_to(rules, 
+            ruler1, "ruler1", duration);
     }
 }
