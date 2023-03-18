@@ -373,6 +373,8 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 
 #[cfg(test)]
 pub mod test {
+    use std::time::Duration;
+
     use super::*;
     use ruler::enumo::{Filter, Ruleset, Workload};
 
