@@ -232,7 +232,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         derive_type: DeriveType,
         baseline: Self,
         name: &str,
-        limit: Limits,
+        limits: Limits,
         duration: Duration,
     ) {
         let mut filepath = "rep/json/derivable_rules/".to_owned();
@@ -244,9 +244,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        let (can_f, cannot_f) = self.derive(derive_type, baseline.clone(), limit);
+        let (can_f, cannot_f) = self.derive(derive_type, baseline.clone(), limits);
 
-        let (can_b, cannot_b) = baseline.derive(derive_type, self.clone(), limit);
+        let (can_b, cannot_b) = baseline.derive(derive_type, self.clone(), limits);
 
         let derivability_results = json!({
             "enumo -> oopsla derivable": &can_f.to_str_vec(),
@@ -262,7 +262,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         let num_rules = &self.len();
         let forwards_derivable = &can_f.len();
         let backwards_derivable = &can_b.len();
-        let time = &duration.as_secs();
 
         let mut outfile = OpenOptions::new()
             .read(true)
@@ -287,7 +286,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             "num_baseline": baseline.len(),
             "enumo_derives_oopsla": forwards_derivable,
             "oopsla_derives_enumo": backwards_derivable,
-            "time": time
+            "time": duration.as_secs(),
         });
 
         json_arr.push(stats);

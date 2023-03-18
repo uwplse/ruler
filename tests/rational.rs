@@ -591,32 +591,25 @@ pub mod test {
         rules
     }
 
-    #[test]
-    fn rational_oopsla_equiv() {
-        let start = Instant::now();
-        let rules = rational_rules();
-        let duration = start.elapsed();
+    fn baseline_compare_to(rules: Ruleset<Math>, baseline: Ruleset<Math>, duration: Duration) {
         let limits = Limits::default();
-        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-
-        rules.write_json_rules("rational.json");
         rules.write_json_equiderivability(
             DeriveType::Lhs,
-            iter2_rules.clone(),
+            baseline.clone(),
             "rational_lhs.json",
             limits,
             duration,
         );
         rules.write_json_equiderivability(
             DeriveType::LhsAndRhs,
-            iter2_rules.clone(),
+            baseline.clone(),
             "rational_lhs_rhs.json",
             limits,
             duration,
         );
         rules.write_json_equiderivability(
             DeriveType::AllRules,
-            iter2_rules.clone(),
+            baseline.clone(),
             "rational_all_rules.json",
             Limits {
                 iter: 2,
@@ -624,5 +617,29 @@ pub mod test {
             },
             duration,
         )
+    }
+
+    #[test]
+    fn test_against_herbie() {
+        let start = Instant::now();
+        let rules = rational_rules();
+        let duration = start.elapsed();
+
+        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
+
+        // Only the herbie test writes the rational rules
+        rules.write_json_rules("rational.json");
+        baseline_compare_to(rules, herbie, duration);
+    }
+
+    #[test]
+    fn test_against_ruler1() {
+        let start = Instant::now();
+        let rules = rational_rules();
+        let duration = start.elapsed();
+
+        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+
+        baseline_compare_to(rules, ruler1, duration);
     }
 }
