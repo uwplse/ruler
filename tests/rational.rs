@@ -593,7 +593,12 @@ pub mod test {
         rules
     }
 
-    fn baseline_compare_to(rules: Ruleset<Math>, baseline: Ruleset<Math>, baseline_name: &str, duration: Duration) {
+    fn baseline_compare_to(
+        rules: Ruleset<Math>,
+        baseline: Ruleset<Math>,
+        baseline_name: &str,
+        duration: Duration,
+    ) {
         let limits = Limits::default();
         rules.write_json_equiderivability(
             DeriveType::Lhs,
@@ -644,7 +649,6 @@ pub mod test {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
-        baseline_compare_to(rules, 
-            ruler1, "ruler1", duration);
+        baseline_compare_to(rules, ruler1, "ruler1", duration);
     }
 }
