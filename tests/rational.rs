@@ -160,10 +160,13 @@ impl Math {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
+        println!("Running compress...");
         let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+        println!("Running fast cvec match...");
         let mut candidates = Ruleset::fast_cvec_match(&compressed);
 
         let num_prior = prior.len();
+        println!("Running minimize on {} candidates...", candidates.len());
         let chosen = candidates.minimize(prior, limits);
         let time = t.elapsed().as_secs_f64();
 
