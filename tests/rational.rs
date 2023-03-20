@@ -563,7 +563,7 @@ pub mod test {
             layer1.clone(),
             rules.clone(),
             Limits {
-                iter: 2,
+                iter: 3,
                 node: 1000000000,
             },
         );
@@ -579,17 +579,19 @@ pub mod test {
             },
         );
         rules.extend(rules2);
-        /*
-                let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-                rules.extend(Math::run_workload(div, rules.clone(), Limits::default()));
+        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
+        rules.extend(Math::run_workload_fast_match(
+            div,
+            rules.clone(),
+            Limits::default(),
+        ));
 
-                let nested_fabs = Workload::new(["(fabs e)"]).plug(
-                    "e",
-                    &layer2.filter(Filter::Contains("fabs".parse().unwrap())),
-                );
-                let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
-                rules.extend(fabs_rules);
-        */
+        let nested_fabs = Workload::new(["(fabs e)"]).plug(
+            "e",
+            &layer2.filter(Filter::Contains("fabs".parse().unwrap())),
+        );
+        let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
+        rules.extend(fabs_rules);
         rules
     }
 
@@ -626,29 +628,29 @@ pub mod test {
         )
     }
 
-    #[test]
-    fn test_against_herbie() {
-        let start = Instant::now();
-        let rules = rational_rules();
-        let duration = start.elapsed();
-
+    fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         // Only the herbie test writes the rational rules
         rules.write_json_rules("rational.json");
         println!("Comparing rational to herbie...");
-        baseline_compare_to(rules, herbie, "herbie", duration);
+        baseline_compare_to(rules, herbie, "herbie", duration)
     }
 
     #[test]
-    fn test_against_ruler1() {
+    fn run_all() {
         let start = Instant::now();
         let rules = rational_rules();
         let duration = start.elapsed();
 
+        test_against_ruler1(rules.clone(), duration);
+        test_against_herbie(rules.clone(), duration);
+    }
+
+    fn test_against_ruler1(rules: Ruleset<Math>, duration: Duration) {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
-        baseline_compare_to(rules, ruler1, "ruler1", duration);
+        baseline_compare_to(rules, ruler1, "ruler1", duration)
     }
 }
