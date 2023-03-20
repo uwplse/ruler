@@ -37,5 +37,7 @@ git clone https://github.com/herbie-fp/herbie.git $BUILD_DIR ||    \
   echo "Herbie already checked out"
 
 # Checkout the branches
-git checkout using-herbie-baseline
-git checkout using-herbie-nightlies
+pushd $BUILD_DIR
+git checkout using-ruler-baseline
+git checkout using-ruler-nightlies
+popd $BUILD_DIR
