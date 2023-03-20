@@ -125,9 +125,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.insert(eq.name.clone(), eq);
     }
 
-    pub fn remove_all(&mut self, other: Self) {
-        for (name, _) in other.0 {
-            self.0.remove(&name);
+    pub fn remove_all(&mut self, other: &Self) {
+        for (name, _) in &other.0 {
+            self.0.remove(name);
         }
     }
 
@@ -504,7 +504,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         for eq in self.0.values() {
             let lhs = egraph.add_expr(&L::instantiate(&eq.lhs));
             let rhs = egraph.add_expr(&L::instantiate(&eq.rhs));
-            initial.push((lhs, rhs));
+            initial.push((lhs, rhs, eq));
         }
 
         // 3. compress with the rules we've chosen so far
@@ -512,18 +512,13 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
-        let extract = Extractor::new(&egraph, AstSize);
         let mut res = Ruleset::default();
-        for (l_id, r_id) in initial {
+        for (l_id, r_id, eq) in initial {
             if egraph.find(l_id) == egraph.find(r_id) {
                 // candidate has merged (derivable from other rewrites)
                 continue;
             }
-            let (_, left) = extract.find_best(l_id);
-            let (_, right) = extract.find_best(r_id);
-            if let Some(eq) = Rule::from_recexprs(&left, &right) {
-                res.add(eq);
-            }
+            res.add(eq.clone());
         }
         res
     }
@@ -537,19 +532,27 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
     }
 
-    pub fn minimize(self, prior: Ruleset<L>, limits: Limits) -> Self {
+    fn minimize_step_size(self, prior: &Ruleset<L>, limits: Limits, step_size: usize) -> Self {
+        println!("Minimizing with step size {}", step_size);
         let mut chosen = prior.clone();
-        let step_size = 1;
         let mut res = self;
         while !res.is_empty() {
-            let selected = res.select(step_size);
-            chosen.extend(selected.clone());
+            chosen.extend(res.select(step_size));
+            println!("Minimizing {} / {}", chosen.len(), prior.len() + res.len());
             res = res.shrink(&chosen, limits);
         }
         // Return only the new rules
         chosen.remove_all(prior);
 
         chosen
+    }
+
+    pub fn minimize(self, prior: Ruleset<L>, limits: Limits) -> Self {
+        let mut res = self;
+        for step_size in [1].iter() {
+            res = res.minimize_step_size(&prior, limits, *step_size);
+        }
+        res
     }
 
     pub fn can_derive(&self, rule: &Rule<L>, allrules: Self, limits: Limits) -> bool {
