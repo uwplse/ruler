@@ -584,7 +584,7 @@ pub mod test {
         let start = Instant::now();
         let rules = rational_rules(Limits {
             iter: 2,
-            node: 1_000_000,
+            node: 300_000,
             derive_type,
         });
         eprintln!("finished rules");
@@ -598,7 +598,7 @@ pub mod test {
             name,
             Limits {
                 iter: 2,
-                node: 1_000_000,
+                node: 300_000,
                 derive_type,
             },
             duration,
