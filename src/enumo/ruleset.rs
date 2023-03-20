@@ -324,22 +324,19 @@ impl<L: SynthLanguage> Ruleset<L> {
     ) {
         let limits = Limits::default();
         self.write_json_equiderivability(
-            DeriveType::Lhs,
             baseline.clone(),
             &format!("{}_{}_lhs.json", baseline_name, domain_name),
             limits,
             duration,
         );
         self.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
             baseline.clone(),
             &format!("{}_{}_lhs_rhs.json", baseline_name, domain_name),
             limits,
             duration,
         );
         self.write_json_equiderivability(
-            DeriveType::AllRules,
-            baseline.clone(),
+            baseline,
             &format!("{}_{}_allrules.json", baseline_name, domain_name),
             limits,
             duration,
@@ -580,9 +577,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn minimize(self, prior: Ruleset<L>, limits: Limits) -> Self {
         let mut res = self;
-        for step_size in [1].iter() {
-            res = res.minimize_step_size(&prior, limits, *step_size);
-        }
+        res = res.minimize_step_size(&prior, limits, 1);
         res
     }
 
