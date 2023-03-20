@@ -539,23 +539,9 @@ pub mod test {
 
     pub fn rational_rules(limits: Limits) -> Ruleset<Math> {
         let mut rules = Ruleset::default();
-<<<<<<< HEAD
-        let vars = Workload::new(["a", "b", "c"]);
-        let consts = Workload::new(["0", "-1", "1"]);
-        let uops = Workload::new(["~", "fabs"]);
-        let bops = Workload::new(["+", "-", "*", "/"]);
-
-        let init_synth = vars.append(consts);
-
-        let layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-            .plug("uop", &uops)
-            .plug("bop", &bops);
-
-=======
         let limits = Limits::default();
 
         // Contains var filter
->>>>>>> origin/main
         let contains_var_filter = Filter::Or(vec![
             Filter::Contains("a".parse().unwrap()),
             Filter::Contains("b".parse().unwrap()),
