@@ -4,6 +4,7 @@
 /*.json
 /*.sh
 /rep/json/*
+/.env
 
 # Scripts
 scripts/ablation/output/*
