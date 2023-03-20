@@ -535,39 +535,31 @@ pub mod test {
         let mut rules = Ruleset::default();
         let limits = Limits::default();
 
-        // Contains var filter
-        let contains_var_filter = Filter::Or(vec![
-            Filter::Contains("a".parse().unwrap()),
-            Filter::Contains("b".parse().unwrap()),
-            Filter::Contains("c".parse().unwrap()),
-        ]);
+        // Domain
+        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
+        let vars = &Workload::new(["a", "b", "c"]);
+        let consts = &Workload::new(["0", "-1", "1"]);
+        let uops = &Workload::new(["~", "fabs"]);
+        let bops = &Workload::new(["+", "-", "*", "/"]);
 
-        let vars = Workload::new(["a", "b", "c"]);
-        let consts = Workload::new(["0", "-1", "1"]);
-        let uops = Workload::new(["~", "fabs"]);
-        let bops = Workload::new(["+", "-", "*", "/"]);
-
-        let init_layer = Workload::Append(vec![vars.clone(), consts]);
-        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-            .plug("uop", &uops)
-            .plug("bop", &bops);
-
-        // Layer 1
+        // Layer 1 (one op)
         println!("layer1");
-        let layer1 = op_layer
+        let layer1 = lang
             .clone()
-            .plug("expr", &init_layer)
-            .filter(contains_var_filter.clone());
+            .iter_metric("expr", enumo::Metric::Lists, 2)
+            .filter(Filter::Contains("var".parse().unwrap()))
+            .plug_lang(vars, consts, uops, bops);
         let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
         rules.extend(layer1_rules);
 
-        // Layer 2
+        // Layer 2 (two ops)
         println!("layer2");
-        let layer2 = op_layer
+        let layer2 = lang
             .clone()
-            .plug("expr", &layer1.append(init_layer))
-            .filter(contains_var_filter);
-
+            .iter_metric("expr", enumo::Metric::Lists, 3)
+            .filter(Filter::Contains("var".parse().unwrap()))
+            .plug_lang(vars, consts, uops, bops);
+        layer2.to_file("replicate_layer2_terms");
         let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
         rules.extend(layer2_rules);
 
