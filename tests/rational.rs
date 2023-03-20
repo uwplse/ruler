@@ -576,7 +576,19 @@ pub mod test {
             },
         );
         rules.extend(rules2);
+        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
+        rules.extend(Math::run_workload_fast_match(
+            div,
+            rules.clone(),
+            Limits::default(),
+        ));
 
+        let nested_fabs = Workload::new(["(fabs e)"]).plug(
+            "e",
+            &layer2.filter(Filter::Contains("fabs".parse().unwrap())),
+        );
+        let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
+        rules.extend(fabs_rules);
         rules
     }
 
