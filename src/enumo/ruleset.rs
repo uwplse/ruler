@@ -103,6 +103,20 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.len()
     }
 
+    pub fn bidir(&mut self) -> Self {
+        let mut bidir_rules = Self::default();
+        let mut map = self.clone();
+
+        for (name, eq) in &map {
+            let reverse = Rule::new(eq.rhs.clone(), eq.lhs.clone());
+            if reverse.is_some() && map.contains(&reverse.clone().unwrap()) {
+                bidir_rules.add(Rule::new(eq.lhs.clone(), eq.rhs.clone()).unwrap());
+            }
+        }
+
+        bidir_rules
+    }
+
     pub fn bidir_len(&self) -> usize {
         let mut bidir = 0;
         let mut unidir = 0;
@@ -123,6 +137,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn add(&mut self, eq: Rule<L>) {
         self.0.insert(eq.name.clone(), eq);
+    }
+
+    pub fn remove(&mut self, name: Arc<str>) {
+        self.0.remove(&name.clone());
     }
 
     pub fn remove_all(&mut self, other: Self) {
@@ -456,7 +474,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        candidates.to_file("candidates.txt");
         candidates
     }
 

@@ -1,7 +1,7 @@
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
+    enumo::{Ruleset, Scheduler, Workload, Rule},
     *,
 };
 use std::{ops::*, time::Instant};
@@ -148,6 +148,21 @@ impl Math {
         );
 
         chosen.pretty_print();
+
+        chosen
+    }
+
+    fn centrist_run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+        let mut candidates = Ruleset::fast_cvec_match(&compressed);
+
+        let mut chosen = candidates.minimize(prior.clone(), limits);
+        let bidir = chosen.bidir();
+
+        let compressed = Scheduler::Compress(limits).run(&compressed, &bidir);
+        let mut candidates = Ruleset::cvec_match(&compressed);
+        let chosen = candidates.minimize(prior.clone(), limits);
 
         chosen
     }
@@ -533,6 +548,54 @@ pub mod test {
         );
     }
 
+    pub fn rational_rules_fast() -> Ruleset<Math> {
+        let mut rules = Ruleset::default();
+
+        let vars = Workload::new(["a", "b", "c"]);
+        let consts = Workload::new(["0", "-1", "1"]);
+        let uops = Workload::new(["~", "fabs"]);
+        let bops = Workload::new(["+", "-", "*", "/"]);
+
+        let init_synth = vars.clone().append(consts);
+
+        let layer = Workload::new(["(uop expr)", "(bop expr expr)"])
+            .plug("uop", &uops)
+            .plug("bop", &bops);
+
+        let contains_var_filter = Filter::Or(vec![
+            Filter::Contains("a".parse().unwrap()),
+            Filter::Contains("b".parse().unwrap()),
+            Filter::Contains("c".parse().unwrap()),
+        ]);
+
+        let layer1 = layer
+            .clone()
+            .plug("expr", &init_synth)
+            .append(init_synth)
+            .filter(contains_var_filter.clone());
+        let rules1 = Math::centrist_run_workload(
+            layer1.clone(),
+            rules.clone(),
+            Limits {
+                iter: 2,
+                node: 1000000000,
+            },
+        );
+        rules.extend(rules1);
+
+        let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
+        let rules2 = Math::centrist_run_workload(
+            layer2.clone(),
+            rules.clone(),
+            Limits {
+                iter: 2,
+                node: 100000000,
+            },
+        );
+        rules.extend(rules2);
+        rules
+    }
+
     pub fn rational_rules() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
         let limits = Limits::default();
@@ -563,7 +626,7 @@ pub mod test {
             layer1.clone(),
             rules.clone(),
             Limits {
-                iter: 3,
+                iter: 2,
                 node: 1000000000,
             },
         );
@@ -606,14 +669,20 @@ pub mod test {
             DeriveType::Lhs,
             baseline.clone(),
             &format!("{}_rational_lhs.json", baseline_name),
-            limits,
+            Limits {
+                iter: 3,
+                node: 1_000_000,
+            },
             duration,
         );
         rules.write_json_equiderivability(
             DeriveType::LhsAndRhs,
             baseline.clone(),
             &format!("{}_rational_lhs_rhs.json", baseline_name),
-            limits,
+            Limits {
+                iter: 3,
+                node: 1_000_000,
+            },
             duration,
         );
         rules.write_json_equiderivability(
@@ -621,7 +690,7 @@ pub mod test {
             baseline.clone(),
             &format!("{}_rational_allrules.json", baseline_name),
             Limits {
-                iter: 2,
+                iter: 3,
                 node: 1_000_000,
             },
             duration,
@@ -640,7 +709,7 @@ pub mod test {
     #[test]
     fn run_all() {
         let start = Instant::now();
-        let rules = rational_rules();
+        let rules = rational_rules_fast();
         let duration = start.elapsed();
 
         test_against_ruler1(rules.clone(), duration);
