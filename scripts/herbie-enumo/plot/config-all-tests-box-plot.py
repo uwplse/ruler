@@ -22,17 +22,11 @@ if field == "time":
             new_times.append(float(t) / 1000.0)
         pairs[k] = new_times
 
-# ho = ('Herbie', pairs['main'])
-# ro = ('SlideRule', pairs['slide-rule'])
-# hr = ('Ruler', pairs['oopsla21'])
-# nr = ('None', pairs['no-rules'])
-# listify = [ho, ro, hr, nr]
-
 ho = ('Herbie', pairs['main'])
-ro = ('Enumo', pairs['using-ruler-nightlies'])
-hr = ('Ruler', pairs['using-ruler-baseline'])
-listify = [ho, ro, hr]
-
+ro = ('SlideRule', pairs['enumo'])
+hr = ('Ruler', pairs['ruler'])
+nr = ('None', pairs['no-rules'])
+listify = [ho, ro, hr, nr]
 
 labs = []
 vals = []

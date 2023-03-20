@@ -38,8 +38,9 @@ cp -r "$HERBIE_DIR/bench/hamming" \
 # Run the branches!!!
 
 function do_branch {
-  branch="$1"
-  flags="$2"
+  branch="$1"; shift
+  outdir="$1"; shift
+  flags="$@"
 
   pushd $HERBIE_DIR
   git checkout $branch
@@ -51,21 +52,22 @@ function do_branch {
       THREADS=$THREADS \
       BENCH=$BENCH_DIR \
       HERBIE_FLAGS=$flags \
-      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$branch"
+      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$outdir"
   else
     HERBIE=$HERBIE_DIR \
       PARALLEL_SEEDS=$PARALLEL_SEEDS \
       THREADS=$THREADS \
       BENCH=$BENCH_DIR \
       HERBIE_FLAGS=$flags \
-      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$branch"
+      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$outdir"
   fi
 }
 
 if [ -z "$NO_RUN" ]; then
-  do_branch main
-  do_branch using-ruler-nightlies
-  do_branch using-ruler-baseline
+  do_branch main main
+  do_branch main no-rules -o generate:rr -o generate:simplify
+  do_branch using-ruler-nightlies enumo
+  do_branch using-ruler-baseline ruler
 fi
 
 # Plots
