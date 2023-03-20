@@ -41,11 +41,8 @@ mod test {
     use ruler::enumo::{Filter, Metric, Ruleset, Workload};
     use std::time::Instant;
 
-    // #[test]
-    fn bv32_oopsla_equiv() {
+    fn bv32_rules() -> Ruleset<Bv> {
         let mut all_rules = Ruleset::default();
-        let start = Instant::now();
-
         let initial_vals = Workload::new(["a", "b", "c"]);
         let uops = Workload::new(["~", "-"]);
         let bops = Workload::new(["&", "|", "*", "--", "+"]);
@@ -72,23 +69,19 @@ mod test {
             3,
         );
         let terms_3 = layer_3.clone().append(terms_2.clone());
-        let rules_3 = Bv::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
+        let rules_3 = Bv::run_workload(terms_3, all_rules.clone(), Limits::default());
         all_rules.extend(rules_3.clone());
+        all_rules
+    }
+
+    #[test]
+    fn run() {
+        let start = Instant::now();
+        let rules = bv32_rules();
         let duration = start.elapsed();
 
-        terms_3.write_terms_to_file("terms_bv32.txt");
+        rules.write_json_rules("bv32.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
-
-        all_rules.write_json_rules("bv32.json");
-        all_rules.write_json_equiderivability(
-            DeriveType::Lhs,
-            baseline.clone(),
-            "bv32.json",
-            Limits {
-                iter: 3,
-                node: 300000,
-            },
-            duration.clone(),
-        );
+        rules.baseline_compare_to(baseline, "ruler1", "bv32", duration);
     }
 }

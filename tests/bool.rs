@@ -286,11 +286,8 @@ mod test {
         assert_eq!(cannot.len(), 0);
     }
 
-    // #[test]
-    fn bool_oopsla_equiv() {
+    pub fn bool_rules() -> Ruleset<Bool> {
         let mut all_rules = Ruleset::default();
-        let start = Instant::now();
-
         let initial_vals = Workload::new(["ba", "bb", "bc"]);
         let uops = Workload::new(["~"]);
         let bops = Workload::new(["&", "|", "^"]);
@@ -317,24 +314,20 @@ mod test {
             3,
         );
         let terms_3 = layer_3.clone().append(terms_2.clone());
-        let rules_3 = Bool::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
+        let rules_3 = Bool::run_workload(terms_3.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_3.clone());
+        all_rules
+    }
+
+    #[test]
+    fn run() {
+        let start = Instant::now();
+        let rules = bool_rules();
         let duration = start.elapsed();
 
-        terms_3.write_terms_to_file("terms_bool.txt");
+        rules.write_json_rules("bool.json");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
-
-        all_rules.write_json_rules("bool.json");
-        all_rules.write_json_equiderivability(
-            DeriveType::Lhs,
-            baseline.clone(),
-            "bool.json",
-            Limits {
-                iter: 3,
-                node: 300000,
-            },
-            duration.clone(),
-        );
+        rules.baseline_compare_to(baseline, "ruler1", "bool", duration);
     }
 
     #[test]

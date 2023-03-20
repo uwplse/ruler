@@ -311,7 +311,7 @@ mod test {
         run_workload(upper_layer, prev_rules)
     }
 
-    // #[test]
+    #[test]
     fn make_rules() {
         let mut all_rules = rational_rules();
         let mut new_rules = Ruleset::default();

@@ -631,8 +631,6 @@ pub mod test {
     fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
-        // Only the herbie test writes the rational rules
-        rules.write_json_rules("rational.json");
         println!("Comparing rational to herbie...");
         baseline_compare_to(rules, herbie, "herbie", duration)
     }
@@ -643,6 +641,7 @@ pub mod test {
         let rules = rational_rules();
         let duration = start.elapsed();
 
+        rules.write_json_rules("rational.json");
         test_against_ruler1(rules.clone(), duration);
         test_against_herbie(rules.clone(), duration);
     }

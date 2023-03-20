@@ -314,6 +314,37 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all("]".as_bytes()).expect("write failed");
     }
 
+    pub fn baseline_compare_to(
+        &self,
+        baseline: Self,
+        baseline_name: &str,
+        domain_name: &str,
+        duration: Duration,
+    ) {
+        let limits = Limits::default();
+        self.write_json_equiderivability(
+            DeriveType::Lhs,
+            baseline.clone(),
+            &format!("{}_{}_lhs.json", baseline_name, domain_name),
+            limits,
+            duration,
+        );
+        self.write_json_equiderivability(
+            DeriveType::LhsAndRhs,
+            baseline.clone(),
+            &format!("{}_{}_lhs_rhs.json", baseline_name, domain_name),
+            limits,
+            duration,
+        );
+        self.write_json_equiderivability(
+            DeriveType::AllRules,
+            baseline.clone(),
+            &format!("{}_{}_allrules.json", baseline_name, domain_name),
+            limits,
+            duration,
+        )
+    }
+
     pub fn extract_candidates(
         eg1: &EGraph<L, SynthAnalysis>,
         eg2: &EGraph<L, SynthAnalysis>,
