@@ -606,15 +606,17 @@ pub mod test {
     }
 
     #[test]
-    fn rational_oopsla_equiv() {
-        let limits = Limits::default();
-
+    fn baseline_comparisons() {
         let start = Instant::now();
         let rules = rational_rules();
         let duration = start.elapsed();
-
-        let iter2_rules: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+        let limits = Limits::default();
         rules.write_json_rules("rational.json");
-        rules.write_json_equiderivability(iter2_rules.clone(), "rational.json", limits, duration)
+
+        let ruler1_baseline: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+        rules.write_json_equiderivability(ruler1_baseline, "rational.json", limits, duration);
+
+        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
+        rules.write_json_equiderivability(herbie, "herbie.json", limits, duration);
     }
 }

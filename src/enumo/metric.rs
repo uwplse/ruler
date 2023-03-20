@@ -1,6 +1,6 @@
 #[derive(Copy, PartialEq, Eq, Clone, Debug)]
 pub enum Metric {
     Atoms,
-    List,
+    Lists,
     Depth,
 }

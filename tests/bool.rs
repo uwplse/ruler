@@ -173,7 +173,6 @@ mod test {
         let egraph = Scheduler::Compress(Limits::default()).run(&atoms3.to_egraph(), &all_rules);
         let mut candidates = Ruleset::cvec_match(&egraph);
         let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules3.len(), 23);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
@@ -182,7 +181,6 @@ mod test {
         let egraph = Scheduler::Compress(Limits::default()).run(&atoms4.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
         let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
@@ -191,8 +189,43 @@ mod test {
         let egraph = Scheduler::Compress(Limits::default()).run(&atoms5.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
         let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 16);
         all_rules.extend(rules5);
+
+        let expected: Ruleset<Bool> = Ruleset::new(&[
+            "(^ ?b ?a) ==> (^ ?a ?b)",
+            "(& ?b ?a) ==> (& ?a ?b)",
+            "(| ?b ?a) ==> (| ?a ?b)",
+            "(& ?a ?a) <=> ?a",
+            "?a <=> (~ (~ ?a))",
+            "?a <=> (| ?a ?a)",
+            "(-> ?a ?a) ==> true",
+            "(^ ?a ?a) ==> false",
+            "(| ?a false) <=> ?a",
+            "?a <=> (-> true ?a)",
+            "?a <=> (& ?a true)",
+            "?a <=> (^ false ?a)",
+            "(~ ?a) <=> (-> ?a false)",
+            "(~ ?a) <=> (^ ?a true)",
+            "(-> ?b (~ ?a)) <=> (~ (& ?b ?a))",
+            "(~ (^ ?b ?a)) ==> (^ ?b (~ ?a))",
+            "(-> (~ ?b) ?a) ==> (| ?a ?b)",
+            "(-> ?b (~ ?a)) ==> (^ ?a (-> ?a ?b))",
+            "(| ?b ?a) ==> (-> (-> ?b ?a) ?a)",
+            "(-> ?b ?a) <=> (-> (| ?a ?b) ?a)",
+            "(| ?b ?a) <=> (| ?a (^ ?b ?a))",
+            "(& ?b ?a) ==> (& ?b (-> ?b ?a))",
+            "(| ?b (& ?b ?a)) ==> ?b",
+            "(& ?a (| ?b ?a)) ==> ?a",
+            "(& ?a (-> ?b ?a)) ==> ?a",
+            "(-> (-> ?a ?b) ?a) ==> ?a",
+            "(-> ?c (-> ?b ?a)) <=> (-> (& ?c ?b) ?a)",
+            "(| ?c (| ?b ?a)) ==> (| ?a (| ?b ?c))",
+            "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
+            "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
+        ]);
+        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        assert_eq!(can.len(), expected.len());
+        assert_eq!(cannot.len(), 0);
     }
 
     #[test]
@@ -202,22 +235,55 @@ mod test {
         assert_eq!(atoms3.force().len(), 93);
 
         let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::default());
-        assert_eq!(rules3.len(), 23);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
         let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::default());
-        assert_eq!(rules4.len(), 4);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
         let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
-        assert_eq!(rules5.len(), 16);
         all_rules.extend(rules5);
+
+        let expected: Ruleset<Bool> = Ruleset::new(&[
+            "(^ ?b ?a) ==> (^ ?a ?b)",
+            "(& ?b ?a) ==> (& ?a ?b)",
+            "(| ?b ?a) ==> (| ?a ?b)",
+            "(& ?a ?a) <=> ?a",
+            "?a <=> (~ (~ ?a))",
+            "?a <=> (| ?a ?a)",
+            "(-> ?a ?a) ==> true",
+            "(^ ?a ?a) ==> false",
+            "(| ?a false) <=> ?a",
+            "?a <=> (-> true ?a)",
+            "?a <=> (& ?a true)",
+            "?a <=> (^ false ?a)",
+            "(~ ?a) <=> (-> ?a false)",
+            "(~ ?a) <=> (^ ?a true)",
+            "(-> ?b (~ ?a)) <=> (~ (& ?b ?a))",
+            "(~ (^ ?b ?a)) ==> (^ ?b (~ ?a))",
+            "(-> (~ ?b) ?a) ==> (| ?a ?b)",
+            "(-> ?b (~ ?a)) ==> (^ ?a (-> ?a ?b))",
+            "(| ?b ?a) ==> (-> (-> ?b ?a) ?a)",
+            "(-> ?b ?a) <=> (-> (| ?a ?b) ?a)",
+            "(| ?b ?a) <=> (| ?a (^ ?b ?a))",
+            "(& ?b ?a) ==> (& ?b (-> ?b ?a))",
+            "(| ?b (& ?b ?a)) ==> ?b",
+            "(& ?a (| ?b ?a)) ==> ?a",
+            "(& ?a (-> ?b ?a)) ==> ?a",
+            "(-> (-> ?a ?b) ?a) ==> ?a",
+            "(-> ?c (-> ?b ?a)) <=> (-> (& ?c ?b) ?a)",
+            "(| ?c (| ?b ?a)) ==> (| ?a (| ?b ?c))",
+            "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
+            "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
+        ]);
+        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        assert_eq!(can.len(), expected.len());
+        assert_eq!(cannot.len(), 0);
     }
 
     #[test]
@@ -230,14 +296,14 @@ mod test {
         let bops = Workload::new(["&", "|", "^"]);
 
         let layer_1 = Workload::make_layer(initial_vals.clone(), uops.clone(), bops.clone())
-            .filter(Filter::MetricLt(Metric::List, 2));
+            .filter(Filter::MetricLt(Metric::Lists, 2));
         let terms_1 = layer_1.clone().append(initial_vals.clone());
         let rules_1 = Bool::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_1.clone());
 
         let layer_2 = Workload::make_layer(layer_1.clone(), uops.clone(), bops.clone())
-            .filter(Filter::MetricLt(Metric::List, 3))
-            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::List, 1))));
+            .filter(Filter::MetricLt(Metric::Lists, 3))
+            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::Lists, 1))));
         let terms_2 = layer_2.clone().append(terms_1.clone());
         let rules_2 = Bool::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
         all_rules.extend(rules_2.clone());
