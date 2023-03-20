@@ -17,16 +17,16 @@
     window.addEventListener("load", () => {
 
 
-        var tableFwdsYes = ConvertJsonToTable(obj["forwards derivable"], "forwards derivable");
+        var tableFwdsYes = ConvertJsonToTable(obj["enumo -> oopsla derivable"], "enumo -> oopsla derivable");
         document.getElementById("table-fwd-yes").innerHTML = tableFwdsYes;
 
-        var tableFwdsNo = ConvertJsonToTable(obj["forwards underivable"], "forwards underivable");
+        var tableFwdsNo = ConvertJsonToTable(obj["enumo -> oopsla underivable"], "enumo -> oopsla underivable");
         document.getElementById("table-fwd-no").innerHTML = tableFwdsNo;
 
-        var tableBkwdsYes = ConvertJsonToTable(obj["backwards derivable"], "backwards derivable");
+        var tableBkwdsYes = ConvertJsonToTable(obj["oopsla -> enumo derivable"], "oopsla -> enumo derivable");
         document.getElementById("table-bkwd-yes").innerHTML = tableBkwdsYes;
 
-        var tableBkwdsNo = ConvertJsonToTable(obj["backwards underivable"], "backwards underivable");
+        var tableBkwdsNo = ConvertJsonToTable(obj["oopsla -> enumo underivable"], "oopsla -> enumo derivable");
         document.getElementById("table-bkwd-no").innerHTML = tableBkwdsNo;
     });
 </script>

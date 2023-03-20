@@ -249,10 +249,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         let (can_b, cannot_b) = baseline.derive(derive_type, self.clone(), limits);
 
         let derivability_results = json!({
-            "enumo -> oopsla derivable": &can_f.to_str_vec(),
-            "enumo -> oopsla underivable": &cannot_f.to_str_vec(),
-            "oopsla -> enumo derivable": &can_b.to_str_vec(),
-            "oopsla -> enumo underivable": &cannot_b.to_str_vec(),
+            "forwards derivable": &can_f.to_str_vec(),
+            "forwards underivable": &cannot_f.to_str_vec(),
+            "backwards derivable": &can_b.to_str_vec(),
+            "backwards underivable": &cannot_b.to_str_vec(),
         })
         .to_string();
 
