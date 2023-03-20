@@ -1,9 +1,7 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
-use log::info;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use serde_json::*;
-use std::collections::HashSet;
 use std::fs::*;
 use std::sync::Mutex;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
