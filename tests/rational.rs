@@ -558,11 +558,7 @@ pub mod test {
             .plug("expr", &init_synth)
             .append(init_synth)
             .filter(contains_var_filter.clone());
-        let rules1 = Math::run_workload_fast_match(
-            layer1.clone(),
-            rules.clone(),
-            limits,
-        );
+        let rules1 = Math::run_workload_fast_match(layer1.clone(), rules.clone(), limits);
         rules.extend(rules1);
 
         let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
@@ -574,23 +570,19 @@ pub mod test {
                 iter: limits.iter,
                 node: limits.node,
                 derive_type: DeriveType::AllRules,
-            }
+            },
         );
         rules.extend(rules2);
-        
+
         rules
     }
 
-    fn baseline_compare_to(
-        baseline: Ruleset<Math>,
-        baseline_name: &str,
-        derive_type: DeriveType,
-    ) {
+    fn baseline_compare_to(baseline: Ruleset<Math>, baseline_name: &str, derive_type: DeriveType) {
         let start = Instant::now();
         let rules = rational_rules(Limits {
             iter: 2,
             node: 1_000_000,
-            derive_type       
+            derive_type,
         });
         eprintln!("finished rules");
         let duration = start.elapsed();

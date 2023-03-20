@@ -245,7 +245,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        println!("Calculating derivability of baseline"); 
+        println!("Calculating derivability of baseline");
         let (can_f, cannot_f) = self.derive(baseline.clone(), limits);
 
         println!("Calculating derivability of self from baseline");
@@ -554,12 +554,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    pub fn can_derive(
-        &self,
-        rule: &Rule<L>,
-        allrules: Self,
-        limits: Limits,
-    ) -> bool {
+    pub fn can_derive(&self, rule: &Rule<L>, allrules: Self, limits: Limits) -> bool {
         let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);

@@ -576,7 +576,7 @@ mod test {
         let limits = Limits {
             iter: 3,
             node: 2000000,
-            derive_type: DeriveType::Lhs
+            derive_type: DeriveType::Lhs,
         };
 
         let mut all = complex;
@@ -607,7 +607,7 @@ mod test {
         let limits = Limits {
             iter: 3,
             node: 2000000,
-            derive_type: DeriveType::Lhs
+            derive_type: DeriveType::Lhs,
         };
 
         let terms = Workload::new([

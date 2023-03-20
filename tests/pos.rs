@@ -174,7 +174,7 @@ mod tests {
         let limits = Limits {
             iter: 3,
             node: 1000000,
-            derive_type: DeriveType::Lhs
+            derive_type: DeriveType::Lhs,
         };
 
         let eg_init = atoms3.to_egraph();
@@ -228,7 +228,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
         all_rules.extend(rules3);
@@ -242,7 +242,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
         all_rules.extend(rules4);
@@ -256,7 +256,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
         all_rules.extend(rules4);

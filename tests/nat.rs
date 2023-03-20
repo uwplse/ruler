@@ -225,7 +225,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
         all_rules.extend(rules3);
@@ -239,7 +239,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
         all_rules.extend(rules4);
@@ -253,7 +253,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
         all_rules.extend(rules5);

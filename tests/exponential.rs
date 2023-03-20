@@ -178,7 +178,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 2_000_000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
 
@@ -317,7 +317,7 @@ mod test {
         let mut all_rules = rational_rules(Limits {
             iter: 2,
             node: 1_000_000,
-            derive_type: DeriveType::Lhs
+            derive_type: DeriveType::Lhs,
         });
         let mut new_rules = Ruleset::default();
 

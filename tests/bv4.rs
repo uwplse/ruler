@@ -86,7 +86,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 300000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
             duration.clone(),
         );
