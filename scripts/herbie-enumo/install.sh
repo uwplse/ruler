@@ -40,4 +40,4 @@ git clone https://github.com/herbie-fp/herbie.git $BUILD_DIR ||    \
 pushd $BUILD_DIR
 git checkout using-ruler-baseline
 git checkout using-ruler-nightlies
-popd $BUILD_DIR
+popd

@@ -49,4 +49,4 @@ mv all-bad.json.tmp all-bad.json
 
 popd
 
-$MYDIR/src/plot-results.sh "$OUTPUT_DIR"
+bash $MYDIR/plot/plot-results.sh "$OUTPUT_DIR"

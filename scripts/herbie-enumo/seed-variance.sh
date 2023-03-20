@@ -19,12 +19,13 @@ if [ -z "$HERBIE" ]; then
 fi
 
 # determine number of seeds to sample
-if [ -z "$1" ] || [ -z "$2" ]; then
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
   echo "Usage: $0 NUM_SEEDS RESULT_PATH"
   exit 1
 else
   NSEEDS="$1"
   RESPATH="$2"
+  NAME="$3"
 fi
 
 # advise user of benchmark location
@@ -54,6 +55,27 @@ else
   echo "Restricting to $PARALLEL_SEEDS parallel concurrent Herbie runs."
 fi
 
+# Runner
+
+function run {
+  bench="$1"; shift
+  name="$1"; shift
+  outdir="$1"; shift
+
+  if [ -z "${args}" ]; then
+    echo "Running tests in '$name' with default flags"
+  else
+    echo "Running tests in '$name' with '$args'"
+  fi
+
+  rm -rf "$outdir/$name"
+  racket -y "$HERBIE/src/herbie.rkt" report \
+    --note "$name" \
+    "$@" \
+    "$bench" "$outdir/$name" \
+    || echo "failed"
+}
+
 #
 #   SAMPLE SEEDS
 #
@@ -68,12 +90,25 @@ function do_seed {
   seed_output="$output/$(printf "%03d" "$seed")"
   mkdir -p "$seed_output"
 
-  racket "$HERBIE/src/herbie.rkt" report \
-    --threads $THREADS \
-    --seed "$seed" \
-    $HERBIE_FLAGS \
-    "$BENCH" \
-    "$seed_output"
+  # lifted from `infra/run.sh` in the Herbie repo
+  dirs=""
+  for bench in $BENCH/*; do
+    name=$(basename "$bench" .fpcore)
+    run "$bench" "$name" "$seed_output" \
+      --profile \
+      --seed "$seed" \
+      --threads "$THREADS" \
+      $HERBIE_FLAGS
+
+    if [ "$?" -eq 0 ]; then
+      dirs="$dirs $name";
+    fi
+  done
+
+  racket -y "$HERBIE/infra/merge.rkt" \
+    --name "$(basename $BENCH .fpcore)" \
+    "$seed_output" \
+    $dirs
 }
 
 # sample herbie behavior
@@ -114,7 +149,7 @@ first=true
 first_error=true
 first_timeout=true
 
-for rj in $(find . -name 'results.json' | sort); do
+for rj in $(find . -maxdepth 2 -name 'results.json' | sort); do
   if $first; then
     first=false
   else
@@ -163,7 +198,7 @@ for rj in $(find . -name 'results.json' | sort); do
     | jq --argjson SEED "$seed" \
          --argjson NPTS "$npts" \
          --argjson HERBIE_ITERS "$herbie_iters" \
-         --arg CFG "$cfg" \
+         --arg CFG "$NAME" \
       '.tests | map(
          select(.status != "error") |
          select(.status != "timeout") |
@@ -190,6 +225,12 @@ echo "]" >> timeouts.json
 # flatten array of array of results to an array
 jq 'flatten' all.json > all.json.tmp
 mv all.json.tmp all.json
+
+jq 'flatten' errors.json > errors.json.tmp
+mv errors.json.tmp errors.json
+
+jq 'flatten' timeouts.json > timeouts.json.tmp
+mv timeouts.json.tmp timeouts.json
 
 popd
 
