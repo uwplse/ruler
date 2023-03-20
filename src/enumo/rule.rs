@@ -12,6 +12,12 @@ pub struct Rule<L: SynthLanguage> {
     pub rewrite: Rewrite<L, SynthAnalysis>,
 }
 
+impl<L: SynthLanguage> Display for Rule<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {} {}", self.name, self.lhs, self.rhs)
+    }
+}
+
 impl<L: SynthLanguage> Rule<L> {
     pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
         if let Some((l, r)) = s.split_once("=>") {

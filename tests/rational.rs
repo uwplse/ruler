@@ -376,6 +376,7 @@ pub mod test {
     use std::time::Duration;
 
     use super::*;
+    use log::info;
     use ruler::enumo::{Filter, Ruleset, Workload};
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -533,16 +534,14 @@ pub mod test {
         );
     }
 
-    pub fn rational_rules() -> Ruleset<Math> {
+    pub fn rational_rules(limits: Limits) -> Ruleset<Math> {
         let mut rules = Ruleset::default();
-        let limits = Limits::default();
-
         let vars = Workload::new(["a", "b", "c"]);
         let consts = Workload::new(["0", "-1", "1"]);
         let uops = Workload::new(["~", "fabs"]);
         let bops = Workload::new(["+", "-", "*", "/"]);
 
-        let init_synth = vars.clone().append(consts);
+        let init_synth = vars.append(consts);
 
         let layer = Workload::new(["(uop expr)", "(bop expr expr)"])
             .plug("uop", &uops)
@@ -562,93 +561,91 @@ pub mod test {
         let rules1 = Math::run_workload_fast_match(
             layer1.clone(),
             rules.clone(),
-            Limits {
-                iter: 2,
-                node: 1000000000,
-            },
+            limits,
         );
         rules.extend(rules1);
 
         let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
         let rules2 = Math::run_workload_fast_match(
-            layer2.clone(),
+            layer2,
             rules.clone(),
+            // we need to use allrules here since we have many candidates
             Limits {
-                iter: 2,
-                node: 100000000,
-            },
+                iter: limits.iter,
+                node: limits.node,
+                derive_type: DeriveType::AllRules,
+            }
         );
         rules.extend(rules2);
-        /*
-                let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-                rules.extend(Math::run_workload(div, rules.clone(), Limits::default()));
-
-                let nested_fabs = Workload::new(["(fabs e)"]).plug(
-                    "e",
-                    &layer2.filter(Filter::Contains("fabs".parse().unwrap())),
-                );
-                let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
-                rules.extend(fabs_rules);
-        */
+        
         rules
     }
 
     fn baseline_compare_to(
-        rules: Ruleset<Math>,
         baseline: Ruleset<Math>,
         baseline_name: &str,
-        duration: Duration,
+        derive_type: DeriveType,
     ) {
-        let limits = Limits::default();
+        let start = Instant::now();
+        let rules = rational_rules(Limits {
+            iter: 2,
+            node: 1_000_000,
+            derive_type       
+        });
+        eprintln!("finished rules");
+        let duration = start.elapsed();
+
+        let name = &format!("{}_rational_{}.json", baseline_name, derive_type);
+        rules.write_json_rules(name);
+
         rules.write_json_equiderivability(
-            DeriveType::Lhs,
             baseline.clone(),
-            &format!("{}_rational_lhs.json", baseline_name),
-            limits,
-            duration,
-        );
-        rules.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
-            baseline.clone(),
-            &format!("{}_rational_lhs_rhs.json", baseline_name),
-            limits,
-            duration,
-        );
-        rules.write_json_equiderivability(
-            DeriveType::AllRules,
-            baseline.clone(),
-            &format!("{}_rational_allrules.json", baseline_name),
+            name,
             Limits {
                 iter: 2,
                 node: 1_000_000,
+                derive_type,
             },
             duration,
-        )
+        );
     }
 
     #[test]
-    fn test_against_herbie() {
-        let start = Instant::now();
-        let rules = rational_rules();
-        let duration = start.elapsed();
-
+    fn rational_herbie_lhs() {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
-
-        // Only the herbie test writes the rational rules
-        rules.write_json_rules("rational.json");
-        println!("Comparing rational to herbie...");
-        baseline_compare_to(rules, herbie, "herbie", duration);
+        baseline_compare_to(herbie, "herbie", DeriveType::Lhs);
     }
 
     #[test]
-    fn test_against_ruler1() {
-        let start = Instant::now();
-        let rules = rational_rules();
-        let duration = start.elapsed();
+    fn rational_herbie_lhs_and_rhs() {
+        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
+        baseline_compare_to(herbie, "herbie", DeriveType::LhsAndRhs);
+    }
 
+    #[test]
+    fn rational_herbie_all_rules() {
+        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
+        baseline_compare_to(herbie, "herbie", DeriveType::AllRules);
+    }
+
+    #[test]
+    fn rational_ruler1_lhs() {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
-        println!("Comparing rational to ruler1...");
-        baseline_compare_to(rules, ruler1, "ruler1", duration);
+        baseline_compare_to(ruler1, "ruler1", DeriveType::Lhs);
+    }
+
+    #[test]
+    fn rational_ruler1_lhs_and_rhs() {
+        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+
+        baseline_compare_to(ruler1, "ruler1", DeriveType::LhsAndRhs);
+    }
+
+    #[test]
+    fn rational_ruler1_all_rules() {
+        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
+
+        baseline_compare_to(ruler1, "ruler1", DeriveType::AllRules);
     }
 }

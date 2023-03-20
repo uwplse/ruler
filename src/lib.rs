@@ -52,6 +52,7 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
 pub struct Limits {
     pub iter: usize,
     pub node: usize,
+    pub derive_type: DeriveType,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -66,6 +67,17 @@ impl Default for Limits {
         Self {
             iter: 3,
             node: 1_000_000,
+            derive_type: DeriveType::Lhs,
+        }
+    }
+}
+
+impl Display for DeriveType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeriveType::Lhs => write!(f, "lhs"),
+            DeriveType::LhsAndRhs => write!(f, "lhs_and_rhs"),
+            DeriveType::AllRules => write!(f, "all_rules"),
         }
     }
 }
@@ -75,6 +87,7 @@ impl Limits {
         Self {
             iter: usize::MAX,
             node: usize::MAX,
+            derive_type: DeriveType::Lhs,
         }
     }
 }

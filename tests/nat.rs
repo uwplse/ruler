@@ -225,6 +225,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
+                derive_type: DeriveType::Lhs
             },
         );
         all_rules.extend(rules3);
@@ -238,6 +239,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
+                derive_type: DeriveType::Lhs
             },
         );
         all_rules.extend(rules4);
@@ -251,6 +253,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
+                derive_type: DeriveType::Lhs
             },
         );
         all_rules.extend(rules5);
@@ -266,7 +269,7 @@ mod test {
             "(* ?c (* ?b ?a)) ==> (* ?a (* ?b ?c))",
             "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }

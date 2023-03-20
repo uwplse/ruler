@@ -1,7 +1,9 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
+use log::info;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use serde_json::*;
+use std::collections::HashSet;
 use std::fs::*;
 use std::sync::Mutex;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
@@ -229,7 +231,6 @@ impl<L: SynthLanguage> Ruleset<L> {
     // and statistics about runtime and the number of rules in each ruleset.
     pub fn write_json_equiderivability(
         &self,
-        derive_type: DeriveType,
         baseline: Self,
         name: &str,
         limits: Limits,
@@ -244,9 +245,11 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        let (can_f, cannot_f) = self.derive(derive_type, baseline.clone(), limits);
+        println!("Calculating derivability of baseline"); 
+        let (can_f, cannot_f) = self.derive(baseline.clone(), limits);
 
-        let (can_b, cannot_b) = baseline.derive(derive_type, self.clone(), limits);
+        println!("Calculating derivability of self from baseline");
+        let (can_b, cannot_b) = baseline.derive(self.clone(), limits);
 
         let derivability_results = json!({
             "enumo -> oopsla derivable": &can_f.to_str_vec(),
@@ -493,7 +496,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    fn shrink(&mut self, chosen: &Self, limits: Limits) {
+    fn shrink_all_lhs_rhs(&self, chosen: &Self, limit: Limits) -> Self {
         // 1. make new egraph
         // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
         let mut egraph = EGraph::default();
@@ -507,12 +510,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         // 3. compress with the rules we've chosen so far
-        let egraph = Scheduler::Compress(limits).run(&egraph, chosen);
+        let egraph = Scheduler::Compress(limit).run(&egraph, chosen);
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
         let extract = Extractor::new(&egraph, AstSize);
-        self.0 = Default::default();
+        let mut res = Ruleset::default();
         for (l_id, r_id) in initial {
             if egraph.find(l_id) == egraph.find(r_id) {
                 // candidate has merged (derivable from other rewrites)
@@ -521,18 +524,29 @@ impl<L: SynthLanguage> Ruleset<L> {
             let (_, left) = extract.find_best(l_id);
             let (_, right) = extract.find_best(r_id);
             if let Some(eq) = Rule::from_recexprs(&left, &right) {
-                self.add(eq);
+                res.add(eq);
             }
+        }
+        res
+    }
+
+    fn shrink(self, chosen: &Self, limits: Limits) -> Self {
+        if let DeriveType::AllRules = limits.derive_type {
+            self.shrink_all_lhs_rhs(chosen, limits)
+        } else {
+            let (_can, cant) = chosen.derive(self, limits);
+            cant
         }
     }
 
-    pub fn minimize(&mut self, prior: Ruleset<L>, limits: Limits) -> Self {
+    pub fn minimize(self, prior: Ruleset<L>, limits: Limits) -> Self {
         let mut chosen = prior.clone();
         let step_size = 1;
-        while !self.is_empty() {
-            let selected = self.select(step_size);
+        let mut res = self;
+        while !res.is_empty() {
+            let selected = res.select(step_size);
             chosen.extend(selected.clone());
-            self.shrink(&chosen, limits);
+            res = res.shrink(&chosen, limits);
         }
         // Return only the new rules
         chosen.remove_all(prior);
@@ -542,7 +556,6 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn can_derive(
         &self,
-        derive_type: DeriveType,
         rule: &Rule<L>,
         allrules: Self,
         limits: Limits,
@@ -552,7 +565,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let lexpr = &L::instantiate(&rule.lhs);
         let rexpr = &L::instantiate(&rule.rhs);
 
-        match derive_type {
+        match limits.derive_type {
             DeriveType::Lhs => {
                 egraph.add_expr(lexpr);
             }
@@ -585,7 +598,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
-    pub fn derive(&self, derive_type: DeriveType, against: Self, limits: Limits) -> (Self, Self) {
-        against.partition(|eq| self.can_derive(derive_type, eq, against.clone(), limits))
+    pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
+        against.partition(|eq| {
+            println!("Checking if {} can be derived", eq);
+            self.can_derive(eq, against.clone(), limits)
+        })
     }
 }

@@ -81,12 +81,12 @@ mod test {
 
         all_rules.write_json_rules("bv4.json");
         all_rules.write_json_equiderivability(
-            DeriveType::Lhs,
             baseline.clone(),
             "bv4.json",
             Limits {
                 iter: 3,
                 node: 300000,
+                derive_type: DeriveType::Lhs
             },
             duration.clone(),
         );

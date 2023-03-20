@@ -60,6 +60,7 @@ impl Scheduler {
                         &Limits {
                             iter: 1,
                             node: limits.node,
+                            derive_type: limits.derive_type,
                         },
                     )
                     .run(&other);

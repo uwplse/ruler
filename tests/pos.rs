@@ -174,6 +174,7 @@ mod tests {
         let limits = Limits {
             iter: 3,
             node: 1000000,
+            derive_type: DeriveType::Lhs
         };
 
         let eg_init = atoms3.to_egraph();
@@ -227,6 +228,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
+                derive_type: DeriveType::Lhs
             },
         );
         all_rules.extend(rules3);
@@ -240,6 +242,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
+                derive_type: DeriveType::Lhs
             },
         );
         all_rules.extend(rules4);
@@ -253,6 +256,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
+                derive_type: DeriveType::Lhs
             },
         );
         all_rules.extend(rules4);
@@ -275,7 +279,7 @@ mod tests {
             "(XO ?a) <=> (+ ?a ?a)",
             "(+ ?a (XO ?a)) <=> (* ?a (XI XH))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }

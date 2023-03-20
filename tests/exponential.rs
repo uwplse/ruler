@@ -164,8 +164,8 @@ mod test {
         ])
     }
 
-    fn rational_rules() -> Ruleset {
-        let rules = rational::test::rational_rules();
+    fn rational_rules(limits: Limits) -> Ruleset {
+        let rules = rational::test::rational_rules(limits);
         let rule_strs = rules.to_str_vec();
         let rule_strs: Vec<&str> = rule_strs.iter().map(|x| &**x).collect();
         Ruleset::new(&rule_strs)
@@ -178,6 +178,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 2_000_000,
+                derive_type: DeriveType::Lhs
             },
         );
 
@@ -313,7 +314,11 @@ mod test {
 
     // #[test]
     fn make_rules() {
-        let mut all_rules = rational_rules();
+        let mut all_rules = rational_rules(Limits {
+            iter: 2,
+            node: 1_000_000,
+            derive_type: DeriveType::Lhs
+        });
         let mut new_rules = Ruleset::default();
 
         all_rules.extend(starting_exponential_rules());

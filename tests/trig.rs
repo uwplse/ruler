@@ -449,7 +449,7 @@ mod test {
             "(- (* (cos ?b) (cos ?b)) (* (cos ?a) (cos ?a))) ==> (- (* (sin ?a) (sin ?a)) (* (sin ?b) (sin ?b)))",
             "(- (* (sin ?b) (sin ?b)) (* (cos ?a) (cos ?a))) ==> (- (* (sin ?a) (sin ?a)) (* (cos ?b) (cos ?b)))",
         ]);
-        let (can, cannot) = all.derive(DeriveType::Lhs, expected.clone(), Limits::default());
+        let (can, cannot) = all.derive(expected.clone(), Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
 
@@ -576,6 +576,7 @@ mod test {
         let limits = Limits {
             iter: 3,
             node: 2000000,
+            derive_type: DeriveType::Lhs
         };
 
         let mut all = complex;
@@ -606,6 +607,7 @@ mod test {
         let limits = Limits {
             iter: 3,
             node: 2000000,
+            derive_type: DeriveType::Lhs
         };
 
         let terms = Workload::new([
@@ -626,7 +628,7 @@ mod test {
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);
-        let (can, cannot) = rules.derive(DeriveType::Lhs, expected.clone(), Limits::default());
+        let (can, cannot) = rules.derive(expected.clone(), Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
