@@ -322,6 +322,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         duration: Duration,
     ) {
         let limits = Limits::default();
+        /*
         self.write_json_equiderivability(
             DeriveType::Lhs,
             baseline.clone(),
@@ -336,9 +337,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             limits,
             duration,
         );
+        */
         self.write_json_equiderivability(
             DeriveType::AllRules,
-            baseline.clone(),
+            baseline,
             &format!("{}_{}_allrules.json", baseline_name, domain_name),
             limits,
             duration,

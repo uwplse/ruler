@@ -535,7 +535,10 @@ pub mod test {
 
     pub fn rational_rules() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
-        let limits = Limits::default();
+        let limits = Limits {
+            iter: 2,
+            node: 100000,
+        };
 
         let vars = Workload::new(["a", "b", "c"]);
         let consts = Workload::new(["0", "-1", "1"]);
@@ -559,80 +562,20 @@ pub mod test {
             .plug("expr", &init_synth)
             .append(init_synth)
             .filter(contains_var_filter.clone());
-        let rules1 = Math::run_workload_fast_match(
-            layer1.clone(),
-            rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000000,
-            },
-        );
+        let rules1 = Math::run_workload(layer1.clone(), rules.clone(), limits);
         rules.extend(rules1);
 
         let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
-        let rules2 = Math::run_workload_fast_match(
-            layer2.clone(),
-            rules.clone(),
-            Limits {
-                iter: 2,
-                node: 100000000,
-            },
-        );
+        let rules2 = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
         rules.extend(rules2);
-        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-        rules.extend(Math::run_workload_fast_match(
-            div,
-            rules.clone(),
-            Limits::default(),
-        ));
-
-        let nested_fabs = Workload::new(["(fabs e)"]).plug(
-            "e",
-            &layer2.filter(Filter::Contains("fabs".parse().unwrap())),
-        );
-        let fabs_rules = Math::run_workload_fast_match(nested_fabs, rules.clone(), limits);
-        rules.extend(fabs_rules);
         rules
-    }
-
-    fn baseline_compare_to(
-        rules: Ruleset<Math>,
-        baseline: Ruleset<Math>,
-        baseline_name: &str,
-        duration: Duration,
-    ) {
-        let limits = Limits::default();
-        rules.write_json_equiderivability(
-            DeriveType::Lhs,
-            baseline.clone(),
-            &format!("{}_rational_lhs.json", baseline_name),
-            limits,
-            duration,
-        );
-        rules.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
-            baseline.clone(),
-            &format!("{}_rational_lhs_rhs.json", baseline_name),
-            limits,
-            duration,
-        );
-        rules.write_json_equiderivability(
-            DeriveType::AllRules,
-            baseline.clone(),
-            &format!("{}_rational_allrules.json", baseline_name),
-            Limits {
-                iter: 2,
-                node: 1_000_000,
-            },
-            duration,
-        )
     }
 
     fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
-        baseline_compare_to(rules, herbie, "herbie", duration)
+        rules.baseline_compare_to(herbie, "herbie", "rational", duration)
     }
 
     #[test]
@@ -650,6 +593,6 @@ pub mod test {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
-        baseline_compare_to(rules, ruler1, "ruler1", duration)
+        rules.baseline_compare_to(ruler1, "ruler1", "rational", duration)
     }
 }

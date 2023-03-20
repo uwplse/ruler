@@ -65,7 +65,7 @@ impl Default for Limits {
     fn default() -> Self {
         Self {
             iter: 3,
-            node: 1_000_000,
+            node: 300000,
         }
     }
 }
