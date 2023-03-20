@@ -159,10 +159,14 @@ impl Math {
 
         let mut chosen = candidates.minimize(prior.clone(), limits);
         let bidir = chosen.bidir();
+        let mut rules = Ruleset::default();
+
+        rules.extend(prior);
+        rules.extend(chosen);
 
         let compressed = Scheduler::Compress(limits).run(&compressed, &bidir);
         let mut candidates = Ruleset::cvec_match(&compressed);
-        let chosen = candidates.minimize(prior.clone(), limits);
+        let chosen = candidates.minimize(rules.clone(), limits);
 
         chosen
     }
