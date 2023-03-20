@@ -566,4 +566,21 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
         against.partition(|eq| self.can_derive(eq, limits))
     }
+
+    pub fn print_derive(one: &str, two: &str) {
+        let r1: Ruleset<L> = Ruleset::from_file(one);
+        let r2: Ruleset<L> = Ruleset::from_file(two);
+
+        let (can, cannot) = r1.derive(r2.clone(), Limits::default());
+        println!(
+            "Using {} ({}) to derive {} ({}).\nCan derive {}, cannot derive {}. Missing:",
+            one,
+            r1.len(),
+            two,
+            r2.len(),
+            can.len(),
+            cannot.len()
+        );
+        cannot.pretty_print();
+    }
 }
