@@ -320,9 +320,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline_name: &str,
         domain_name: &str,
         duration: Duration,
+        limits: Limits,
     ) {
-        let limits = Limits::default();
-        
         self.write_json_equiderivability(
             DeriveType::Lhs,
             baseline.clone(),

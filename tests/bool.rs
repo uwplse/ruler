@@ -327,7 +327,10 @@ mod test {
 
         rules.write_json_rules("bool.json");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
-        rules.baseline_compare_to(baseline, "ruler1", "bool", duration);
+        rules.baseline_compare_to(baseline, "ruler1", "bool", duration, Limits {
+            iter: 3,
+            node: 200000,
+        });
     }
 
     #[test]

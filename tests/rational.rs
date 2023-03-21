@@ -537,7 +537,7 @@ pub mod test {
         let mut rules = Ruleset::default();
         let limits = Limits {
             iter: 2,
-            node: 100000,
+            node: 250000,
         };
 
         let vars = Workload::new(["a", "b", "c"]);
@@ -566,7 +566,7 @@ pub mod test {
         rules.extend(rules1);
 
         let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
-        let rules2 = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
+        let rules2 = Math::run_workload(layer2.clone(), rules.clone(), limits);
         rules.extend(rules2);
         rules
     }
@@ -575,7 +575,10 @@ pub mod test {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
-        rules.baseline_compare_to(herbie, "herbie", "rational", duration)
+        rules.baseline_compare_to(herbie, "herbie", "rational", duration, Limits {
+            iter: 2,
+            node: 300000,
+        })
     }
 
     #[test]
@@ -593,6 +596,9 @@ pub mod test {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
-        rules.baseline_compare_to(ruler1, "ruler1", "rational", duration)
+        rules.baseline_compare_to(ruler1, "ruler1", "rational", duration, Limits {
+            iter: 2,
+            node: 150000,
+        })
     }
 }
