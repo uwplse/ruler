@@ -378,15 +378,27 @@ mod test {
         );
         four.to_file("four.txt");
 
-        let (can, cannot) = three.derive(
-            four,
+        let (can, cannot) = three.clone().derive(
+            four.clone(),
             Limits {
                 iter: 10,
                 node: 1000000,
-                derive_type: DeriveType::AllRules,
+                derive_type: DeriveType::LhsAndRhs,
             },
         );
-        assert_eq!(can.len(), 16);
-        assert_eq!(cannot.len(), 7);
+        assert_eq!(can.len(), 12);
+        assert_eq!(cannot.len(), 12);
+
+
+        let (can_four_three, _cannot_four_three) = four.derive(
+            three.clone(),
+            Limits {
+                iter: 10,
+                node: 1000000,
+                derive_type: DeriveType::LhsAndRhs,
+            },
+        );
+
+        assert_eq!(can_four_three.len(), three.0.len());
     }
 }
