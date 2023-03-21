@@ -56,7 +56,7 @@ mod test {
             Limits {
                 iter: 2,
                 node: 300000,
-                derive_type: DeriveType::AllRules
+                derive_type: DeriveType::AllRules,
             },
         );
         all_rules.extend(rules_1.clone());
@@ -71,7 +71,7 @@ mod test {
             Limits {
                 iter: 2,
                 node: 300000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
         all_rules.extend(rules_2.clone());
@@ -94,7 +94,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 200000,
-                derive_type: DeriveType::Lhs
+                derive_type: DeriveType::Lhs,
             },
         );
     }

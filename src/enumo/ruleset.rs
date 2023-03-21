@@ -627,8 +627,6 @@ impl<L: SynthLanguage> Ruleset<L> {
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
     pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
-        against.partition(|eq| {
-            self.can_derive(eq, against.clone(), limits)
-        })
+        against.partition(|eq| self.can_derive(eq, against.clone(), limits))
     }
 }
