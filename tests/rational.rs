@@ -628,7 +628,7 @@ pub mod test {
             baseline.clone(),
             name,
             Limits {
-                iter: 2,
+                iter: 3,
                 node: 300_000,
                 derive_type,
             },
@@ -637,41 +637,15 @@ pub mod test {
     }
 
     #[test]
-    fn rational_herbie_lhs() {
+    fn rational_herbie() {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
         baseline_compare_to(herbie, "herbie", DeriveType::Lhs);
     }
 
     #[test]
-    fn rational_herbie_lhs_and_rhs() {
-        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
-        baseline_compare_to(herbie, "herbie", DeriveType::LhsAndRhs);
-    }
-
-    #[test]
-    fn rational_herbie_all_rules() {
-        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
-        baseline_compare_to(herbie, "herbie", DeriveType::AllRules);
-    }
-
-    #[test]
-    fn rational_ruler1_lhs() {
+    fn rational_ruler1() {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         baseline_compare_to(ruler1, "ruler1", DeriveType::Lhs);
-    }
-
-    #[test]
-    fn rational_ruler1_lhs_and_rhs() {
-        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-
-        baseline_compare_to(ruler1, "ruler1", DeriveType::LhsAndRhs);
-    }
-
-    #[test]
-    fn rational_ruler1_all_rules() {
-        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-
-        baseline_compare_to(ruler1, "ruler1", DeriveType::AllRules);
     }
 }

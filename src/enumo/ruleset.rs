@@ -323,18 +323,21 @@ impl<L: SynthLanguage> Ruleset<L> {
         duration: Duration,
     ) {
         let limits = Limits::default();
+        println!("Lhs derivibility of baseline");
         self.write_json_equiderivability(
             baseline.clone(),
             &format!("{}_{}_lhs.json", baseline_name, domain_name),
             limits,
             duration,
         );
+        println!("Lhs and Rhs derivibility of baseline");
         self.write_json_equiderivability(
             baseline.clone(),
             &format!("{}_{}_lhs_rhs.json", baseline_name, domain_name),
             limits,
             duration,
         );
+        println!("All rules derivibility of baseline");
         self.write_json_equiderivability(
             baseline,
             &format!("{}_{}_allrules.json", baseline_name, domain_name),
@@ -622,7 +625,6 @@ impl<L: SynthLanguage> Ruleset<L> {
     // into derivable / not-derivable with respect to self
     pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
         against.partition(|eq| {
-            println!("Checking if {} can be derived", eq);
             self.can_derive(eq, against.clone(), limits)
         })
     }
