@@ -535,39 +535,75 @@ pub mod test {
 
     pub fn rational_rules() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
-        let limits = Limits {
-            iter: 2,
-            node: 250000,
-        };
+        let limits = Limits::default();
 
-        let vars = Workload::new(["a", "b", "c"]);
-        let consts = Workload::new(["0", "-1", "1"]);
-        let uops = Workload::new(["~", "fabs"]);
-        let bops = Workload::new(["+", "-", "*", "/"]);
-
-        let init_synth = vars.clone().append(consts);
-
-        let layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-            .plug("uop", &uops)
-            .plug("bop", &bops);
-
+        // Contains var filter
         let contains_var_filter = Filter::Or(vec![
             Filter::Contains("a".parse().unwrap()),
             Filter::Contains("b".parse().unwrap()),
             Filter::Contains("c".parse().unwrap()),
         ]);
 
-        let layer1 = layer
-            .clone()
-            .plug("expr", &init_synth)
-            .append(init_synth)
-            .filter(contains_var_filter.clone());
-        let rules1 = Math::run_workload(layer1.clone(), rules.clone(), limits);
-        rules.extend(rules1);
+        // Safe filter
+        let safe_filter = Filter::Invert(Box::new(Filter::Contains("(/ ?x 0)".parse().unwrap())));
 
-        let layer2 = layer.plug("expr", &layer1).filter(contains_var_filter);
-        let rules2 = Math::run_workload(layer2.clone(), rules.clone(), limits);
-        rules.extend(rules2);
+        // Contains abs filter
+        let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
+
+        // The steps:
+        //  [Name]         [Origin]
+        //  layer1         PR #108
+        //  layer2         PR #108
+        //  div            PR #113
+        //  nested fabs    PR #113
+        //
+
+        let vars = Workload::new(["a", "b", "c"]);
+        let consts = Workload::new(["0", "-1", "1"]);
+        let uops = Workload::new(["~", "fabs"]);
+        let bops = Workload::new(["+", "-", "*", "/"]);
+
+        let init_layer = Workload::Append(vec![vars.clone(), consts]);
+        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
+            .plug("uop", &uops)
+            .plug("bop", &bops);
+
+        // Layer 1
+        println!("layer1");
+        let init_layer_with_2 = Workload::Append(vec![init_layer.clone(), Workload::new(["2"])]);
+        let app_layer1 = op_layer.clone().plug("expr", &init_layer_with_2);
+        let layer1 = Workload::Append(vec![app_layer1, init_layer_with_2])
+            .filter(contains_var_filter.clone())
+            .filter(safe_filter.clone());
+
+        let layer1_rules = Math::run_workload(layer1, rules.clone(), limits);
+        rules.extend(layer1_rules);
+
+        // Layer 2
+        println!("layer2");
+        let app_layer1 = op_layer.clone().plug("expr", &init_layer);
+        let layer1 = Workload::Append(vec![app_layer1, init_layer.clone()]);
+        let app_layer2 = op_layer.clone().plug("expr", &layer1);
+        let layer2 = app_layer2
+            .filter(safe_filter.clone())
+            .filter(contains_var_filter.clone());
+
+        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
+        rules.extend(layer2_rules);
+
+        // Div
+        println!("div");
+        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
+        let div_rules = Math::run_workload(div, rules.clone(), limits);
+        rules.extend(div_rules);
+
+        // Nested fabs
+        println!("nested fabs");
+        let layer2_abs = layer2.filter(contains_abs_filter);
+        let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2_abs);
+        let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
+        rules.extend(nested_abs_rules);
+
         rules
     }
 
@@ -575,10 +611,16 @@ pub mod test {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
-        rules.baseline_compare_to(herbie, "herbie", "rational", duration, Limits {
-            iter: 2,
-            node: 300000,
-        })
+        rules.baseline_compare_to(
+            herbie,
+            "herbie",
+            "rational",
+            duration,
+            Limits {
+                iter: 2,
+                node: 300000,
+            },
+        )
     }
 
     #[test]
@@ -596,9 +638,15 @@ pub mod test {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
-        rules.baseline_compare_to(ruler1, "ruler1", "rational", duration, Limits {
-            iter: 2,
-            node: 150000,
-        })
+        rules.baseline_compare_to(
+            ruler1,
+            "ruler1",
+            "rational",
+            duration,
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+        )
     }
 }

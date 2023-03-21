@@ -55,7 +55,7 @@ mod test {
             all_rules.clone(),
             Limits {
                 iter: 2,
-                node: 1_000_000,
+                node: 300000,
             },
         );
         all_rules.extend(rules_1.clone());
@@ -69,7 +69,7 @@ mod test {
             all_rules.clone(),
             Limits {
                 iter: 2,
-                node: 1_000_000,
+                node: 300000,
             },
         );
         all_rules.extend(rules_2.clone());
@@ -84,9 +84,15 @@ mod test {
 
         rules.write_json_rules("bv4.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-        rules.baseline_compare_to(baseline, "ruler1", "bv4", duration, Limits {
-            iter: 3,
-            node: 200000,
-        });
+        rules.baseline_compare_to(
+            baseline,
+            "ruler1",
+            "bv4",
+            duration,
+            Limits {
+                iter: 3,
+                node: 200000,
+            },
+        );
     }
 }

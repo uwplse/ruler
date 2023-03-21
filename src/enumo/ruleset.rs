@@ -336,7 +336,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             limits,
             duration,
         );
-        
+
         self.write_json_equiderivability(
             DeriveType::AllRules,
             baseline,
