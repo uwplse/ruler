@@ -99,17 +99,21 @@ impl Workload {
         }
     }
 
-    fn iter(self, atom: &str, n: usize) -> Self {
-        if n == 0 {
-            Self::Set(vec![])
-        } else {
-            let rec = self.clone().iter(atom, n - 1);
-            self.plug(atom, &rec)
+    pub fn pretty_print(&self) {
+        for t in self.force() {
+            println!("{}", t);
         }
     }
 
     pub fn iter_metric(self, atom: &str, met: Metric, n: usize) -> Self {
-        self.iter(atom, n).filter(Filter::MetricLt(met, n + 1))
+        let mut pegs = self.clone();
+        for i in 1..(n + 1) {
+            pegs = self
+                .clone()
+                .plug(atom, &pegs)
+                .filter(Filter::MetricLt(met, i + 1));
+        }
+        pegs
     }
 
     pub fn iter_lang(
@@ -142,11 +146,7 @@ impl Workload {
             if let Workload::Plug(wkld, name, pegs) = self {
                 Workload::Filter(
                     filter.clone(),
-                    Box::new(Workload::Plug(
-                        wkld,
-                        name,
-                        Box::new(pegs.filter(filter.reduce_monotonic())),
-                    )),
+                    Box::new(Workload::Plug(wkld, name, Box::new(pegs.filter(filter)))),
                 )
             } else {
                 Workload::Filter(filter, Box::new(self))
@@ -226,23 +226,46 @@ mod test {
     use super::*;
 
     #[test]
-    fn iter() {
-        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-        let actual2 = lang.clone().iter("expr", 2).force();
-        assert_eq!(actual2.len(), 8);
-
-        let actual3 = lang.iter("expr", 3).force();
-        assert_eq!(actual3.len(), 74);
-    }
-
-    #[test]
     fn iter_metric() {
         let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-        let actual2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
-        assert_eq!(actual2.len(), 4);
+        let atoms1 = lang.clone().iter_metric("expr", Metric::Atoms, 1).force();
+        assert_eq!(atoms1.len(), 2);
 
-        let actual3 = lang.iter_metric("expr", Metric::Atoms, 3).force();
-        assert_eq!(actual3.len(), 10);
+        let atoms2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
+        assert_eq!(atoms2.len(), 4);
+
+        let atoms3 = lang.clone().iter_metric("expr", Metric::Atoms, 3).force();
+        assert_eq!(atoms3.len(), 10);
+
+        let atoms4 = lang.clone().iter_metric("expr", Metric::Atoms, 4).force();
+        assert_eq!(atoms4.len(), 24);
+
+        let atoms5 = lang.clone().iter_metric("expr", Metric::Atoms, 5).force();
+        assert_eq!(atoms5.len(), 66);
+
+        let atoms6 = lang.clone().iter_metric("expr", Metric::Atoms, 6).force();
+        assert_eq!(atoms6.len(), 188);
+
+        let depth1 = lang.clone().iter_metric("expr", Metric::Depth, 1).force();
+        assert_eq!(depth1.len(), 2);
+
+        let depth2 = lang.clone().iter_metric("expr", Metric::Depth, 2).force();
+        assert_eq!(depth2.len(), 8);
+
+        let depth3 = lang.clone().iter_metric("expr", Metric::Depth, 3).force();
+        assert_eq!(depth3.len(), 74);
+
+        let depth4 = lang.clone().iter_metric("expr", Metric::Depth, 4).force();
+        assert_eq!(depth4.len(), 5552);
+
+        let lists1 = lang.clone().iter_metric("expr", Metric::Lists, 1).force();
+        assert_eq!(lists1.len(), 8);
+
+        let lists2 = lang.clone().iter_metric("expr", Metric::Lists, 2).force();
+        assert_eq!(lists2.len(), 38);
+
+        let lists3 = lang.clone().iter_metric("expr", Metric::Lists, 3).force();
+        assert_eq!(lists3.len(), 224);
     }
 
     #[test]
@@ -260,7 +283,6 @@ mod test {
             "(top expr expr expr)",
         ]);
         let three = extended.clone().iter_metric("expr", Metric::Atoms, 3);
-        println!("{:?}", three);
         assert_eq!(three.force().len(), 10);
 
         let four = extended.clone().iter_metric("expr", Metric::Atoms, 4);
@@ -280,7 +302,7 @@ mod test {
         let plugged = wkld
             .plug("x", &pegs)
             .filter(Filter::MetricLt(Metric::Atoms, 2));
-        assert_eq!(plugged.force().len(), 2);
+        assert_eq!(plugged.force().len(), 3);
     }
 
     #[test]
