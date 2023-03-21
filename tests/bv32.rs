@@ -55,7 +55,7 @@ mod test {
             all_rules.clone(),
             Limits {
                 iter: 2,
-                node: 1_000_000,
+                node: 300000,
             },
         );
         all_rules.extend(rules_1.clone());
@@ -69,7 +69,7 @@ mod test {
             all_rules.clone(),
             Limits {
                 iter: 2,
-                node: 1_000_000,
+                node: 300000,
             },
         );
         all_rules.extend(rules_2.clone());

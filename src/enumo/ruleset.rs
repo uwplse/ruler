@@ -380,7 +380,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        candidates.to_file("candidates.txt");
         candidates
     }
 
@@ -456,7 +455,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        candidates.to_file("candidates.txt");
         candidates
     }
 
@@ -488,7 +486,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        candidates.to_file("candidates.txt");
         candidates
     }
 
