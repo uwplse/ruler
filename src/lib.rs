@@ -87,7 +87,7 @@ impl Limits {
         Self {
             iter: usize::MAX,
             node: usize::MAX,
-            derive_type: DeriveType::Lhs,
+            derive_type: DeriveType::AllRules,
         }
     }
 }

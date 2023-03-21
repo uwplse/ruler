@@ -365,7 +365,7 @@ mod test {
             Limits {
                 iter: 4,
                 node: 1000000,
-                derive_type: DeriveType::Lhs,
+                derive_type: DeriveType::AllRules,
             },
         );
         three.to_file("three.txt");
@@ -376,7 +376,7 @@ mod test {
             Limits {
                 iter: 4,
                 node: 1000000,
-                derive_type: DeriveType::Lhs,
+                derive_type: DeriveType::AllRules,
             },
         );
         four.to_file("four.txt");
@@ -386,10 +386,10 @@ mod test {
             Limits {
                 iter: 10,
                 node: 1000000,
-                derive_type: DeriveType::Lhs,
+                derive_type: DeriveType::AllRules,
             },
         );
-        //assert_eq!(can.len(), 16);
-        //assert_eq!(cannot.len(), 7);
+        assert_eq!(can.len(), 16);
+        assert_eq!(cannot.len(), 7);
     }
 }
