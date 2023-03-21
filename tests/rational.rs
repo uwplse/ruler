@@ -539,7 +539,6 @@ pub mod test {
 
     pub fn rational_rules() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
-        let mut limits = Limits::default();
 
         // Contains var filter
         let contains_var_filter = Filter::Or(vec![
@@ -580,7 +579,13 @@ pub mod test {
             .filter(contains_var_filter.clone())
             .filter(safe_filter.clone());
 
-        let layer1_rules = Math::run_workload(layer1, rules.clone(), limits);
+        let layer1_rules = Math::run_workload(layer1, rules.clone(), 
+            Limits {
+                iter: 3,
+                node: 300_000,
+                derive_type: DeriveType::Lhs,
+            }
+        );
         rules.extend(layer1_rules);
 
         // Layer 2
@@ -592,21 +597,33 @@ pub mod test {
             .filter(safe_filter.clone())
             .filter(contains_var_filter.clone());
 
-        limits.derive_type = DeriveType::AllRules;
-        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
+        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(),  Limits {
+            iter: 3,
+            node: 300_000,
+            derive_type: DeriveType::AllRules,
+        });
         rules.extend(layer2_rules);
 
         // Div
         println!("div");
         let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-        let div_rules = Math::run_workload(div, rules.clone(), limits);
+        let div_rules = Math::run_workload(div, rules.clone(), 
+        Limits {
+            iter: 3,
+            node: 300_000,
+            derive_type: DeriveType::AllRules,
+        });
         rules.extend(div_rules);
 
         // Nested fabs
         println!("nested fabs");
         let layer2_abs = layer2.filter(contains_abs_filter);
         let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2_abs);
-        let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
+        let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), Limits {
+            iter: 3,
+            node: 300_000,
+            derive_type: DeriveType::AllRules,
+        });
         rules.extend(nested_abs_rules);
 
         rules
