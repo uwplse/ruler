@@ -646,14 +646,7 @@ pub mod test {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
-        rules.baseline_compare_to(
-            herbie,
-            "herbie",
-            "rational",
-            duration,
-            2,
-            300_000
-        )
+        rules.baseline_compare_to(herbie, "herbie", "rational", duration, 2, 300_000)
     }
 
     #[test]
@@ -671,13 +664,6 @@ pub mod test {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
-        rules.baseline_compare_to(
-            ruler1,
-            "ruler1",
-            "rational",
-            duration,
-            2,
-            150_000
-        )
+        rules.baseline_compare_to(ruler1, "ruler1", "rational", duration, 2, 150_000)
     }
 }

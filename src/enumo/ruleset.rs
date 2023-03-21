@@ -322,7 +322,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         domain_name: &str,
         duration: Duration,
         iter_limit: usize,
-        node_limit: usize
+        node_limit: usize,
     ) {
         let mut limits = Limits {
             iter: iter_limit,

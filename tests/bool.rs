@@ -327,14 +327,7 @@ mod test {
 
         rules.write_json_rules("bool.json");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
-        rules.baseline_compare_to(
-            baseline,
-            "ruler1",
-            "bool",
-            duration,
-            3,
-            200_000
-        );
+        rules.baseline_compare_to(baseline, "ruler1", "bool", duration, 3, 200_000);
     }
 
     #[test]
@@ -388,7 +381,6 @@ mod test {
         );
         assert_eq!(can.len(), 12);
         assert_eq!(cannot.len(), 12);
-
 
         let (can_four_three, _cannot_four_three) = four.derive(
             three.clone(),
