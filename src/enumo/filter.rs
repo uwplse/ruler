@@ -31,6 +31,13 @@ impl Filter {
     pub(crate) fn is_monotonic(&self) -> bool {
         matches!(self, Filter::MetricLt(_, _))
     }
+
+    pub(crate) fn reduce_monotonic(&self) -> Self {
+        match self {
+            Filter::MetricLt(m, n) => Filter::MetricLt(*m, n - 1),
+            _ => self.clone(),
+        }
+    }
 }
 
 #[cfg(test)]

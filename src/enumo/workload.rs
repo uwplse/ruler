@@ -142,7 +142,11 @@ impl Workload {
             if let Workload::Plug(wkld, name, pegs) = self {
                 Workload::Filter(
                     filter.clone(),
-                    Box::new(Workload::Plug(wkld, name, Box::new(pegs.filter(filter)))),
+                    Box::new(Workload::Plug(
+                        wkld,
+                        name,
+                        Box::new(pegs.filter(filter.reduce_monotonic())),
+                    )),
                 )
             } else {
                 Workload::Filter(filter, Box::new(self))
@@ -247,6 +251,26 @@ mod test {
         let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let six = lang.iter_metric("expr", Metric::Atoms, 6);
         assert_eq!(six.force().len(), 188);
+
+        let extended = Workload::new([
+            "cnst",
+            "var",
+            "(uop expr)",
+            "(bop expr expr)",
+            "(top expr expr expr)",
+        ]);
+        let three = extended.clone().iter_metric("expr", Metric::Atoms, 3);
+        println!("{:?}", three);
+        assert_eq!(three.force().len(), 10);
+
+        let four = extended.clone().iter_metric("expr", Metric::Atoms, 4);
+        assert_eq!(four.force().len(), 32);
+
+        let five = extended.clone().iter_metric("expr", Metric::Atoms, 5);
+        assert_eq!(five.force().len(), 106);
+
+        let six = extended.clone().iter_metric("expr", Metric::Atoms, 6);
+        assert_eq!(six.force().len(), 388);
     }
 
     #[test]
