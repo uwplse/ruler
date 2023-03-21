@@ -321,9 +321,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline_name: &str,
         domain_name: &str,
         duration: Duration,
-        mut limits: Limits,
+        iter_limit: usize,
+        node_limit: usize
     ) {
-        limits.derive_type = DeriveType::Lhs;
+        let mut limits = Limits {
+            iter: iter_limit,
+            node: node_limit,
+            derive_type: DeriveType::Lhs,
+        };
 
         println!("Calculating lhs derivability of baseline");
         self.write_json_equiderivability(

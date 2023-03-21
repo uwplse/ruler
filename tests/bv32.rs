@@ -91,11 +91,8 @@ mod test {
             "ruler1",
             "bv32",
             duration,
-            Limits {
-                iter: 3,
-                node: 200000,
-                derive_type: DeriveType::Lhs,
-            },
+            3,
+            200_000
         );
     }
 }

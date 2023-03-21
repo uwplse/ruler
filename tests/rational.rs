@@ -651,11 +651,8 @@ pub mod test {
             "herbie",
             "rational",
             duration,
-            Limits {
-                iter: 2,
-                node: 300000,
-                derive_type: DeriveType::Lhs,
-            },
+            2,
+            300_000
         )
     }
 
@@ -679,11 +676,8 @@ pub mod test {
             "ruler1",
             "rational",
             duration,
-            Limits {
-                iter: 2,
-                node: 150000,
-                derive_type: DeriveType::Lhs,
-            },
+            2,
+            150_000
         )
     }
 }
