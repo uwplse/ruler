@@ -321,23 +321,29 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline_name: &str,
         domain_name: &str,
         duration: Duration,
+        mut limits: Limits,
     ) {
-        let limits = Limits::default();
-        println!("Lhs derivibility of baseline");
+        limits.derive_type = DeriveType::Lhs;
+
+        println!("Calculating lhs derivability of baseline");
         self.write_json_equiderivability(
             baseline.clone(),
             &format!("{}_{}_lhs.json", baseline_name, domain_name),
             limits,
             duration,
         );
-        println!("Lhs and Rhs derivibility of baseline");
+
+        limits.derive_type = DeriveType::LhsAndRhs;
+        println!("Calculating lhs and rhs derivability of baseline");
         self.write_json_equiderivability(
             baseline.clone(),
             &format!("{}_{}_lhs_rhs.json", baseline_name, domain_name),
             limits,
             duration,
         );
-        println!("All rules derivibility of baseline");
+
+        limits.derive_type = DeriveType::AllRules;
+        println!("Calculating all rules derivability of baseline");
         self.write_json_equiderivability(
             baseline,
             &format!("{}_{}_allrules.json", baseline_name, domain_name),
@@ -380,7 +386,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        candidates.to_file("candidates.txt");
         candidates
     }
 
@@ -456,7 +461,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        candidates.to_file("candidates.txt");
         candidates
     }
 
@@ -488,7 +492,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        candidates.to_file("candidates.txt");
         candidates
     }
 

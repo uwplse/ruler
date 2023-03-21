@@ -611,29 +611,20 @@ pub mod test {
         rules
     }
 
-    fn baseline_compare_to(baseline: Ruleset<Math>, baseline_name: &str, derive_type: DeriveType) {
-        let start = Instant::now();
-        let rules = rational_rules(Limits {
-            iter: 2,
-            node: 300_000,
-            derive_type,
-        });
-        eprintln!("finished rules");
-        let duration = start.elapsed();
+    fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
+        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
-        let name = &format!("{}_rational_{}.json", baseline_name, derive_type);
-        rules.write_json_rules(name);
-
-        rules.write_json_equiderivability(
-            baseline.clone(),
-            name,
-            Limits {
-                iter: 3,
-                node: 300_000,
-                derive_type,
-            },
+        println!("Comparing rational to herbie...");
+        rules.baseline_compare_to(
+            herbie,
+            "herbie",
+            "rational",
             duration,
-        );
+            Limits {
+                iter: 2,
+                node: 300000,
+            },
+        )
     }
 
     #[test]
@@ -646,6 +637,16 @@ pub mod test {
     fn rational_ruler1() {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
-        baseline_compare_to(ruler1, "ruler1", DeriveType::Lhs);
+        println!("Comparing rational to ruler1...");
+        rules.baseline_compare_to(
+            ruler1,
+            "ruler1",
+            "rational",
+            duration,
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+        )
     }
 }
