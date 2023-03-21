@@ -147,7 +147,7 @@ impl Workload {
         bops: &Workload,
     ) -> Self {
         self.plug("var", vars)
-            .plug("const", &consts)
+            .plug("const", consts)
             .plug("uop", uops)
             .plug("bop", bops)
     }
