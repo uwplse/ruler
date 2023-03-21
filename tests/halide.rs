@@ -15,8 +15,6 @@ egg::define_language! {
     Lit(Constant),
     "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
-    ">" = Gt([Id;2]),
-    ">=" = Geq([Id;2]),
     "==" = Eq([Id;2]),
     "!=" = Neq([Id;2]),
     "->" = Implies([Id; 2]),
@@ -52,12 +50,6 @@ impl SynthLanguage for Pred {
             }
             Pred::Leq([x, y]) => {
                 map!(get_cvec, x, y => if x <= y {Some(one.clone())} else {Some(zero.clone())})
-            }
-            Pred::Gt([x, y]) => {
-                map!(get_cvec, x, y => if x > y {Some(one.clone())} else {Some(zero.clone())})
-            }
-            Pred::Geq([x, y]) => {
-                map!(get_cvec, x, y => if x >= y {Some(one.clone())} else {Some(zero.clone())})
             }
             Pred::Eq([x, y]) => {
                 map!(get_cvec, x, y => if x == y {Some(one.clone())} else {Some(zero.clone())})
@@ -186,16 +178,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
                 buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), &one, &zero))
-            }
-            Pred::Gt([x, y]) => {
-                let l = &buf[usize::from(*x)];
-                let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::gt(l, r), &one, &zero))
-            }
-            Pred::Geq([x, y]) => {
-                let l = &buf[usize::from(*x)];
-                let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::ge(l, r), &one, &zero))
             }
             Pred::Eq([x, y]) => {
                 let l = &buf[usize::from(*x)];
