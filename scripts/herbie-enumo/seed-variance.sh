@@ -71,7 +71,10 @@ function run {
   rm -rf "$outdir/$name"
   racket -y "$HERBIE/src/herbie.rkt" report \
     --note "$name" \
-    "$@" \
+    --profile \
+    --seed "$seed" \
+    --threads "$THREADS" \
+    $HERBIE_FLAGS \
     "$bench" "$outdir/$name" \
     || echo "failed"
 }
@@ -94,11 +97,7 @@ function do_seed {
   dirs=""
   for bench in $BENCH/*; do
     name=$(basename "$bench" .fpcore)
-    run "$bench" "$name" "$seed_output" \
-      --profile \
-      --seed "$seed" \
-      --threads "$THREADS" \
-      $HERBIE_FLAGS
+    run "$bench" "$name" "$seed_output"
 
     if [ "$?" -eq 0 ]; then
       dirs="$dirs $name";

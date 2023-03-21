@@ -16,9 +16,14 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 # Constants
 HERBIE_DIR="$MYDIR/herbie"
 BENCH_DIR="$MYDIR/bench"
-NUM_SEEDS=1
 THREADS=4
 GROUP="main"
+
+if [ -z "$NUM_SEEDS" ]; then
+  NUM_SEEDS=1
+fi
+
+echo "Running with $NUM_SEEDS seeds"
 
 # Output
 tstamp="$(date "+%Y-%m-%d_%H%M")"
@@ -31,13 +36,13 @@ BUILD_DIR=$HERBIE_DIR bash install.sh
 mkdir -p $BENCH_DIR
 cp -r "$HERBIE_DIR/bench/hamming" "$BENCH_DIR/"
 
-# cp -r "$HERBIE_DIR/bench/hamming" \
-#       "$HERBIE_DIR/bench/mathematics" \
-#       "$HERBIE_DIR/bench/numerics" \
-#       "$HERBIE_DIR/bench/physics" \
-#       "$HERBIE_DIR/bench/pbrt.fpcore" \
-#       "$BENCH_DIR/"
+cp -r "$HERBIE_DIR/bench/hamming" \
+      "$HERBIE_DIR/bench/mathematics" \
+      "$HERBIE_DIR/bench/numerics" \
+      "$HERBIE_DIR/bench/physics" \
+      "$BENCH_DIR/"
 
+#       "$HERBIE_DIR/bench/pbrt.fpcore" \
       # "$HERBIE_DIR/bench/libraries" \
 
 # Run the branches!!!
@@ -47,8 +52,16 @@ function do_branch {
   name="$1"; shift
   flags="$@"
 
+  # Checkout and build
   pushd $HERBIE_DIR
+  git checkout "$HERBIE_DIR/src/syntax/rules.rkt"
   git checkout $branch
+
+  # Required patch
+  if [[ "$name" == "no-rules" ]]; then
+    cp "$MYDIR/empty-rules.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
+  fi
+
   make install
   popd
 

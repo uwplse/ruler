@@ -23,7 +23,7 @@ if field == "time":
         pairs[k] = new_times
 
 ho = ('Herbie', pairs['main'])
-ro = ('SlideRule', pairs['enumo'])
+ro = ('Enumo', pairs['enumo'])
 hr = ('Ruler', pairs['ruler'])
 nr = ('None', pairs['no-rules'])
 listify = [ho, ro, hr, nr]
@@ -40,13 +40,13 @@ ax.boxplot(vals)
 # manually set before deadline
 if str(field) == "output_parens":
     yname = "AST Size"
-    ax.set_ylim([0, 1000])
+    ax.set_ylim([0, 4000])
 elif str(field) == "time":
     yname = "Time (s)"
-    ax.set_ylim([0, 1000])
+    ax.set_ylim([0, 6000])
 elif str(field) == "avg_bits_err_improve":
     yname = "Average bits of error improved"
-    ax.set_ylim([0, 1000])
+    ax.set_ylim([0, 4000])
 else:
     yname = str(field)
     ax.set_ylim(bottom=0)
