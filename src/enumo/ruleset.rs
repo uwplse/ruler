@@ -229,7 +229,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     // and statistics about runtime and the number of rules in each ruleset.
     pub fn write_json_equiderivability(
         &self,
-        baseline: Self,
+        baseline: &Self,
         name: &str,
         limits: Limits,
         duration: Duration,
@@ -243,9 +243,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        let (can_f, cannot_f) = self.derive(baseline.clone(), limits);
+        let (can_f, cannot_f) = self.derive(&baseline, limits);
 
-        let (can_b, cannot_b) = baseline.derive(self.clone(), limits);
+        let (can_b, cannot_b) = baseline.derive(&self, limits);
 
         let derivability_results = json!({
             "forwards derivable": &can_f.to_str_vec(),
@@ -563,7 +563,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
-    pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
+    pub fn derive(&self, against: &Self, limits: Limits) -> (Self, Self) {
         against.partition(|eq| self.can_derive(eq, limits))
     }
 
@@ -571,7 +571,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let r1: Ruleset<L> = Ruleset::from_file(one);
         let r2: Ruleset<L> = Ruleset::from_file(two);
 
-        let (can, cannot) = r1.derive(r2.clone(), Limits::default());
+        let (can, cannot) = r1.derive(&r2, Limits::default());
         println!(
             "Using {} ({}) to derive {} ({}).\nCan derive {}, cannot derive {}. Missing:",
             one,

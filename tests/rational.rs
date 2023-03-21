@@ -619,9 +619,19 @@ pub mod test {
         rules.write_json_rules("rational.json");
 
         let ruler1_baseline: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-        rules.write_json_equiderivability(ruler1_baseline, "rational.json", limits, duration);
+        rules.write_json_equiderivability(&ruler1_baseline, "rational.json", limits, duration);
+
+        let start = Instant::now();
+        let best_recipe: Ruleset<Math> = best_enumo_recipe();
+        let duration = start.elapsed();
+        best_recipe.write_json_equiderivability(
+            &ruler1_baseline,
+            "rational_best.json",
+            limits,
+            duration,
+        );
 
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
-        rules.write_json_equiderivability(herbie, "herbie.json", limits, duration);
+        rules.write_json_equiderivability(&herbie, "herbie.json", limits, duration);
     }
 }

@@ -81,7 +81,7 @@ mod test {
 
         all_rules.write_json_rules("bv4.json");
         all_rules.write_json_equiderivability(
-            baseline.clone(),
+            &baseline,
             "bv4.json",
             Limits {
                 iter: 3,
