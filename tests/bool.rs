@@ -335,6 +335,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 200000,
+                derive_type: DeriveType::Lhs,
             },
         );
     }

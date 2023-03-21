@@ -67,7 +67,7 @@ impl Default for Limits {
         Self {
             iter: 3,
             node: 300_000,
-            derive_type: DeriveType::Lhs,
+            derive_type: DeriveType::AllRules,
         }
     }
 }

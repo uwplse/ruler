@@ -537,9 +537,9 @@ pub mod test {
         );
     }
 
-    pub fn rational_rules(limits: Limits) -> Ruleset<Math> {
+    pub fn rational_rules() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
-        let limits = Limits::default();
+        let mut limits = Limits::default();
 
         // Contains var filter
         let contains_var_filter = Filter::Or(vec![
@@ -592,6 +592,7 @@ pub mod test {
             .filter(safe_filter.clone())
             .filter(contains_var_filter.clone());
 
+        limits.derive_type = DeriveType::AllRules;
         let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
         rules.extend(layer2_rules);
 
@@ -623,18 +624,23 @@ pub mod test {
             Limits {
                 iter: 2,
                 node: 300000,
+                derive_type: DeriveType::Lhs
             },
         )
     }
 
     #[test]
-    fn rational_herbie() {
-        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
-        baseline_compare_to(herbie, "herbie", DeriveType::Lhs);
+    fn run_all() {
+        let start = Instant::now();
+        let rules = rational_rules();
+        let duration = start.elapsed();
+
+        rules.write_json_rules("rational.json");
+        test_against_ruler1(rules.clone(), duration);
+        test_against_herbie(rules.clone(), duration);
     }
 
-    #[test]
-    fn rational_ruler1() {
+    fn test_against_ruler1(rules: Ruleset<Math>, duration: Duration) {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
@@ -646,6 +652,7 @@ pub mod test {
             Limits {
                 iter: 2,
                 node: 150000,
+                derive_type: DeriveType::Lhs
             },
         )
     }
