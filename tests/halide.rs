@@ -346,6 +346,7 @@ mod test {
         uops: &Workload,
         bops: &Workload,
         tops: &Workload,
+        prior: Ruleset<Pred>,
     ) -> Ruleset<Pred> {
         let lang = Workload::new(&[
             "const",
@@ -357,7 +358,8 @@ mod test {
         if n < 1 {
             Ruleset::default()
         } else {
-            let prior = recursive_rules(metric, n - 1, consts, vars, uops, bops, tops);
+            let mut rec =
+                recursive_rules(metric, n - 1, consts, vars, uops, bops, tops, prior.clone());
             let wkld = lang
                 .iter_metric("expr", metric, n)
                 .filter(Filter::Contains("var".parse().unwrap()))
@@ -366,9 +368,10 @@ mod test {
                 .plug("uop", uops)
                 .plug("bop", bops)
                 .plug("top", tops);
-            let new = Pred::run_workload(wkld, prior.clone(), Limits::default());
+            rec.extend(prior);
+            let new = Pred::run_workload(wkld, rec.clone(), Limits::default());
             let mut all = new;
-            all.extend(prior);
+            all.extend(rec);
             all
         }
     }
@@ -381,16 +384,20 @@ mod test {
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
 
+        let mut all_rules = Ruleset::default();
+
         // Bool rules up to size 5:
         let bool_only = recursive_rules(
             Metric::Atoms,
             5,
-            &Workload::new(&["true", "false"]),
+            &Workload::new(&["0", "1"]),
             &Workload::new(&["a", "b", "c"]),
             &Workload::new(&["!"]),
             &Workload::new(&["&&", "||", "^"]),
             &Workload::Set(vec![]),
+            all_rules.clone(),
         );
+        all_rules.extend(bool_only);
 
         // Rational rules up to size 5:
         let rat_only = recursive_rules(
@@ -401,7 +408,9 @@ mod test {
             &Workload::new(&["-"]),
             &Workload::new(&["+", "-", "*", "min", "max"]), // No div for now
             &Workload::Set(vec![]),
+            all_rules.clone(),
         );
+        all_rules.extend(rat_only);
 
         // Pred rules up to size 5
         let pred_only = recursive_rules(
@@ -412,14 +421,29 @@ mod test {
             &Workload::new(&[""]),
             &Workload::new(&["<", "<=", "==", "!="]),
             &Workload::new(&["select"]),
+            all_rules.clone(),
         );
-
-        let mut all_rules = Ruleset::default();
-        all_rules.extend(bool_only);
-        all_rules.extend(rat_only);
         all_rules.extend(pred_only);
 
+        // All terms up to size 4
+        let full = recursive_rules(
+            Metric::Atoms,
+            4,
+            &Workload::new(&["-1", "0", "1"]),
+            &Workload::new(&["a", "b", "c"]),
+            &Workload::new(&["-", "!"]),
+            &Workload::new(&[
+                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+            ]),
+            &Workload::new(&["select"]),
+            all_rules.clone(),
+        );
+        all_rules.extend(full);
+
         let duration = start.elapsed();
+
+        // let (can, cannot) = all_rules.derive(baseline, Limits::default());
+        // println!("{} / {}", can.len(), can.len() + cannot.len());
 
         all_rules.write_json_rules("halide.json");
         all_rules.write_json_equiderivability(baseline, "halide.json", Limits::default(), duration);
