@@ -274,6 +274,16 @@ mod test {
     }
 
     #[test]
+    fn filter_optimization() {
+        let wkld = Workload::new(["x"]);
+        let pegs = Workload::new(["a", "b", "c"]);
+        let plugged = wkld
+            .plug("x", &pegs)
+            .filter(Filter::MetricLt(Metric::Atoms, 2));
+        assert_eq!(plugged.force().len(), 2);
+    }
+
+    #[test]
     fn contains() {
         let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
 
