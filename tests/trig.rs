@@ -481,7 +481,7 @@ mod test {
         let app = Workload::new(["(op v)"]);
         let shift = Workload::new(["x", "(- 1 x)", "(+ 1 x)"]);
         let scale_down = Workload::new(["x", "(/ x 2)"]);
-        let scale_up = Workload::new(["x", "(* x 2)", "(* x -2)"]);
+        // let scale_up = Workload::new(["x", "(* x 2)", "(* x -2)"]);
         let consts = Workload::new(["-2", "-1", "0", "1", "2"]);
 
         let simple = app.clone().plug("op", &t_ops).plug(
@@ -493,13 +493,13 @@ mod test {
             .plug("x", &app)
             .plug("op", &t_ops)
             .plug("v", &Workload::new(["a"]));
-        let one_var = app
-            .clone()
-            .plug("op", &t_ops)
-            .plug("v", &Workload::new(["a"]));
-        let prod_one_var = Workload::new(["(* x y)"])
-            .plug("x", &one_var)
-            .plug("y", &one_var);
+        // let one_var = app
+        //     .clone()
+        //     .plug("op", &t_ops)
+        //     .plug("v", &Workload::new(["a"]));
+        // let prod_one_var = Workload::new(["(* x y)"])
+        //     .plug("x", &one_var)
+        //     .plug("y", &one_var);
 
         let two_var = app
             .clone()
@@ -519,15 +519,15 @@ mod test {
             .filter(two_x_filter)
             .filter(trivial_trig_filter);
 
-        let sum_of_squares = Workload::new(["(+ x y)", "(- x y)"])
-            .plug("x", &trivial_squares)
-            .plug("y", &trivial_squares);
+        // let sum_of_squares = Workload::new(["(+ x y)", "(- x y)"])
+        //     .plug("x", &trivial_squares)
+        //     .plug("y", &trivial_squares);
 
         let shifted_simple = shift.clone().plug("x", &simple);
         let sum_and_prod = Workload::Append(vec![sum_two_vars.clone(), prod_two_vars.clone()]);
         let shifted_simple_sqrs = Workload::Append(vec![shifted_simple, trivial_squares]);
         let scaled_shifted_sqrs = scale_down.clone().plug("x", &shifted_simple_sqrs);
-        let scaled_prod_one_var = scale_up.clone().plug("x", &prod_one_var);
+        // let scaled_prod_one_var = scale_up.clone().plug("x", &prod_one_var);
         let scaled_sum_prod = scale_down.clone().plug("x", &sum_and_prod);
 
         let two_var_no_sub = two_var.clone().filter(trig_no_sub_filter);
@@ -557,15 +557,15 @@ mod test {
         new.extend(rules4.clone());
 
         // Double angle
-        let wkld5 = Workload::Append(vec![
-            wkld1,
-            scaled_prod_one_var,
-            sum_of_squares,
-            consts.clone(),
-        ]);
-        let rules5 = Trig::run_workload(wkld5.clone(), all.clone(), limits);
-        all.extend(rules5.clone());
-        new.extend(rules5.clone());
+        // let wkld5 = Workload::Append(vec![
+        //     wkld1,
+        //     scaled_prod_one_var,
+        //     sum_of_squares,
+        //     consts.clone(),
+        // ]);
+        // let rules5 = Trig::run_workload(wkld5.clone(), all.clone(), limits);
+        // all.extend(rules5.clone());
+        // new.extend(rules5.clone());
 
         new
     }
