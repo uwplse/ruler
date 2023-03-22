@@ -61,6 +61,7 @@ function run {
   bench="$1"; shift
   name="$1"; shift
   outdir="$1"; shift
+  args="$HERBIE_FLAGS"
 
   if [ -z "${args}" ]; then
     echo "Running tests in '$name' with default flags"
@@ -74,9 +75,9 @@ function run {
     --profile \
     --seed "$seed" \
     --threads "$THREADS" \
-    $HERBIE_FLAGS \
-    "$bench" "$outdir/$name" \
-    || echo "failed"
+    $args \
+    $bench \
+    "$outdir/$name"
 }
 
 #

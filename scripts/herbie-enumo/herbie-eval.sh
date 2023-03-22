@@ -40,10 +40,10 @@ cp -r "$HERBIE_DIR/bench/hamming" \
       "$HERBIE_DIR/bench/mathematics" \
       "$HERBIE_DIR/bench/numerics" \
       "$HERBIE_DIR/bench/physics" \
+      "$HERBIE_DIR/bench/pbrt.fpcore" \
       "$BENCH_DIR/"
 
-#       "$HERBIE_DIR/bench/pbrt.fpcore" \
-      # "$HERBIE_DIR/bench/libraries" \
+# "$HERBIE_DIR/bench/libraries" \
 
 # Run the branches!!!
 
@@ -57,9 +57,17 @@ function do_branch {
   git checkout "$HERBIE_DIR/src/syntax/rules.rkt"
   git checkout $branch
 
-  # Required patch
+  # Patch bug where rules cannot be disabled
+  if [[ "$flags" == *"-o rules:numerics"* ]]; then
+    cp "$MYDIR/no-numerics.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
+  fi
   if [[ "$name" == "no-rules" ]]; then
     cp "$MYDIR/empty-rules.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
+  fi
+
+  # In case of broken nightlies, target different branch
+  if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" ]]; then
+    sed -i 's/main/halide/g' "$HERBIE_DIR/src/syntax/rules.rkt"
   fi
 
   make install
@@ -83,9 +91,14 @@ function do_branch {
 
 if [ -z "$NO_RUN" ]; then
   do_branch main main
-  do_branch main no-rules -o generate:rr -o generate:simplify
+  do_branch main main-n -o rules:numerics
+  do_branch main main-t -o generate:taylor
+  do_branch main main-n-t -o rules:numerics -o generate:taylor
   do_branch using-ruler-nightlies enumo
+  do_branch using-ruler-nightlies enumo-t -o generate:taylor
   do_branch using-ruler-baseline ruler
+  do_branch using-ruler-baseline ruler-t -o generate:taylor
+  do_branch main no-rules -o generate:rr -o generate:simplify
 fi
 
 # Plots

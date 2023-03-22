@@ -19,13 +19,11 @@ else
   OUTPUT_DIR="$1"
 fi
 
+JSONS=$(find $OUTPUT_DIR -maxdepth 2 -name all.json)
+# echo $JSONS
+
 # make unified all_all.json with all.json from all configs
-jq -s . \
-    $OUTPUT_DIR/main/all.json      \
-    $OUTPUT_DIR/enumo/all.json     \
-    $OUTPUT_DIR/ruler/all.json     \
-    $OUTPUT_DIR/no-rules/all.json  \
-    > $OUTPUT_DIR/all-all.json
+jq -s . $JSONS > $OUTPUT_DIR/all-all.json
 
 pushd "$OUTPUT_DIR"
 
@@ -35,15 +33,15 @@ mv all-all.json.tmp all-all.json
 # first group by test, then by seed within each test
 jq 'group_by(.test) | [ .[] | group_by(.seed) ]' all-all.json > by_test_then_seed.json
 
-# if length of this test-seed is 4, that means all configs succeeded
+# if length of this test-seed is 9, that means all configs succeeded
 # keep it
-jq '[ .[] | .[] | select(length == 4) ]' by_test_then_seed.json > all-good.json
+jq '[ .[] | .[] | select(length == 9) ]' by_test_then_seed.json > all-good.json
 jq 'flatten' all-good.json > all-good.json.tmp
 mv all-good.json.tmp all-good.json
 
-# if length is not 4 that means this test-seed did not succeed for all configs
+# if length is not 9 that means this test-seed did not succeed for all configs
 # discard
-jq '[ .[] | .[] | select(length != 4) ]' by_test_then_seed.json > all-bad.json
+jq '[ .[] | .[] | select(length != 9) ]' by_test_then_seed.json > all-bad.json
 jq 'flatten' all-bad.json > all-bad.json.tmp
 mv all-bad.json.tmp all-bad.json
 

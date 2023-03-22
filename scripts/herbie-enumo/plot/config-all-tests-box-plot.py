@@ -22,11 +22,22 @@ if field == "time":
             new_times.append(float(t) / 1000.0)
         pairs[k] = new_times
 
-ho = ('Herbie', pairs['main'])
-ro = ('Enumo', pairs['enumo'])
-hr = ('Ruler', pairs['ruler'])
-nr = ('None', pairs['no-rules'])
-listify = [ho, ro, hr, nr]
+# ho = ('Herbie', pairs['main'])
+# ro = ('Enumo', pairs['enumo'])
+# hr = ('Ruler', pairs['ruler'])
+# nr = ('None', pairs['no-rules'])
+# listify = [ho, ro, hr, nr]
+
+h = ('H', pairs['main'])
+hn = ('H[-N]', pairs['main-n'])
+ht = ('H[-T]', pairs['main-t'])
+hnt = ('H[-NT]', pairs['main-n-t'])
+e = ('E', pairs['enumo'])
+et = ('E[-T]', pairs['enumo-t'])
+r = ('R', pairs['ruler'])
+rt = ('R[-T]', pairs['ruler-t'])
+n = ('N', pairs['no-rules'])
+listify = [h, hn, ht, hnt, e, et, r, rt, n]
 
 labs = []
 vals = []
@@ -34,13 +45,13 @@ for c, ds in listify:
     labs.append(c)
     vals.append(ds)
 
-fig, ax = plt.subplots(figsize=(3, 5))
+fig, ax = plt.subplots(figsize=(6, 10))
 ax.boxplot(vals)
 
 # manually set before deadline
 if str(field) == "output_parens":
     yname = "AST Size"
-    ax.set_ylim([0, 4000])
+    ax.set_ylim([0, 5000])
 elif str(field) == "time":
     yname = "Time (s)"
     ax.set_ylim([0, 6000])
@@ -59,3 +70,4 @@ ax.set_xticklabels(labs)
 
 plt.tight_layout()
 plt.savefig('by-config-all-tests-{}-boxplot.pdf'.format(field))
+plt.savefig('by-config-all-tests-{}-boxplot.png'.format(field))
