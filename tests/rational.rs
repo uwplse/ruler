@@ -612,14 +612,14 @@ pub mod test {
         rules
     }
 
-    fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
+    fn test_against_herbie(rules: &Ruleset<Math>, name: &str, duration: Duration) {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
         rules.baseline_compare_to(
             &herbie,
             "herbie",
-            "rational",
+            name,
             duration,
             Limits {
                 iter: 2,
@@ -634,19 +634,27 @@ pub mod test {
         let rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
-        rules.write_json_rules("rational.json");
-        test_against_ruler1(rules.clone(), duration);
-        test_against_herbie(rules.clone(), duration);
+        rules.write_json_rules("rational_replicate.json");
+        test_against_ruler1(&rules, "rational (replicate)", duration);
+        test_against_herbie(&rules, "rational (replicate)", duration);
+
+        let start = Instant::now();
+        let rules = best_enumo_recipe();
+        let duration = start.elapsed();
+
+        rules.write_json_rules("rational_best.json");
+        test_against_ruler1(&rules, "rational (best)", duration);
+        test_against_herbie(&rules, "rational (best)", duration);
     }
 
-    fn test_against_ruler1(rules: Ruleset<Math>, duration: Duration) {
+    fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
         rules.baseline_compare_to(
             &ruler1,
             "ruler1",
-            "rational",
+            name,
             duration,
             Limits {
                 iter: 2,
