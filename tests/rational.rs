@@ -653,7 +653,7 @@ pub mod test {
         println!("Comparing rational to ruler1...");
         rules.write_baseline_row(
             ruler1,
-            "rational",
+            name,
             "baseline.json",
             Limits {
                 iter: 2,

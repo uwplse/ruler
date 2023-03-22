@@ -294,34 +294,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all("]".as_bytes()).expect("write failed");
     }
 
-    fn fmt_ratio(
-        ratio: Ratio<usize>
-    ) -> String {
-        let mut ratio_str = String::new();
-        
-        ratio_str.push_str(&ratio.numer().to_string());
-        ratio_str.push_str(" / ");
-        ratio_str.push_str(&ratio.denom().to_string());
-
-        ratio_str
-    }
-
-    fn fmt_ratios(
-        lhs: Ratio<usize>,
-        lhs_rhs: Ratio<usize>,
-        all: Ratio<usize>,
-    ) -> String {
-        let mut all_ratios = String::new();
-
-        all_ratios.push_str(&Self::fmt_ratio(lhs));
-        all_ratios.push_str(", ");
-        all_ratios.push_str(&Self::fmt_ratio(lhs_rhs));
-        all_ratios.push_str(", ");
-        all_ratios.push_str(&Self::fmt_ratio(all));
-
-        all_ratios
-    }
-
     fn fmt_times(
         lhs: Duration,
         lhs_rhs: Duration,
@@ -344,7 +316,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline: Self,
         name: &str,
         limits: Limits,
-    ) -> ((Ratio<usize>, Ratio<usize>), (Duration, Duration)) {
+    ) -> ((String, String), (Duration, Duration)) {
         let mut filepath = "rep/json/derivable_rules/".to_owned();
 
         std::fs::create_dir_all(filepath.clone())
@@ -379,10 +351,38 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
 
-        let derivable_ratio_enumo = Ratio::new(can_f.len(), baseline.clone().len());
-        let derivable_ratio_oopsla = Ratio::new(can_b.len(), self.clone().len());
+
+        let derivable_ratio_enumo = can_f.fmt_derivable_ratio(baseline);
+        let derivable_ratio_oopsla = can_b.fmt_derivable_ratio(self.clone());
 
         ((derivable_ratio_enumo, derivable_ratio_oopsla), (time_f, time_b))
+    }
+
+    fn fmt_derivable_ratio(
+        &self,
+        baseline: Self,
+    ) -> String {
+        let mut ratio = String::new();
+        ratio.push_str(&self.len().to_string());
+        ratio.push_str("/");
+        ratio.push_str(&baseline.len().to_string());
+        ratio
+    }
+
+    fn fmt_ratios(
+        lhs: String,
+        lhs_rhs: String,
+        all: String,
+    ) -> String {
+        let mut all_ratios = String::new();
+
+        all_ratios.push_str(&lhs);
+        all_ratios.push_str(", ");
+        all_ratios.push_str(&lhs_rhs);
+        all_ratios.push_str(", ");
+        all_ratios.push_str(&all);
+
+        all_ratios
     }
 
     pub fn write_herbie_table() {
