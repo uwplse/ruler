@@ -329,7 +329,7 @@ mod test {
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
         rules.write_baseline_row(
             baseline,
-            "bool", 
+            "bool",
             "oopsla",
             "baseline.json",
             Limits {

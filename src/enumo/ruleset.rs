@@ -1,12 +1,12 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
+use num::rational::Ratio;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use serde_json::*;
 use std::fs::*;
 use std::sync::Mutex;
-use std::{io::Read, io::Write, sync::Arc, time::Duration};
-use num::{rational::Ratio};
 use std::time::Instant;
+use std::{io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -231,11 +231,11 @@ impl<L: SynthLanguage> Ruleset<L> {
         limits: Limits,
         time_rules: Duration,
     ) {
-        let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b)) = 
+        let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b)) =
             self.write_derivability_results(DeriveType::Lhs, baseline.clone(), name, limits);
-        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b)) = 
+        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b)) =
             self.write_derivability_results(DeriveType::LhsAndRhs, baseline.clone(), name, limits);
-        let ((forwards_all, backwards_all), (all_f, all_b)) = 
+        let ((forwards_all, backwards_all), (all_f, all_b)) =
             self.write_derivability_results(DeriveType::AllRules, baseline.clone(), name, limits);
 
         let mut filepath = "rep/json/".to_owned();
@@ -295,11 +295,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all("]".as_bytes()).expect("write failed");
     }
 
-    fn fmt_times(
-        lhs: Duration,
-        lhs_rhs: Duration,
-        all: Duration,
-    ) -> String {
+    fn fmt_times(lhs: Duration, lhs_rhs: Duration, all: Duration) -> String {
         let mut all_times = String::new();
 
         all_times.push_str(&lhs.as_secs_f64().to_string());
@@ -330,7 +326,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             DeriveType::LhsAndRhs => filepath.push_str("_lhs_rhs.json"),
             _ => filepath.push_str("_all.json"),
         }
-        
+
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
@@ -352,17 +348,16 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
 
-
         let derivable_ratio_enumo = can_f.fmt_derivable_ratio(baseline);
         let derivable_ratio_oopsla = can_b.fmt_derivable_ratio(self.clone());
 
-        ((derivable_ratio_enumo, derivable_ratio_oopsla), (time_f, time_b))
+        (
+            (derivable_ratio_enumo, derivable_ratio_oopsla),
+            (time_f, time_b),
+        )
     }
 
-    fn fmt_derivable_ratio(
-        &self,
-        baseline: Self,
-    ) -> String {
+    fn fmt_derivable_ratio(&self, baseline: Self) -> String {
         let mut ratio = String::new();
         ratio.push_str(&self.len().to_string());
         ratio.push_str("/");
@@ -370,11 +365,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         ratio
     }
 
-    fn fmt_ratios(
-        lhs: String,
-        lhs_rhs: String,
-        all: String,
-    ) -> String {
+    fn fmt_ratios(lhs: String, lhs_rhs: String, all: String) -> String {
         let mut all_ratios = String::new();
 
         all_ratios.push_str(&lhs);
@@ -386,13 +377,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         all_ratios
     }
 
-    pub fn write_herbie_table() {
+    pub fn write_herbie_table() {}
 
-    }
-
-    pub fn write_halide_table() {
-
-    }
+    pub fn write_halide_table() {}
 
     pub fn extract_candidates(
         eg1: &EGraph<L, SynthAnalysis>,

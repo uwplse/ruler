@@ -86,7 +86,7 @@ mod test {
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
         rules.write_baseline_row(
             baseline,
-            "bv4", 
+            "bv4",
             "oopsla",
             "baseline.json",
             Limits {
