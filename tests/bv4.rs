@@ -84,15 +84,14 @@ mod test {
 
         rules.write_json_rules("bv4.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-        rules.baseline_compare_to(
+        rules.write_baseline_row(
             baseline,
-            "ruler1",
-            "bv4",
-            duration,
+            "bv4", 
             Limits {
                 iter: 3,
                 node: 200000,
             },
+            duration,
         );
     }
 }

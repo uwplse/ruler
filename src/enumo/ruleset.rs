@@ -5,6 +5,8 @@ use serde_json::*;
 use std::fs::*;
 use std::sync::Mutex;
 use std::{io::Read, io::Write, sync::Arc, time::Duration};
+use num::{rational::Ratio};
+use std::time::Instant;
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -227,41 +229,19 @@ impl<L: SynthLanguage> Ruleset<L> {
     // "backwards derivable", and "backwards underivable". Also updates the
     // "output.json" file in the json/ subdirectory with the the derivability results
     // and statistics about runtime and the number of rules in each ruleset.
-    pub fn write_json_equiderivability(
+    pub fn write_baseline_row(
         &self,
-        derive_type: DeriveType,
         baseline: Self,
         name: &str,
         limits: Limits,
-        duration: Duration,
+        time_rules: Duration,
     ) {
-        let mut filepath = "rep/json/derivable_rules/".to_owned();
-
-        std::fs::create_dir_all(filepath.clone())
-            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-
-        filepath.push_str(name);
-        let mut file = std::fs::File::create(filepath.clone())
-            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
-
-        let (can_f, cannot_f) = self.derive(derive_type, baseline.clone(), limits);
-
-        let (can_b, cannot_b) = baseline.derive(derive_type, self.clone(), limits);
-
-        let derivability_results = json!({
-            "forwards derivable": &can_f.to_str_vec(),
-            "forwards underivable": &cannot_f.to_str_vec(),
-            "backwards derivable": &can_b.to_str_vec(),
-            "backwards underivable": &cannot_b.to_str_vec(),
-        })
-        .to_string();
-
-        file.write_all(derivability_results.as_bytes())
-            .expect("Unable to write to file");
-
-        let num_rules = &self.len();
-        let forwards_derivable = &can_f.len();
-        let backwards_derivable = &can_b.len();
+        let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b)) = 
+            self.write_derivability_results(DeriveType::Lhs, baseline.clone(), name, limits);
+        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b)) = 
+            self.write_derivability_results(DeriveType::LhsAndRhs, baseline.clone(), name, limits);
+        let ((forwards_all, backwards_all), (all_f, all_b)) = 
+            self.write_derivability_results(DeriveType::AllRules, baseline.clone(), name, limits);
 
         let mut outfile = OpenOptions::new()
             .read(true)
@@ -281,12 +261,15 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         let stats = json!({
-            "spec": name,
-            "num_rules": num_rules,
-            "num_baseline": baseline.len(),
-            "enumo_derives_oopsla": forwards_derivable,
-            "oopsla_derives_enumo": backwards_derivable,
-            "time": duration.as_secs(),
+            "domain": name,
+            "# rules found": self.len(),
+            "rulefinding time (sec)": time_rules.as_secs_f64(),
+            "# oopsla rules": baseline.len(),
+            "e -> o (lhs, lhs & rhs, all)": Self::fmt_ratios(forwards_lhs, forwards_lhs_rhs, forwards_all),
+            "e -> o time": Self::fmt_times(lhs_f, lhs_rhs_f, all_f),
+            "o -> e (lhs, lhs & rhs, all)": Self::fmt_ratios(backwards_lhs, backwards_lhs_rhs, backwards_all),
+            "o -> e time": Self::fmt_times(lhs_b, lhs_rhs_b, all_b),
+            "minimization strategy": "compress",
         });
 
         json_arr.push(stats);
@@ -314,36 +297,95 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all("]".as_bytes()).expect("write failed");
     }
 
-    pub fn baseline_compare_to(
-        &self,
-        baseline: Self,
-        baseline_name: &str,
-        domain_name: &str,
-        duration: Duration,
-        limits: Limits,
-    ) {
-        self.write_json_equiderivability(
-            DeriveType::Lhs,
-            baseline.clone(),
-            &format!("{}_{}_lhs.json", baseline_name, domain_name),
-            limits,
-            duration,
-        );
-        self.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
-            baseline.clone(),
-            &format!("{}_{}_lhs_rhs.json", baseline_name, domain_name),
-            limits,
-            duration,
-        );
+    pub fn fmt_ratio(
+        ratio: Ratio<usize>
+    ) -> String {
+        let mut ratio_str = String::new();
+        
+        ratio_str.push_str(&ratio.numer().to_string());
+        ratio_str.push_str(" / ");
+        ratio_str.push_str(&ratio.denom().to_string());
 
-        self.write_json_equiderivability(
-            DeriveType::AllRules,
-            baseline,
-            &format!("{}_{}_allrules.json", baseline_name, domain_name),
-            limits,
-            duration,
-        )
+        ratio_str
+    }
+
+    pub fn fmt_ratios(
+        lhs: Ratio<usize>,
+        lhs_rhs: Ratio<usize>,
+        all: Ratio<usize>,
+    ) -> String {
+        let mut all_ratios = String::new();
+
+        all_ratios.push_str(&Self::fmt_ratio(lhs));
+        all_ratios.push_str(", ");
+        all_ratios.push_str(&Self::fmt_ratio(lhs_rhs));
+        all_ratios.push_str(", ");
+        all_ratios.push_str(&Self::fmt_ratio(all));
+
+        all_ratios
+    }
+
+    pub fn fmt_times(
+        lhs: Duration,
+        lhs_rhs: Duration,
+        all: Duration,
+    ) -> String {
+        let mut all_times = String::new();
+
+        all_times.push_str(&lhs.as_secs_f64().to_string());
+        all_times.push_str(", ");
+        all_times.push_str(&lhs_rhs.as_secs_f64().to_string());
+        all_times.push_str(", ");
+        all_times.push_str(&all.as_secs_f64().to_string());
+
+        all_times
+    }
+
+    pub fn write_derivability_results(
+        &self,
+        derive_type: DeriveType,
+        baseline: Self,
+        name: &str,
+        limits: Limits,
+    ) -> ((Ratio<usize>, Ratio<usize>), (Duration, Duration)) {
+        let mut filepath = "rep/json/derivable_rules/".to_owned();
+
+        std::fs::create_dir_all(filepath.clone())
+            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+
+        filepath.push_str(name);
+
+        match derive_type {
+            DeriveType::Lhs => filepath.push_str("_lhs.json"),
+            DeriveType::LhsAndRhs => filepath.push_str("_lhs_rhs.json"),
+            _ => filepath.push_str("_all.json"),
+        }
+        
+        let mut file = std::fs::File::create(filepath.clone())
+            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
+
+        let start_f = Instant::now();
+        let (can_f, cannot_f) = self.derive(derive_type, baseline.clone(), limits);
+        let time_f = start_f.elapsed();
+        let start_b = Instant::now();
+        let (can_b, cannot_b) = baseline.derive(derive_type, self.clone(), limits);
+        let time_b = start_b.elapsed();
+
+        let derivability_results = json!({
+            "enumo -> oopsla derivable": &can_f.to_str_vec(),
+            "enumo -> oopsla underivable": &cannot_f.to_str_vec(),
+            "oopsla -> enumo derivable": &can_b.to_str_vec(),
+            "oopsla -> enumo underivable": &cannot_b.to_str_vec(),
+        })
+        .to_string();
+
+        file.write_all(derivability_results.as_bytes())
+            .expect("Unable to write to file");
+
+        let derivable_ratio_enumo = Ratio::new(can_f.len(), baseline.clone().len());
+        let derivable_ratio_oopsla = Ratio::new(can_b.len(), self.clone().len());
+
+        ((derivable_ratio_enumo, derivable_ratio_oopsla), (time_f, time_b))
     }
 
     pub fn extract_candidates(

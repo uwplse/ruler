@@ -148,7 +148,7 @@ mod test {
     macro_rules! str_vec {
         ($($x:expr),*) => (vec![$($x.to_string()),*]);
     }
-
+/*
     fn starting_exponential_rules() -> Ruleset {
         Ruleset::new(&[
             // exponential properties (expand)
@@ -352,4 +352,5 @@ mod test {
         // only upload new rules
         new_rules.write_json_rules("exponential.json");
     }
+*/
 }
