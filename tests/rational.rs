@@ -533,8 +533,43 @@ pub mod test {
         );
     }
 
-    pub fn rational_rules() -> Ruleset<Math> {
+    fn replicate_ruler1_recipe() -> Ruleset<Math> {
         let mut rules = Ruleset::default();
+        let limits = Limits::default();
+
+        // Domain
+        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
+        let vars = &Workload::new(["a", "b", "c"]);
+        let consts = &Workload::new(["0", "-1", "1"]);
+        let uops = &Workload::new(["~", "fabs"]);
+        let bops = &Workload::new(["+", "-", "*", "/"]);
+
+        // Layer 1 (one op)
+        println!("layer1");
+        let layer1 = lang
+            .clone()
+            .iter_metric("expr", enumo::Metric::Depth, 2)
+            .filter(Filter::Contains("var".parse().unwrap()))
+            .plug_lang(vars, consts, uops, bops);
+        let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
+        rules.extend(layer1_rules);
+
+        // Layer 2 (two ops)
+        println!("layer2");
+        let layer2 = lang
+            .clone()
+            .iter_metric("expr", enumo::Metric::Depth, 3)
+            .filter(Filter::Contains("var".parse().unwrap()))
+            .plug_lang(vars, consts, uops, bops);
+        layer2.to_file("replicate_layer2_terms");
+        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
+        rules.extend(layer2_rules);
+
+        rules
+    }
+
+    pub fn best_enumo_recipe() -> Ruleset<Math> {
+        let mut rules = replicate_ruler1_recipe();
         let limits = Limits::default();
 
         // Contains var filter
@@ -550,46 +585,8 @@ pub mod test {
         // Contains abs filter
         let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
 
-        // The steps:
-        //  [Name]         [Origin]
-        //  layer1         PR #108
-        //  layer2         PR #108
-        //  div            PR #113
-        //  nested fabs    PR #113
-        //
-
         let vars = Workload::new(["a", "b", "c"]);
-        let consts = Workload::new(["0", "-1", "1"]);
-        let uops = Workload::new(["~", "fabs"]);
-        let bops = Workload::new(["+", "-", "*", "/"]);
-
-        let init_layer = Workload::Append(vec![vars.clone(), consts]);
-        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-            .plug("uop", &uops)
-            .plug("bop", &bops);
-
-        // Layer 1
-        println!("layer1");
-        let init_layer_with_2 = Workload::Append(vec![init_layer.clone(), Workload::new(["2"])]);
-        let app_layer1 = op_layer.clone().plug("expr", &init_layer_with_2);
-        let layer1 = Workload::Append(vec![app_layer1, init_layer_with_2])
-            .filter(contains_var_filter.clone())
-            .filter(safe_filter.clone());
-
-        let layer1_rules = Math::run_workload(layer1, rules.clone(), limits);
-        rules.extend(layer1_rules);
-
-        // Layer 2
-        println!("layer2");
-        let app_layer1 = op_layer.clone().plug("expr", &init_layer);
-        let layer1 = Workload::Append(vec![app_layer1, init_layer.clone()]);
-        let app_layer2 = op_layer.clone().plug("expr", &layer1);
-        let layer2 = app_layer2
-            .filter(safe_filter.clone())
-            .filter(contains_var_filter.clone());
-
-        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
-        rules.extend(layer2_rules);
+        let consts = Workload::new(["-1", "0", "1", "2"]);
 
         // Div
         println!("div");
@@ -599,22 +596,30 @@ pub mod test {
 
         // Nested fabs
         println!("nested fabs");
-        let layer2_abs = layer2.filter(contains_abs_filter);
-        let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2_abs);
+        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
+            .plug("uop", &Workload::new(&["~", "fabs"]))
+            .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
+        let layer1 = op_layer.clone().plug("expr", &vars.append(consts));
+        let layer2 = op_layer
+            .plug("expr", &layer1)
+            .filter(safe_filter.clone())
+            .filter(contains_var_filter.clone())
+            .filter(contains_abs_filter);
+        let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
         let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
         rules.extend(nested_abs_rules);
 
         rules
     }
 
-    fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
+    fn test_against_herbie(rules: &Ruleset<Math>, name: &str, duration: Duration) {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
         rules.baseline_compare_to(
-            herbie,
+            &herbie,
             "herbie",
-            "rational",
+            name,
             duration,
             Limits {
                 iter: 2,
@@ -626,22 +631,30 @@ pub mod test {
     #[test]
     fn run_all() {
         let start = Instant::now();
-        let rules = rational_rules();
+        let rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
-        rules.write_json_rules("rational.json");
-        test_against_ruler1(rules.clone(), duration);
-        test_against_herbie(rules.clone(), duration);
+        rules.write_json_rules("rational_replicate.json");
+        test_against_ruler1(&rules, "rational (replicate)", duration);
+        test_against_herbie(&rules, "rational (replicate)", duration);
+
+        let start = Instant::now();
+        let rules = best_enumo_recipe();
+        let duration = start.elapsed();
+
+        rules.write_json_rules("rational_best.json");
+        test_against_ruler1(&rules, "rational (best)", duration);
+        test_against_herbie(&rules, "rational (best)", duration);
     }
 
-    fn test_against_ruler1(rules: Ruleset<Math>, duration: Duration) {
+    fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
         rules.baseline_compare_to(
-            ruler1,
+            &ruler1,
             "ruler1",
-            "rational",
+            name,
             duration,
             Limits {
                 iter: 2,

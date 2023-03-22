@@ -223,7 +223,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -281,7 +281,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -328,7 +328,7 @@ mod test {
         rules.write_json_rules("bool.json");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
         rules.baseline_compare_to(
-            baseline,
+            &baseline,
             "ruler1",
             "bool",
             duration,
@@ -380,7 +380,7 @@ mod test {
 
         let (can, cannot) = three.derive(
             DeriveType::LhsAndRhs,
-            four,
+            &four,
             Limits {
                 iter: 10,
                 node: 1000000,
