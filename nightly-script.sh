@@ -5,6 +5,7 @@
 
 rm -rf rep/json/*
 rm -rf rep/output/*
+mkdir rep/output
 
 # Run tests.
 RUST_TEST_THREADS=1 cargo test --release
