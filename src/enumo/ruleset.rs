@@ -258,10 +258,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             "# rules found": self.len(),
             "rulefinding time (sec)": time_rules.as_secs_f64(),
             "# oopsla rules": baseline.len(),
-            "e -> o (lhs, lhs & rhs, all)": Self::fmt_ratios(forwards_lhs, forwards_lhs_rhs, forwards_all),
-            "e -> o time": Self::fmt_times(lhs_f, lhs_rhs_f, all_f),
-            "o -> e (lhs, lhs & rhs, all)": Self::fmt_ratios(backwards_lhs, backwards_lhs_rhs, backwards_all),
-            "o -> e time": Self::fmt_times(lhs_b, lhs_rhs_b, all_b),
+            "forwards (lhs, lhs & rhs, all)": Self::fmt_ratios(forwards_lhs, forwards_lhs_rhs, forwards_all),
+            "forwards time": Self::fmt_times(lhs_f, lhs_rhs_f, all_f),
+            "backwards (lhs, lhs & rhs, all)": Self::fmt_ratios(backwards_lhs, backwards_lhs_rhs, backwards_all),
+            "backwards time": Self::fmt_times(lhs_b, lhs_rhs_b, all_b),
             "minimization strategy": "compress",
         });
 
@@ -365,10 +365,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         let time_b = start_b.elapsed();
 
         let derivability_results = json!({
-            "enumo -> oopsla derivable": &can_f.to_str_vec(),
-            "enumo -> oopsla underivable": &cannot_f.to_str_vec(),
-            "oopsla -> enumo derivable": &can_b.to_str_vec(),
-            "oopsla -> enumo underivable": &cannot_b.to_str_vec(),
+            "forwards derivable": &can_f.to_str_vec(),
+            "forwards underivable": &cannot_f.to_str_vec(),
+            "backwards derivable": &can_b.to_str_vec(),
+            "backwards underivable": &cannot_b.to_str_vec(),
         })
         .to_string();
 
