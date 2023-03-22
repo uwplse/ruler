@@ -11,7 +11,7 @@ RUST_TEST_THREADS=1 cargo test --release
 
 # Update HTML index page.
 cp rep/*.js rep/output
-python3 generatehtml.py
+python3 rep/generatehtml.py
 
 # This is the uploading part, copied directly from Herbie's nightly script.
 DIR="rep/output"
