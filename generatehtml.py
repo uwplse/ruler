@@ -1,23 +1,15 @@
 import sys, os
+from pathlib import Path
 
-baseline_json = "rep/json/baseline.json"
-herbie_json = "rep/json/herbie.json"
-# halide_json = "rep/json/halide.json"
-
+output_json = "rep/json/output.json"
 index_html = "rep/index_base.html"
 derive_dir = "rep/json/derivable_rules"
 output_dir = "rep/output"
 
 def generate_html():
-    baseline = open(baseline_json, "r").read()
-    herbie = open(herbie_json, "r").read()
-    # halide = open(halide_json, "r").read()
-
+    json = open(output_json, "r").read()
     html = open(index_html, "r").read()
-    html = html.replace("\"REPLACE_WITH_BASELINE\"", baseline)
-    html = html.replace("\"REPLACE_WITH_HERBIE\"", herbie)
-    # html = html.replace("\"REPLACE_WITH_HALIDE\"", halide)
-
+    html = html.replace("\"REPLACE_WITH_JSON\"", json)
     open(output_dir + "/index.html", "w").write(html)
 
     # loop through derivable_rules
@@ -30,8 +22,12 @@ def generate_html():
           base = open("rep/base.html", "r").read()
           base = base.replace("NAME", filename)
           base = base.replace("\"REPLACE_WITH_JSON\"", content)
+
+          specname = Path(filename)
+          base = base.replace("\"REPLACE_WITH_SPECNAME\"", specname.stem)
           without_extension = filename[:-5]
           
           open(output_dir + "/" + without_extension + ".html", "w").write(base)
+
 
 generate_html()
