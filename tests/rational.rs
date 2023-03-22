@@ -548,7 +548,7 @@ pub mod test {
         println!("layer1");
         let layer1 = lang
             .clone()
-            .iter_metric("expr", enumo::Metric::Lists, 2)
+            .iter_metric("expr", enumo::Metric::Depth, 2)
             .filter(Filter::Contains("var".parse().unwrap()))
             .plug_lang(vars, consts, uops, bops);
         let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
@@ -558,7 +558,7 @@ pub mod test {
         println!("layer2");
         let layer2 = lang
             .clone()
-            .iter_metric("expr", enumo::Metric::Lists, 3)
+            .iter_metric("expr", enumo::Metric::Depth, 3)
             .filter(Filter::Contains("var".parse().unwrap()))
             .plug_lang(vars, consts, uops, bops);
         layer2.to_file("replicate_layer2_terms");
