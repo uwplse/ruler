@@ -32,6 +32,8 @@ egg::define_language! {
     "/" = Div([Id; 2]),
     "~" = Neg(Id),
     "fabs" = Abs(Id),
+    "if" = If([Id; 3]),
+    "zero?" = Z(Id),
     Lit(Constant),
     Var(egg::Symbol),
   }
@@ -59,6 +61,15 @@ impl SynthLanguage for Math {
             Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
+            Math::If([x, y, z]) => {
+                map!(get_cvec, x, y, z => Some( if x.is_zero() {y.clone()} else {z.clone()}))
+            }
+
+            Math::Z(x) => {
+                let zero = mk_rat(0, 1);
+                let one = mk_rat(1, 1);
+                map!(get_cvec, x => Some(if x.eq(&zero) {one.clone()} else {zero.clone()}))
+            }
         }
     }
 
@@ -75,6 +86,11 @@ impl SynthLanguage for Math {
             Math::Sub([x, y]) => add(get_interval(x), &neg(get_interval(y))),
             Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
             Math::Div([x, y]) => mul(get_interval(x), &recip(get_interval(y))),
+            Math::If(_) => Interval::default(), // TODO?
+            Math::Z(_) => Interval {
+                low: Some(mk_rat(0, 1)),
+                high: Some(mk_rat(1, 1)),
+            },
         }
     }
 
@@ -220,6 +236,25 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 (c.denom()).to_i32().unwrap(),
             )),
             Math::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
+            Math::If([x, y, z]) => {
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                let cond = z3::ast::Bool::not(&buf[usize::from(*x)]._eq(&zero));
+                buf.push(z3::ast::Bool::ite(
+                    &cond,
+                    &buf[usize::from(*y)],
+                    &buf[usize::from(*z)],
+                ))
+            }
+            Math::Z(x) => {
+                let l = &buf[usize::from(*x)];
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                let one = z3::ast::Real::from_real(ctx, 1, 1);
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Real::_eq(l, &zero),
+                    &one,
+                    &zero,
+                ))
+            }
         }
     }
     buf.pop().unwrap()
@@ -661,5 +696,12 @@ pub mod test {
                 node: 150000,
             },
         )
+    }
+
+    #[test]
+    fn cond_div() {
+        // Goal: x/x => if (x != 0) 1 else x/x
+        let wkld = Workload::new(["(/ x x)", "(zero? x)", "(if (zero? x) (/ x x) 1)"]);
+        Math::run_workload(wkld, Ruleset::default(), Limits::default());
     }
 }
