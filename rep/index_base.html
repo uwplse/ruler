@@ -3,42 +3,51 @@
 <html>
 <title>Nightlies</title>
 <h2>Nightlies</h2>
-<center><p id="table"></p></center>
+<center><p id="baseline_table"></p></center>
+<!-- <center><p id="herbie_table"></p></center> -->
+<!-- <center><p id="halide_table"></p></center> -->
 <body>
 <script type="text/javascript">
     
     window.addEventListener("load", () => {
-        var json = "REPLACE_WITH_JSON";
+        var baseline = "REPLACE_WITH_BASELINE";
+        // var herbie = "REPLACE_WITH_HERBIE";
+        // var halide = "REPLACE_WITH_HALIDE";
 
-        var table = ConvertJsonToTable(json);
-        document.getElementById("table").innerHTML = table;
+        var baseline_table = ConvertJsonToTable(baseline);
+        // var herbie_table = ConvertJsonToTable(herbie);
+        // var halide_table = ConvertJsonToTable(halide);
+
+        document.getElementById("baseline_table").innerHTML = baseline_table;
+        // document.getElementById("herbie_table").innerHTML = herbie_table;
+        // document.getElementById("halide_table").innerHTML = halide_table;
     });
 </script>
 <p>Individual results for BV4:
-    <a href="ruler1_bv4_allrules.html">all</a>,
-    <a href="ruler1_bv4_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_bv4_lhs.html">LHS only</a>.
+    <a href="bv4_lhs.html">all</a>,
+    <a href="bv4_lhs_rhs.html">LHS/RHS</a>,
+    <a href="bv4_all.html">LHS only</a>.
 </p>
 <p>Individual results for BV32:
-    <a href="ruler1_bv32_allrules.html">all</a>,
-    <a href="ruler1_bv32_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_bv32_lhs.html">LHS only</a>.
+    <a href="bv32_lhs.html">all</a>,
+    <a href="bv32_lhs_rhs.html">LHS/RHS</a>,
+    <a href="bv32_all.html">LHS only</a>.
 </p>
 <p>Individual results for bool:
-    <a href="ruler1_bool_allrules.html">all</a>,
-    <a href="ruler1_bool_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_bool_lhs.html">LHS only</a>.
+    <a href="bool_lhs.html">all</a>,
+    <a href="bool_lhs_rhs.html">LHS/RHS</a>,
+    <a href="bool_all.html">LHS only</a>.
 </p>
-<p>Individual results for Herbie comparison:
-    <a href="herbie_rational_allrules.html">all</a>,
-    <a href="herbie_rational_lhs_rhs.html">LHS/RHS</a>,
-    <a href="herbie_rational_lhs.html">LHS only</a>.
+<p>Individual results for rational:
+    <a href="rational_lhs.html">all</a>,
+    <a href="rational_lhs_rhs.html">LHS/RHS</a>,
+    <a href="rational_all.html">LHS only</a>.
 </p>
-<p>Individual results for comparison to OOPSLA Ruler:
-    <a href="ruler1_rational_allrules.html">all</a>,
-    <a href="ruler1_rational_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_rational_lhs.html">LHS only</a>.
-</p>
+<!-- <p>Individual results for Herbie comparison:
+    <a href="herbie_lhs.html">all</a>,
+    <a href="herbie_lhs_rhs.html">LHS/RHS</a>,
+    <a href="herbie_all.html">LHS only</a>.
+</p> -->
 <script src="table.js"></script>
 </body>
 </html>

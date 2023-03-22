@@ -607,22 +607,6 @@ pub mod test {
         rules
     }
 
-    fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
-        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
-
-        println!("Comparing rational to herbie...");
-        /*rules.write_baseline_row(
-            herbie,
-            "rational", 
-            Limits {
-                iter: 2,
-                node: 300000,
-            },
-            duration,
-        );
-        */
-    }
-
     #[test]
     fn run_all() {
         let start = Instant::now();
@@ -631,7 +615,6 @@ pub mod test {
 
         rules.write_json_rules("rational.json");
         test_against_ruler1(rules.clone(), duration);
-        test_against_herbie(rules.clone(), duration);
     }
 
     fn test_against_ruler1(rules: Ruleset<Math>, duration: Duration) {

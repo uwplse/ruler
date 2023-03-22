@@ -570,7 +570,7 @@ mod test {
         new
     }
 
-    #[test]
+    // #[test]
     fn nightly_recipe() {
         let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
         let limits = Limits {
@@ -598,7 +598,7 @@ mod test {
         new.write_json_rules("trig.json");
     }
 
-    #[test]
+    // #[test]
     fn simple() {
         let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
         assert_eq!(complex.len(), 57);

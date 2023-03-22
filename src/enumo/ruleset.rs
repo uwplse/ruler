@@ -222,13 +222,6 @@ impl<L: SynthLanguage> Ruleset<L> {
             .expect("Unable to write to file");
     }
 
-    // Given two rulesets, computes bidirectional derivability between them
-    // and writes the results to the json/derivable_rules/ subdirectory,
-    // to be uploaded to the nightly server. The results are formatted as a
-    // json object with four fields: "forwards derivable", "forwards underivable",
-    // "backwards derivable", and "backwards underivable". Also updates the
-    // "output.json" file in the json/ subdirectory with the the derivability results
-    // and statistics about runtime and the number of rules in each ruleset.
     pub fn write_baseline_row(
         &self,
         baseline: Self,
@@ -247,7 +240,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .read(true)
             .write(true)
             .create(true)
-            .open("rep/json/output.json")
+            .open("rep/json/baseline.json")
             .expect("Unable to open file");
 
         let mut outfile_string = String::new();
@@ -278,7 +271,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .write(true)
             .truncate(true)
             .create(true)
-            .open("rep/json/output.json")
+            .open("rep/json/baseline.json")
             .expect("Unable to open file");
 
         file.write_all("[".as_bytes()).expect("write failed");
@@ -297,7 +290,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all("]".as_bytes()).expect("write failed");
     }
 
-    pub fn fmt_ratio(
+    fn fmt_ratio(
         ratio: Ratio<usize>
     ) -> String {
         let mut ratio_str = String::new();
@@ -309,7 +302,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         ratio_str
     }
 
-    pub fn fmt_ratios(
+    fn fmt_ratios(
         lhs: Ratio<usize>,
         lhs_rhs: Ratio<usize>,
         all: Ratio<usize>,
@@ -325,7 +318,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         all_ratios
     }
 
-    pub fn fmt_times(
+    fn fmt_times(
         lhs: Duration,
         lhs_rhs: Duration,
         all: Duration,
@@ -386,6 +379,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         let derivable_ratio_oopsla = Ratio::new(can_b.len(), self.clone().len());
 
         ((derivable_ratio_enumo, derivable_ratio_oopsla), (time_f, time_b))
+    }
+
+    pub fn write_herbie_table() {
+
+    }
+
+    pub fn write_halide_table() {
+
     }
 
     pub fn extract_candidates(
