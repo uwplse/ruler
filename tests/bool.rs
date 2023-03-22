@@ -330,6 +330,7 @@ mod test {
         rules.write_baseline_row(
             baseline,
             "bool", 
+            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,

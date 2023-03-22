@@ -86,7 +86,8 @@ mod test {
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
         rules.write_baseline_row(
             baseline,
-            "bv32", 
+            "bv32",
+            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,

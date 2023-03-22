@@ -1,7 +1,7 @@
 import sys, os
 
 baseline_json = "rep/json/baseline.json"
-# herbie_json = "rep/json/herbie.json"
+herbie_json = "rep/json/herbie.json"
 # halide_json = "rep/json/halide.json"
 
 index_html = "rep/index_base.html"
@@ -10,12 +10,12 @@ output_dir = "rep/output"
 
 def generate_html():
     baseline = open(baseline_json, "r").read()
-    # herbie = open(herbie_json, "r").read()
+    herbie = open(herbie_json, "r").read()
     # halide = open(halide_json, "r").read()
 
     html = open(index_html, "r").read()
     html = html.replace("\"REPLACE_WITH_BASELINE\"", baseline)
-    # html = html.replace("\"REPLACE_WITH_HERBIE\"", herbie)
+    html = html.replace("\"REPLACE_WITH_HERBIE\"", herbie)
     # html = html.replace("\"REPLACE_WITH_HALIDE\"", halide)
 
     open(output_dir + "/index.html", "w").write(html)

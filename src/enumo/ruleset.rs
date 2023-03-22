@@ -226,6 +226,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         &self,
         baseline: Self,
         name: &str,
+        outfile: &str,
         limits: Limits,
         time_rules: Duration,
     ) {
@@ -236,11 +237,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         let ((forwards_all, backwards_all), (all_f, all_b)) = 
             self.write_derivability_results(DeriveType::AllRules, baseline.clone(), name, limits);
 
+        let mut filepath = "rep/json/".to_owned();
+        filepath.push_str(outfile);
+
         let mut outfile = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open("rep/json/baseline.json")
+            .open(filepath.clone())
             .expect("Unable to open file");
 
         let mut outfile_string = String::new();
@@ -271,7 +275,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .write(true)
             .truncate(true)
             .create(true)
-            .open("rep/json/baseline.json")
+            .open(filepath)
             .expect("Unable to open file");
 
         file.write_all("[".as_bytes()).expect("write failed");

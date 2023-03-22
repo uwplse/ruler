@@ -616,6 +616,16 @@ pub mod test {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
+        rules.write_baseline_row(
+            herbie,
+            "herbie",
+            "herbie.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 
     #[test]
@@ -643,7 +653,8 @@ pub mod test {
         println!("Comparing rational to ruler1...");
         rules.write_baseline_row(
             ruler1,
-            "rational", 
+            "rational",
+            "baseline.json",
             Limits {
                 iter: 2,
                 node: 150000,

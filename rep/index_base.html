@@ -4,22 +4,22 @@
 <title>Nightlies</title>
 <h2>Nightlies</h2>
 <center><p id="baseline_table"></p></center>
-<!-- <center><p id="herbie_table"></p></center> -->
+<center><p id="herbie_table"></p></center>
 <!-- <center><p id="halide_table"></p></center> -->
 <body>
 <script type="text/javascript">
     
     window.addEventListener("load", () => {
         var baseline = "REPLACE_WITH_BASELINE";
-        // var herbie = "REPLACE_WITH_HERBIE";
+        var herbie = "REPLACE_WITH_HERBIE";
         // var halide = "REPLACE_WITH_HALIDE";
 
         var baseline_table = ConvertJsonToTable(baseline);
-        // var herbie_table = ConvertJsonToTable(herbie);
+        var herbie_table = ConvertJsonToTable(herbie);
         // var halide_table = ConvertJsonToTable(halide);
 
         document.getElementById("baseline_table").innerHTML = baseline_table;
-        // document.getElementById("herbie_table").innerHTML = herbie_table;
+        document.getElementById("herbie_table").innerHTML = herbie_table;
         // document.getElementById("halide_table").innerHTML = halide_table;
     });
 </script>
@@ -43,11 +43,11 @@
     <a href="rational_lhs_rhs.html">LHS/RHS</a>,
     <a href="rational_all.html">LHS only</a>.
 </p>
-<!-- <p>Individual results for Herbie comparison:
+<p>Individual results for Herbie comparison:
     <a href="herbie_lhs.html">all</a>,
     <a href="herbie_lhs_rhs.html">LHS/RHS</a>,
     <a href="herbie_all.html">LHS only</a>.
-</p> -->
+</p>
 <script src="table.js"></script>
 </body>
 </html>
