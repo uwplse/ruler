@@ -373,6 +373,8 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 
 #[cfg(test)]
 pub mod test {
+    use std::time::Duration;
+
     use super::*;
     use ruler::enumo::{Filter, Ruleset, Workload};
 
@@ -610,28 +612,46 @@ pub mod test {
         rules
     }
 
+    fn test_against_herbie(rules: Ruleset<Math>, duration: Duration) {
+        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
+
+        println!("Comparing rational to herbie...");
+        rules.baseline_compare_to(
+            &herbie,
+            "herbie",
+            "rational",
+            duration,
+            Limits {
+                iter: 2,
+                node: 300000,
+            },
+        )
+    }
+
     #[test]
-    fn baseline_comparisons() {
+    fn run_all() {
         let start = Instant::now();
         let rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
-        let limits = Limits::default();
+
         rules.write_json_rules("rational.json");
+        test_against_ruler1(rules.clone(), duration);
+        test_against_herbie(rules.clone(), duration);
+    }
 
-        let ruler1_baseline: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-        rules.write_json_equiderivability(&ruler1_baseline, "rational.json", limits, duration);
+    fn test_against_ruler1(rules: Ruleset<Math>, duration: Duration) {
+        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
-        let start = Instant::now();
-        let best_recipe: Ruleset<Math> = best_enumo_recipe();
-        let duration = start.elapsed();
-        best_recipe.write_json_equiderivability(
-            &ruler1_baseline,
-            "rational_best.json",
-            limits,
+        println!("Comparing rational to ruler1...");
+        rules.baseline_compare_to(
+            &ruler1,
+            "ruler1",
+            "rational",
             duration,
-        );
-
-        let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
-        rules.write_json_equiderivability(&herbie, "herbie.json", limits, duration);
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+        )
     }
 }

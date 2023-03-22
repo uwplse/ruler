@@ -266,7 +266,7 @@ mod test {
             "(* ?c (* ?b ?a)) ==> (* ?a (* ?b ?c))",
             "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
         ]);
-        let (can, cannot) = all_rules.derive(&expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }

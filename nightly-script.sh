@@ -7,7 +7,7 @@ rm rep/json/*
 rm rep/json/derivable_rules/*
 
 # Run tests.
-cargo test --release
+RUST_TEST_THREADS=1 cargo test --release
 
 # Update HTML index page.
 OUTPUT=`cat rep/json/output.json`
