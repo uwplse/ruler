@@ -87,6 +87,7 @@ mod test {
         rules.write_baseline_row(
             baseline,
             "bv32",
+            "oopsla",
             "baseline.json",
             Limits {
                 iter: 3,

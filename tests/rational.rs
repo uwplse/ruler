@@ -619,6 +619,7 @@ pub mod test {
         rules.write_baseline_row(
             herbie,
             name,
+            "herbie_baseline",
             "herbie.json",
             Limits {
                 iter: 2,
@@ -654,6 +655,7 @@ pub mod test {
         rules.write_baseline_row(
             ruler1,
             name,
+            "oopsla",
             "baseline.json",
             Limits {
                 iter: 2,
