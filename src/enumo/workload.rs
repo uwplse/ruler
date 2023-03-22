@@ -146,11 +146,7 @@ impl Workload {
             if let Workload::Plug(wkld, name, pegs) = self {
                 Workload::Filter(
                     filter.clone(),
-                    Box::new(Workload::Plug(
-                        wkld,
-                        name,
-                        Box::new(pegs.filter(filter.reduce_monotonic())),
-                    )),
+                    Box::new(Workload::Plug(wkld, name, Box::new(pegs.filter(filter)))),
                 )
             } else {
                 Workload::Filter(filter, Box::new(self))
