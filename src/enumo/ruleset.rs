@@ -1,6 +1,5 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
-use num::rational::Ratio;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use serde_json::*;
 use std::fs::*;
@@ -263,10 +262,14 @@ impl<L: SynthLanguage> Ruleset<L> {
             "# rules found": self.len(),
             "rulefinding time (sec)": time_rules.as_secs_f64(),
             &format!("# {} rules", baseline_name): baseline.len(),
-            &format!("{} -> {} (lhs, lhs & rhs, all)", name, baseline_name): Self::fmt_ratios(forwards_lhs, forwards_lhs_rhs, forwards_all),
-            &format!("{} -> {} time", name, baseline_name): Self::fmt_times(lhs_f, lhs_rhs_f, all_f),
-            &format!("{} -> {} (lhs, lhs & rhs, all)", baseline_name, name): Self::fmt_ratios(backwards_lhs, backwards_lhs_rhs, backwards_all),
-            &format!("{} -> {} time", baseline_name, name): Self::fmt_times(lhs_b, lhs_rhs_b, all_b),
+            &format!("{} -> {} (lhs, lhs & rhs, all)", name, baseline_name): 
+                format!("{}, {}, {}", forwards_lhs, forwards_lhs_rhs, forwards_all),
+            &format!("{} -> {} time", name, baseline_name): 
+                format!("{}, {}, {}", lhs_f.as_secs_f64(), lhs_rhs_f.as_secs_f64(), all_f.as_secs_f64()),
+            &format!("{} -> {} (lhs, lhs & rhs, all)", baseline_name, name): 
+                format!("{}, {}, {}", backwards_lhs, backwards_lhs_rhs, backwards_all),
+            &format!("{} -> {} time", baseline_name, name): 
+                format!("{}, {}, {}", lhs_b.as_secs_f64(), lhs_rhs_b.as_secs_f64(), all_b.as_secs_f64()),
             "minimization strategy": "compress",
         });
 
@@ -293,18 +296,6 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
         file.write_all("]".as_bytes()).expect("write failed");
-    }
-
-    fn fmt_times(lhs: Duration, lhs_rhs: Duration, all: Duration) -> String {
-        let mut all_times = String::new();
-
-        all_times.push_str(&lhs.as_secs_f64().to_string());
-        all_times.push_str(", ");
-        all_times.push_str(&lhs_rhs.as_secs_f64().to_string());
-        all_times.push_str(", ");
-        all_times.push_str(&all.as_secs_f64().to_string());
-
-        all_times
     }
 
     pub fn write_derivability_results(
@@ -348,38 +339,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
 
-        let derivable_ratio_enumo = can_f.fmt_derivable_ratio(baseline);
-        let derivable_ratio_oopsla = can_b.fmt_derivable_ratio(self.clone());
+        let derivable_ratio_enumo = format!("{}/{}", can_f.len().to_string(), baseline.len().to_string());
+        let derivable_ratio_oopsla = format!("{}/{}", can_b.len().to_string(), self.clone().len().to_string());
 
         (
             (derivable_ratio_enumo, derivable_ratio_oopsla),
             (time_f, time_b),
         )
     }
-
-    fn fmt_derivable_ratio(&self, baseline: Self) -> String {
-        let mut ratio = String::new();
-        ratio.push_str(&self.len().to_string());
-        ratio.push_str("/");
-        ratio.push_str(&baseline.len().to_string());
-        ratio
-    }
-
-    fn fmt_ratios(lhs: String, lhs_rhs: String, all: String) -> String {
-        let mut all_ratios = String::new();
-
-        all_ratios.push_str(&lhs);
-        all_ratios.push_str(", ");
-        all_ratios.push_str(&lhs_rhs);
-        all_ratios.push_str(", ");
-        all_ratios.push_str(&all);
-
-        all_ratios
-    }
-
-    pub fn write_herbie_table() {}
-
-    pub fn write_halide_table() {}
 
     pub fn extract_candidates(
         eg1: &EGraph<L, SynthAnalysis>,
