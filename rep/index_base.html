@@ -5,48 +5,63 @@
 <h2>Nightlies</h2>
 <center><p id="baseline_table"></p></center>
 <center><p id="herbie_table"></p></center>
-<!-- <center><p id="halide_table"></p></center> -->
+<center><p id="halide_table"></p></center>
 <body>
 <script type="text/javascript">
     
     window.addEventListener("load", () => {
         var baseline = "REPLACE_WITH_BASELINE";
         var herbie = "REPLACE_WITH_HERBIE";
-        // var halide = "REPLACE_WITH_HALIDE";
+        var halide = "REPLACE_WITH_HALIDE";
 
         var baseline_table = ConvertJsonToTable(baseline);
         var herbie_table = ConvertJsonToTable(herbie);
-        // var halide_table = ConvertJsonToTable(halide);
+        var halide_table = ConvertJsonToTable(halide);
 
         document.getElementById("baseline_table").innerHTML = baseline_table;
         document.getElementById("herbie_table").innerHTML = herbie_table;
-        // document.getElementById("halide_table").innerHTML = halide_table;
+        document.getElementById("halide_table").innerHTML = halide_table;
     });
 </script>
 <p>Individual results for BV4:
-    <a href="bv4_lhs.html">all</a>,
+    <a href="bv4_lhs.html">LHS</a>,
     <a href="bv4_lhs_rhs.html">LHS/RHS</a>,
-    <a href="bv4_all.html">LHS only</a>.
+    <a href="bv4_all.html">all</a>.
 </p>
 <p>Individual results for BV32:
-    <a href="bv32_lhs.html">all</a>,
+    <a href="bv32_lhs.html">LHS</a>,
     <a href="bv32_lhs_rhs.html">LHS/RHS</a>,
-    <a href="bv32_all.html">LHS only</a>.
+    <a href="bv32_all.html">all</a>.
 </p>
 <p>Individual results for bool:
-    <a href="bool_lhs.html">all</a>,
+    <a href="bool_lhs.html">LHS</a>,
     <a href="bool_lhs_rhs.html">LHS/RHS</a>,
-    <a href="bool_all.html">LHS only</a>.
+    <a href="bool_all.html">all</a>.
 </p>
-<p>Individual results for rational:
-    <a href="rational_lhs.html">all</a>,
-    <a href="rational_lhs_rhs.html">LHS/RHS</a>,
-    <a href="rational_all.html">LHS only</a>.
+<p>Individual results for rational (replicate):
+    <a href="rational_replicate_lhs.html">LHS</a>,
+    <a href="rational_replicate_lhs_rhs.html">LHS/RHS</a>,
+    <a href="rational_replicate_all.html">all</a>.
 </p>
-<p>Individual results for Herbie comparison:
-    <a href="herbie_lhs.html">all</a>,
-    <a href="herbie_lhs_rhs.html">LHS/RHS</a>,
-    <a href="herbie_all.html">LHS only</a>.
+<p>Individual results for rational (best):
+    <a href="rational_best_lhs.html">LHS</a>,
+    <a href="rational_best_lhs_rhs.html">LHS/RHS</a>,
+    <a href="rational_best_all.html">all</a>.
+</p>
+<p>Individual results for Herbie comparison (replicate):
+    <a href="herbie_rational_replicate_lhs.html">LHS</a>,
+    <a href="herbie_rational_replicate_lhs_rhs.html">LHS/RHS</a>,
+    <a href="herbie_rational_replicate_all.html">all</a>.
+</p>
+<p>Individual results for Herbie comparison (best):
+    <a href="herbie_rational_best_lhs.html">LHS</a>,
+    <a href="herbie_rational_best_lhs_rhs.html">LHS/RHS</a>,
+    <a href="herbie_rational_best_all.html">all</a>.
+</p>
+<p>Individual results for Halide:
+    <a href="halide_lhs.html">LHS</a>,
+    <a href="halide_lhs_rhs.html">LHS/RHS</a>,
+    <a href="halide_all.html">all</a>.
 </p>
 <script src="table.js"></script>
 </body>

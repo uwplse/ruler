@@ -357,7 +357,7 @@ mod test {
             all
         }
     }
-/*
+
     #[test]
     fn recipe() {
         // This is porting the halide recipe at incremental/halide.spec
@@ -428,14 +428,14 @@ mod test {
         //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
         // println!("{} / {}", can.len(), can.len() + cannot.len());
 
-        all_rules.write_json_rules("halide.json");
-        all_rules.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
-            &baseline,
+        all_rules.write_json_rules("halide_rules.json");
+        all_rules.write_baseline_row(
+            baseline,
+            "halide",
+            "baseline",
             "halide.json",
             Limits::default(),
             duration,
-        );
+        )
     }
-*/
 }

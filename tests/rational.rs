@@ -637,7 +637,7 @@ pub mod test {
 
         rules.write_json_rules("rational_replicate.json");
         test_against_ruler1(&rules, "rational_replicate", duration);
-        test_against_herbie(&rules, "rational_replicate", duration);
+        test_against_herbie(&rules, "herbie_rational_replicate", duration);
 
         let start = Instant::now();
         let rules = best_enumo_recipe();
@@ -645,7 +645,7 @@ pub mod test {
 
         rules.write_json_rules("rational_best.json");
         test_against_ruler1(&rules, "rational_best", duration);
-        test_against_herbie(&rules, "rational_best", duration);
+        test_against_herbie(&rules, "herbie_rational_best", duration);
     }
 
     fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
