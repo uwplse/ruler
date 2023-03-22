@@ -224,17 +224,52 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn write_baseline_row(
         &self,
+<<<<<<< HEAD
         baseline: Self,
+=======
+        derive_type: DeriveType,
+        baseline: &Self,
+>>>>>>> ab7459c6601e07f00e225aacdf57f2ccf3388441
         name: &str,
         limits: Limits,
         time_rules: Duration,
     ) {
+<<<<<<< HEAD
         let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b)) = 
             self.write_derivability_results(DeriveType::Lhs, baseline.clone(), name, limits);
         let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b)) = 
             self.write_derivability_results(DeriveType::LhsAndRhs, baseline.clone(), name, limits);
         let ((forwards_all, backwards_all), (all_f, all_b)) = 
             self.write_derivability_results(DeriveType::AllRules, baseline.clone(), name, limits);
+=======
+        let mut filepath = "rep/json/derivable_rules/".to_owned();
+
+        std::fs::create_dir_all(filepath.clone())
+            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+
+        filepath.push_str(name);
+        let mut file = std::fs::File::create(filepath.clone())
+            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
+
+        let (can_f, cannot_f) = self.derive(derive_type, baseline, limits);
+
+        let (can_b, cannot_b) = baseline.derive(derive_type, self, limits);
+
+        let derivability_results = json!({
+            "forwards derivable": &can_f.to_str_vec(),
+            "forwards underivable": &cannot_f.to_str_vec(),
+            "backwards derivable": &can_b.to_str_vec(),
+            "backwards underivable": &cannot_b.to_str_vec(),
+        })
+        .to_string();
+
+        file.write_all(derivability_results.as_bytes())
+            .expect("Unable to write to file");
+
+        let num_rules = &self.len();
+        let forwards_derivable = &can_f.len();
+        let backwards_derivable = &can_b.len();
+>>>>>>> ab7459c6601e07f00e225aacdf57f2ccf3388441
 
         let mut outfile = OpenOptions::new()
             .read(true)
@@ -336,6 +371,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn write_derivability_results(
         &self,
+<<<<<<< HEAD
         derive_type: DeriveType,
         baseline: Self,
         name: &str,
@@ -386,6 +422,28 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn write_halide_table() {
+=======
+        baseline: &Self,
+        baseline_name: &str,
+        domain_name: &str,
+        duration: Duration,
+        limits: Limits,
+    ) {
+        self.write_json_equiderivability(
+            DeriveType::Lhs,
+            baseline,
+            &format!("{}_{}_lhs.json", baseline_name, domain_name),
+            limits,
+            duration,
+        );
+        self.write_json_equiderivability(
+            DeriveType::LhsAndRhs,
+            baseline,
+            &format!("{}_{}_lhs_rhs.json", baseline_name, domain_name),
+            limits,
+            duration,
+        );
+>>>>>>> ab7459c6601e07f00e225aacdf57f2ccf3388441
 
     }
 
@@ -616,7 +674,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         &self,
         derive_type: DeriveType,
         rule: &Rule<L>,
-        allrules: Self,
+        allrules: &Self,
         limits: Limits,
     ) -> bool {
         let scheduler = Scheduler::Saturating(limits);
@@ -657,7 +715,24 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
-    pub fn derive(&self, derive_type: DeriveType, against: Self, limits: Limits) -> (Self, Self) {
-        against.partition(|eq| self.can_derive(derive_type, eq, against.clone(), limits))
+    pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
+        against.partition(|eq| self.can_derive(derive_type, eq, against, limits))
+    }
+
+    pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {
+        let r1: Ruleset<L> = Ruleset::from_file(one);
+        let r2: Ruleset<L> = Ruleset::from_file(two);
+
+        let (can, cannot) = r1.derive(derive_type, &r2, Limits::default());
+        println!(
+            "Using {} ({}) to derive {} ({}).\nCan derive {}, cannot derive {}. Missing:",
+            one,
+            r1.len(),
+            two,
+            r2.len(),
+            can.len(),
+            cannot.len()
+        );
+        cannot.pretty_print();
     }
 }

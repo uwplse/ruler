@@ -12,6 +12,12 @@ pub enum Workload {
     Append(Vec<Self>),
 }
 
+impl Default for Workload {
+    fn default() -> Self {
+        Workload::Set(vec![])
+    }
+}
+
 impl Workload {
     pub fn new<I>(vals: I) -> Self
     where
@@ -135,6 +141,19 @@ impl Workload {
 
     pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
+    }
+
+    pub fn plug_lang(
+        self,
+        vars: &Workload,
+        consts: &Workload,
+        uops: &Workload,
+        bops: &Workload,
+    ) -> Self {
+        self.plug("var", vars)
+            .plug("const", consts)
+            .plug("uop", uops)
+            .plug("bop", bops)
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {
@@ -353,5 +372,20 @@ mod test {
         .force();
 
         assert_eq!(actual4, expected4);
+    }
+
+    #[test]
+    fn plug() {
+        let w1 = Workload::new(["x", "(x x)", "(x x x)"]);
+        let w2 = Workload::new(["1", "2"]);
+
+        let expected = Workload::new([
+            "1", "2", "(1 1)", "(1 2)", "(2 1)", "(2 2)", "(1 1 1)", "(1 1 2)", "(1 2 1)",
+            "(1 2 2)", "(2 1 1)", "(2 1 2)", "(2 2 1)", "(2 2 2)",
+        ]);
+        let actual = w1.plug("x", &w2).force();
+        for t in expected.force() {
+            assert!(actual.contains(&t));
+        }
     }
 }
