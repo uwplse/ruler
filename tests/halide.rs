@@ -1,6 +1,11 @@
+use std::time::Instant;
+
 use num::{BigInt, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
-use ruler::*;
+use ruler::{
+    enumo::{Ruleset, Scheduler, Workload},
+    *,
+};
 use z3::ast::Ast;
 
 type Constant = BigInt;
@@ -10,8 +15,6 @@ egg::define_language! {
     Lit(Constant),
     "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
-    ">" = Gt([Id;2]),
-    ">=" = Geq([Id;2]),
     "==" = Eq([Id;2]),
     "!=" = Neq([Id;2]),
     "->" = Implies([Id; 2]),
@@ -47,12 +50,6 @@ impl SynthLanguage for Pred {
             }
             Pred::Leq([x, y]) => {
                 map!(get_cvec, x, y => if x <= y {Some(one.clone())} else {Some(zero.clone())})
-            }
-            Pred::Gt([x, y]) => {
-                map!(get_cvec, x, y => if x > y {Some(one.clone())} else {Some(zero.clone())})
-            }
-            Pred::Geq([x, y]) => {
-                map!(get_cvec, x, y => if x >= y {Some(one.clone())} else {Some(zero.clone())})
             }
             Pred::Eq([x, y]) => {
                 map!(get_cvec, x, y => if x == y {Some(one.clone())} else {Some(zero.clone())})
@@ -182,16 +179,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
                 let r = &buf[usize::from(*y)];
                 buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), &one, &zero))
             }
-            Pred::Gt([x, y]) => {
-                let l = &buf[usize::from(*x)];
-                let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::gt(l, r), &one, &zero))
-            }
-            Pred::Geq([x, y]) => {
-                let l = &buf[usize::from(*x)];
-                let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::ge(l, r), &one, &zero))
-            }
             Pred::Eq([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
@@ -294,4 +281,160 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
         }
     }
     buf.pop().unwrap()
+}
+
+impl Pred {
+    fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+
+        let mut candidates = Ruleset::fast_cvec_match(&compressed);
+
+        let num_prior = prior.len();
+        let chosen = candidates.minimize(prior, limits);
+        let time = t.elapsed().as_secs_f64();
+
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            chosen.bidir_len(),
+            chosen.len(),
+            time,
+            num_prior
+        );
+
+        chosen.pretty_print();
+
+        chosen
+    }
+}
+
+mod test {
+    use std::time::Instant;
+
+    use ruler::{
+        enumo::{Filter, Metric, Ruleset, Workload},
+        DeriveType, Limits,
+    };
+
+    use crate::Pred;
+
+    fn recursive_rules(
+        metric: Metric,
+        n: usize,
+        consts: &Workload,
+        vars: &Workload,
+        uops: &Workload,
+        bops: &Workload,
+        tops: &Workload,
+        prior: Ruleset<Pred>,
+    ) -> Ruleset<Pred> {
+        let lang = Workload::new(&[
+            "const",
+            "var",
+            "(uop expr)",
+            "(bop expr expr)",
+            "(top expr expr expr)",
+        ]);
+        if n < 1 {
+            Ruleset::default()
+        } else {
+            let mut rec =
+                recursive_rules(metric, n - 1, consts, vars, uops, bops, tops, prior.clone());
+            let wkld = lang
+                .iter_metric("expr", metric, n)
+                .filter(Filter::Contains("var".parse().unwrap()))
+                .plug("var", vars)
+                .plug("const", consts)
+                .plug("uop", uops)
+                .plug("bop", bops)
+                .plug("top", tops);
+            rec.extend(prior);
+            let new = Pred::run_workload(wkld, rec.clone(), Limits::default());
+            let mut all = new;
+            all.extend(rec);
+            all
+        }
+    }
+
+    #[test]
+    fn recipe() {
+        // This is porting the halide recipe at incremental/halide.spec
+        // on the branch "maybe-useful" in the old recipes repo
+
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        let start = Instant::now();
+
+        let mut all_rules = Ruleset::default();
+
+        // Bool rules up to size 5:
+        let bool_only = recursive_rules(
+            Metric::Atoms,
+            5,
+            &Workload::new(&["0", "1"]),
+            &Workload::new(&["a", "b", "c"]),
+            &Workload::new(&["!"]),
+            &Workload::new(&["&&", "||", "^"]),
+            &Workload::Set(vec![]),
+            all_rules.clone(),
+        );
+        all_rules.extend(bool_only);
+
+        // Rational rules up to size 5:
+        let rat_only = recursive_rules(
+            Metric::Atoms,
+            5,
+            &Workload::new(&["-1", "0", "1"]),
+            &Workload::new(&["a", "b", "c"]),
+            &Workload::new(&["-"]),
+            &Workload::new(&["+", "-", "*", "min", "max"]), // No div for now
+            &Workload::Set(vec![]),
+            all_rules.clone(),
+        );
+        all_rules.extend(rat_only);
+
+        // Pred rules up to size 5
+        let pred_only = recursive_rules(
+            Metric::Atoms,
+            5,
+            &Workload::new(&["-1", "0", "1"]),
+            &Workload::new(&["a", "b", "c"]),
+            &Workload::new(&[""]),
+            &Workload::new(&["<", "<=", "==", "!="]),
+            &Workload::new(&["select"]),
+            all_rules.clone(),
+        );
+        all_rules.extend(pred_only);
+
+        // All terms up to size 4
+        let full = recursive_rules(
+            Metric::Atoms,
+            4,
+            &Workload::new(&["-1", "0", "1"]),
+            &Workload::new(&["a", "b", "c"]),
+            &Workload::new(&["-", "!"]),
+            &Workload::new(&[
+                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+            ]),
+            &Workload::new(&["select"]),
+            all_rules.clone(),
+        );
+        all_rules.extend(full);
+
+        let duration = start.elapsed();
+
+        // let (can, cannot) =
+        //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
+        // println!("{} / {}", can.len(), can.len() + cannot.len());
+
+        all_rules.write_json_rules("halide.json");
+        all_rules.write_json_equiderivability(
+            DeriveType::LhsAndRhs,
+            baseline,
+            "halide.json",
+            Limits::default(),
+            duration,
+        );
+    }
 }
