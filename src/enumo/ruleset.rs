@@ -243,9 +243,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filepath.clone())
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
-        let (can_f, cannot_f) = self.derive(&baseline, limits);
+        let (can_f, cannot_f) = self.derive(baseline, limits);
 
-        let (can_b, cannot_b) = baseline.derive(&self, limits);
+        let (can_b, cannot_b) = baseline.derive(self, limits);
 
         let derivability_results = json!({
             "forwards derivable": &can_f.to_str_vec(),
