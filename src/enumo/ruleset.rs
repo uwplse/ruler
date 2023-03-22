@@ -322,10 +322,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
         let start_f = Instant::now();
-        let (can_f, cannot_f) = self.derive(derive_type, &baseline.clone(), limits);
+        let (can_f, cannot_f) = self.derive(derive_type, &baseline, limits);
         let time_f = start_f.elapsed();
         let start_b = Instant::now();
-        let (can_b, cannot_b) = baseline.derive(derive_type, &self.clone(), limits);
+        let (can_b, cannot_b) = baseline.derive(derive_type, &self, limits);
         let time_b = start_b.elapsed();
 
         let derivability_results = json!({
@@ -339,13 +339,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
 
-        let derivable_ratio_enumo =
-            format!("{}/{}", can_f.len().to_string(), baseline.len().to_string());
-        let derivable_ratio_oopsla = format!(
-            "{}/{}",
-            can_b.len().to_string(),
-            self.clone().len().to_string()
-        );
+        let derivable_ratio_enumo = format!("{}/{}", can_f.len(), baseline.len());
+        let derivable_ratio_oopsla = format!("{}/{}", can_b.len(), self.clone().len());
 
         (
             (derivable_ratio_enumo, derivable_ratio_oopsla),
