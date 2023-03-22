@@ -431,7 +431,7 @@ mod test {
         all_rules.write_json_rules("halide.json");
         all_rules.write_json_equiderivability(
             DeriveType::LhsAndRhs,
-            baseline,
+            &baseline,
             "halide.json",
             Limits::default(),
             duration,
