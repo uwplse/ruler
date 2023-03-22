@@ -325,7 +325,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let (can_f, cannot_f) = self.derive(derive_type, &baseline, limits);
         let time_f = start_f.elapsed();
         let start_b = Instant::now();
-        let (can_b, cannot_b) = baseline.derive(derive_type, &self, limits);
+        let (can_b, cannot_b) = baseline.derive(derive_type, self, limits);
         let time_b = start_b.elapsed();
 
         let derivability_results = json!({
