@@ -262,13 +262,13 @@ impl<L: SynthLanguage> Ruleset<L> {
             "# rules found": self.len(),
             "rulefinding time (sec)": time_rules.as_secs_f64(),
             &format!("# {} rules", baseline_name): baseline.len(),
-            &format!("{} -> {} (lhs, lhs & rhs, all)", name, baseline_name): 
+            &format!("{} -> {} (lhs, lhs & rhs, all)", name, baseline_name):
                 format!("{}, {}, {}", forwards_lhs, forwards_lhs_rhs, forwards_all),
-            &format!("{} -> {} time", name, baseline_name): 
+            &format!("{} -> {} time", name, baseline_name):
                 format!("{}, {}, {}", lhs_f.as_secs_f64(), lhs_rhs_f.as_secs_f64(), all_f.as_secs_f64()),
-            &format!("{} -> {} (lhs, lhs & rhs, all)", baseline_name, name): 
+            &format!("{} -> {} (lhs, lhs & rhs, all)", baseline_name, name):
                 format!("{}, {}, {}", backwards_lhs, backwards_lhs_rhs, backwards_all),
-            &format!("{} -> {} time", baseline_name, name): 
+            &format!("{} -> {} time", baseline_name, name):
                 format!("{}, {}, {}", lhs_b.as_secs_f64(), lhs_rhs_b.as_secs_f64(), all_b.as_secs_f64()),
             "minimization strategy": "compress",
         });
@@ -339,8 +339,13 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
 
-        let derivable_ratio_enumo = format!("{}/{}", can_f.len().to_string(), baseline.len().to_string());
-        let derivable_ratio_oopsla = format!("{}/{}", can_b.len().to_string(), self.clone().len().to_string());
+        let derivable_ratio_enumo =
+            format!("{}/{}", can_f.len().to_string(), baseline.len().to_string());
+        let derivable_ratio_oopsla = format!(
+            "{}/{}",
+            can_b.len().to_string(),
+            self.clone().len().to_string()
+        );
 
         (
             (derivable_ratio_enumo, derivable_ratio_oopsla),

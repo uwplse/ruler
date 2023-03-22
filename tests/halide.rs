@@ -314,7 +314,8 @@ mod test {
     use std::time::Instant;
 
     use ruler::{
-        enumo::{Filter, Metric, Ruleset, Workload}, Limits,
+        enumo::{Filter, Metric, Ruleset, Workload},
+        Limits,
     };
 
     use crate::Pred;
