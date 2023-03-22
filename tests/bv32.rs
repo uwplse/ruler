@@ -76,7 +76,7 @@ mod test {
         all_rules
     }
 
-    // #[test]
+    #[test]
     fn run() {
         let start = Instant::now();
         let rules = bv32_rules();

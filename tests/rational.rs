@@ -628,7 +628,7 @@ pub mod test {
         )
     }
 
-    // #[test]
+    #[test]
     fn run_all() {
         let start = Instant::now();
         let rules = replicate_ruler1_recipe();
