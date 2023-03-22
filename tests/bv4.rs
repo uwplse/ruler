@@ -86,6 +86,6 @@ mod test {
 
         rules.write_json_rules("bv4.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-        rules.baseline_compare_to(baseline, "ruler1", "bv4", duration, 3, 200_000);
+        rules.baseline_compare_to(&baseline, "ruler1", "bv4", duration, 3, 200_000);
     }
 }

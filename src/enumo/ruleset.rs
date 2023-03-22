@@ -244,10 +244,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
 
         println!("Calculating derivability of baseline");
-        let (can_f, cannot_f) = self.derive(baseline.clone(), limits);
+        let (can_f, cannot_f) = self.derive(&baseline, limits);
 
         println!("Calculating derivability of self from baseline");
-        let (can_b, cannot_b) = baseline.derive(self.clone(), limits);
+        let (can_b, cannot_b) = baseline.derive(&self, limits);
 
         let derivability_results = json!({
             "forwards derivable": &can_f.to_str_vec(),
@@ -317,7 +317,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn baseline_compare_to(
         &self,
-        baseline: Self,
+        baseline: &Self,
         baseline_name: &str,
         domain_name: &str,
         duration: Duration,
@@ -350,7 +350,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         limits.derive_type = DeriveType::AllRules;
         println!("Calculating all rules derivability of baseline");
         self.write_json_equiderivability(
-            baseline,
+            baseline.clone(),
             &format!("{}_{}_allrules.json", baseline_name, domain_name),
             limits,
             duration,
@@ -566,7 +566,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         if let DeriveType::AllRules = limits.derive_type {
             self.shrink_all_lhs_rhs(chosen, limits)
         } else {
-            let (_can, cant) = chosen.derive(self, limits);
+            let (_can, cant) = chosen.derive(&self, limits);
             cant
         }
     }
@@ -631,7 +631,24 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
-    pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
+    pub fn derive(&self, against: &Self, limits: Limits) -> (Self, Self) {
         against.partition(|eq| self.can_derive(eq, against.clone(), limits))
+    }
+
+    pub fn print_derive(limits: Limits, one: &str, two: &str) {
+        let r1: Ruleset<L> = Ruleset::from_file(one);
+        let r2: Ruleset<L> = Ruleset::from_file(two);
+
+        let (can, cannot) = r1.derive(&r2, limits);
+        println!(
+            "Using {} ({}) to derive {} ({}).\nCan derive {}, cannot derive {}. Missing:",
+            one,
+            r1.len(),
+            two,
+            r2.len(),
+            can.len(),
+            cannot.len()
+        );
+        cannot.pretty_print();
     }
 }

@@ -165,7 +165,7 @@ mod test {
     }
 
     fn rational_rules() -> Ruleset {
-        let rules = rational::test::rational_rules();
+        let rules = rational::test::best_enumo_recipe();
         let rule_strs = rules.to_str_vec();
         let rule_strs: Vec<&str> = rule_strs.iter().map(|x| &**x).collect();
         Ruleset::new(&rule_strs)

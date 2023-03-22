@@ -223,7 +223,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(&expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -281,7 +281,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(&expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -327,7 +327,7 @@ mod test {
 
         rules.write_json_rules("bool.json");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
-        rules.baseline_compare_to(baseline, "ruler1", "bool", duration, 3, 200_000);
+        rules.baseline_compare_to(&baseline, "ruler1", "bool", duration, 3, 200_000);
     }
 
     #[test]
@@ -371,8 +371,8 @@ mod test {
         );
         four.to_file("four.txt");
 
-        let (can, cannot) = three.clone().derive(
-            four.clone(),
+        let (can, cannot) = three.derive(
+            &four,
             Limits {
                 iter: 10,
                 node: 1000000,
@@ -383,7 +383,7 @@ mod test {
         assert_eq!(cannot.len(), 12);
 
         let (can_four_three, _cannot_four_three) = four.derive(
-            three.clone(),
+            &three,
             Limits {
                 iter: 10,
                 node: 1000000,
