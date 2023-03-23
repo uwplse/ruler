@@ -31,9 +31,8 @@ def generate_html():
           base = open("rep/base.html", "r").read()
           base = base.replace("NAME", filename)
           base = base.replace("\"REPLACE_WITH_JSON\"", content)
-          specname = Path(filename)
-          base = base.replace("\"REPLACE_WITH_SPECNAME\"", specname.stem)
           without_extension = filename[:-5]
+          base = base.replace("\"REPLACE_WITH_SPECNAME\"", filename)
           
           open(output_dir + "/" + without_extension + ".html", "w").write(base)
 
