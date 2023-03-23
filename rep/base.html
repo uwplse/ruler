@@ -11,17 +11,17 @@
 <center><p id="table-fwd-no"></p></center>
 <center><p id="table-bkwd-yes"></p></center>
 <center><p id="table-bkwd-no"></p></center>
-<center><p>Raw JSON: <a href="REPLACE_WITH_FILENAME"></a>raw JSON</a></p></center>
+<center><p>Raw JSON: <a href="NAME"></a>raw JSON</a></p></center>
 <body>
 <script type="text/javascript">
     
     window.addEventListener("load", () => {
         var obj = "REPLACE_WITH_JSON";
 
-        var tableFwdsYes = ConvertJsonToTable(obj["forwards derivable"], "REPLACE_WITH_SPECNAME derivable");
+        var tableFwdsYes = ConvertJsonToTable(obj["forwards derivable"], "REPLACE_WITH_SPEC derivable");
         document.getElementById("table-fwd-yes").innerHTML = tableFwdsYes;
 
-        var tableFwdsNo = ConvertJsonToTable(obj["forwards underivable"], "REPLACE_WITH_SPECNAME underivable");
+        var tableFwdsNo = ConvertJsonToTable(obj["forwards underivable"], "REPLACE_WITH_SPEC underivable");
         document.getElementById("table-fwd-no").innerHTML = tableFwdsNo;
 
         var tableBkwdsYes = ConvertJsonToTable(obj["backwards derivable"], "baseline derivable");
