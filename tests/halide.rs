@@ -434,7 +434,10 @@ mod test {
             "halide",
             "baseline",
             "halide.json",
-            Limits::default(),
+            Limits {
+                iter: 2,
+                node: 200000,
+            },
             duration,
         )
     }
