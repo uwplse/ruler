@@ -32,7 +32,7 @@ def generate_html():
           base = base.replace("NAME", filename)
           base = base.replace("\"REPLACE_WITH_JSON\"", content)
           without_extension = filename[:-5]
-          base = base.replace("\"REPLACE_WITH_SPECNAME\"", filename)
+          base = base.replace("\"REPLACE_WITH_SPECNAME\"", without_extension)
           
           open(output_dir + "/" + without_extension + ".html", "w").write(base)
 
