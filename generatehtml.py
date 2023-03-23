@@ -1,5 +1,4 @@
 import sys, os
-from pathlib import Path
 
 baseline_json = "rep/json/baseline.json"
 herbie_json = "rep/json/herbie.json"
