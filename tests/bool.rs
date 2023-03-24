@@ -223,7 +223,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -281,7 +281,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -386,7 +386,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(can.len(), 16);
-        assert_eq!(cannot.len(), 7);
+        assert_eq!(can.len(), 12);
+        assert_eq!(cannot.len(), 12);
     }
 }

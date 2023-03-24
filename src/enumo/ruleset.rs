@@ -532,7 +532,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         for eq in self.0.values() {
             let lhs = egraph.add_expr(&L::instantiate(&eq.lhs));
             let rhs = egraph.add_expr(&L::instantiate(&eq.rhs));
-            initial.push((lhs, rhs));
+            initial.push((lhs, rhs, eq.clone()));
         }
 
         // 3. compress with the rules we've chosen so far
@@ -540,16 +540,12 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
-        let extract = Extractor::new(&egraph, AstSize);
         self.0 = Default::default();
-        for (l_id, r_id) in initial {
+        for (l_id, r_id, eq) in initial {
             if egraph.find(l_id) == egraph.find(r_id) {
                 // candidate has merged (derivable from other rewrites)
                 continue;
-            }
-            let (_, left) = extract.find_best(l_id);
-            let (_, right) = extract.find_best(r_id);
-            if let Some(eq) = Rule::from_recexprs(&left, &right) {
+            } else {
                 self.add(eq);
             }
         }
