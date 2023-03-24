@@ -33,7 +33,7 @@ egg::define_language! {
     "~" = Neg(Id),
     "fabs" = Abs(Id),
     "if" = If([Id; 3]),
-    "zero?" = Z(Id),
+    "zero" = Z(Id),
     Lit(Constant),
     Var(egg::Symbol),
   }
@@ -62,7 +62,7 @@ impl SynthLanguage for Math {
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
             Math::If([x, y, z]) => {
-                map!(get_cvec, x, y, z => Some( if x.is_zero() {y.clone()} else {z.clone()}))
+                map!(get_cvec, x, y, z => Some( if x.is_zero() {z.clone()} else {y.clone()}))
             }
 
             Math::Z(x) => {
@@ -87,10 +87,7 @@ impl SynthLanguage for Math {
             Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
             Math::Div([x, y]) => mul(get_interval(x), &recip(get_interval(y))),
             Math::If(_) => Interval::default(), // TODO?
-            Math::Z(_) => Interval {
-                low: Some(mk_rat(0, 1)),
-                high: Some(mk_rat(1, 1)),
-            },
+            Math::Z(_) => Interval::default(),
         }
     }
 
@@ -696,6 +693,48 @@ pub mod test {
                 node: 150000,
             },
         )
+    }
+
+    #[test]
+    fn cond_div_figure() {
+        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
+        let uops = &Workload::new(["~", "fabs"]);
+        let bops = &Workload::new(["+", "-", "*", "/"]);
+
+        let mut all_rules = Ruleset::default();
+
+        let starting_rules = Math::run_workload(
+            lang.clone()
+                .iter_metric("expr", enumo::Metric::Atoms, 3)
+                .plug_lang(
+                    &Workload::new(["a", "b", "c"]),
+                    &Workload::new(["-1", "0", "1"]),
+                    uops,
+                    bops,
+                ),
+            all_rules.clone(),
+            Limits::default(),
+        );
+        all_rules.extend(starting_rules);
+
+        let basic_if_rules = Math::run_workload(
+            Workload::new(["(if e e e)"])
+                .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
+            all_rules.clone(),
+            Limits::default(),
+        );
+        all_rules.extend(basic_if_rules);
+
+        let terms = Workload::new(["(/ lit var)", "(if (zero var) (/ lit var) (op lit lit))"])
+            .plug("lit", &Workload::new(["a", "0", "1"]))
+            .plug("var", &Workload::new(["a"]))
+            .plug("op", &Workload::new(["+", "-", "*", "/"]));
+        terms.to_file("guard.terms");
+
+        let guarded_rules = Math::run_workload(terms, all_rules.clone(), Limits::default());
+        assert!(guarded_rules
+            .0
+            .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
     }
 
     #[test]
