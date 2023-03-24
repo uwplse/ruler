@@ -736,11 +736,4 @@ pub mod test {
             .0
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
     }
-
-    #[test]
-    fn cond_div() {
-        // Goal: x/x => if (x != 0) 1 else x/x
-        let wkld = Workload::new(["(/ x x)", "(zero? x)", "(if (zero? x) (/ x x) 1)"]);
-        Math::run_workload(wkld, Ruleset::default(), Limits::default());
-    }
 }
