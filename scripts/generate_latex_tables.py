@@ -26,13 +26,13 @@ def generate_tables(filename):
   return tables
 
 def generate_table(data, baseline):
+  columns = get_headers_for_baseline(baseline)
+
   lines = [
     r'\begin{table}[]',
     r'\resizebox{\textwidth}{!}{%',
-    r'\begin{tabular}{lllllllll}'
+    r'\begin{tabular}{' + ('l' * len(columns)) + r'}'
   ]
-
-  columns = get_headers_for_baseline(baseline)
 
   lines.append(parse_header(columns))
 
