@@ -600,7 +600,7 @@ mod test {
 
     #[test]
     fn simple() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         assert_eq!(complex.len(), 57);
 
         let limits = Limits {
