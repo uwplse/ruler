@@ -66,9 +66,9 @@ function do_branch {
   fi
 
   # In case of broken nightlies, target different branch
-  if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" ]]; then
-    sed -i 's/main/halide/g' "$HERBIE_DIR/src/syntax/rules.rkt"
-  fi
+  # if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" ]]; then
+  #   sed -i 's/main/halide/g' "$HERBIE_DIR/src/syntax/rules.rkt"
+  # fi
 
   make install
   popd
