@@ -18,16 +18,16 @@
     window.addEventListener("load", () => {
         var obj = "REPLACE_WITH_JSON";
 
-        var tableFwdsYes = ConvertJsonToTable(obj["forwards derivable"], "REPLACE_WITH_SPEC derivable");
+        var tableFwdsYes = ConvertJsonToTable(obj["enumo_derives_baseline_derivable"], "REPLACE_WITH_SPEC derivable");
         document.getElementById("table-fwd-yes").innerHTML = tableFwdsYes;
 
-        var tableFwdsNo = ConvertJsonToTable(obj["forwards underivable"], "REPLACE_WITH_SPEC underivable");
+        var tableFwdsNo = ConvertJsonToTable(obj["enumo_derives_baseline_underivable"], "REPLACE_WITH_SPEC underivable");
         document.getElementById("table-fwd-no").innerHTML = tableFwdsNo;
 
-        var tableBkwdsYes = ConvertJsonToTable(obj["backwards derivable"], "baseline derivable");
+        var tableBkwdsYes = ConvertJsonToTable(obj["baseline_derives_enumo_derivable"], "baseline derivable");
         document.getElementById("table-bkwd-yes").innerHTML = tableBkwdsYes;
 
-        var tableBkwdsNo = ConvertJsonToTable(obj["backwards underivable"], "baseline underivable");
+        var tableBkwdsNo = ConvertJsonToTable(obj["baseline_derives_enumo_underivablee"], "baseline underivable");
         document.getElementById("table-bkwd-no").innerHTML = tableBkwdsNo;
     });
 </script>

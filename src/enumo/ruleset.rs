@@ -224,18 +224,27 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn write_baseline_row(
         &self,
         baseline: Self,
-        name: &str,
+        enumo_name: &str,
         baseline_name: &str,
         outfile: &str,
         limits: Limits,
         time_rules: Duration,
     ) {
         let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b)) =
-            self.write_derivability_results(DeriveType::Lhs, baseline.clone(), name, limits);
-        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b)) =
-            self.write_derivability_results(DeriveType::LhsAndRhs, baseline.clone(), name, limits);
-        let ((forwards_all, backwards_all), (all_f, all_b)) =
-            self.write_derivability_results(DeriveType::AllRules, baseline.clone(), name, limits);
+            self.write_derivability_results(DeriveType::Lhs, baseline.clone(), enumo_name, limits);
+        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b)) = self
+            .write_derivability_results(
+                DeriveType::LhsAndRhs,
+                baseline.clone(),
+                enumo_name,
+                limits,
+            );
+        let ((forwards_all, backwards_all), (all_f, all_b)) = self.write_derivability_results(
+            DeriveType::AllRules,
+            baseline.clone(),
+            enumo_name,
+            limits,
+        );
 
         let mut filepath = "rep/json/".to_owned();
         filepath.push_str(outfile);
@@ -258,17 +267,18 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         let stats = json!({
-            "domain": name,
-            "# rules found": self.len(),
-            "rulefinding time (sec)": time_rules.as_secs_f64(),
-            &format!("# {} rules", baseline_name): baseline.len(),
-            &format!("enumo -> {} (lhs, lhs & rhs, all)", baseline_name):
+            "baseline_name": baseline_name,
+            "enumo_spec_name": enumo_name,
+            "num_rules": self.len(),
+            "num_baseline": baseline.len(),
+            "time": time_rules.as_secs_f64(),
+            "enumo_derives_baseline (lhs, lhs & rhs, all)":
                 format!("{}, {}, {}", forwards_lhs, forwards_lhs_rhs, forwards_all),
-            &format!("enumo -> {} time",baseline_name):
+            "enumo_derives_baseline_time":
                 format!("{}, {}, {}", lhs_f.as_secs_f64(), lhs_rhs_f.as_secs_f64(), all_f.as_secs_f64()),
-            &format!("{} -> enumo (lhs, lhs & rhs, all)", baseline_name):
+            "baseline_derives_enumo (lhs, lhs & rhs, all)":
                 format!("{}, {}, {}", backwards_lhs, backwards_lhs_rhs, backwards_all),
-            &format!("{} -> enumo time", baseline_name):
+            "baseline_derives_enumo_time":
                 format!("{}, {}, {}", lhs_b.as_secs_f64(), lhs_rhs_b.as_secs_f64(), all_b.as_secs_f64()),
             "minimization strategy": "compress",
         });
@@ -329,10 +339,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         let time_b = start_b.elapsed();
 
         let derivability_results = json!({
-            "forwards derivable": &can_f.to_str_vec(),
-            "forwards underivable": &cannot_f.to_str_vec(),
-            "backwards derivable": &can_b.to_str_vec(),
-            "backwards underivable": &cannot_b.to_str_vec(),
+            "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
+            "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
+            "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
+            "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
         })
         .to_string();
 
