@@ -32,6 +32,8 @@ egg::define_language! {
     "/" = Div([Id; 2]),
     "~" = Neg(Id),
     "fabs" = Abs(Id),
+    "if" = If([Id; 3]),
+    "zero" = Z(Id),
     Lit(Constant),
     Var(egg::Symbol),
   }
@@ -59,6 +61,15 @@ impl SynthLanguage for Math {
             Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
+            Math::If([x, y, z]) => {
+                map!(get_cvec, x, y, z => Some( if x.is_zero() {z.clone()} else {y.clone()}))
+            }
+
+            Math::Z(x) => {
+                let zero = mk_rat(0, 1);
+                let one = mk_rat(1, 1);
+                map!(get_cvec, x => Some(if x.eq(&zero) {one.clone()} else {zero.clone()}))
+            }
         }
     }
 
@@ -75,6 +86,8 @@ impl SynthLanguage for Math {
             Math::Sub([x, y]) => add(get_interval(x), &neg(get_interval(y))),
             Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
             Math::Div([x, y]) => mul(get_interval(x), &recip(get_interval(y))),
+            Math::If(_) => Interval::default(), // TODO?
+            Math::Z(_) => Interval::default(),
         }
     }
 
@@ -220,6 +233,25 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 (c.denom()).to_i32().unwrap(),
             )),
             Math::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
+            Math::If([x, y, z]) => {
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                let cond = z3::ast::Bool::not(&buf[usize::from(*x)]._eq(&zero));
+                buf.push(z3::ast::Bool::ite(
+                    &cond,
+                    &buf[usize::from(*y)],
+                    &buf[usize::from(*z)],
+                ))
+            }
+            Math::Z(x) => {
+                let l = &buf[usize::from(*x)];
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                let one = z3::ast::Real::from_real(ctx, 1, 1);
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Real::_eq(l, &zero),
+                    &one,
+                    &zero,
+                ))
+            }
         }
     }
     buf.pop().unwrap()
@@ -661,5 +693,47 @@ pub mod test {
                 node: 150000,
             },
         )
+    }
+
+    #[test]
+    fn cond_div_figure() {
+        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
+        let uops = &Workload::new(["~", "fabs"]);
+        let bops = &Workload::new(["+", "-", "*", "/"]);
+
+        let mut all_rules = Ruleset::default();
+
+        let starting_rules = Math::run_workload(
+            lang.clone()
+                .iter_metric("expr", enumo::Metric::Atoms, 3)
+                .plug_lang(
+                    &Workload::new(["a", "b", "c"]),
+                    &Workload::new(["-1", "0", "1"]),
+                    uops,
+                    bops,
+                ),
+            all_rules.clone(),
+            Limits::default(),
+        );
+        all_rules.extend(starting_rules);
+
+        let basic_if_rules = Math::run_workload(
+            Workload::new(["(if e e e)"])
+                .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
+            all_rules.clone(),
+            Limits::default(),
+        );
+        all_rules.extend(basic_if_rules);
+
+        let terms = Workload::new(["(/ lit var)", "(if (zero var) (/ lit var) (op lit lit))"])
+            .plug("lit", &Workload::new(["a", "0", "1"]))
+            .plug("var", &Workload::new(["a"]))
+            .plug("op", &Workload::new(["+", "-", "*", "/"]));
+        terms.to_file("guard.terms");
+
+        let guarded_rules = Math::run_workload(terms, all_rules.clone(), Limits::default());
+        assert!(guarded_rules
+            .0
+            .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
     }
 }
