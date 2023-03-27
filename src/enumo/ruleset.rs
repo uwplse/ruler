@@ -352,10 +352,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
 
-        (
-            (can_f.len(), can_b.len()),
-            (time_f, time_b),
-        )
+        ((can_f.len(), can_b.len()), (time_f, time_b))
     }
 
     pub fn extract_candidates(
