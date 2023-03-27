@@ -65,10 +65,16 @@ function do_branch {
     cp "$MYDIR/empty-rules.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
   fi
 
-  # In case of broken nightlies, target different branch
-  # if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" ]]; then
-  #   sed -i 's/main/halide/g' "$HERBIE_DIR/src/syntax/rules.rkt"
-  # fi
+  # Patch ruler-autogen rule branches
+  if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" ]]; then
+    # In case of broken nightlies, target different branch
+    sed -i 's/main/halide/g' "$HERBIE_DIR/src/syntax/rules.rkt"
+    if [[ "$flags" == *"-o rules:numerics"* ]]; then
+      echo "skipping numerics patch"
+    else
+      cat "$MYDIR/numerics.patch" >> "$HERBIE_DIR/src/syntax/rules.rkt"
+    fi
+  fi
 
   make install
   popd
@@ -95,9 +101,13 @@ if [ -z "$NO_RUN" ]; then
   do_branch main main-t -o generate:taylor
   do_branch main main-n-t -o rules:numerics -o generate:taylor
   do_branch using-ruler-nightlies enumo
+  do_branch using-ruler-nightlies enumo-n -o rules:numerics
   do_branch using-ruler-nightlies enumo-t -o generate:taylor
+  do_branch using-ruler-nightlies enumo-n-t -o rules:numerics -o generate:taylor
   do_branch using-ruler-baseline ruler
+  do_branch using-ruler-baseline ruler-n -o rules:numerics
   do_branch using-ruler-baseline ruler-t -o generate:taylor
+  do_branch using-ruler-baseline ruler-n-t -o rules:numerics -o generate:taylor
   do_branch main no-rules -o generate:rr -o generate:simplify
 fi
 
