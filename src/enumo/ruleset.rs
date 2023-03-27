@@ -8,7 +8,7 @@ use std::{io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
-    SynthAnalysis, SynthLanguage, ValidationResult,
+    SynthAnalysis, SynthLanguage,
 };
 
 use super::{Rule, Scheduler};
@@ -106,8 +106,8 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn bidir_len(&self) -> usize {
         let mut bidir = 0;
         let mut unidir = 0;
-        for (_, eq) in &self.0 {
-            let reverse = Rule::new(eq.rhs.clone(), eq.lhs.clone());
+        for (_, rule) in &self.0 {
+            let reverse = Rule::new(rule.rhs.clone(), rule.lhs.clone());
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
                 bidir += 1;
             } else {
@@ -117,12 +117,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         unidir + (bidir / 2)
     }
 
-    pub fn contains(&self, eq: &Rule<L>) -> bool {
-        self.0.contains_key(&eq.name)
+    pub fn contains(&self, rule: &Rule<L>) -> bool {
+        self.0.contains_key(&rule.name)
     }
 
-    pub fn add(&mut self, eq: Rule<L>) {
-        self.0.insert(eq.name.clone(), eq);
+    pub fn add(&mut self, rule: Rule<L>) {
+        self.0.insert(rule.name.clone(), rule);
     }
 
     pub fn remove_all(&mut self, other: Self) {
@@ -140,14 +140,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         F: Fn(&Rule<L>) -> bool + std::marker::Sync,
     {
         let results = Mutex::new((Ruleset::default(), Ruleset::default()));
-        let eqs: Vec<&Rule<L>> = self.0.values().collect();
-        eqs.into_par_iter().for_each(|eq| {
-            let f_eq = f(eq);
+        let rules: Vec<&Rule<L>> = self.0.values().collect();
+        rules.into_par_iter().for_each(|rule| {
+            let f_rule = f(rule);
             let mut results = results.lock().unwrap();
-            if f_eq {
-                results.0.add(eq.clone());
+            if f_rule {
+                results.0.add(rule.clone());
             } else {
-                results.1.add(eq.clone());
+                results.1.add(rule.clone());
             }
         });
         results.into_inner().unwrap()
@@ -164,27 +164,27 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn from_file(filename: &str) -> Self {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
-        let mut all_eqs = IndexMap::default();
+        let mut all_rules = IndexMap::default();
         for line in std::io::BufRead::lines(reader) {
             let line = line.unwrap();
             if let Ok((forwards, backwards)) = Rule::from_string(&line) {
-                all_eqs.insert(forwards.name.clone(), forwards);
+                all_rules.insert(forwards.name.clone(), forwards);
                 if let Some(backwards) = backwards {
-                    all_eqs.insert(backwards.name.clone(), backwards);
+                    all_rules.insert(backwards.name.clone(), backwards);
                 }
             }
         }
-        Self(all_eqs)
+        Self(all_rules)
     }
 
     pub fn pretty_print(&self) {
         let mut strs = vec![];
-        for (name, eq) in &self.0 {
-            let reverse = Rule::new(eq.rhs.clone(), eq.lhs.clone());
+        for (name, rule) in &self.0 {
+            let reverse = Rule::new(rule.rhs.clone(), rule.lhs.clone());
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
-                let reverse_name = format!("{} <=> {}", eq.rhs, eq.lhs);
+                let reverse_name = format!("{} <=> {}", rule.rhs, rule.lhs);
                 if !strs.contains(&reverse_name) {
-                    strs.push(format!("{} <=> {}", eq.lhs, eq.rhs));
+                    strs.push(format!("{} <=> {}", rule.lhs, rule.rhs));
                 }
             } else {
                 strs.push(name.to_string());
@@ -370,11 +370,11 @@ impl<L: SynthLanguage> Ruleset<L> {
                         continue;
                     }
                     if e1 != e2 {
-                        if let Some(eq) = Rule::from_recexprs(&e1, &e2) {
-                            candidates.add(eq)
+                        if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
+                            candidates.add(rule)
                         }
-                        if let Some(eq) = Rule::from_recexprs(&e2, &e1) {
-                            candidates.add(eq)
+                        if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
+                            candidates.add(rule)
                         }
                     }
                 }
@@ -396,7 +396,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         let eg_init = egraph;
         // Allowed rules: run on clone, apply unions, no candidates
-        let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
+        let (allowed, _) = prior.partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
         let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
@@ -446,11 +446,11 @@ impl<L: SynthLanguage> Ruleset<L> {
                 if compare(&class1.data.cvec, &class2.data.cvec) {
                     let (_, e1) = extract.find_best(class1.id);
                     let (_, e2) = extract.find_best(class2.id);
-                    if let Some(eq) = Rule::from_recexprs(&e1, &e2) {
-                        candidates.add(eq);
+                    if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
+                        candidates.add(rule);
                     }
-                    if let Some(eq) = Rule::from_recexprs(&e2, &e1) {
-                        candidates.add(eq);
+                    if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
+                        candidates.add(rule);
                     }
                 }
             }
@@ -477,11 +477,11 @@ impl<L: SynthLanguage> Ruleset<L> {
 
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
-                    if let Some(eq) = Rule::from_recexprs(e1, e2) {
-                        candidates.add(eq);
+                    if let Some(rule) = Rule::from_recexprs(e1, e2) {
+                        candidates.add(rule);
                     }
-                    if let Some(eq) = Rule::from_recexprs(e2, e1) {
-                        candidates.add(eq);
+                    if let Some(rule) = Rule::from_recexprs(e2, e1) {
+                        candidates.add(rule);
                     }
                 }
             }
@@ -492,24 +492,22 @@ impl<L: SynthLanguage> Ruleset<L> {
     fn select(&mut self, step_size: usize) -> Self {
         let mut chosen = Self::default();
         self.0
-            .sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
+            .sort_by(|_, rule1, _, rule2| rule1.score().cmp(&rule2.score()));
 
         // 2. insert step_size best candidates into self.new_rws
         let mut selected: Ruleset<L> = Default::default();
         while selected.len() < step_size {
             let popped = self.0.pop();
-            if let Some((_, eq)) = popped {
-                if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
-                    selected.add(eq.clone());
+            if let Some((_, rule)) = popped {
+                if rule.is_valid() {
+                    selected.add(rule.clone());
                 }
 
                 // If reverse direction is also in candidates, add it at the same time
-                let reverse = Rule::new(eq.rhs, eq.lhs);
+                let reverse = Rule::new(rule.rhs, rule.lhs);
                 if let Some(reverse) = reverse {
-                    if self.contains(&reverse) {
-                        if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
-                            selected.add(reverse);
-                        }
+                    if self.contains(&reverse) && reverse.is_valid() {
+                        selected.add(reverse);
                     }
                 }
             } else {
@@ -529,10 +527,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         let mut initial = vec![];
         // 2. insert lhs and rhs of all candidates as roots
-        for eq in self.0.values() {
-            let lhs = egraph.add_expr(&L::instantiate(&eq.lhs));
-            let rhs = egraph.add_expr(&L::instantiate(&eq.rhs));
-            initial.push((lhs, rhs, eq.clone()));
+        for rule in self.0.values() {
+            let lhs = egraph.add_expr(&L::instantiate(&rule.lhs));
+            let rhs = egraph.add_expr(&L::instantiate(&rule.rhs));
+            initial.push((lhs, rhs, rule.clone()));
         }
 
         // 3. compress with the rules we've chosen so far
@@ -541,12 +539,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
         self.0 = Default::default();
-        for (l_id, r_id, eq) in initial {
+        for (l_id, r_id, rule) in initial {
             if egraph.find(l_id) == egraph.find(r_id) {
                 // candidate has merged (derivable from other rewrites)
                 continue;
             } else {
-                self.add(eq);
+                self.add(rule);
             }
         }
     }
@@ -586,9 +584,9 @@ impl<L: SynthLanguage> Ruleset<L> {
                 egraph.add_expr(rexpr);
             }
             DeriveType::AllRules => {
-                for eq in allrules.0.values() {
-                    let lhs = &L::instantiate(&eq.lhs);
-                    let rhs = &L::instantiate(&eq.rhs);
+                for rule in allrules.0.values() {
+                    let lhs = &L::instantiate(&rule.lhs);
+                    let rhs = &L::instantiate(&rule.rhs);
                     egraph.add_expr(lhs);
                     egraph.add_expr(rhs);
                 }
@@ -611,7 +609,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|eq| self.can_derive(derive_type, eq, against, limits))
+        against.partition(|rule| self.can_derive(derive_type, rule, against, limits))
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {
