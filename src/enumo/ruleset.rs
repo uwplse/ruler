@@ -8,7 +8,7 @@ use std::{io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
-    SynthAnalysis, SynthLanguage, ValidationResult,
+    SynthAnalysis, SynthLanguage,
 };
 
 use super::{Rule, Scheduler};
@@ -499,17 +499,15 @@ impl<L: SynthLanguage> Ruleset<L> {
         while selected.len() < step_size {
             let popped = self.0.pop();
             if let Some((_, eq)) = popped {
-                if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
+                if eq.is_valid() {
                     selected.add(eq.clone());
                 }
 
                 // If reverse direction is also in candidates, add it at the same time
                 let reverse = Rule::new(eq.rhs, eq.lhs);
                 if let Some(reverse) = reverse {
-                    if self.contains(&reverse) {
-                        if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
-                            selected.add(reverse);
-                        }
+                    if self.contains(&reverse) && reverse.is_valid() {
+                        selected.add(reverse);
                     }
                 }
             } else {
