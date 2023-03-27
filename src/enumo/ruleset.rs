@@ -200,7 +200,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     // nightly server. The ruleset is written as a json object with a single
     // field, "rules".
     pub fn write_json_rules(&self, filename: &str) {
-        let mut filepath = "rep/json/".to_owned();
+        let mut filepath = "nightly/json/".to_owned();
 
         std::fs::create_dir_all(filepath.clone())
             .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
@@ -235,7 +235,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         limits: Limits,
         duration: Duration,
     ) {
-        let mut filepath = "rep/json/derivable_rules/".to_owned();
+        let mut filepath = "nightly/json/derivable_rules/".to_owned();
 
         std::fs::create_dir_all(filepath.clone())
             .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
@@ -267,7 +267,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .read(true)
             .write(true)
             .create(true)
-            .open("rep/json/output.json")
+            .open("nightly/json/output.json")
             .expect("Unable to open file");
 
         let mut outfile_string = String::new();
@@ -295,7 +295,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             .write(true)
             .truncate(true)
             .create(true)
-            .open("rep/json/output.json")
+            .open("nightly/json/output.json")
             .expect("Unable to open file");
 
         file.write_all("[".as_bytes()).expect("write failed");
