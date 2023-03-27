@@ -232,16 +232,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
             self.write_derivability_results_big_object(DeriveType::Lhs, baseline.clone(), limits);
         let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) = self
-            .write_derivability_results_big_object(
-                DeriveType::LhsAndRhs,
-                baseline.clone(),
-                limits,
-            );
-        let ((forwards_all, backwards_all), (all_f, all_b), results_all) = self.write_derivability_results_big_object(
-            DeriveType::AllRules,
-            baseline.clone(),
-            limits,
-        );
+            .write_derivability_results_big_object(DeriveType::LhsAndRhs, baseline.clone(), limits);
+        let ((forwards_all, backwards_all), (all_f, all_b), results_all) = self
+            .write_derivability_results_big_object(DeriveType::AllRules, baseline.clone(), limits);
 
         let mut outfile = OpenOptions::new()
             .read(true)
@@ -444,7 +437,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         (
             (derivable_ratio_enumo, derivable_ratio_oopsla),
             (time_f, time_b),
-            
         )
     }
 
@@ -467,8 +459,12 @@ impl<L: SynthLanguage> Ruleset<L> {
             "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
             "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
         });
-        
-        ((can_f.len(), can_b.len()), (time_f, time_b), derivability_results)
+
+        (
+            (can_f.len(), can_b.len()),
+            (time_f, time_b),
+            derivability_results,
+        )
     }
 
     pub fn extract_candidates(
