@@ -1,2 +1,7 @@
+# Makefile for the nightly machine
+# Will not work on other systems
+
 nightly:
-	bash nightly-script.sh
+	bash infra/nightly.sh
+
+.PHONY: nightly
