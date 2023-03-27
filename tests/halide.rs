@@ -430,9 +430,20 @@ mod test {
 
         all_rules.write_json_rules("halide_rules.json");
         all_rules.write_baseline_row(
+            baseline.clone(),
+            "halide",
+            "baseline_halide",
+            "halide.json",
+            Limits {
+                iter: 2,
+                node: 200000,
+            },
+            duration,
+        );
+        all_rules.write_baseline_row_big_object(
             baseline,
             "halide",
-            "baseline",
+            "baseline_halide",
             Limits {
                 iter: 2,
                 node: 200000,

@@ -85,9 +85,20 @@ mod test {
         rules.write_json_rules("bv4.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
         rules.write_baseline_row(
+            baseline.clone(),
+            "bv4",
+            "oopsla_bv4",
+            "baseline.json",
+            Limits {
+                iter: 3,
+                node: 200000,
+            },
+            duration,
+        );
+        rules.write_baseline_row_big_object(
             baseline,
             "bv4",
-            "oopsla",
+            "oopsla_bv4",
             Limits {
                 iter: 3,
                 node: 200000,

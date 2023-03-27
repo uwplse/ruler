@@ -649,6 +649,17 @@ pub mod test {
 
         println!("Comparing rational to herbie...");
         rules.write_baseline_row(
+            herbie.clone(),
+            name,
+            "herbie_baseline",
+            "herbie.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+        rules.write_baseline_row_big_object(
             herbie,
             name,
             "herbie_baseline",
@@ -684,9 +695,20 @@ pub mod test {
 
         println!("Comparing rational to ruler1...");
         rules.write_baseline_row(
+            ruler1.clone(),
+            name,
+            "oopsla_rational",
+            "baseline.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+        rules.write_baseline_row_big_object(
             ruler1,
             name,
-            "oopsla",
+            "oopsla_rational",
             Limits {
                 iter: 2,
                 node: 150000,

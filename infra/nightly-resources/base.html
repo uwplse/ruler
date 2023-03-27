@@ -18,10 +18,10 @@
     window.addEventListener("load", () => {
         var obj = "REPLACE_WITH_JSON";
 
-        var tableFwdsYes = ConvertJsonToTable(obj["enumo_derives_baseline_derivable"], "REPLACE_WITH_SPEC derivable");
+        var tableFwdsYes = ConvertJsonToTable(obj["enumo_derives_baseline_derivable"], "enumo derivable");
         document.getElementById("table-fwd-yes").innerHTML = tableFwdsYes;
 
-        var tableFwdsNo = ConvertJsonToTable(obj["enumo_derives_baseline_underivable"], "REPLACE_WITH_SPEC underivable");
+        var tableFwdsNo = ConvertJsonToTable(obj["enumo_derives_baseline_underivable"], "enumo underivable");
         document.getElementById("table-fwd-no").innerHTML = tableFwdsNo;
 
         var tableBkwdsYes = ConvertJsonToTable(obj["baseline_derives_enumo_derivable"], "baseline derivable");
