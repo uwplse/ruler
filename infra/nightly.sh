@@ -19,7 +19,7 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 
 # Absolute directory paths
 TOP_DIR="$MYDIR/.."
-RESOURCE_DIR="$MYDIR/nightly"
+RESOURCE_DIR="$MYDIR/nightly-resources"
 NIGHTLY_DIR="$TOP_DIR/nightly"
 
 # Make sure we're in the right place
@@ -35,7 +35,7 @@ mkdir -p "$NIGHTLY_DIR/json" "$NIGHTLY_DIR/output"
 
 # Run tests.
 pushd $TOP_DIR
-RUST_TEST_THREADS=1 cargo test --release
+RUST_TEST_THREADS=1 cargo test --release --test bool
 popd
 
 # Update HTML index page.
