@@ -11,7 +11,6 @@ scripts/ablation/output/*
 scripts/eqsat-sound/output/*
 scripts/herbie-float/output/*
 scripts/herbie-rational/output/*
-scripts/**/*.json
 
 # Rust
 Cargo.lock
@@ -32,5 +31,5 @@ out/
 *.zo
 
 # Exceptions
-!scripts/ablation/submitted-plots/*.pdf
-!scripts/ablation/submitted-plots/*.json
+!scripts/oopsla21/ablation/submitted-plots/**/*.pdf
+!scripts/oopsla21/ablation/submitted-plots/**/*.json

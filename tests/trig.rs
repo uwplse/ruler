@@ -572,7 +572,7 @@ mod test {
 
     #[test]
     fn nightly_recipe() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         let limits = Limits {
             iter: 3,
             node: 2000000,
@@ -600,7 +600,7 @@ mod test {
 
     #[test]
     fn simple() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         assert_eq!(complex.len(), 57);
 
         let limits = Limits {

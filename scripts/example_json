@@ -1,0 +1,140 @@
+{
+  "oopsla": [
+    {
+      "domain": "bool",
+      "# rules found": 28,
+      "rulefinding time (sec)": 1.014991478,
+      "# oopsla rules": 51,
+      "enumo -> oopsla (lhs, lhs & rhs, all)": "39/51, 43/51, 51/51",
+      "enumo -> oopsla time": "0.104041383, 0.18735749, 21.719598257",
+      "oopsla -> enumo (lhs, lhs & rhs, all)": "28/28, 28/28, 28/28",
+      "oopsla -> enumo time": "0.793705205, 2.409191377, 18.351835227",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "bv32",
+      "# rules found": 57,
+      "rulefinding time (sec)": 18.421756834,
+      "# oopsla rules": 78,
+      "enumo -> oopsla (lhs, lhs & rhs, all)": "74/78, 76/78, 78/78",
+      "enumo -> oopsla time": "0.044585347, 0.048881204, 23.524592271",
+      "oopsla -> enumo (lhs, lhs & rhs, all)": "53/57, 53/57, 55/57",
+      "oopsla -> enumo time": "0.139339912, 0.157925453, 82.025676238",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "bv4",
+      "# rules found": 59,
+      "rulefinding time (sec)": 0.974915251,
+      "# oopsla rules": 84,
+      "enumo -> oopsla (lhs, lhs & rhs, all)": "76/84, 79/84, 84/84",
+      "enumo -> oopsla time": "0.03971249, 0.038010634, 30.262983782",
+      "oopsla -> enumo (lhs, lhs & rhs, all)": "58/59, 58/59, 59/59",
+      "oopsla -> enumo time": "0.109026803, 0.123698249, 174.735992465",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "rational_replicate",
+      "# rules found": 98,
+      "rulefinding time (sec)": 168.225040777,
+      "# oopsla rules": 113,
+      "enumo -> oopsla (lhs, lhs & rhs, all)": "91/113, 100/113, 104/113",
+      "enumo -> oopsla time": "0.037985486, 0.046049464, 1.673053074",
+      "oopsla -> enumo (lhs, lhs & rhs, all)": "83/98, 92/98, 95/98",
+      "oopsla -> enumo time": "0.046324366, 0.057244534, 13.02901925",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "rational_best",
+      "# rules found": 130,
+      "rulefinding time (sec)": 227.385160458,
+      "# oopsla rules": 113,
+      "enumo -> oopsla (lhs, lhs & rhs, all)": "92/113, 102/113, 108/113",
+      "enumo -> oopsla time": "0.05988025, 0.066719065, 2.584209453",
+      "oopsla -> enumo (lhs, lhs & rhs, all)": "87/130, 97/130, 100/130",
+      "oopsla -> enumo time": "0.05546866, 0.066315123, 21.292519372",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "rational_replicate",
+      "# rules found": 98,
+      "rulefinding time (sec)": 164.773740173,
+      "# oopsla rules": 113,
+      "enumo -> oopsla (lhs, lhs & rhs, all)": "91/113, 100/113, 104/113",
+      "enumo -> oopsla time": "0.036117669, 0.042114026, 1.6834605599999999",
+      "oopsla -> enumo (lhs, lhs & rhs, all)": "83/98, 92/98, 95/98",
+      "oopsla -> enumo time": "0.046881227, 0.058869733, 13.040560158",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "rational_best",
+      "# rules found": 130,
+      "rulefinding time (sec)": 224.927544274,
+      "# oopsla rules": 113,
+      "enumo -> oopsla (lhs, lhs & rhs, all)": "92/113, 102/113, 108/113",
+      "enumo -> oopsla time": "0.061290414, 0.067653942, 2.573308098",
+      "oopsla -> enumo (lhs, lhs & rhs, all)": "87/130, 97/130, 100/130",
+      "oopsla -> enumo time": "0.053970422, 0.066457157, 21.456864865",
+      "minimization strategy": "compress"
+    }
+  ],
+  "herbie_baseline": [
+    {
+      "domain": "herbie_rational_replicate",
+      "# rules found": 98,
+      "rulefinding time (sec)": 168.225040777,
+      "# herbie_baseline rules": 87,
+      "enumo -> herbie_baseline (lhs, lhs & rhs, all)": "43/87, 55/87, 56/87",
+      "enumo -> herbie_baseline time": "0.029629622, 0.029765835, 0.649295732",
+      "herbie_baseline -> enumo (lhs, lhs & rhs, all)": "10/98, 21/98, 21/98",
+      "herbie_baseline -> enumo time": "0.009993331, 0.011170344, 0.083133493",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "herbie_rational_best",
+      "# rules found": 130,
+      "rulefinding time (sec)": 227.385160458,
+      "# herbie_baseline rules": 87,
+      "enumo -> herbie_baseline (lhs, lhs & rhs, all)": "43/87, 55/87, 56/87",
+      "enumo -> herbie_baseline time": "0.050201664, 0.057408338, 1.383096237",
+      "herbie_baseline -> enumo (lhs, lhs & rhs, all)": "12/130, 25/130, 25/130",
+      "herbie_baseline -> enumo time": "0.013143148, 0.014951552, 0.13443616",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "herbie_rational_replicate",
+      "# rules found": 98,
+      "rulefinding time (sec)": 164.773740173,
+      "# herbie_baseline rules": 87,
+      "enumo -> herbie_baseline (lhs, lhs & rhs, all)": "43/87, 55/87, 56/87",
+      "enumo -> herbie_baseline time": "0.026747102, 0.031844113, 0.69484828",
+      "herbie_baseline -> enumo (lhs, lhs & rhs, all)": "10/98, 21/98, 21/98",
+      "herbie_baseline -> enumo time": "0.010170039, 0.011780909, 0.079838375",
+      "minimization strategy": "compress"
+    },
+    {
+      "domain": "herbie_rational_best",
+      "# rules found": 130,
+      "rulefinding time (sec)": 224.927544274,
+      "# herbie_baseline rules": 87,
+      "enumo -> herbie_baseline (lhs, lhs & rhs, all)": "43/87, 55/87, 56/87",
+      "enumo -> herbie_baseline time": "0.043052861, 0.060674542, 1.371755013",
+      "herbie_baseline -> enumo (lhs, lhs & rhs, all)": "12/130, 25/130, 25/130",
+      "herbie_baseline -> enumo time": "0.013514196, 0.014573495, 0.133898012",
+      "minimization strategy": "compress"
+    }
+  ],
+  "baseline": [
+    {
+      "domain": "halide",
+      "# rules found": 237,
+      "rulefinding time (sec)": 35.793610092,
+      "# baseline rules": 725,
+      "enumo -> baseline (lhs, lhs & rhs, all)": "105/725, 123/725, 202/725",
+      "enumo -> baseline time": "0.566811445, 0.746995599, 207.091126984",
+      "baseline -> enumo (lhs, lhs & rhs, all)": "0/237, 0/237, 0/237",
+      "baseline -> enumo time": "0.177454662, 0.184773119, 0.902583065",
+      "minimization strategy": "compress"
+    }
+  ]
+}
