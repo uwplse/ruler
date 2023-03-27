@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
-use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero}; 
+use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use rayon::vec;
 use ruler::{
@@ -9,9 +9,7 @@ use ruler::{
 };
 use std::time::Instant;
 
-
 pub type Constant = Ratio<BigInt>;
-
 
 fn get_nat_rules() -> Vec<&'static str> {
     [
@@ -36,7 +34,8 @@ fn get_nat_rules() -> Vec<&'static str> {
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
-    ].into()
+    ]
+    .into()
 }
 
 egg::define_language! {
@@ -88,24 +87,28 @@ impl SynthLanguage for CaddyAndFRep {
             "(/ z ?a) ==> (subst z z (/ z ?a))",
             "(min (subst ?e ?from ?to) ?a) ==> (subst (min ?e ?a) ?from ?to)",
             "(- ?a (subst ?e ?from ?to)) ==> (subst (- ?a ?e) ?from ?to)",
-
             "(Cuboid ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
             "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
             "(FRep (max ?a ?b)) ==> (Union (FRep ?a) (FRep ?b))",
             "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
             "(FRep (min ?a ?b)) ==> (Inter (FRep ?a) (FRep ?b))",
             // "(Empty) ==> (FRep (~ 1))",
-
-            "(Scale (FRep ?e) ?a ?b ?c)"
-            // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
+            "(Scale (FRep ?e) ?a ?b ?c)", // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
         ])
     }
 
     fn is_allowed_op(&self) -> bool {
         matches!(
             self,
-            CaddyAndFRep::FRep(_) | CaddyAndFRep::Cuboid(_) | CaddyAndFRep::Spheroid(_) | CaddyAndFRep::Trans(_) | CaddyAndFRep::Scale(_) | CaddyAndFRep::Var(_) | CaddyAndFRep::Union(_) | CaddyAndFRep::Inter(_) |
-            CaddyAndFRep::Cheat(_)
+            CaddyAndFRep::FRep(_)
+                | CaddyAndFRep::Cuboid(_)
+                | CaddyAndFRep::Spheroid(_)
+                | CaddyAndFRep::Trans(_)
+                | CaddyAndFRep::Scale(_)
+                | CaddyAndFRep::Var(_)
+                | CaddyAndFRep::Union(_)
+                | CaddyAndFRep::Inter(_)
+                | CaddyAndFRep::Cheat(_)
         )
     }
 

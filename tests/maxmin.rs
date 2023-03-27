@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
-use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero}; 
+use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use rayon::vec;
 use ruler::{
@@ -8,7 +8,6 @@ use ruler::{
     *,
 };
 use std::time::Instant;
-
 
 pub type Constant = Ratio<BigInt>;
 
@@ -135,7 +134,7 @@ egg::define_language! {
     "|" = Or([Id; 2]),
     "true" = True,
     "false" = False,
-    
+
     // rule utility
     "know" = Know([Id; 2]),
     "binop" = Binop([Id; 3]),
@@ -165,238 +164,236 @@ impl SynthLanguage for CaddyAndFRep {
         true
     }
 
-/*
+    /*
 
-(Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))
-(Intersect (FRep ?a) (FRep (max ?a ?b))
+    (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))
+    (Intersect (FRep ?a) (FRep (max ?a ?b))
 
-max(min(a, b), a)
-(ite (< ?a (ite (< ?a ?b) ?a ?b)) (ite (< ?a ?b) ?a ?b) ?a)
+    max(min(a, b), a)
+    (ite (< ?a (ite (< ?a ?b) ?a ?b)) (ite (< ?a ?b) ?a ?b) ?a)
 
-if (< ?a (if (< ?a ?b) then ?a else ?b))
-then (if (< ?a ?b) then ?a else ?b)
-else ?a
+    if (< ?a (if (< ?a ?b) then ?a else ?b))
+    then (if (< ?a ?b) then ?a else ?b)
+    else ?a
 
-(case
-    (< ?a
+    (case
+        (< ?a
+            (if (< ?a ?b) then ?a else ?b)
+        )
         (if (< ?a ?b) then ?a else ?b)
-    )
-    (if (< ?a ?b) then ?a else ?b)
-(case
-    (! (< ?a
-        (if (< ?a ?b) then ?a else ?b)
-    ))
-    ?a
-endcase))
-
-(case
-    (< ?a
-        (case (< ?a ?b)
-            ?a
-        (case (! (< ?a ?b))
-            ?b
-        endcase))
-    )
-    (case (< ?a ?b)
+    (case
+        (! (< ?a
+            (if (< ?a ?b) then ?a else ?b)
+        ))
         ?a
-    (case (! (< ?a ?b))
-        ?b
     endcase))
-(case
-    (! (< ?a
+
+    (case
+        (< ?a
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        )
         (case (< ?a ?b)
             ?a
         (case (! (< ?a ?b))
             ?b
         endcase))
-    ))
-    ?a
-endcase))
-
-
-fold min
-
-
-(case
-    (< ?a (min a b))
-    (case (< ?a ?b)
+    (case
+        (! (< ?a
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        ))
         ?a
-    (case (! (< ?a ?b))
-        ?b
     endcase))
-(case
-    (! (< ?a
+
+
+    fold min
+
+
+    (case
+        (< ?a (min a b))
         (case (< ?a ?b)
             ?a
         (case (! (< ?a ?b))
             ?b
         endcase))
-    ))
-    ?a
-endcase))
+    (case
+        (! (< ?a
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        ))
+        ?a
+    endcase))
 
-lift
+    lift
 
-(case
-    (& (< ?a (min a b)) (< ?a ?b))
-    ?a
-(case
-    (& (< ?a (min a b)) (! (< ?a ?b)))
-    (case (! (< ?a ?b))
+    (case
+        (& (< ?a (min a b)) (< ?a ?b))
+        ?a
+    (case
+        (& (< ?a (min a b)) (! (< ?a ?b)))
+        (case (! (< ?a ?b))
+            ?b
+        endcase)
+    (case
+        (! (< ?a
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        ))
+        ?a
+    endcase)))
+
+
+
+    (case
+        (& (< ?a (min a b)) (< ?a ?b))
+        ?a
+    (case
+        (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (< ?a ?b)))
         ?b
-    endcase)
-(case
-    (! (< ?a
-        (case (< ?a ?b)
-            ?a
-        (case (! (< ?a ?b))
-            ?b
-        endcase))
-    ))
-    ?a
-endcase)))
+    (case
+        (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (! (< ?a ?b))))
+        endcase
+    (case
+        (! (< ?a
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        ))
+        ?a
+    endcase))))
+
+
+    (case
+        (& (< ?a (min a b)) (< ?a ?b))
+        ?a
+    (case
+        (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (< ?a ?b)))
+        ?b
+    (case
+        (! (< ?a
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        ))
+        ?a
+    endcase))))
+
+    detour -->
+
+    (case
+        (& (< ?a (min a b)) (< ?a ?b))
+        ?a
+    (case
+        (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (< ?a ?b)))
+        ?b
+    (case
+        (! (< ?a
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        ))
+        ?a
+    endcase))))
 
 
 
-(case
-    (& (< ?a (min a b)) (< ?a ?b))
-    ?a
-(case
+
+
+
+
+    detour <--
+
     (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (< ?a ?b)))
-    ?b
-(case
-    (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (! (< ?a ?b))))
-    endcase
-(case
-    (! (< ?a
-        (case (< ?a ?b)
-            ?a
-        (case (! (< ?a ?b))
-            ?b
-        endcase))
-    ))
-    ?a
-endcase))))
+
+    (&
+        (&
+            (< ?a (min a b))
+            (! (< ?a ?b))
+        )
+        (! (< ?a ?b))
+    )
 
 
-(case
-    (& (< ?a (min a b)) (< ?a ?b))
-    ?a
-(case
-    (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (< ?a ?b)))
-    ?b
-(case
-    (! (< ?a
-        (case (< ?a ?b)
-            ?a
-        (case (! (< ?a ?b))
-            ?b
-        endcase))
-    ))
-    ?a
-endcase))))
-
-detour -->
-
-(case
-    (& (< ?a (min a b)) (< ?a ?b))
-    ?a
-(case
-    (& (& (< ?a (min a b)) (! (< ?a ?b))) (! (< ?a ?b)))
-    ?b
-(case
-    (! (< ?a
-        (case (< ?a ?b)
-            ?a
-        (case (! (< ?a ?b))
-            ?b
-        endcase))
-    ))
-    ?a
-endcase))))
-
-
-
-
-
-
-
-detour <--
-
-(& (& (< ?a (min a b)) (! (< ?a ?b))) (! (< ?a ?b)))
-
-(&
     (&
         (< ?a (min a b))
         (! (< ?a ?b))
     )
-    (! (< ?a ?b))
-)
 
-
-(&
-    (< ?a (min a b))
-    (! (< ?a ?b))
-)
-
-(&
-    (<
-        ?a
-        (case (< ?a ?b)
+    (&
+        (<
             ?a
-        (case (! (< ?a ?b))
-            ?b
-        endcase))
+            (case (< ?a ?b)
+                ?a
+            (case (! (< ?a ?b))
+                ?b
+            endcase))
+        )
+        (! (< ?a ?b))
     )
-    (! (< ?a ?b))
-)
 
 
-(&
+    (&
+        (case (< ?a ?b)
+            (< ?a ?a)
+        (case (! (< ?a ?b))
+            (< ?a ?b)
+        endcase))
+        (! (< ?a ?b))
+    )
+
+    (&
+        (case (< ?a ?b)
+            (know (< ?a ?b) (< ?a ?b))
+        (case (! (< ?a ?b))
+            (< ?a ?b)
+        endcase))
+        (! (< ?a ?b))
+    )
+
+    (know ?a (! ?a))
+    (| (! ?a) (! ?a))
+
+    (&
+        (case (< ?a ?b)
+            (| (! (< ?a ?b)) (< ?a ?b)))
+        (case (! (< ?a ?b))
+            (< ?a ?b)
+        endcase))
+        (! (< ?a ?b))
+    )
+
+
     (case (< ?a ?b)
-        (< ?a ?a)
+        ! (< ?a ?b)
     (case (! (< ?a ?b))
-        (< ?a ?b)
+        false
     endcase))
-    (! (< ?a ?b))
-)
-
-(&
-    (case (< ?a ?b)
-        (know (< ?a ?b) (< ?a ?b))
-    (case (! (< ?a ?b))
-        (< ?a ?b)
-    endcase))
-    (! (< ?a ?b))
-)
-
-(know ?a (! ?a))
-(| (! ?a) (! ?a))
-
-(&
-    (case (< ?a ?b)
-        (| (! (< ?a ?b)) (< ?a ?b)))
-    (case (! (< ?a ?b))
-        (< ?a ?b)
-    endcase))
-    (! (< ?a ?b))
-)
-
-
-(case (< ?a ?b)
-    ! (< ?a ?b)
-(case (! (< ?a ?b))
-    false
-endcase))
- */
-
+     */
 
     fn get_lifting_rules() -> Ruleset<Self> {
         Ruleset::new(&[
             "(ite ?c ?t ?e) ==> (case ?c ?t (case (! ?c) ?e endcase))",
             "(max ?a ?b) ==> (ite (< ?a ?b) ?b ?a)",
             "(min ?a ?b) ==> (ite (< ?a ?b) ?a ?b)",
-
             // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
         ])
     }
@@ -404,7 +401,10 @@ endcase))
     fn is_allowed_op(&self) -> bool {
         matches!(
             self,
-            CaddyAndFRep::Max(_) | CaddyAndFRep::Min(_) | CaddyAndFRep::Var(_) | CaddyAndFRep::Cheat(_)
+            CaddyAndFRep::Max(_)
+                | CaddyAndFRep::Min(_)
+                | CaddyAndFRep::Var(_)
+                | CaddyAndFRep::Cheat(_)
         )
     }
 
