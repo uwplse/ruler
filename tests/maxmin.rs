@@ -1,3 +1,7 @@
+// An attempt to infer rules about max/min, e.g. max(min(a, b), a) ==> a
+// by lowering to if.
+// Status: Very experimental. Doesn't work.
+
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};

@@ -1,3 +1,6 @@
+// Learn Szalinski rules by lowering to FRep
+// Status: work-in-progress.
+
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
@@ -13,6 +16,7 @@ pub type Constant = Ratio<BigInt>;
 
 fn get_nat_rules() -> Vec<&'static str> {
     [
+        // Small subset of rat rules
         "(+ ?b ?a) ==> (+ ?a ?b)",
         "(* ?b ?a) ==> (* ?a ?b)",
         "(+ 0 ?a) ==> ?a",
@@ -20,7 +24,6 @@ fn get_nat_rules() -> Vec<&'static str> {
         // "(* ?a 0) ==> 0",
         "(* 1 ?a) ==> ?a",
         "?a ==> (* 1 ?a)",
-        "?a ==> (/ ?a 1)",
         "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
         "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
         "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
@@ -34,12 +37,6 @@ fn get_nat_rules() -> Vec<&'static str> {
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
-        "(/ x ?a) ==> (subst x x (/ x ?a))",
-        "(/ y ?a) ==> (subst y y (/ y ?a))",
-        "(/ z ?a) ==> (subst z z (/ z ?a))",
-        "(min (subst ?e ?from ?to) ?a) ==> (subst (min ?e ?a) ?from ?to)",
-        "(- ?a (subst ?e ?from ?to)) ==> (subst (- ?a ?e) ?from ?to)",
-        "(subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c)) ==> (Scale ?e ?a ?b ?c)",
     ]
     .into()
 }
@@ -59,6 +56,8 @@ egg::define_language! {
     "y" = DimY,
     "z" = DimZ,
     "subst" = Subst([Id; 3]),
+
+    // "binop" = Binop([Id; 3]),
 
     // Caddy
     "Caddy" = Caddy([Id; 1]),
@@ -86,14 +85,18 @@ impl SynthLanguage for CaddyAndFRep {
 
     fn get_lifting_rules() -> Ruleset<Self> {
         Ruleset::new(&[
-            "(Cuboid ?a ?b ?c) ==> (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c)))",
-            // "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
-            // "(FRep (max ?a ?b)) ==> (Union (FRep ?a) (FRep ?b))",
-            // "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
-            // "(FRep (min ?a ?b)) ==> (Inter (FRep ?a) (FRep ?b))",
+            "(/ x ?a) ==> (subst x x (/ x ?a))",
+            "(/ y ?a) ==> (subst y y (/ y ?a))",
+            "(/ z ?a) ==> (subst z z (/ z ?a))",
+            "(min (subst ?e ?from ?to) ?a) ==> (subst (min ?e ?a) ?from ?to)",
+            "(- ?a (subst ?e ?from ?to)) ==> (subst (- ?a ?e) ?from ?to)",
+            "(Cuboid ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
+            "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
+            "(FRep (max ?a ?b)) ==> (Union (FRep ?a) (FRep ?b))",
+            "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
+            "(FRep (min ?a ?b)) ==> (Inter (FRep ?a) (FRep ?b))",
             // "(Empty) ==> (FRep (~ 1))",
-            "(Scale ?e ?a ?b ?c) ==> (subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c))",
-            "(Cheat ?a ?b) ==> (Cuboid ?a ?b ?a)",
+            "(Scale (FRep ?e) ?a ?b ?c)", // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
         ])
     }
 
@@ -180,8 +183,7 @@ mod tests {
     use super::*;
 
     fn iter_pos(n: usize) -> Workload {
-        // Workload::iter_lang(n, &[], &["Empty", "a", "b"], &["FRep"], &["Union", "Inter"])
-        Workload::iter_lang(n, &[], &["a", "b"], &[], &["Cheat"])
+        Workload::iter_lang(n, &[], &["Empty", "a", "b"], &["FRep"], &["Union", "Inter"])
     }
 
     #[test]
@@ -194,7 +196,7 @@ mod tests {
         // assert_eq!(atoms3.force().len(), 51);
 
         let limits = Limits {
-            iter: 6,
+            iter: 4,
             node: 10000000,
         };
 
@@ -227,7 +229,7 @@ mod tests {
         let mut all_rules = Ruleset::default();
         all_rules.extend(Ruleset::new(&nat_rules));
 
-        let atoms3 = iter_pos(3);
+        let atoms3 = iter_pos(8);
         // assert_eq!(atoms3.force().len(), 51);
 
         let rules3 = CaddyAndFRep::run_workload(
