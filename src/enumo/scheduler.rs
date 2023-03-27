@@ -6,6 +6,7 @@ use crate::{EGraph, Id, Limits, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
+#[derive(Debug, Clone, Copy)]
 pub enum Scheduler {
     Simple(Limits),
     Saturating(Limits),

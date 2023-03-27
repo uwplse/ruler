@@ -522,7 +522,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    fn shrink(&mut self, chosen: &Self, limits: Limits) {
+    fn shrink(&mut self, chosen: &Self, scheduler: Scheduler) {
         // 1. make new egraph
         // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
         let mut egraph = EGraph::default();
@@ -536,7 +536,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         // 3. compress with the rules we've chosen so far
-        let egraph = Scheduler::Compress(limits).run(&egraph, chosen);
+        let egraph = scheduler.run(&egraph, chosen);
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
@@ -551,13 +551,13 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
     }
 
-    pub fn minimize(&mut self, prior: Ruleset<L>, limits: Limits) -> Self {
+    pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> Self {
         let mut chosen = prior.clone();
         let step_size = 1;
         while !self.is_empty() {
             let selected = self.select(step_size);
             chosen.extend(selected.clone());
-            self.shrink(&chosen, limits);
+            self.shrink(&chosen, scheduler);
         }
         // Return only the new rules
         chosen.remove_all(prior);
