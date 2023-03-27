@@ -620,7 +620,6 @@ pub mod test {
             herbie,
             name,
             "herbie_baseline",
-            "herbie.json",
             Limits {
                 iter: 2,
                 node: 150000,
@@ -656,7 +655,6 @@ pub mod test {
             ruler1,
             name,
             "oopsla",
-            "baseline.json",
             Limits {
                 iter: 2,
                 node: 150000,

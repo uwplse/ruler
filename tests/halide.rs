@@ -433,7 +433,6 @@ mod test {
             baseline,
             "halide",
             "baseline",
-            "halide.json",
             Limits {
                 iter: 2,
                 node: 200000,

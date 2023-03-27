@@ -226,7 +226,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline: Self,
         enumo_name: &str,
         baseline_name: &str,
-        outfile: &str,
         limits: Limits,
         time_rules: Duration,
     ) {
@@ -247,7 +246,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         );
 
         let mut filepath = "rep/json/".to_owned();
-        filepath.push_str(outfile);
+        filepath.push_str("output.json");
 
         let mut outfile = OpenOptions::new()
             .read(true)
@@ -272,14 +271,18 @@ impl<L: SynthLanguage> Ruleset<L> {
             "num_rules": self.len(),
             "num_baseline": baseline.len(),
             "time": time_rules.as_secs_f64(),
-            "enumo_derives_baseline (lhs, lhs & rhs, all)":
-                format!("{}, {}, {}", forwards_lhs, forwards_lhs_rhs, forwards_all),
-            "enumo_derives_baseline_time":
-                format!("{}, {}, {}", lhs_f.as_secs_f64(), lhs_rhs_f.as_secs_f64(), all_f.as_secs_f64()),
-            "baseline_derives_enumo (lhs, lhs & rhs, all)":
-                format!("{}, {}, {}", backwards_lhs, backwards_lhs_rhs, backwards_all),
-            "baseline_derives_enumo_time":
-                format!("{}, {}, {}", lhs_b.as_secs_f64(), lhs_rhs_b.as_secs_f64(), all_b.as_secs_f64()),
+            "enumo_to_baseline_lhs": forwards_lhs,
+            "enumo_to_baseline_lhs_time": lhs_f.as_secs_f64(),
+            "enumo_to_baseline_lhsrhs": forwards_lhs_rhs,
+            "enumo_to_baseline_lhsrhs_time": lhs_rhs_f.as_secs_f64(),
+            "enumo_to_baseline_all": forwards_all,
+            "enumo_to_baseline_all_time": all_f.as_secs_f64(),
+            "baseline_to_enumo_lhs": backwards_lhs,
+            "baseline_to_enumo_lhs_time": lhs_b.as_secs_f64(),
+            "baseline_to_enumo_lhsrhs": backwards_lhs_rhs,
+            "baseline_to_enumo_lhsrhs_time": lhs_rhs_b.as_secs_f64(),
+            "baseline_to_enumo_all": backwards_all,
+            "baseline_to_enumo_all_time": all_b.as_secs_f64(),
             "minimization strategy": "compress",
         });
 
@@ -314,7 +317,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline: Self,
         name: &str,
         limits: Limits,
-    ) -> ((String, String), (Duration, Duration)) {
+    ) -> ((usize, usize), (Duration, Duration)) {
         let mut filepath = "rep/json/derivable_rules/".to_owned();
 
         std::fs::create_dir_all(filepath.clone())
@@ -349,11 +352,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all(derivability_results.as_bytes())
             .expect("Unable to write to file");
 
-        let derivable_ratio_enumo = format!("{}/{}", can_f.len(), baseline.len());
-        let derivable_ratio_oopsla = format!("{}/{}", can_b.len(), self.clone().len());
-
         (
-            (derivable_ratio_enumo, derivable_ratio_oopsla),
+            (can_f.len(), can_b.len()),
             (time_f, time_b),
         )
     }

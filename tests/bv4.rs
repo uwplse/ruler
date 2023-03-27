@@ -88,7 +88,6 @@ mod test {
             baseline,
             "bv4",
             "oopsla",
-            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,
