@@ -35,7 +35,7 @@ mkdir -p "$NIGHTLY_DIR/json" "$NIGHTLY_DIR/output"
 
 # Run tests.
 pushd $TOP_DIR
-RUST_TEST_THREADS=1 cargo test --release --test bool
+RUST_TEST_THREADS=1 cargo test --release
 popd
 
 # Update HTML index page.
