@@ -7,7 +7,7 @@ use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use rayon::vec;
 use ruler::{
-    enumo::{Ruleset, Workload},
+    enumo::{Ruleset, Scheduler, Workload},
     *,
 };
 use std::time::Instant;
@@ -159,7 +159,7 @@ impl CaddyAndFRep {
         let num_prior = prior.len();
         let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
 
-        let chosen = candidates.minimize(prior, limits);
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
