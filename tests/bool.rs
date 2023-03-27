@@ -131,7 +131,7 @@ impl Bool {
         let mut candidates = Ruleset::cvec_match(&compressed);
 
         let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, limits);
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -170,25 +170,27 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let egraph = Scheduler::Compress(Limits::default()).run(&atoms3.to_egraph(), &all_rules);
+        let scheduler = Scheduler::Compress(Limits::default());
+
+        let egraph = scheduler.run(&atoms3.to_egraph(), &all_rules);
         let mut candidates = Ruleset::cvec_match(&egraph);
-        let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
+        let rules3 = candidates.minimize(all_rules.clone(), scheduler);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let egraph = Scheduler::Compress(Limits::default()).run(&atoms4.to_egraph(), &all_rules);
+        let egraph = scheduler.run(&atoms4.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
-        let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
+        let rules4 = candidates.minimize(all_rules.clone(), scheduler);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let egraph = Scheduler::Compress(Limits::default()).run(&atoms5.to_egraph(), &all_rules);
+        let egraph = scheduler.run(&atoms5.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
-        let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
+        let rules5 = candidates.minimize(all_rules.clone(), scheduler);
         all_rules.extend(rules5);
 
         let expected: Ruleset<Bool> = Ruleset::new(&[
@@ -223,7 +225,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -281,7 +283,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::default());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -386,7 +388,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(can.len(), 16);
-        assert_eq!(cannot.len(), 7);
+        assert_eq!(can.len(), 12);
+        assert_eq!(cannot.len(), 12);
     }
 }

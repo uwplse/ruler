@@ -1,7 +1,7 @@
 use num::rational::Ratio;
 use num::BigInt;
 use num::{Signed, Zero};
-use ruler::enumo::{Ruleset, Workload};
+use ruler::enumo::{Ruleset, Scheduler, Workload};
 use ruler::*;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -318,7 +318,7 @@ impl Trig {
         let num_prior = prior.len();
         let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
 
-        let chosen = candidates.minimize(prior, limits);
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -572,7 +572,7 @@ mod test {
 
     #[test]
     fn nightly_recipe() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         let limits = Limits {
             iter: 3,
             node: 2000000,
@@ -600,7 +600,7 @@ mod test {
 
     #[test]
     fn simple() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/trig/complex.rules");
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         assert_eq!(complex.len(), 57);
 
         let limits = Limits {

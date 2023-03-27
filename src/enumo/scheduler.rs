@@ -6,6 +6,7 @@ use crate::{EGraph, Id, Limits, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
+#[derive(Debug, Clone, Copy)]
 pub enum Scheduler {
     Simple(Limits),
     Saturating(Limits),
@@ -32,7 +33,7 @@ impl Scheduler {
     ) -> EGraph<L, SynthAnalysis> {
         match self {
             Scheduler::Simple(limits) => {
-                let rewrites = ruleset.0.values().map(|eq| &eq.rewrite);
+                let rewrites = ruleset.0.values().map(|rule| &rule.rewrite);
                 let mut runner = Self::mk_runner(egraph.clone(), limits)
                     .with_iter_limit(limits.iter)
                     .with_node_limit(limits.node)
@@ -42,10 +43,14 @@ impl Scheduler {
                 runner.egraph
             }
             Scheduler::Saturating(limits) => {
-                let (sat, other) = ruleset.partition(|eq| eq.is_saturating());
+                let (sat, other) = ruleset.partition(|rule| rule.is_saturating());
                 let (sat, other): (Vec<Rewrite<_, _>>, Vec<Rewrite<_, _>>) = (
-                    (sat.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
-                    (other.0.iter().map(|(_, eq)| eq.rewrite.clone()).collect()),
+                    (sat.0.iter().map(|(_, rule)| rule.rewrite.clone()).collect()),
+                    (other
+                        .0
+                        .iter()
+                        .map(|(_, rule)| rule.rewrite.clone())
+                        .collect()),
                 );
 
                 let mut runner = Self::mk_runner(egraph.clone(), limits);
