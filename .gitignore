@@ -4,6 +4,7 @@
 /*.json
 /*.sh
 /nightly
+/*.terms
 
 # Scripts
 scripts/ablation/output/*
