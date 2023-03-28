@@ -3,41 +3,68 @@
 <html>
 <title>Nightlies</title>
 <h2>Nightlies</h2>
-<center><p id="table"></p></center>
+<center><p id="baseline_table"></p></center>
+<center><p id="herbie_table"></p></center>
+<center><p id="halide_table"></p></center>
 <body>
 <script type="text/javascript">
     
     window.addEventListener("load", () => {
-        var json = "REPLACE_WITH_JSON";
+        var baseline = "REPLACE_WITH_BASELINE";
+        var herbie = "REPLACE_WITH_HERBIE";
+        var halide = "REPLACE_WITH_HALIDE";
 
-        var table = ConvertJsonToTable(json);
-        document.getElementById("table").innerHTML = table;
+        var baseline_table = ConvertJsonToTable(baseline);
+        var herbie_table = ConvertJsonToTable(herbie);
+        var halide_table = ConvertJsonToTable(halide);
+
+        document.getElementById("baseline_table").innerHTML = baseline_table;
+        document.getElementById("herbie_table").innerHTML = herbie_table;
+        document.getElementById("halide_table").innerHTML = halide_table;
     });
 </script>
+<p>Big JSON:
+    <a href="json/output.json">object</a>.
+</p>
 <p>Individual results for BV4:
-    <a href="ruler1_bv4_allrules.html">all</a>,
-    <a href="ruler1_bv4_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_bv4_lhs.html">LHS only</a>.
+    <a href="json/derivable_rules/bv4_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/bv4_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/bv4_all.html">all</a>.
 </p>
 <p>Individual results for BV32:
-    <a href="ruler1_bv32_allrules.html">all</a>,
-    <a href="ruler1_bv32_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_bv32_lhs.html">LHS only</a>.
+    <a href="json/derivable_rules/bv32_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/bv32_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/bv32_all.html">all</a>.
 </p>
 <p>Individual results for bool:
-    <a href="ruler1_bool_allrules.html">all</a>,
-    <a href="ruler1_bool_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_bool_lhs.html">LHS only</a>.
+    <a href="json/derivable_rules/bool_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/bool_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/bool_all.html">all</a>.
 </p>
-<p>Individual results for Herbie comparison:
-    <a href="herbie_rational_allrules.html">all</a>,
-    <a href="herbie_rational_lhs_rhs.html">LHS/RHS</a>,
-    <a href="herbie_rational_lhs.html">LHS only</a>.
+<p>Individual results for rational (replicate):
+    <a href="json/derivable_rules/rational_replicate_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/rational_replicate_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/rational_replicate_all.html">all</a>.
 </p>
-<p>Individual results for comparison to OOPSLA Ruler:
-    <a href="ruler1_rational_allrules.html">all</a>,
-    <a href="ruler1_rational_lhs_rhs.html">LHS/RHS</a>,
-    <a href="ruler1_rational_lhs.html">LHS only</a>.
+<p>Individual results for rational (best):
+    <a href="json/derivable_rules/rational_best_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/rational_best_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/rational_best_all.html">all</a>.
+</p>
+<p>Individual results for Herbie comparison (replicate):
+    <a href="json/derivable_rules/herbie_rational_replicate_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/herbie_rational_replicate_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/herbie_rational_replicate_all.html">all</a>.
+</p>
+<p>Individual results for Herbie comparison (best):
+    <a href="json/derivable_rules/herbie_rational_best_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/herbie_rational_best_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/herbie_rational_best_all.html">all</a>.
+</p>
+<p>Individual results for Halide:
+    <a href="json/derivable_rules/halide_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/halide_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/halide_all.html">all</a>.
 </p>
 <script src="table.js"></script>
 </body>

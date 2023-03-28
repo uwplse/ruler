@@ -648,16 +648,27 @@ pub mod test {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
-        rules.baseline_compare_to(
-            &herbie,
-            "herbie",
+        rules.write_baseline_row(
+            herbie.clone(),
             name,
-            duration,
+            "herbie_baseline",
+            "herbie.json",
             Limits {
                 iter: 2,
-                node: 300000,
+                node: 150000,
             },
-        )
+            duration,
+        );
+        rules.write_baseline_row_big_object(
+            herbie,
+            name,
+            "herbie_baseline",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 
     #[test]
@@ -667,32 +678,43 @@ pub mod test {
         let duration = start.elapsed();
 
         rules.write_json_rules("rational_replicate.json");
-        test_against_ruler1(&rules, "rational (replicate)", duration);
-        test_against_herbie(&rules, "rational (replicate)", duration);
+        test_against_ruler1(&rules, "rational_replicate", duration);
+        test_against_herbie(&rules, "herbie_rational_replicate", duration);
 
         let start = Instant::now();
         let rules = best_enumo_recipe();
         let duration = start.elapsed();
 
         rules.write_json_rules("rational_best.json");
-        test_against_ruler1(&rules, "rational (best)", duration);
-        test_against_herbie(&rules, "rational (best)", duration);
+        test_against_ruler1(&rules, "rational_best", duration);
+        test_against_herbie(&rules, "herbie_rational_best", duration);
     }
 
     fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
-        rules.baseline_compare_to(
-            &ruler1,
-            "ruler1",
+        rules.write_baseline_row(
+            ruler1.clone(),
             name,
-            duration,
+            "oopsla_rational",
+            "baseline.json",
             Limits {
                 iter: 2,
                 node: 150000,
             },
-        )
+            duration,
+        );
+        rules.write_baseline_row_big_object(
+            ruler1,
+            name,
+            "oopsla_rational",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 
     #[test]

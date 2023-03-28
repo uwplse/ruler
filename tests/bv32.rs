@@ -84,15 +84,26 @@ mod test {
 
         rules.write_json_rules("bv32.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
-        rules.baseline_compare_to(
-            &baseline,
-            "ruler1",
+        rules.write_baseline_row(
+            baseline.clone(),
             "bv32",
-            duration,
+            "oopsla",
+            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,
             },
+            duration,
+        );
+        rules.write_baseline_row_big_object(
+            baseline,
+            "bv32",
+            "oopsla_bv32",
+            Limits {
+                iter: 3,
+                node: 200000,
+            },
+            duration,
         );
     }
 }

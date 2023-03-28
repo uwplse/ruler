@@ -315,7 +315,7 @@ mod test {
 
     use ruler::{
         enumo::{Filter, Metric, Ruleset, Workload},
-        DeriveType, Limits,
+        Limits,
     };
 
     use crate::Pred;
@@ -428,13 +428,27 @@ mod test {
         //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
         // println!("{} / {}", can.len(), can.len() + cannot.len());
 
-        all_rules.write_json_rules("halide.json");
-        all_rules.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
-            &baseline,
+        all_rules.write_json_rules("halide_rules.json");
+        all_rules.write_baseline_row(
+            baseline.clone(),
+            "halide",
+            "baseline_halide",
             "halide.json",
-            Limits::default(),
+            Limits {
+                iter: 2,
+                node: 200000,
+            },
             duration,
         );
+        all_rules.write_baseline_row_big_object(
+            baseline,
+            "halide",
+            "baseline_halide",
+            Limits {
+                iter: 2,
+                node: 200000,
+            },
+            duration,
+        )
     }
 }

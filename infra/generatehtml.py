@@ -6,14 +6,23 @@ def generate_html(resource_dir, nightly_dir):
     base_html =  os.path.join(resource_dir, "base.html")
 
     # nightly output
-    output_json = os.path.join(nightly_dir, "json/output.json")
+    # output_json = os.path.join(nightly_dir, "json/output.json")
+    baseline_json = os.path.join(nightly_dir, "json/baseline.json")
+    herbie_json = os.path.join(nightly_dir, "json/herbie.json")
+    halide_json = os.path.join(nightly_dir, "json/halide.json")
+
     derive_dir =  os.path.join(nightly_dir, "json/derivable_rules/")
     output_dir =  os.path.join(nightly_dir, "output/")
 
     # Create the index page
-    json = open(output_json, "r").read()
+    base_json = open(baseline_json, "r").read()
+    herb_json = open(herbie_json, "r").read()
+    hali_json = open(halide_json, "r").read()
+
     html = open(index_html, "r").read()
-    html = html.replace("\"REPLACE_WITH_JSON\"", json)
+    html = html.replace("\"REPLACE_WITH_BASELINE\"", base_json)
+    html = html.replace("\"REPLACE_WITH_HERBIE\"", herb_json)
+    html = html.replace("\"REPLACE_WITH_HALIDE\"", hali_json)
     open(output_dir + "index.html", "w").write(html)
 
     # loop through derivable_rules
