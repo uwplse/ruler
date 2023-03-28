@@ -6,8 +6,10 @@ use ruler::{
 };
 use std::{ops::*, time::Instant};
 use z3::ast::Ast;
-#[path = "./recipes/rational.rs"]
-pub mod rational;
+#[path = "./recipes/rationalreplicate.rs"]
+pub mod rationalreplicate;
+#[path = "./recipes/bestrational.rs"]
+pub mod bestrational;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
@@ -410,7 +412,8 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 pub mod test {
     use std::time::Duration;
     use super::*;
-    use crate::rational::replicate_ruler1_recipe;
+    use crate::rationalreplicate::replicate_ruler1_recipe;
+    use crate::bestrational::best_enumo_recipe;
     use ruler::enumo::{Ruleset, Workload};
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -568,7 +571,7 @@ pub mod test {
         );
     }
 
-    fn test_against_herbie(rules: &Ruleset<Math>, name: &str, duration: Duration) {
+    fn test_against_herbie(rules: &Ruleset<Math>, name: &str, recipe_name: &str, duration: Duration) {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         println!("Comparing rational to herbie...");
@@ -576,6 +579,7 @@ pub mod test {
             herbie.clone(),
             name,
             "herbie_baseline",
+            recipe_name,
             "herbie.json",
             Limits {
                 iter: 2,
@@ -587,6 +591,7 @@ pub mod test {
             herbie,
             name,
             "herbie_baseline",
+            recipe_name,
             Limits {
                 iter: 2,
                 node: 150000,
@@ -602,20 +607,19 @@ pub mod test {
         let duration = start.elapsed();
 
         rules.write_json_rules("rational_replicate.json");
-        test_against_ruler1(&rules, "rational_replicate", duration);
-        test_against_herbie(&rules, "herbie_rational_replicate", duration);
-/*
+        test_against_ruler1(&rules, "rational_replicate", "recipes/rationalreplicate.rs", duration);
+        test_against_herbie(&rules, "herbie_rational_replicate", "recipes/bestrational.rs", duration);
+
         let start = Instant::now();
-        let rules = best_rat_rules();
+        let rules = best_enumo_recipe();
         let duration = start.elapsed();
 
         rules.write_json_rules("rational_best.json");
-        test_against_ruler1(&rules, "rational_best", duration);
-        test_against_herbie(&rules, "herbie_rational_best", duration);
-*/
+        test_against_ruler1(&rules, "rational_best", "recipes/bestrational.rs", duration);
+        test_against_herbie(&rules, "herbie_rational_best", "recipes/bestrational.rs", duration);
     }
 
-    fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
+    fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, recipe_name: &str, duration: Duration) {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
         println!("Comparing rational to ruler1...");
@@ -623,6 +627,7 @@ pub mod test {
             ruler1.clone(),
             name,
             "oopsla_rational",
+            recipe_name,
             "baseline.json",
             Limits {
                 iter: 2,
@@ -634,6 +639,7 @@ pub mod test {
             ruler1,
             name,
             "oopsla_rational",
+            recipe_name,
             Limits {
                 iter: 2,
                 node: 150000,

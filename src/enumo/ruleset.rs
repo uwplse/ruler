@@ -5,7 +5,7 @@ use serde_json::*;
 use std::fs::*;
 use std::sync::Mutex;
 use std::time::Instant;
-use std::{io::Read, io::Write, sync::Arc, time::Duration};
+use std::{io::Read, io::Write, io::BufRead, io::BufReader, sync::Arc, time::Duration};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -226,6 +226,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline: Self,
         enumo_name: &str,
         baseline_name: &str,
+        recipe_name: &str,
         limits: Limits,
         time_rules: Duration,
     ) {
@@ -235,6 +236,13 @@ impl<L: SynthLanguage> Ruleset<L> {
             .write_derivability_results_big_object(DeriveType::LhsAndRhs, baseline.clone(), limits);
         let ((forwards_all, backwards_all), (all_f, all_b), results_all) = self
             .write_derivability_results_big_object(DeriveType::AllRules, baseline.clone(), limits);
+
+        let file = BufReader::new(File::open(recipe_name).expect("Unable to open file"));
+        let mut cnt  = 0;
+            
+        for _ in file.lines() {
+            cnt = cnt + 1;
+        }
 
         let mut outfile = OpenOptions::new()
             .read(true)
@@ -256,6 +264,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let stats = json!({
             "baseline_name": baseline_name,
             "enumo_spec_name": enumo_name,
+            "loc": cnt,
             "num_rules": self.len(),
             "rules": json!({"rules": self.to_str_vec()}),
             "num_baseline": baseline.len(),
@@ -308,6 +317,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         baseline: Self,
         enumo_name: &str,
         baseline_name: &str,
+        recipe_name: &str,
         outfile: &str,
         limits: Limits,
         time_rules: Duration,
@@ -327,6 +337,13 @@ impl<L: SynthLanguage> Ruleset<L> {
             enumo_name,
             limits,
         );
+
+        let file = BufReader::new(File::open(recipe_name).expect("Unable to open file"));
+        let mut cnt  = 0;
+        
+        for _ in file.lines() {
+            cnt = cnt + 1;
+        }
 
         let mut filepath = "nightly/json/".to_owned();
         filepath.push_str(outfile);
@@ -351,6 +368,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let stats = json!({
             "baseline_name": baseline_name,
             "enumo_spec_name": enumo_name,
+            "loc": cnt,
             "num_rules": self.len(),
             "num_baseline": baseline.len(),
             "time": time_rules.as_secs_f64(),

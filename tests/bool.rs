@@ -4,7 +4,7 @@ use ruler::{
 };
 use std::{ops::*, time::Instant};
 #[path = "./recipes/bool.rs"]
-mod bool;
+pub mod bool;
 
 egg::define_language! {
   pub enum Bool {
@@ -303,6 +303,7 @@ mod test {
             baseline.clone(),
             "bool",
             "oopsla",
+            "tests/recipes/bool.rs",
             "baseline.json",
             Limits {
                 iter: 3,
@@ -314,6 +315,7 @@ mod test {
             baseline,
             "bool",
             "oopsla_bool",
+            "tests/recipes/bool.rs",
             Limits {
                 iter: 3,
                 node: 200000,

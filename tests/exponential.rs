@@ -8,8 +8,7 @@ use num::rational::Ratio;
 use num::BigInt;
 use ruler::enumo::{Ruleset, Scheduler, Workload};
 use ruler::*;
-
-mod rational;
+// mod rational;
 
 pub type Rational = Ratio<BigInt>;
 
@@ -135,7 +134,7 @@ impl Exponential {
         chosen
     }
 }
-
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -148,7 +147,7 @@ mod test {
     macro_rules! str_vec {
         ($($x:expr),*) => (vec![$($x.to_string()),*]);
     }
-/*
+
     fn starting_exponential_rules() -> Ruleset {
         Ruleset::new(&[
             // exponential properties (expand)
@@ -165,7 +164,7 @@ mod test {
     }
 
     fn rational_rules() -> Ruleset {
-        let rules = rational::test::best_rat_rules();
+        let rules = best_enumo_recipe();
         let rule_strs = rules.to_str_vec();
         let rule_strs: Vec<&str> = rule_strs.iter().map(|x| &**x).collect();
         Ruleset::new(&rule_strs)
@@ -352,5 +351,5 @@ mod test {
         // only upload new rules
         new_rules.write_json_rules("exponential.json");
     }
-*/
 }
+*/

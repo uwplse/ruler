@@ -4,7 +4,7 @@
 
 use std::time::Instant;
 #[path = "./recipes/bv4.rs"]
-mod bv4;
+pub mod bv4;
 use ruler::enumo::{Ruleset, Scheduler, Workload};
 
 ruler::impl_bv!(4);
@@ -37,7 +37,7 @@ impl Bv {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use crate::bv4::bv4_rules;
     use super::*;
     use ruler::enumo::{Ruleset};
@@ -55,6 +55,7 @@ mod test {
             baseline.clone(),
             "bv4",
             "oopsla_bv4",
+            "recipes/bv4.rs",
             "baseline.json",
             Limits {
                 iter: 3,
@@ -66,6 +67,7 @@ mod test {
             baseline,
             "bv4",
             "oopsla_bv4",
+            "recipes/bv4.rs",
             Limits {
                 iter: 3,
                 node: 200000,
