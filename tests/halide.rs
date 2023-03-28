@@ -343,7 +343,7 @@ mod test {
             baseline.clone(),
             "halide",
             "baseline_halide",
-            "recipes/halide.rs",
+            "tests/recipes/halide.rs",
             "halide.json",
             Limits {
                 iter: 2,
@@ -355,7 +355,7 @@ mod test {
             baseline,
             "halide",
             "baseline_halide",
-            "recipes/halide.rs",
+            "tests/recipes/halide.rs",
             Limits {
                 iter: 2,
                 node: 200000,

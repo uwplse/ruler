@@ -55,7 +55,7 @@ pub mod test {
             baseline.clone(),
             "bv4",
             "oopsla_bv4",
-            "recipes/bv4.rs",
+            "tests/recipes/bv4.rs",
             "baseline.json",
             Limits {
                 iter: 3,
@@ -67,7 +67,7 @@ pub mod test {
             baseline,
             "bv4",
             "oopsla_bv4",
-            "recipes/bv4.rs",
+            "tests/recipes/bv4.rs",
             Limits {
                 iter: 3,
                 node: 200000,

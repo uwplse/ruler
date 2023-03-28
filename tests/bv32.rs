@@ -54,7 +54,7 @@ mod test {
             baseline.clone(),
             "bv32",
             "oopsla",
-            "recipes/bv32.rs",
+            "tests/recipes/bv32.rs",
             "baseline.json",
             Limits {
                 iter: 3,
@@ -66,7 +66,7 @@ mod test {
             baseline,
             "bv32",
             "oopsla_bv32",
-            "recipes/bv32.rs",
+            "tests/recipes/bv32.rs",
             Limits {
                 iter: 3,
                 node: 200000,

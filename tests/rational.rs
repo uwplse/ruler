@@ -607,16 +607,16 @@ pub mod test {
         let duration = start.elapsed();
 
         rules.write_json_rules("rational_replicate.json");
-        test_against_ruler1(&rules, "rational_replicate", "recipes/rationalreplicate.rs", duration);
-        test_against_herbie(&rules, "herbie_rational_replicate", "recipes/bestrational.rs", duration);
+        test_against_ruler1(&rules, "rational_replicate", "tests/recipes/rationalreplicate.rs", duration);
+        test_against_herbie(&rules, "herbie_rational_replicate", "tests/recipes/bestrational.rs", duration);
 
         let start = Instant::now();
         let rules = best_enumo_recipe();
         let duration = start.elapsed();
 
         rules.write_json_rules("rational_best.json");
-        test_against_ruler1(&rules, "rational_best", "recipes/bestrational.rs", duration);
-        test_against_herbie(&rules, "herbie_rational_best", "recipes/bestrational.rs", duration);
+        test_against_ruler1(&rules, "rational_best", "tests/recipes/bestrational.rs", duration);
+        test_against_herbie(&rules, "herbie_rational_best", "tests/recipes/bestrational.rs", duration);
     }
 
     fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, recipe_name: &str, duration: Duration) {
