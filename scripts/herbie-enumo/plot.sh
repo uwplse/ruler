@@ -20,7 +20,10 @@ else
 fi
 
 JSONS=$(find $OUTPUT_DIR -maxdepth 2 -name all.json)
-# echo $JSONS
+NUM_JSONS=$(find $OUTPUT_DIR -maxdepth 2 -name all.json | wc -l)
+
+echo "Found $NUM_JSONS jsons at"
+echo "$JSONS"
 
 # make unified all_all.json with all.json from all configs
 jq -s . $JSONS > $OUTPUT_DIR/all-all.json
@@ -33,15 +36,21 @@ mv all-all.json.tmp all-all.json
 # first group by test, then by seed within each test
 jq 'group_by(.test) | [ .[] | group_by(.seed) ]' all-all.json > by_test_then_seed.json
 
-# if length of this test-seed is 9, that means all configs succeeded
+# if length of this test-seed is $NUM_JSONS, that means all configs succeeded
 # keep it
-jq '[ .[] | .[] | select(length == 9) ]' by_test_then_seed.json > all-good.json
+jq --argjson NUM_JSONS "$NUM_JSONS" \
+  '[ .[] | .[] | select(length == $NUM_JSONS) ]' \
+  by_test_then_seed.json \
+  > all-good.json
 jq 'flatten' all-good.json > all-good.json.tmp
 mv all-good.json.tmp all-good.json
 
-# if length is not 9 that means this test-seed did not succeed for all configs
+# if length is not $NUM_JSONS that means this test-seed did not succeed for all configs
 # discard
-jq '[ .[] | .[] | select(length != 9) ]' by_test_then_seed.json > all-bad.json
+jq --argjson NUM_JSONS "$NUM_JSONS" \
+  '[ .[] | .[] | select(length != $NUM_JSONS) ]' \
+  by_test_then_seed.json \
+  > all-bad.json
 jq 'flatten' all-bad.json > all-bad.json.tmp
 mv all-bad.json.tmp all-bad.json
 

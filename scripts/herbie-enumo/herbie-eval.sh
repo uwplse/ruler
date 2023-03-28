@@ -57,14 +57,6 @@ function do_branch {
   git checkout "$HERBIE_DIR/src/syntax/rules.rkt"
   git checkout $branch
 
-  # Patch bug where rules cannot be disabled
-  if [[ "$flags" == *"-o rules:numerics"* ]]; then
-    cp "$MYDIR/no-numerics.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
-  fi
-  if [[ "$name" == "no-rules" ]]; then
-    cp "$MYDIR/empty-rules.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
-  fi
-
   # Patch ruler-autogen rule branches
   if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" ]]; then
     # In case of broken nightlies, target different branch
@@ -73,6 +65,16 @@ function do_branch {
       echo "skipping numerics patch"
     else
       cat "$MYDIR/numerics.patch" >> "$HERBIE_DIR/src/syntax/rules.rkt"
+      echo "" >> "$HERBIE_DIR/src/syntax/rules.rkt"
+    fi
+  # Patch no-rules branch
+  elif [[ "$name" == "no-rules" ]]; then
+    cp "$MYDIR/empty-rules.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
+  # Patch any other branch
+  else
+    # Patch bug where rules cannot be disabled
+    if [[ "$flags" == *"-o rules:numerics"* ]]; then
+      cp "$MYDIR/no-numerics.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
   fi
 

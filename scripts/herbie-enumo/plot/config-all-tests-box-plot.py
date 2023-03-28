@@ -22,22 +22,38 @@ if field == "time":
             new_times.append(float(t) / 1000.0)
         pairs[k] = new_times
 
-# ho = ('Herbie', pairs['main'])
-# ro = ('Enumo', pairs['enumo'])
-# hr = ('Ruler', pairs['ruler'])
-# nr = ('None', pairs['no-rules'])
-# listify = [ho, ro, hr, nr]
-
 h = ('H', pairs['main'])
 hn = ('H[-N]', pairs['main-n'])
 ht = ('H[-T]', pairs['main-t'])
 hnt = ('H[-NT]', pairs['main-n-t'])
 e = ('E', pairs['enumo'])
+en = ('E[-N]', pairs['enumo-n'])
 et = ('E[-T]', pairs['enumo-t'])
+ent = ('E[-NT]', pairs['enumo-n-t'])
 r = ('R', pairs['ruler'])
+rn = ('R[-N]', pairs['ruler-n'])
 rt = ('R[-T]', pairs['ruler-t'])
+rnt = ('R[-NT]', pairs['ruler-n-t'])
 n = ('N', pairs['no-rules'])
-listify = [h, hn, ht, hnt, e, et, r, rt, n]
+listify = [h, hn, ht, hnt, e, en, et, ent, r, rn, rt, rnt, n]
+
+# h = ('H', pairs['main'])
+# hn = ('H[-N]', pairs['main-n'])
+# e = ('E', pairs['enumo'])
+# en = ('E[-N]', pairs['enumo-n'])
+# r = ('R', pairs['ruler'])
+# rn = ('R[-N]', pairs['ruler-n'])
+# n = ('N', pairs['no-rules'])
+# listify = [h, hn, e, en, r, rn, n]
+
+# ht = ('H[-T]', pairs['main-t'])
+# hnt = ('H[-NT]', pairs['main-n-t'])
+# et = ('E[-T]', pairs['enumo-t'])
+# ent = ('E[-NT]', pairs['enumo-n-t'])
+# rt = ('R[-T]', pairs['ruler-t'])
+# rnt = ('R[-NT]', pairs['ruler-n-t'])
+# n = ('N', pairs['no-rules'])
+# listify = [ht, hnt, et, ent,  rt, rnt, n]
 
 labs = []
 vals = []
