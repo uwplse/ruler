@@ -136,18 +136,22 @@ impl SynthLanguage for Math {
         let rhs_denom = Self::all_denominators(Self::pat_to_sexp(rhs));
         let denominators = lhs_denom.union(&rhs_denom);
 
-        let mut assertion = lexpr._eq(&rexpr).not();
+        let mut assertion = lexpr._eq(&rexpr);
 
         for d in denominators {
-            let expr = egg_to_z3(&ctx, Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref());
+            let expr = egg_to_z3(
+                &ctx,
+                Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
+            );
             assertion = expr._eq(&rexpr).not().implies(&assertion);
         }
 
         let rhs_errors = Self::one_of_errors(&ctx, rhs_denom);
         let lhs_errors = Self::one_of_errors(&ctx, lhs_denom);
-        
-        solver.assert(&assertion);
-        solver.assert(&lhs_errors.iff(&rhs_errors));
+        let error_preserved = rhs_errors.iff(&lhs_errors);
+
+        solver.assert(&assertion.not());
+        solver.assert(&error_preserved.not());
         Self::z3_res_to_validationresult(solver.check())
     }
 
@@ -167,12 +171,14 @@ impl Math {
 
         let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
         for d in denoms {
-            let expr = egg_to_z3(ctx, Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref());
+            let expr = egg_to_z3(
+                ctx,
+                Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
+            );
             one_of_rhs_errors = z3::ast::Bool::or(ctx, &[&one_of_rhs_errors, &expr._eq(&zero_z3)]);
         }
         one_of_rhs_errors
     }
-    
 
     fn z3_res_to_validationresult(res: z3::SatResult) -> ValidationResult {
         match res {
@@ -181,7 +187,7 @@ impl Math {
             z3::SatResult::Sat => ValidationResult::Invalid,
         }
     }
-    
+
     fn pat_to_sexp(pat: &Pattern<Math>) -> Sexp {
         parse_str(&pat.to_string()).unwrap()
     }
@@ -281,8 +287,6 @@ impl Math {
 
         let num_prior = prior.len();
         let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
-        
-
 
         // here's the conditional stuff
         let mut with_condition = Ruleset::<Math>(
@@ -299,10 +303,11 @@ impl Math {
                 .collect(),
         );
 
-        let chosen_conditional = with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
+        let chosen_conditional =
+            with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
 
         let result = chosen.union(&chosen_conditional);
-        
+
         let time = t.elapsed().as_secs_f64();
         println!(
             "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
@@ -350,7 +355,6 @@ impl Math {
         chosen
     }
 }
-
 
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
     let mut buf: Vec<z3::ast::Real> = vec![];
