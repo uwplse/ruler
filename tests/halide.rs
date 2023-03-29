@@ -328,8 +328,7 @@ mod test {
 
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
-        // let all_rules = halide_rules();
-        let all_rules = Ruleset::default();
+        let all_rules = halide_rules();
         let duration = start.elapsed();
 
         // let (can, cannot) =
