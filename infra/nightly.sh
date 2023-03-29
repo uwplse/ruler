@@ -41,6 +41,8 @@ popd
 # Update HTML index page.
 cp "$RESOURCE_DIR/*" "$NIGHTLY_DIR/output"
 
+# Put the json data in a JS object for consumption by frontend
+(echo "var data = "; cat "$NIGHTLY_DIR/data/output.json") > "$NIGHTLY_DIR/data/output.js"
 # Copy json directory to the artifact
 cp -r "$NIGHTLY_DIR/data" "$NIGHTLY_DIR/output/data"
 
