@@ -66,7 +66,6 @@ function loadDeriveDetail() {
   }
   let deriveTypes = ["lhs", "lhs_rhs", "all"];
   deriveTypes.forEach((deriveType) => {
-    console.log(deriveType);
     document.getElementById(`${deriveType}_etob_can`).innerHTML =
       ConvertJsonToTable(
         domainData[`enumo_to_baseline_${deriveType}`]
@@ -105,4 +104,32 @@ function tryRound(v) {
   } else {
     return v;
   }
+}
+
+function generateLatex(baseline) {
+  let baselineData = getBaseline(data, baseline);
+
+  let columnNames = Object.keys(baselineData[0]);
+
+  var lines = [
+    String.raw`\begin{table}[]`,
+    String.raw`\resizebox{\textwidth}{!}{%`,
+    String.raw`\begin{tabular}{` + "l".repeat(columnNames.length) + "}",
+  ];
+
+  lines.push(columnNames.join(" & ") + " \\\\ cline{1-9}");
+
+  baselineData.forEach((row) => {
+    lines.push(Object.values(row).join(" & ") + " \\\\");
+  });
+
+  lines.push(String.raw`\end{tabular}%`);
+  lines.push(String.raw`}`);
+  lines.push(String.raw`\label{table:${baseline}}`);
+  lines.push(String.raw`\end{table}`);
+
+  let s = lines.join("\n");
+  let elem = document.getElementById("latex");
+  elem.innerHTML = s;
+  elem.style.height = "200px";
 }

@@ -19,3 +19,7 @@ h3 {
 .derive_container {
     display: inline-block;
 }
+
+textarea {
+    width: 100%;
+}
