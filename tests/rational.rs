@@ -136,22 +136,24 @@ impl SynthLanguage for Math {
         let rhs_denom = Self::all_denominators(Self::pat_to_sexp(rhs));
         let denominators = lhs_denom.union(&rhs_denom);
 
-        let mut assertion = lexpr._eq(&rexpr);
+        let mut assert_equal = lexpr._eq(&rexpr);
+        let zero_pat = "0".parse::<Pattern<Math>>().unwrap();
+        let zero_z3 = egg_to_z3(&ctx, Self::instantiate(&zero_pat).as_ref());
 
         for d in denominators {
             let expr = egg_to_z3(
                 &ctx,
                 Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
             );
-            assertion = expr._eq(&rexpr).not().implies(&assertion);
+            assert_equal = expr._eq(&zero_z3).not().implies(&assert_equal);
         }
 
         let rhs_errors = Self::one_of_errors(&ctx, rhs_denom);
         let lhs_errors = Self::one_of_errors(&ctx, lhs_denom);
         let error_preserved = rhs_errors.iff(&lhs_errors);
+        let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
 
         solver.assert(&assertion.not());
-        solver.assert(&error_preserved.not());
         Self::z3_res_to_validationresult(solver.check())
     }
 
@@ -220,13 +222,14 @@ impl Math {
         let lhs_sexp = parse_str(&rule.lhs.to_string()).unwrap();
         let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
         let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
-        let mut rhs_denoms = Self::all_denominators(rhs_sexp.clone());
-        rhs_denoms = rhs_denoms.sub(&lhs_denoms);
+        let rhs_denoms = Self::all_denominators(rhs_sexp.clone());
+        let intersection: HashSet<String> = lhs_denoms.intersection(&rhs_denoms).cloned().collect();
+        let all_denoms: Vec<String> = lhs_denoms.union(&rhs_denoms).cloned().collect::<HashSet<String>>().difference(&intersection).cloned().collect();
 
-        if rhs_denoms.is_empty() {
+        if all_denoms.is_empty() {
             None
         } else {
-            let mut iterator = rhs_denoms.iter();
+            let mut iterator = all_denoms.iter();
             let mut condition: Sexp =
                 Self::wrap_neqzero(parse_str(iterator.next().unwrap()).unwrap());
 
@@ -888,6 +891,12 @@ pub mod test {
         rules.write_json_rules("rational_best.json");
         test_against_ruler1(&rules, "rational_best", duration);
         test_against_herbie(&rules, "herbie_rational_best", duration);
+    }
+
+    // todo delete
+    #[test]
+    fn best_enumo() {
+        best_enumo_recipe();
     }
 
     fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
