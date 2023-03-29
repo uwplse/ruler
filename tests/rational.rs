@@ -132,12 +132,23 @@ impl SynthLanguage for Math {
         let solver = z3::Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check() {
-            z3::SatResult::Unsat => ValidationResult::Valid,
-            z3::SatResult::Unknown => ValidationResult::Unknown,
-            z3::SatResult::Sat => ValidationResult::Invalid,
+        let lhs_denom = Self::all_denominators(Self::pat_to_sexp(lhs));
+        let rhs_denom = Self::all_denominators(Self::pat_to_sexp(rhs));
+        let denominators = lhs_denom.union(&rhs_denom);
+
+        let mut assertion = lexpr._eq(&rexpr).not();
+
+        for d in denominators {
+            let expr = egg_to_z3(&ctx, Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref());
+            assertion = expr._eq(&rexpr).not().implies(&assertion);
         }
+
+        let rhs_errors = Self::one_of_errors(&ctx, rhs_denom);
+        let lhs_errors = Self::one_of_errors(&ctx, lhs_denom);
+        
+        solver.assert(&assertion);
+        solver.assert(&lhs_errors.iff(&rhs_errors));
+        Self::z3_res_to_validationresult(solver.check())
     }
 
     fn is_constant(&self) -> bool {
@@ -150,6 +161,31 @@ impl SynthLanguage for Math {
 }
 
 impl Math {
+    fn one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
+        let zero_pat = "0".parse::<Pattern<Math>>().unwrap();
+        let zero_z3 = egg_to_z3(ctx, Self::instantiate(&zero_pat).as_ref());
+
+        let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
+        for d in denoms {
+            let expr = egg_to_z3(ctx, Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref());
+            one_of_rhs_errors = z3::ast::Bool::or(ctx, &[&one_of_rhs_errors, &expr._eq(&zero_z3)]);
+        }
+        one_of_rhs_errors
+    }
+    
+
+    fn z3_res_to_validationresult(res: z3::SatResult) -> ValidationResult {
+        match res {
+            z3::SatResult::Unsat => ValidationResult::Valid,
+            z3::SatResult::Unknown => ValidationResult::Unknown,
+            z3::SatResult::Sat => ValidationResult::Invalid,
+        }
+    }
+    
+    fn pat_to_sexp(pat: &Pattern<Math>) -> Sexp {
+        parse_str(&pat.to_string()).unwrap()
+    }
+
     fn all_denominators(sexp: Sexp) -> HashSet<String> {
         let mut res = HashSet::<String>::default();
         match sexp {
@@ -242,12 +278,14 @@ impl Math {
             candidates.len()
         );
         let (mut valid, invalid) = candidates.partition(|r| r.is_valid());
-        for candidate in invalid.clone() {
-            println!("Invalid candidate: {}", candidate.1.name);
-        }
+
+        let num_prior = prior.len();
+        let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
+        
+
 
         // here's the conditional stuff
-        let with_condition = Ruleset::<Math>(
+        let mut with_condition = Ruleset::<Math>(
             invalid
                 .0
                 .iter()
@@ -261,25 +299,21 @@ impl Math {
                 .collect(),
         );
 
-        for rule in with_condition.0 {
-            println!("Candidate conditional rule: {}", rule.1.name);
-        }
+        let chosen_conditional = with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
 
-        let num_prior = prior.len();
-        let chosen = valid.minimize(prior, Scheduler::Compress(limits));
+        let result = chosen.union(&chosen_conditional);
+        
         let time = t.elapsed().as_secs_f64();
-
         println!(
             "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
+            result.bidir_len(),
+            result.len(),
             time,
             num_prior
         );
 
-        chosen.pretty_print();
-
-        chosen
+        result.pretty_print();
+        result
     }
 
     fn run_workload(
@@ -316,6 +350,7 @@ impl Math {
         chosen
     }
 }
+
 
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
     let mut buf: Vec<z3::ast::Real> = vec![];

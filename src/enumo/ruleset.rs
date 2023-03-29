@@ -82,6 +82,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         Ruleset(map)
     }
 
+    pub fn union(&self, other: &Self) -> Self {
+        let mut map = self.0.clone();
+        map.extend(other.0.clone());
+        Ruleset(map)
+    }
+
     pub fn iter(&self) -> Values<'_, Arc<str>, Rule<L>> {
         self.0.values()
     }
