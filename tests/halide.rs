@@ -328,20 +328,19 @@ mod test {
 
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
-        let all_rules = halide_rules();
+        // let all_rules = halide_rules();
+        let all_rules = Ruleset::default();
         let duration = start.elapsed();
 
         // let (can, cannot) =
         //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
         // println!("{} / {}", can.len(), can.len() + cannot.len());
 
-        logger::write_json_rules(&all_rules, "halide_rules.json");
         logger::write_output(
             &all_rules,
             &baseline,
             "halide",
             "baseline",
-            "halide.json",
             Limits {
                 iter: 2,
                 node: 200000,

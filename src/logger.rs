@@ -8,54 +8,11 @@ use serde_json::{json, Value};
 
 use crate::{enumo::Ruleset, DeriveType, Limits, SynthLanguage};
 
-// Writes the ruleset to the json/ subdirectory, to be uploaded to the
-// nightly server. The ruleset is written as a json object with a single
-// field, "rules".
-pub fn write_json_rules<L: SynthLanguage>(ruleset: &Ruleset<L>, filename: &str) {
-    let mut filepath = "nightly/json/".to_owned();
-
-    std::fs::create_dir_all(filepath.clone())
-        .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-
-    filepath.push_str(filename);
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(filepath)
-        .expect("Unable to open file");
-    let rules = json!({
-        "rules": ruleset.to_str_vec(),
-    })
-    .to_string();
-    file.write_all(rules.as_bytes())
-        .expect("Unable to write to file");
-}
-
-pub fn write_json_derivability(filename: String, json: Value) {
-    let mut filepath = "nightly/json/derivable_rules/".to_owned();
-
-    std::fs::create_dir_all(filepath.clone())
-        .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-
-    filepath.push_str(&filename);
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(filepath)
-        .expect("Unable to open file");
-
-    file.write_all(json.to_string().as_bytes())
-        .expect("Unable to write to file");
-}
-
 pub fn write_output<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     baseline: &Ruleset<L>,
     recipe_name: &str,
     baseline_name: &str,
-    nightly_file: &str,
     limits: Limits,
     time_rules: Duration,
 ) {
@@ -96,43 +53,8 @@ pub fn write_output<L: SynthLanguage>(
         "minimization strategy": "compress",
     });
 
-    let nightly_stats = json!({
-        "baseline_name": baseline_name,
-        "enumo_spec_name": recipe_name,
-        "loc": cnt,
-        "num_rules": ruleset.len(),
-        "num_baseline": baseline.len(),
-        "time": time_rules.as_secs_f64(),
-        "enumo_derives_baseline (lhs, lhs & rhs, all)":
-            format!("{}, {}, {}", forwards_lhs, forwards_lhs_rhs, forwards_all),
-        "enumo_derives_baseline_time":
-            format!("{}, {}, {}", lhs_f.as_secs_f64(), lhs_rhs_f.as_secs_f64(), all_f.as_secs_f64()),
-        "baseline_derives_enumo (lhs, lhs & rhs, all)":
-            format!("{}, {}, {}", backwards_lhs, backwards_lhs_rhs, backwards_all),
-        "baseline_derives_enumo_time":
-            format!("{}, {}, {}", lhs_b.as_secs_f64(), lhs_rhs_b.as_secs_f64(), all_b.as_secs_f64()),
-        "minimization strategy": "compress",
-    });
-
     // write to big object JSON file
     add_to_json_file("nightly/json/output.json".to_string(), stats);
-
-    // write to individual derivability results tables for LHS, LHS/RHS, all
-    write_json_derivability(
-        format!("{}_{}_lhs.json", recipe_name, baseline_name),
-        results_lhs,
-    );
-    write_json_derivability(
-        format!("{}_{}_lhs_rhs.json", recipe_name, baseline_name),
-        results_lhs_rhs,
-    );
-    write_json_derivability(
-        format!("{}_{}_all.json", recipe_name, baseline_name),
-        results_all,
-    );
-
-    // write to the table for the individual nightly results
-    add_to_json_file(format!("nightly/json/{}", nightly_file), nightly_stats);
 }
 
 pub fn add_to_json_file(outfile: String, json: Value) {

@@ -578,13 +578,11 @@ pub mod test {
         let rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
-        logger::write_json_rules(&rules, "rational_replicate.json");
         logger::write_output(
             &rules,
             &ruler1,
             "rational_replicate",
             "oopsla",
-            "baseline.json",
             Limits {
                 iter: 2,
                 node: 150000,
@@ -596,7 +594,6 @@ pub mod test {
             &herbie,
             "rational_replicate",
             "herbie",
-            "herbie.json",
             Limits {
                 iter: 2,
                 node: 150000,
@@ -608,13 +605,11 @@ pub mod test {
         let rules = best_enumo_recipe();
         let duration = start.elapsed();
 
-        logger::write_json_rules(&rules, "rational_best.json");
         logger::write_output(
             &rules,
             &ruler1,
             "rational_best",
             "oopsla",
-            "baseline.json",
             Limits {
                 iter: 2,
                 node: 150000,
@@ -626,7 +621,6 @@ pub mod test {
             &herbie,
             "rational_replicate",
             "herbie",
-            "herbie.json",
             Limits {
                 iter: 2,
                 node: 150000,
