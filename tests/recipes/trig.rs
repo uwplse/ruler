@@ -1,9 +1,9 @@
 use super::*;
+use crate::test::prior_rules;
 use ruler::{
     enumo::{Filter, Ruleset, Workload},
     Limits,
 };
-use crate::test::prior_rules;
 
 pub fn trig_rules() -> Ruleset<Trig> {
     let limits = Limits {

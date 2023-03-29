@@ -316,13 +316,10 @@ mod halide;
 
 mod test {
     use crate::halide::halide_rules;
-    use std::time::Instant;
     use crate::Pred;
+    use std::time::Instant;
 
-    use ruler::{
-        enumo::{Ruleset},
-        Limits,
-    };
+    use ruler::{enumo::Ruleset, Limits};
 
     #[test]
     fn recipe() {
@@ -339,23 +336,11 @@ mod test {
         // println!("{} / {}", can.len(), can.len() + cannot.len());
 
         all_rules.write_json_rules("halide_rules.json");
-        all_rules.write_baseline_row(
-            baseline.clone(),
-            "halide",
-            "baseline_halide",
-            "tests/recipes/halide.rs",
-            "halide.json",
-            Limits {
-                iter: 2,
-                node: 200000,
-            },
-            duration,
-        );
-        all_rules.write_baseline_row_big_object(
+        all_rules.write_output(
             baseline,
             "halide",
-            "baseline_halide",
-            "tests/recipes/halide.rs",
+            "baseline",
+            "halide.json",
             Limits {
                 iter: 2,
                 node: 200000,

@@ -340,11 +340,11 @@ impl Trig {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::trig::trig_rules;
     use ruler::{
         enumo::{Ruleset, Workload},
         Limits,
     };
-    use crate::trig::trig_rules;
 
     // Extra rules about `cis` and `I` to "fast-forward" rule synthesis
     pub fn prior_rules() -> Ruleset<Trig> {
@@ -373,9 +373,27 @@ mod test {
 
     #[test]
     fn nightly_recipe() {
+        // breaks
+        // let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-rational.rules");
+
+        let start = Instant::now();
         let rules = trig_rules();
-        // Only new rules should be uploaded!
+        let duration = start.elapsed();
+
         rules.write_json_rules("trig.json");
+        /*
+        rules.write_output(
+            herbie,
+            "trig",
+            "herbie",
+            "herbie.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        )
+        */
     }
 
     #[test]

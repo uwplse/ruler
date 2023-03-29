@@ -2,8 +2,8 @@
 32 bit implementation of Bitvectors.
 !*/
 
-use std::time::Instant;
 use ruler::enumo::{Ruleset, Scheduler, Workload};
+use std::time::Instant;
 #[path = "./recipes/bv32.rs"]
 mod bv32;
 ruler::impl_bv!(32);
@@ -39,7 +39,7 @@ impl Bv {
 mod test {
     use super::*;
     use crate::bv32::bv32_rules;
-    use ruler::enumo::{Ruleset};
+    use ruler::enumo::Ruleset;
     use std::time::Instant;
 
     #[test]
@@ -50,23 +50,11 @@ mod test {
 
         rules.write_json_rules("bv32.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
-        rules.write_baseline_row(
-            baseline.clone(),
-            "bv32",
-            "oopsla",
-            "tests/recipes/bv32.rs",
-            "baseline.json",
-            Limits {
-                iter: 3,
-                node: 200000,
-            },
-            duration,
-        );
-        rules.write_baseline_row_big_object(
+        rules.write_output(
             baseline,
             "bv32",
-            "oopsla_bv32",
-            "tests/recipes/bv32.rs",
+            "oopsla",
+            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,

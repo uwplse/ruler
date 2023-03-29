@@ -32,7 +32,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     layer2.to_file("replicate_layer2_terms");
     let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
     rules.extend(layer2_rules);
-    
+
     // Contains var filter
     let contains_var_filter = Filter::Or(vec![
         Filter::Contains("a".parse().unwrap()),

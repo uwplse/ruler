@@ -6,10 +6,10 @@ use ruler::{
 };
 use std::{ops::*, time::Instant};
 use z3::ast::Ast;
-#[path = "./recipes/rationalreplicate.rs"]
-pub mod rationalreplicate;
-#[path = "./recipes/bestrational.rs"]
-pub mod bestrational;
+#[path = "./recipes/rational_best.rs"]
+pub mod rational_best;
+#[path = "./recipes/rational_replicate.rs"]
+pub mod rational_replicate;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
@@ -407,14 +407,13 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
     }
 }
 
-
 #[cfg(test)]
 pub mod test {
-    use std::time::Duration;
     use super::*;
-    use crate::rationalreplicate::replicate_ruler1_recipe;
-    use crate::bestrational::best_enumo_recipe;
+    use crate::rational_best::best_enumo_recipe;
+    use crate::rational_replicate::replicate_ruler1_recipe;
     use ruler::enumo::{Ruleset, Workload};
+    use std::time::Duration;
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
@@ -571,63 +570,20 @@ pub mod test {
         );
     }
 
-    fn test_against_herbie(rules: &Ruleset<Math>, name: &str, recipe_name: &str, duration: Duration) {
+    #[test]
+    fn run() {
+        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
-        println!("Comparing rational to herbie...");
-        rules.write_baseline_row(
-            herbie.clone(),
-            name,
-            "herbie_baseline",
-            recipe_name,
-            "herbie.json",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-        rules.write_baseline_row_big_object(
-            herbie,
-            name,
-            "herbie_baseline",
-            recipe_name,
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-    }
-
-    #[test]
-    fn run_all() {
         let start = Instant::now();
         let rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
         rules.write_json_rules("rational_replicate.json");
-        test_against_ruler1(&rules, "rational_replicate", "tests/recipes/rationalreplicate.rs", duration);
-        test_against_herbie(&rules, "herbie_rational_replicate", "tests/recipes/bestrational.rs", duration);
-
-        let start = Instant::now();
-        let rules = best_enumo_recipe();
-        let duration = start.elapsed();
-
-        rules.write_json_rules("rational_best.json");
-        test_against_ruler1(&rules, "rational_best", "tests/recipes/bestrational.rs", duration);
-        test_against_herbie(&rules, "herbie_rational_best", "tests/recipes/bestrational.rs", duration);
-    }
-
-    fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, recipe_name: &str, duration: Duration) {
-        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-
-        println!("Comparing rational to ruler1...");
-        rules.write_baseline_row(
+        rules.write_output(
             ruler1.clone(),
-            name,
-            "oopsla_rational",
-            recipe_name,
+            "rational_replicate",
+            "oopsla",
             "baseline.json",
             Limits {
                 iter: 2,
@@ -635,11 +591,39 @@ pub mod test {
             },
             duration,
         );
-        rules.write_baseline_row_big_object(
+        rules.write_output(
+            herbie.clone(),
+            "rational_replicate",
+            "herbie",
+            "herbie.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+
+        let start = Instant::now();
+        let rules = best_enumo_recipe();
+        let duration = start.elapsed();
+
+        rules.write_json_rules("rational_best.json");
+        rules.write_output(
             ruler1,
-            name,
-            "oopsla_rational",
-            recipe_name,
+            "rational_best",
+            "oopsla",
+            "baseline.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+        rules.write_output(
+            herbie,
+            "rational_replicate",
+            "herbie",
+            "herbie.json",
             Limits {
                 iter: 2,
                 node: 150000,

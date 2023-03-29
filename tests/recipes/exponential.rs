@@ -1,7 +1,7 @@
 use super::*;
-use ruler::enumo;
 use crate::test::run_workload;
-use crate::test::{starting_exponential_rules, rational_rules};
+use crate::test::{rational_rules, starting_exponential_rules};
+use ruler::enumo;
 
 type Workload = enumo::Workload;
 type Ruleset = enumo::Ruleset<Exponential>;

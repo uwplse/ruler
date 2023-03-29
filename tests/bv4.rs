@@ -38,9 +38,9 @@ impl Bv {
 
 #[cfg(test)]
 pub mod test {
-    use crate::bv4::bv4_rules;
     use super::*;
-    use ruler::enumo::{Ruleset};
+    use crate::bv4::bv4_rules;
+    use ruler::enumo::Ruleset;
     use std::time::Instant;
 
     #[test]
@@ -51,23 +51,11 @@ pub mod test {
 
         rules.write_json_rules("bv4.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-        rules.write_baseline_row(
-            baseline.clone(),
-            "bv4",
-            "oopsla_bv4",
-            "tests/recipes/bv4.rs",
-            "baseline.json",
-            Limits {
-                iter: 3,
-                node: 200000,
-            },
-            duration,
-        );
-        rules.write_baseline_row_big_object(
+        rules.write_output(
             baseline,
             "bv4",
-            "oopsla_bv4",
-            "tests/recipes/bv4.rs",
+            "oopsla",
+            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,

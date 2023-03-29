@@ -140,8 +140,8 @@ impl Exponential {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ruler::enumo;
     use crate::exponential::make_rules;
+    use ruler::enumo;
 
     type Workload = enumo::Workload;
     type Ruleset = enumo::Ruleset<Exponential>;
@@ -322,8 +322,23 @@ mod test {
 
     #[test]
     fn run() {
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-rational.rules");
+
+        let start = Instant::now();
         let rules = make_rules();
-        // only upload new rules
+        let duration = start.elapsed();
+
         rules.write_json_rules("exponential.json");
+        rules.write_output(
+            herbie,
+            "exponential",
+            "herbie",
+            "herbie.json",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        )
     }
 }
