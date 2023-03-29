@@ -51,8 +51,16 @@ function load() {
   );
 }
 
-function loadDomain(domain) {
-  var domainData = data.find((x) => x.enumo_spec_name == domain);
+function loadDeriveDetail() {
+  let params = new URLSearchParams(window.location.search);
+  let domain = Object.fromEntries(params).domain;
+
+  if (!domain) {
+    return;
+  }
+  document.getElementById("domain_name").innerHTML = domain;
+
+  let domainData = data.find((x) => x.enumo_spec_name == domain);
   if (!domainData) {
     return;
   }
