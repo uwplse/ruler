@@ -327,7 +327,7 @@ mod test {
         let rules = make_rules();
         // let duration = start.elapsed();
 
-        rules.write_json_rules("exponential.json");
+        logger::write_json_rules(&rules, "exponential.json");
         /*
         rules.write_output(
             herbie,

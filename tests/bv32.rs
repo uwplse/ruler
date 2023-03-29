@@ -48,10 +48,11 @@ mod test {
         let rules = bv32_rules();
         let duration = start.elapsed();
 
-        rules.write_json_rules("bv32.json");
+        logger::write_json_rules(&rules, "bv32.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
-        rules.write_output(
-            baseline,
+        logger::write_output(
+            &rules,
+            &baseline,
             "bv32",
             "oopsla",
             "baseline.json",

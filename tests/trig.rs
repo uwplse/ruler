@@ -380,7 +380,7 @@ mod test {
         let rules = trig_rules();
         // let duration = start.elapsed();
 
-        rules.write_json_rules("trig.json");
+        logger::write_json_rules(&rules, "trig.json");
         /*
         rules.write_output(
             herbie,

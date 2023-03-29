@@ -297,11 +297,12 @@ mod test {
         let rules = bool_rules();
         let duration = start.elapsed();
 
-        rules.write_json_rules("bool.json");
+        logger::write_json_rules(&rules, "bool.json");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 
-        rules.write_output(
-            baseline,
+        logger::write_output(
+            &rules,
+            &baseline,
             "bool",
             "oopsla",
             "baseline.json",
