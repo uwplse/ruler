@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="stylesheet.css" type="text/css" charset="utf-8" />
+<html>
+
+<head>
+  <script src="table.js"></script>
+  <script src="../../nightly/data/output.js"></script>
+  <script src="generate.js"></script>
+</head>
+
+<title>BV4</title>
+
+<body onload="loadDomain('bv4')">
+  <h2>BV4</h2>
+  <div>
+    <h3>LHS Derivability</h3>
+    <div class="derive_container">
+      <div class="derive_table" id="lhs_etob_can"></div>
+      <div class="derive_table" id="lhs_etob_cannot"></div>
+    </div>
+    <div class="derive_container">
+      <div class="derive_table" id="lhs_btoe_can"></div>
+      <div class="derive_table" id="lhs_btoe_cannot"></div>
+    </div> 
+  </div>
+
+  <div>
+    <h3>LHS+RHS Derivability</h3>
+    <div class="derive_table" id="lhs_rhs_etob_can"></div>
+    <div class="derive_table" id="lhs_rhs_etob_cannot"></div>
+    <div class="derive_table" id="lhs_rhs_btoe_can"></div>
+    <div class="derive_table" id="lhs_rhs_btoe_cannot"></div>
+  </div>
+
+  <div>
+    <h3>All Derivability</h3>
+    <div class="derive_table" id="all_etob_can"></div>
+    <div class="derive_table" id="all_etob_cannot"></div>
+    <div class="derive_table" id="all_btoe_can"></div>
+    <div class="derive_table" id="all_btoe_cannot"></div>
+  </div>
+</body>

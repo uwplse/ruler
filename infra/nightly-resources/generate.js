@@ -51,6 +51,42 @@ function load() {
   );
 }
 
+function loadDomain(domain) {
+  var domainData = data.find((x) => x.enumo_spec_name == domain);
+  if (!domainData) {
+    return;
+  }
+  let deriveTypes = ["lhs", "lhs_rhs", "all"];
+  deriveTypes.forEach((deriveType) => {
+    console.log(deriveType);
+    document.getElementById(`${deriveType}_etob_can`).innerHTML =
+      ConvertJsonToTable(
+        domainData[`enumo_to_baseline_${deriveType}`]
+          .enumo_derives_baseline_derivable,
+        "Using Enumo to Derive Baseline (derivable)"
+      );
+    document.getElementById(`${deriveType}_etob_cannot`).innerHTML =
+      ConvertJsonToTable(
+        domainData[`enumo_to_baseline_${deriveType}`]
+          .enumo_derives_baseline_underivable,
+        "Using Enumo to Derive Baseline (not derivable)"
+      );
+
+    document.getElementById(`${deriveType}_btoe_can`).innerHTML =
+      ConvertJsonToTable(
+        domainData[`enumo_to_baseline_${deriveType}`]
+          .baseline_derives_enumo_derivable,
+        "Using Baseline to Derive Enumo (derivable)"
+      );
+    document.getElementById(`${deriveType}_btoe_cannot`).innerHTML =
+      ConvertJsonToTable(
+        domainData[`enumo_to_baseline_${deriveType}`]
+          .baseline_derives_enumo_underivable,
+        "Using Baseline to Derive Enumo (not derivable)"
+      );
+  });
+}
+
 function tryRound(v) {
   if (typeof v == "number") {
     if (v % 1 == 0) {

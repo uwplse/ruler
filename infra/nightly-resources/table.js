@@ -81,6 +81,10 @@ function ConvertJsonToTable(
   var trCon = "";
 
   if (parsedJson) {
+    if (parsedJson.length == 0) {
+      // If there are no rows, show one blank row
+      parsedJson.push("");
+    }
     var isStringArray = typeof parsedJson[0] == "string";
     var headers;
 
