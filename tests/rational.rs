@@ -890,12 +890,6 @@ pub mod test {
         test_against_herbie(&rules, "herbie_rational_best", duration);
     }
 
-    // todo delete
-    #[test]
-    fn best_enumo() {
-        best_enumo_recipe();
-    }
-
     fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
 
