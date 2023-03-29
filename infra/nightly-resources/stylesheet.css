@@ -1,3 +1,7 @@
 body {
     font-family: monospace, monospace;
 }
+
+.table {
+    padding-top: 20px;
+}

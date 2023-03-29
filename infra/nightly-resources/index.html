@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="stylesheet.css" type="text/css" charset="utf-8" />
+<html>
+
+<head>
+  <script src="table.js"></script>
+  <script src="../../nightly/data/output.js"></script>
+  <script src="generate.js"></script>
+</head>
+
+<title>Nightlies</title>
+<h2>Nightlies</h2>
+<div class="table" id="baseline_table">
+</div>
+<div class="table" id="herbie_table">
+</div>
+<div class="table" id="halide_table">
+</div>
+
+<body onload="load()">
+  <p>Big JSON:
+    <a href="../../nightly/data/output.js">object</a>.
+  </p>
+  <p>Individual results for BV4:
+    <a href="json/derivable_rules/bv4_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/bv4_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/bv4_all.html">all</a>.
+  </p>
+  <p>Individual results for BV32:
+    <a href="json/derivable_rules/bv32_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/bv32_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/bv32_all.html">all</a>.
+  </p>
+  <p>Individual results for bool:
+    <a href="json/derivable_rules/bool_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/bool_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/bool_all.html">all</a>.
+  </p>
+  <p>Individual results for rational (replicate):
+    <a href="json/derivable_rules/rational_replicate_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/rational_replicate_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/rational_replicate_all.html">all</a>.
+  </p>
+  <p>Individual results for rational (best):
+    <a href="json/derivable_rules/rational_best_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/rational_best_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/rational_best_all.html">all</a>.
+  </p>
+  <p>Individual results for Herbie comparison (replicate):
+    <a href="json/derivable_rules/herbie_rational_replicate_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/herbie_rational_replicate_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/herbie_rational_replicate_all.html">all</a>.
+  </p>
+  <p>Individual results for Herbie comparison (best):
+    <a href="json/derivable_rules/herbie_rational_best_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/herbie_rational_best_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/herbie_rational_best_all.html">all</a>.
+  </p>
+  <p>Individual results for Halide:
+    <a href="json/derivable_rules/halide_lhs.html">LHS</a>,
+    <a href="json/derivable_rules/halide_lhs_rhs.html">LHS/RHS</a>,
+    <a href="json/derivable_rules/halide_all.html">all</a>.
+  </p>
+</body>
+
+</html>

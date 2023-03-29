@@ -53,11 +53,11 @@ pub fn write_output<L: SynthLanguage>(
         "minimization strategy": "compress",
     });
 
-    // write to big object JSON file
-    add_to_json_file("nightly/json/output.json".to_string(), stats);
+    // write data to a big JS object that is read by the frontend
+    add_to_data_file("nightly/data/output.js".to_string(), stats);
 }
 
-pub fn add_to_json_file(outfile: String, json: Value) {
+pub fn add_to_data_file(outfile: String, json: Value) {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -82,7 +82,8 @@ pub fn add_to_json_file(outfile: String, json: Value) {
         .open(outfile)
         .expect("Unable to open file");
 
-    file.write_all("[".as_bytes()).expect("write failed");
+    file.write_all("var data = [".as_bytes())
+        .expect("write failed");
 
     for (object, is_last_element) in json_arr
         .iter()
@@ -95,7 +96,7 @@ pub fn add_to_json_file(outfile: String, json: Value) {
             file.write_all(", ".as_bytes()).expect("write failed");
         }
     }
-    file.write_all("]".as_bytes()).expect("write failed");
+    file.write_all("];".as_bytes()).expect("write failed");
 }
 
 pub fn count_lines(recipe_name: &str) -> usize {
