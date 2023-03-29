@@ -308,23 +308,20 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // write to individual derivability results tables for LHS, LHS/RHS, all
         Self::write_json_derivability(
-            format!("{}_{}_lhs.json", recipe_name, baseline_name).to_string(),
+            format!("{}_{}_lhs.json", recipe_name, baseline_name),
             results_lhs,
         );
         Self::write_json_derivability(
-            format!("{}_{}_lhs_rhs.json", recipe_name, baseline_name).to_string(),
+            format!("{}_{}_lhs_rhs.json", recipe_name, baseline_name),
             results_lhs_rhs,
         );
         Self::write_json_derivability(
-            format!("{}_{}_all.json", recipe_name, baseline_name).to_string(),
+            format!("{}_{}_all.json", recipe_name, baseline_name),
             results_all,
         );
 
         // write to the table for the individual nightly results
-        Self::add_to_json_file(
-            format!("nightly/json/{}", nightly_file).to_string(),
-            nightly_stats,
-        );
+        Self::add_to_json_file(format!("nightly/json/{}", nightly_file), nightly_stats);
     }
 
     pub fn add_to_json_file(outfile: String, json: Value) {
@@ -377,7 +374,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut cnt = 0;
 
         for _ in file.lines() {
-            cnt = cnt + 1;
+            cnt += 1;
         }
         cnt
     }

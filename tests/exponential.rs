@@ -145,7 +145,6 @@ mod test {
 
     type Workload = enumo::Workload;
     type Ruleset = enumo::Ruleset<Exponential>;
-    type Filter = enumo::Filter;
 
     pub fn starting_exponential_rules() -> Ruleset {
         Ruleset::new(&[
@@ -322,13 +321,14 @@ mod test {
 
     #[test]
     fn run() {
-        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-rational.rules");
+        // let herbie: Ruleset = Ruleset::from_file("baseline/herbie-rational.rules");
 
-        let start = Instant::now();
+        // let start = Instant::now();
         let rules = make_rules();
-        let duration = start.elapsed();
+        // let duration = start.elapsed();
 
         rules.write_json_rules("exponential.json");
+        /*
         rules.write_output(
             herbie,
             "exponential",
@@ -340,5 +340,6 @@ mod test {
             },
             duration,
         )
+        */
     }
 }
