@@ -53,7 +53,7 @@ pub fn write_output<L: SynthLanguage>(
         "minimization strategy": "compress",
     });
 
-    // write data to a big JS object that is read by the frontend
+    std::fs::create_dir_all("nightly/data").unwrap_or_else(|e| panic!("Error creating dir: {}", e));
     add_to_data_file("nightly/data/output.json".to_string(), stats);
 }
 
