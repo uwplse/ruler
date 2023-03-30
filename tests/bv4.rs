@@ -49,13 +49,12 @@ pub mod test {
         let rules = bv4_rules();
         let duration = start.elapsed();
 
-        rules.write_json_rules("bv4.json");
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-        rules.write_output(
-            baseline,
+        logger::write_output(
+            &rules,
+            &baseline,
             "bv4",
             "oopsla",
-            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,

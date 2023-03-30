@@ -377,23 +377,20 @@ mod test {
         // let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         // let start = Instant::now();
-        let rules = trig_rules();
+        // let rules = trig_rules();
         // let duration = start.elapsed();
 
-        rules.write_json_rules("trig.json");
-        /*
-        rules.write_output(
-            herbie,
-            "trig",
-            "herbie",
-            "herbie.json",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        )
-        */
+        // logger::write_output(
+        //     &rules,
+        //     &herbie,
+        //     "trig",
+        //     "herbie",
+        //     Limits {
+        //         iter: 2,
+        //         node: 150000,
+        //     },
+        //     duration,
+        // )
     }
 
     #[test]

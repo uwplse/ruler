@@ -324,22 +324,19 @@ mod test {
         // let herbie: Ruleset = Ruleset::from_file("baseline/herbie-rational.rules");
 
         // let start = Instant::now();
-        let rules = make_rules();
+        // let rules = make_rules();
         // let duration = start.elapsed();
 
-        rules.write_json_rules("exponential.json");
-        /*
-        rules.write_output(
-            herbie,
-            "exponential",
-            "herbie",
-            "herbie.json",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        )
-        */
+        // logger::write_output(
+        //     &rules,
+        //     &herbie,
+        //     "exponential",
+        //     "herbie",
+        //     Limits {
+        //         iter: 2,
+        //         node: 150000,
+        //     },
+        //     duration,
+        // )
     }
 }

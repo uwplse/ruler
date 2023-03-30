@@ -319,7 +319,7 @@ mod test {
     use crate::Pred;
     use std::time::Instant;
 
-    use ruler::{enumo::Ruleset, Limits};
+    use ruler::{enumo::Ruleset, logger, Limits};
 
     #[test]
     fn recipe() {
@@ -335,12 +335,11 @@ mod test {
         //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
         // println!("{} / {}", can.len(), can.len() + cannot.len());
 
-        all_rules.write_json_rules("halide_rules.json");
-        all_rules.write_output(
-            baseline,
+        logger::write_output(
+            &all_rules,
+            &baseline,
             "halide",
-            "baseline",
-            "halide.json",
+            "halide",
             Limits {
                 iter: 2,
                 node: 200000,

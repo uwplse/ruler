@@ -296,15 +296,13 @@ mod test {
         let start = Instant::now();
         let rules = bool_rules();
         let duration = start.elapsed();
-
-        rules.write_json_rules("bool.json");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 
-        rules.write_output(
-            baseline,
+        logger::write_output(
+            &rules,
+            &baseline,
             "bool",
             "oopsla",
-            "baseline.json",
             Limits {
                 iter: 3,
                 node: 200000,

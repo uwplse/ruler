@@ -31,7 +31,7 @@ echo "Switching to nighly script directory: $MYDIR"
 rm -rf $NIGHTLY_DIR
 
 # Prepare output directories
-mkdir -p "$NIGHTLY_DIR/json" "$NIGHTLY_DIR/output"
+mkdir -p "$NIGHTLY_DIR/data" "$NIGHTLY_DIR/output"
 
 # Run tests.
 pushd $TOP_DIR
@@ -39,11 +39,12 @@ RUST_TEST_THREADS=1 cargo test --release
 popd
 
 # Update HTML index page.
-cp "$RESOURCE_DIR/table.js" "$RESOURCE_DIR/stylesheet.css" "$NIGHTLY_DIR/output"
-python3 $MYDIR/generatehtml.py $RESOURCE_DIR $NIGHTLY_DIR
+cp "$RESOURCE_DIR"/* "$NIGHTLY_DIR/output"
 
+# Put the json data in a JS object for consumption by frontend
+(echo "var data = "; cat "$NIGHTLY_DIR/data/output.json") > "$NIGHTLY_DIR/data/output.js"
 # Copy json directory to the artifact
-cp -r "$NIGHTLY_DIR/json" "$NIGHTLY_DIR/output/json"
+cp -r "$NIGHTLY_DIR/data" "$NIGHTLY_DIR/output/data"
 
 # This is the uploading part, copied directly from Herbie's nightly script.
 DIR="$NIGHTLY_DIR/output"
