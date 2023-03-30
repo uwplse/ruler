@@ -5,7 +5,7 @@ use serde_json::*;
 use std::fs::*;
 use std::sync::Mutex;
 use std::time::Instant;
-use std::{io::Read, io::Write, sync::Arc, time::Duration};
+use std::{io::BufRead, io::BufReader, io::Read, io::Write, sync::Arc, time::Duration};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -221,41 +221,48 @@ impl<L: SynthLanguage> Ruleset<L> {
             .expect("Unable to write to file");
     }
 
-    pub fn write_baseline_row_big_object(
-        &self,
-        baseline: Self,
-        enumo_name: &str,
-        baseline_name: &str,
-        limits: Limits,
-        time_rules: Duration,
-    ) {
-        let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-            self.write_derivability_results_big_object(DeriveType::Lhs, baseline.clone(), limits);
-        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) = self
-            .write_derivability_results_big_object(DeriveType::LhsAndRhs, baseline.clone(), limits);
-        let ((forwards_all, backwards_all), (all_f, all_b), results_all) = self
-            .write_derivability_results_big_object(DeriveType::AllRules, baseline.clone(), limits);
+    pub fn write_json_derivability(filename: String, json: Value) {
+        let mut filepath = "nightly/json/derivable_rules/".to_owned();
 
-        let mut outfile = OpenOptions::new()
+        std::fs::create_dir_all(filepath.clone())
+            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+
+        filepath.push_str(&filename);
+        let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open("nightly/json/output.json")
+            .open(filepath)
             .expect("Unable to open file");
 
-        let mut outfile_string = String::new();
-        outfile
-            .read_to_string(&mut outfile_string)
-            .expect("Unable to read file");
-        let mut json_arr = vec![];
+        file.write_all(json.to_string().as_bytes())
+            .expect("Unable to write to file");
+    }
 
-        if !(outfile_string.is_empty()) {
-            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile_string).unwrap();
-        }
+    pub fn write_output(
+        &self,
+        baseline: Self,
+        recipe_name: &str,
+        baseline_name: &str,
+        nightly_file: &str,
+        limits: Limits,
+        time_rules: Duration,
+    ) {
+        // get information about the derivability of our ruleset vs. the baseline ruleset
+        let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
+            self.get_derivability_results(DeriveType::Lhs, baseline.clone(), limits);
+        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
+            self.get_derivability_results(DeriveType::LhsAndRhs, baseline.clone(), limits);
+        let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
+            self.get_derivability_results(DeriveType::AllRules, baseline.clone(), limits);
+
+        // get linecount of recipe
+        let cnt = Self::count_lines(recipe_name);
 
         let stats = json!({
             "baseline_name": baseline_name,
-            "enumo_spec_name": enumo_name,
+            "enumo_spec_name": recipe_name,
+            "loc": cnt,
             "num_rules": self.len(),
             "rules": json!({"rules": self.to_str_vec()}),
             "num_baseline": baseline.len(),
@@ -278,79 +285,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             "minimization strategy": "compress",
         });
 
-        json_arr.push(stats);
-
-        let mut file = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open("nightly/json/output.json")
-            .expect("Unable to open file");
-
-        file.write_all("[".as_bytes()).expect("write failed");
-
-        for (object, is_last_element) in json_arr
-            .iter()
-            .enumerate()
-            .map(|(i, w)| (w, i == json_arr.len() - 1))
-        {
-            file.write_all(object.to_string().as_bytes())
-                .expect("write failed");
-            if !(is_last_element) {
-                file.write_all(", ".as_bytes()).expect("write failed");
-            }
-        }
-        file.write_all("]".as_bytes()).expect("write failed");
-    }
-
-    pub fn write_baseline_row(
-        &self,
-        baseline: Self,
-        enumo_name: &str,
-        baseline_name: &str,
-        outfile: &str,
-        limits: Limits,
-        time_rules: Duration,
-    ) {
-        let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b)) =
-            self.write_derivability_results(DeriveType::Lhs, baseline.clone(), enumo_name, limits);
-        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b)) = self
-            .write_derivability_results(
-                DeriveType::LhsAndRhs,
-                baseline.clone(),
-                enumo_name,
-                limits,
-            );
-        let ((forwards_all, backwards_all), (all_f, all_b)) = self.write_derivability_results(
-            DeriveType::AllRules,
-            baseline.clone(),
-            enumo_name,
-            limits,
-        );
-
-        let mut filepath = "nightly/json/".to_owned();
-        filepath.push_str(outfile);
-
-        let mut outfile = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(filepath.clone())
-            .expect("Unable to open file");
-
-        let mut outfile_string = String::new();
-        outfile
-            .read_to_string(&mut outfile_string)
-            .expect("Unable to read file");
-        let mut json_arr = vec![];
-
-        if !(outfile_string.is_empty()) {
-            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile_string).unwrap();
-        }
-
-        let stats = json!({
+        let nightly_stats = json!({
             "baseline_name": baseline_name,
-            "enumo_spec_name": enumo_name,
+            "enumo_spec_name": recipe_name,
+            "loc": cnt,
             "num_rules": self.len(),
             "num_baseline": baseline.len(),
             "time": time_rules.as_secs_f64(),
@@ -365,13 +303,50 @@ impl<L: SynthLanguage> Ruleset<L> {
             "minimization strategy": "compress",
         });
 
-        json_arr.push(stats);
+        // write to big object JSON file
+        Self::add_to_json_file("nightly/json/output.json".to_string(), stats);
+
+        // write to individual derivability results tables for LHS, LHS/RHS, all
+        Self::write_json_derivability(
+            format!("{}_{}_lhs.json", recipe_name, baseline_name),
+            results_lhs,
+        );
+        Self::write_json_derivability(
+            format!("{}_{}_lhs_rhs.json", recipe_name, baseline_name),
+            results_lhs_rhs,
+        );
+        Self::write_json_derivability(
+            format!("{}_{}_all.json", recipe_name, baseline_name),
+            results_all,
+        );
+
+        // write to the table for the individual nightly results
+        Self::add_to_json_file(format!("nightly/json/{}", nightly_file), nightly_stats);
+    }
+
+    pub fn add_to_json_file(outfile: String, json: Value) {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(outfile.clone())
+            .expect("Unable to open file");
+
+        let mut file_string = String::new();
+        file.read_to_string(&mut file_string)
+            .expect("Unable to read file");
+
+        let mut json_arr = vec![];
+        if !(file_string.is_empty()) {
+            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&file_string).unwrap();
+        }
+        json_arr.push(json);
 
         let mut file = OpenOptions::new()
             .write(true)
             .truncate(true)
             .create(true)
-            .open(filepath)
+            .open(outfile)
             .expect("Unable to open file");
 
         file.write_all("[".as_bytes()).expect("write failed");
@@ -390,57 +365,21 @@ impl<L: SynthLanguage> Ruleset<L> {
         file.write_all("]".as_bytes()).expect("write failed");
     }
 
-    pub fn write_derivability_results(
-        &self,
-        derive_type: DeriveType,
-        baseline: Self,
-        name: &str,
-        limits: Limits,
-    ) -> ((String, String), (Duration, Duration)) {
-        let mut filepath = "nightly/json/derivable_rules/".to_owned();
+    pub fn count_lines(recipe_name: &str) -> usize {
+        let mut filepath = "tests/recipes/".to_owned();
+        filepath.push_str(recipe_name);
+        filepath.push_str(".rs");
 
-        std::fs::create_dir_all(filepath.clone())
-            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+        let file = BufReader::new(File::open(filepath).expect("Unable to open file"));
+        let mut cnt = 0;
 
-        filepath.push_str(name);
-
-        match derive_type {
-            DeriveType::Lhs => filepath.push_str("_lhs.json"),
-            DeriveType::LhsAndRhs => filepath.push_str("_lhs_rhs.json"),
-            _ => filepath.push_str("_all.json"),
+        for _ in file.lines() {
+            cnt += 1;
         }
-
-        let mut file = std::fs::File::create(filepath.clone())
-            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
-
-        let start_f = Instant::now();
-        let (can_f, cannot_f) = self.derive(derive_type, &baseline, limits);
-        let time_f = start_f.elapsed();
-        let start_b = Instant::now();
-        let (can_b, cannot_b) = baseline.derive(derive_type, self, limits);
-        let time_b = start_b.elapsed();
-
-        let derivability_results = json!({
-            "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
-            "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
-            "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
-            "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
-        })
-        .to_string();
-
-        file.write_all(derivability_results.as_bytes())
-            .expect("Unable to write to file");
-
-        let derivable_ratio_enumo = format!("{}/{}", can_f.len(), baseline.len());
-        let derivable_ratio_oopsla = format!("{}/{}", can_b.len(), self.clone().len());
-
-        (
-            (derivable_ratio_enumo, derivable_ratio_oopsla),
-            (time_f, time_b),
-        )
+        cnt
     }
 
-    pub fn write_derivability_results_big_object(
+    pub fn get_derivability_results(
         &self,
         derive_type: DeriveType,
         baseline: Self,
