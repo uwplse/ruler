@@ -339,7 +339,7 @@ mod test {
             &all_rules,
             &baseline,
             "halide",
-            "baseline",
+            "halide",
             Limits {
                 iter: 2,
                 node: 200000,
