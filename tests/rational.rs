@@ -224,7 +224,13 @@ impl Math {
         let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
         let rhs_denoms = Self::all_denominators(rhs_sexp.clone());
         let intersection: HashSet<String> = lhs_denoms.intersection(&rhs_denoms).cloned().collect();
-        let all_denoms: Vec<String> = lhs_denoms.union(&rhs_denoms).cloned().collect::<HashSet<String>>().difference(&intersection).cloned().collect();
+        let all_denoms: Vec<String> = lhs_denoms
+            .union(&rhs_denoms)
+            .cloned()
+            .collect::<HashSet<String>>()
+            .difference(&intersection)
+            .cloned()
+            .collect();
 
         if all_denoms.is_empty() {
             None
@@ -287,6 +293,11 @@ impl Math {
             candidates.len()
         );
         let (mut valid, invalid) = candidates.partition(|r| r.is_valid());
+        println!(
+            "Found {} valid and {} invalid rules",
+            valid.len(),
+            invalid.len()
+        );
 
         let num_prior = prior.len();
         let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
@@ -304,6 +315,11 @@ impl Math {
                     }
                 })
                 .collect(),
+        );
+
+        println!(
+            "Instrumented {} rules with conditions",
+            with_condition.len()
         );
 
         let chosen_conditional =
