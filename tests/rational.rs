@@ -860,6 +860,10 @@ pub mod test {
         let nested_abs_rules = Math::run_workload(nested_abs, rules.clone(), limits, true);
         rules.extend(nested_abs_rules);
 
+        // Top level div
+        //println!("top level div");
+        //let top_level_div = Workload::new(["(/ size3 size3)");
+
         rules
     }
 
@@ -904,15 +908,14 @@ pub mod test {
         let rules = best_enumo_recipe();
         let duration = start.elapsed();
 
+        let _flip_rule = Rule::<Math>::from_string(
+            "(+ ?a ?b) ==> (/ (- (* ?a ?a) (* ?b ?b))
+               (- ?a ?b))",
+        );
+
         rules.write_json_rules("rational_best.json");
         test_against_ruler1(&rules, "rational_best", duration);
         test_against_herbie(&rules, "herbie_rational_best", duration);
-    }
-
-    // todo delete
-    #[test]
-    fn best_enumo() {
-        best_enumo_recipe();
     }
 
     fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
