@@ -7,42 +7,96 @@ use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use rayon::vec;
 use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
+    enumo::{Filter, Ruleset, Metric, Scheduler, Workload},
     *,
 };
 use std::time::Instant;
+use std::fs;
+use std::time::SystemTime;
 
-pub type Constant = Ratio<BigInt>;
+pub type Constant = usize;
+
 
 fn get_nat_rules() -> Vec<&'static str> {
     [
         // Small subset of rat rules
-        "(+ ?b ?a) ==> (+ ?a ?b)",
-        "(* ?b ?a) ==> (* ?a ?b)",
-        "(+ 0 ?a) ==> ?a",
-        "?a ==> (+ 0 ?a)",
+        // "(+ ?b ?a) ==> (+ ?a ?b)",
+        // "(* ?b ?a) ==> (* ?a ?b)",
+        // "(+ 0 ?a) ==> ?a",
+        // "?a ==> (+ 0 ?a)",
         // "(* ?a 0) ==> 0",
-        "(* 1 ?a) ==> ?a",
-        "?a ==> (* 1 ?a)",
-        "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
-        "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
-        "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
-        "(+ ?a (max ?b ?c)) ==> (max (+ ?a ?b) (+ ?a ?c))",
-        "(max (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (max ?b ?c))",
-        "(+ ?a (min ?b ?c)) ==> (min (+ ?a ?b) (+ ?a ?c))",
-        "(min (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (min ?b ?c))",
-        "(max ?b ?a) ==> (max ?a ?b)",
-        "(min ?b ?a) ==> (min ?a ?b)",
+        // "(* 1 ?a) ==> ?a",
+        // "?a ==> (* 1 ?a)",
+        // "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
+        // "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
+        // "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
+
+        // "(+ ?a (max ?b ?c)) ==> (max (+ ?a ?b) (+ ?a ?c))",
+        // "(max (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (max ?b ?c))",
+        // "(+ ?a (min ?b ?c)) ==> (min (+ ?a ?b) (+ ?a ?c))",
+        // "(min (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (min ?b ?c))",
+        // "(max ?b ?a) ==> (max ?a ?b)",
+        // "(min ?b ?a) ==> (min ?a ?b)",
         "(min (max ?a ?b) ?a) ==> ?a",
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
+
+
+        // Subst computing
+        "(subst x x ?to) ==> ?to",
+        "(subst x y ?to) ==> x",
+        "(subst x z ?to) ==> x",
+        "(subst y x ?to) ==> y",
+        "(subst y y ?to) ==> ?to",
+        "(subst y z ?to) ==> y",
+        "(subst z x ?to) ==> z",
+        "(subst z y ?to) ==> z",
+        "(subst z z ?to) ==> ?to",
+        "(subst (min ?a ?b) ?from ?to) ==> (min (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        "(subst (- ?a ?b) ?from ?to) ==> (- (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        "(subst (/ ?a ?b) ?from ?to) ==> (/ (subst ?a ?from ?to) (subst ?b ?from ?to))",
+
+        "(subst 1 ?from ?to) ==> 1",
     ]
     .into()
 }
 
+fn get_lifting_rules() -> Vec<&'static str> {
+    [
+        // Subst lifting
+        // "(/ x ?a) ==> (subst x x (/ x ?a))",
+        // "(/ y ?a) ==> (subst y y (/ y ?a))",
+        // "(/ z ?a) ==> (subst z z (/ z ?a))",
+        // "(min (subst ?e ?from ?to) ?a) ==> (subst (min ?e ?a) ?from ?to)",
+        // "(- ?a (subst ?e ?from ?to)) ==> (subst (- ?a ?e) ?from ?to)",
+
+        
+        "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
+        "(FRep (max ?a ?b)) ==> (Union (FRep ?a) (FRep ?b))",
+        "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
+        "(FRep (min ?a ?b)) ==> (Inter (FRep ?a) (FRep ?b))",
+        // "(Empty) ==> (FRep (~ 1))",
+
+
+        "(Scale (FRep ?e) ?a ?b ?c) ==> (FRep (subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c)))",
+        "(FRep (subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c))) ==> (Scale (FRep ?e) ?a ?b ?c)",
+
+        "(Cuboid ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
+        "(FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c)))) ==> (Cuboid ?a ?b ?c)",
+        // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
+        
+        // "(Scale (Cuboid ?w ?l? ?h) ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x (* ?w ?a)) (/ y (* ?l ?b))) (/ z (* ?h ?c)))))",
+        // "(Scale (Cuboid ?w ?l? ?h) ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x (* ?w ?a)) (/ y (* ?l ?b))) (/ z (* ?h ?c)))))",
+        // "(Scale (Cuboid 1 1 1) ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
+
+        "(Scale (Cuboid ?w ?l? ?h) ?a ?b ?c) ==> (Cheat ?a ?b ?c)",
+        "(Cheat ?a ?b ?c) ==> (Cuboid ?a ?b ?c)",
+    ].into()
+}
+
 egg::define_language! {
- pub enum CaddyAndFRep  {
+ pub enum CF  {
     // FRep
     "FRep" = FRep([Id; 1]),
     "max" = Max([Id; 2]),
@@ -57,10 +111,7 @@ egg::define_language! {
     "z" = DimZ,
     "subst" = Subst([Id; 3]),
 
-    // "binop" = Binop([Id; 3]),
-
     // Caddy
-    "Caddy" = Caddy([Id; 1]),
     "Cuboid" = Cuboid([Id; 3]),
     "Spheroid" = Spheroid([Id; 3]),
     "Trans" = Trans([Id; 4]),
@@ -69,14 +120,68 @@ egg::define_language! {
     "Inter" = Inter([Id; 2]),
     "Empty" = Empty,
 
-    "Cheat" = Cheat([Id; 2]),
+    "Cheat" = Cheat([Id; 3]),
 
     Lit(Constant),
     Var(egg::Symbol),
  }
 }
 
-impl SynthLanguage for CaddyAndFRep {
+fn compute_subst(egraph: &mut EGraph<CF, SynthAnalysis>, e: Id, from: &CF, to: &Id) -> Option<CF>{
+    // Choose arbitrary node to continue computation on
+    let nodes = egraph[e].nodes.clone();
+    for n in nodes {
+        match n {
+            CF::Min([a, b]) => {
+                if let Some(a_substed) = compute_subst(egraph, a, from, to) {
+                    if let Some(b_substed) = compute_subst(egraph, b, from, to) {
+                        // TODO: Only add to egraph if entire computation
+                        // is successful by maintaining a tree of terms only.
+                        let a_id = egraph.add(a_substed);
+                        let b_id = egraph.add(b_substed);
+                        return Some(CF::Min([a_id, b_id]));
+                    }
+                }
+            }
+
+            CF::Div([a, b]) => {
+                if let Some(a_substed) = compute_subst(egraph, a, from, to) {
+                    if let Some(b_substed) = compute_subst(egraph, b, from, to) {
+                        let a_id = egraph.add(a_substed);
+                        let b_id = egraph.add(b_substed);
+                        return Some(CF::Div([a_id, b_id]));
+                    }
+                }
+            }
+
+            CF::Sub([a, b]) => {
+                if let Some(a_substed) = compute_subst(egraph, a, from, to) {
+                    if let Some(b_substed) = compute_subst(egraph, b, from, to) {
+                        let a_id = egraph.add(a_substed);
+                        let b_id = egraph.add(b_substed);
+                        return Some(CF::Sub([a_id, b_id]));
+                    }
+                }
+            }
+
+            CF::DimX | CF::DimY | CF::DimZ => {
+                if *from == n {
+                    return Some(egraph[*to].nodes[0].clone());
+                } else {
+                    return Some(n);
+                }
+            }
+
+            CF::Lit(i) => {
+                return Some(n);
+            }
+            _ => (),
+        }
+    }
+    None
+}
+
+impl SynthLanguage for CF {
     type Constant = Constant;
 
     fn is_rule_lifting() -> bool {
@@ -84,34 +189,22 @@ impl SynthLanguage for CaddyAndFRep {
     }
 
     fn get_lifting_rules() -> Ruleset<Self> {
-        Ruleset::new(&[
-            "(/ x ?a) ==> (subst x x (/ x ?a))",
-            "(/ y ?a) ==> (subst y y (/ y ?a))",
-            "(/ z ?a) ==> (subst z z (/ z ?a))",
-            "(min (subst ?e ?from ?to) ?a) ==> (subst (min ?e ?a) ?from ?to)",
-            "(- ?a (subst ?e ?from ?to)) ==> (subst (- ?a ?e) ?from ?to)",
-            "(Cuboid ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
-            "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
-            "(FRep (max ?a ?b)) ==> (Union (FRep ?a) (FRep ?b))",
-            "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
-            "(FRep (min ?a ?b)) ==> (Inter (FRep ?a) (FRep ?b))",
-            // "(Empty) ==> (FRep (~ 1))",
-            "(Scale (FRep ?e) ?a ?b ?c)", // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
-        ])
+        Ruleset::new(&get_lifting_rules())
     }
 
     fn is_allowed_op(&self) -> bool {
         matches!(
             self,
-            CaddyAndFRep::FRep(_)
-                | CaddyAndFRep::Cuboid(_)
-                | CaddyAndFRep::Spheroid(_)
-                | CaddyAndFRep::Trans(_)
-                | CaddyAndFRep::Scale(_)
-                | CaddyAndFRep::Var(_)
-                | CaddyAndFRep::Union(_)
-                | CaddyAndFRep::Inter(_)
-                | CaddyAndFRep::Cheat(_)
+            CF::FRep(_)
+                | CF::Cuboid(_)
+                | CF::Spheroid(_)
+                | CF::Trans(_)
+                | CF::Scale(_)
+                | CF::Var(_)
+                | CF::Union(_)
+                | CF::Inter(_)
+                | CF::Cheat(_)
+                | CF::Lit(_)
         )
     }
 
@@ -127,7 +220,7 @@ impl SynthLanguage for CaddyAndFRep {
     fn initialize_vars(_egraph: &mut EGraph<Self, SynthAnalysis>, _vars: &[String]) {}
 
     fn to_var(&self) -> Option<Symbol> {
-        if let CaddyAndFRep::Var(sym) = self {
+        if let CF::Var(sym) = self {
             Some(*sym)
         } else {
             None
@@ -135,15 +228,44 @@ impl SynthLanguage for CaddyAndFRep {
     }
 
     fn mk_var(sym: Symbol) -> Self {
-        CaddyAndFRep::Var(sym)
+        CF::Var(sym)
     }
 
     fn is_constant(&self) -> bool {
-        matches!(self, CaddyAndFRep::Lit(_))
+        matches!(self, CF::Lit(_))
     }
 
     fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
-        CaddyAndFRep::Lit(c)
+        CF::Lit(c)
+    }
+
+    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
+
+        let get_dim_var = |nodes: &[CF]| {
+            for n in nodes {
+                if let CF::DimX = n {
+                    return Some(CF::DimX);
+                } else if let CF::DimY = n {
+                    return Some(CF::DimY);
+                } else if let CF::DimZ = n {
+                    return Some(CF::DimZ);
+                }
+            }
+            None
+        };
+
+
+        for n in &egraph[id].nodes {
+            if let CF::Subst([e, from, to]) = egraph[id].nodes[0] {
+                if let Some(from_var) = get_dim_var(&egraph[from].nodes) {
+                    if let Some(substed) = compute_subst(egraph, e, &from_var, &to) {
+                        let id2 = egraph.add(substed);
+                        egraph.union(id, id2);
+                    }
+                    return;
+                }
+            }
+        }
     }
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
@@ -151,7 +273,7 @@ impl SynthLanguage for CaddyAndFRep {
     }
 }
 
-impl CaddyAndFRep {
+impl CF {
     pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
         let t = Instant::now();
 
@@ -176,14 +298,48 @@ impl CaddyAndFRep {
     }
 }
 
+
+fn time() -> String {
+    let mut t = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() - 1680159600;
+    let days = t / (60 * 60 * 24);
+    t %= 60 * 60 * 24;
+    let hours = t / (60 * 60);
+    t %= 60 * 60;
+    let minutes = t / 60;
+    t %= 60;
+    format!("{}d {}:{:02}:{:02}", days, hours, minutes, t)
+}
 #[cfg(test)]
 mod tests {
     use ruler::enumo::{Ruleset, Scheduler, Workload};
 
     use super::*;
 
-    fn iter_pos(n: usize) -> Workload {
-        Workload::iter_lang(n, &[], &["Empty", "a", "b"], &["FRep"], &["Union", "Inter"])
+    fn iter_szalinski(n: usize) -> Workload {
+        let lang = Workload::new([
+            // For union, inter
+            // "(FRep var)",
+            // "(bop shape shape)",
+
+            // "(Scale shape var var var)",
+            // "(Cuboid cnst cnst cnst)",
+            "(Scale (Cuboid cnst cnst cnst) var var var)",
+        ]);
+
+        let consts: &[&str] = &["1"];
+        let vars: &[&str] = &["a", "b", "c"];
+        let bops: &[&str] = &["Union", "Inter"];
+        
+        let w = lang.iter_metric("shape", Metric::Atoms, n)
+            // .filter(Filter::Contains("var".parse().unwrap()))
+            .plug("cnst", &consts.into())
+            .plug("var", &vars.into())
+            .plug("bop", &bops.into());
+        
+        let mut data = w.force().iter().map(|x| x.to_string()).collect::<Vec<String>>().join("\n");
+        data = format!("{}\n{}\n", time(), data);
+        fs::write("wl.txt", data).expect("Unable to write file");
+        w
     }
 
     #[test]
@@ -192,7 +348,7 @@ mod tests {
 
         let prior = Ruleset::new(&nat_rules);
 
-        let atoms3 = iter_pos(3);
+        let atoms3 = iter_szalinski(8);
         // assert_eq!(atoms3.force().len(), 51);
 
         let limits = Limits {
@@ -202,11 +358,11 @@ mod tests {
 
         let eg_init = atoms3.to_egraph();
         // Allowed rules: run on clone, apply unions, no candidates
-        let (allowed, _) = prior.partition(|eq| CaddyAndFRep::is_allowed_rewrite(&eq.lhs, &eq.rhs));
+        let (allowed, _) = prior.partition(|eq| CF::is_allowed_rewrite(&eq.lhs, &eq.rhs));
         let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
-        let lifting_rules = CaddyAndFRep::get_lifting_rules();
+        let lifting_rules = CF::get_lifting_rules();
         let eg_denote = Scheduler::Simple(limits).run(&eg_allowed, &lifting_rules);
         let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
 
@@ -229,45 +385,30 @@ mod tests {
         let mut all_rules = Ruleset::default();
         all_rules.extend(Ruleset::new(&nat_rules));
 
-        let atoms3 = iter_pos(8);
+        let atoms3 = iter_szalinski(8);
         // assert_eq!(atoms3.force().len(), 51);
 
-        let rules3 = CaddyAndFRep::run_workload(
+        let rules3 = CF::run_workload(
             atoms3,
             all_rules.clone(),
             Limits {
-                iter: 3,
-                node: 1000000,
+                iter: 20,
+                node: 10000000,
             },
         );
-        // assert_eq!(rules3.len(), 6);
         all_rules.extend(rules3);
 
-        let atoms4 = iter_pos(4);
-        // assert_eq!(atoms4.force().len(), 255);
+        // let atoms4 = iter_szalinski(8);
 
-        let rules4 = CaddyAndFRep::run_workload(
-            atoms4,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
-        // assert_eq!(rules4.len(), 2);
-        all_rules.extend(rules4);
+        // let rules4 = CF::run_workload(
+        //     atoms4,
+        //     all_rules.clone(),
+        //     Limits {
+        //         iter: 3,
+        //         node: 1000000,
+        //     },
+        // );
+        // all_rules.extend(rules4);
 
-        let atoms5 = iter_pos(5);
-        // assert_eq!(atoms5.force().len(), 1527);
-
-        let rules4 = CaddyAndFRep::run_workload(
-            atoms5,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
-        // assert_eq!(rules4.len(), 1);
     }
 }
