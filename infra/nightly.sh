@@ -39,7 +39,7 @@ RUST_TEST_THREADS=1 cargo test --release
 popd
 
 # Update HTML index page.
-cp "$RESOURCE_DIR/*" "$NIGHTLY_DIR/output"
+cp "$RESOURCE_DIR"/* "$NIGHTLY_DIR/output"
 
 # Put the json data in a JS object for consumption by frontend
 (echo "var data = "; cat "$NIGHTLY_DIR/data/output.json") > "$NIGHTLY_DIR/data/output.js"
