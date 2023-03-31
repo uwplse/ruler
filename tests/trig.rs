@@ -373,24 +373,23 @@ mod test {
 
     #[test]
     fn nightly_recipe() {
-        // breaks
-        // let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-rational.rules");
+        let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
 
-        // let start = Instant::now();
-        // let rules = trig_rules();
-        // let duration = start.elapsed();
+        let start = Instant::now();
+        let rules = trig_rules();
+        let duration = start.elapsed();
 
-        // logger::write_output(
-        //     &rules,
-        //     &herbie,
-        //     "trig",
-        //     "herbie",
-        //     Limits {
-        //         iter: 2,
-        //         node: 150000,
-        //     },
-        //     duration,
-        // )
+        logger::write_output(
+            &rules,
+            &herbie,
+            "trig",
+            "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 
     #[test]
