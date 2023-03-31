@@ -17,7 +17,7 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 HERBIE_DIR="$MYDIR/herbie"
 BENCH_DIR="$MYDIR/bench"
 THREADS=4
-GROUP="debug"
+GROUP="main"
 
 if [ -z "$NUM_SEEDS" ]; then
   NUM_SEEDS=1
@@ -42,6 +42,22 @@ cp -r "$HERBIE_DIR/bench/hamming" \
       "$HERBIE_DIR/bench/physics" \
       "$HERBIE_DIR/bench/pbrt.fpcore" \
       "$BENCH_DIR/"
+
+FPCORES=$(find $BENCH_DIR -name "*.fpcore")
+for fpcore in $FPCORES; do
+  echo "filtering $fpcore"
+  racket "$MYDIR/filter.rkt" \
+    --names "raw-angle from scale-rotated-ellipse ; \
+             a from scale-rotated-ellipse ; \
+             b from scale-rotated-ellipse ; \
+             raw-angle from scale-rotated-ellipse ; \
+             Simplification of discriminant from scale-rotated-ellipse ; \
+             Distance on a great circle ; \
+             Harley's example" \
+    $fpcore >> "$fpcore.tmp"
+  mv "$fpcore.tmp" $fpcore
+done
+
 
 # "$HERBIE_DIR/bench/libraries" \
 
@@ -83,23 +99,23 @@ function do_branch {
     fi
   fi
 
-  # make install
+  make install
   popd
 
-  # if [ -z "$PARALLEL_SEEDS" ]; then
-  #   HERBIE=$HERBIE_DIR \
-  #     THREADS=$THREADS \
-  #     BENCH=$BENCH_DIR \
-  #     HERBIE_FLAGS=$flags \
-  #     bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
-  # else
-  #   HERBIE=$HERBIE_DIR \
-  #     PARALLEL_SEEDS=$PARALLEL_SEEDS \
-  #     THREADS=$THREADS \
-  #     BENCH=$BENCH_DIR \
-  #     HERBIE_FLAGS=$flags \
-  #     bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
-  # fi
+  if [ -z "$PARALLEL_SEEDS" ]; then
+    HERBIE=$HERBIE_DIR \
+      THREADS=$THREADS \
+      BENCH=$BENCH_DIR \
+      HERBIE_FLAGS=$flags \
+      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
+  else
+    HERBIE=$HERBIE_DIR \
+      PARALLEL_SEEDS=$PARALLEL_SEEDS \
+      THREADS=$THREADS \
+      BENCH=$BENCH_DIR \
+      HERBIE_FLAGS=$flags \
+      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
+  fi
 }
 
 if [ -z "$NO_RUN" ]; then
