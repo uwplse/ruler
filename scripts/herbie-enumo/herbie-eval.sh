@@ -17,7 +17,7 @@ MYDIR="$(cd -P "$(dirname "$src")" && pwd)"
 HERBIE_DIR="$MYDIR/herbie"
 BENCH_DIR="$MYDIR/bench"
 THREADS=4
-GROUP="main"
+GROUP="debug"
 
 if [ -z "$NUM_SEEDS" ]; then
   NUM_SEEDS=1
@@ -57,10 +57,15 @@ function do_branch {
   git checkout "$HERBIE_DIR/src/syntax/rules.rkt"
   git checkout $branch
 
+  # Change commit for main
+  if [[ "$branch" == "main" ]]; then
+    git checkout 5a1accbc5ebcb1311f85421a3c6dd73e4f8575be
+  fi
+
   # Patch ruler-autogen rule branches
-  if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" ]]; then
+  if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
     # In case of broken nightlies, target different branch
-    sed -i 's/main/halide/g' "$HERBIE_DIR/src/syntax/rules.rkt"
+    # sed -i 's/main/halide/g' "$HERBIE_DIR/src/syntax/rules.rkt"
     if [[ "$flags" == *"-o rules:numerics"* ]]; then
       echo "skipping numerics patch"
     else
@@ -78,41 +83,47 @@ function do_branch {
     fi
   fi
 
-  make install
+  # make install
   popd
 
-  if [ -z "$PARALLEL_SEEDS" ]; then
-    HERBIE=$HERBIE_DIR \
-      THREADS=$THREADS \
-      BENCH=$BENCH_DIR \
-      HERBIE_FLAGS=$flags \
-      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
-  else
-    HERBIE=$HERBIE_DIR \
-      PARALLEL_SEEDS=$PARALLEL_SEEDS \
-      THREADS=$THREADS \
-      BENCH=$BENCH_DIR \
-      HERBIE_FLAGS=$flags \
-      bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
-  fi
+  # if [ -z "$PARALLEL_SEEDS" ]; then
+  #   HERBIE=$HERBIE_DIR \
+  #     THREADS=$THREADS \
+  #     BENCH=$BENCH_DIR \
+  #     HERBIE_FLAGS=$flags \
+  #     bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
+  # else
+  #   HERBIE=$HERBIE_DIR \
+  #     PARALLEL_SEEDS=$PARALLEL_SEEDS \
+  #     THREADS=$THREADS \
+  #     BENCH=$BENCH_DIR \
+  #     HERBIE_FLAGS=$flags \
+  #     bash seed-variance.sh $NUM_SEEDS "$OUTDIR/$name" $name
+  # fi
 }
 
 if [ -z "$NO_RUN" ]; then
-  do_branch main main
-  do_branch main main-n -o rules:numerics
+  # All branch configuration
+  # do_branch main main
+  # do_branch main main-n -o rules:numerics
   do_branch main main-t -o generate:taylor
-  do_branch main main-n-t -o rules:numerics -o generate:taylor
-  do_branch using-ruler-nightlies enumo
-  do_branch using-ruler-nightlies enumo-n -o rules:numerics
+  # do_branch main main-n-t -o rules:numerics -o generate:taylor
+  # do_branch using-ruler-nightlies enumo
+  # do_branch using-ruler-nightlies enumo-n -o rules:numerics
   do_branch using-ruler-nightlies enumo-t -o generate:taylor
   do_branch using-ruler-nightlies enumo-n-t -o rules:numerics -o generate:taylor
-  do_branch using-ruler-baseline ruler
-  do_branch using-ruler-baseline ruler-n -o rules:numerics
+  # do_branch using-ruler-baseline ruler
+  # do_branch using-ruler-baseline ruler-n -o rules:numerics
   do_branch using-ruler-baseline ruler-t -o generate:taylor
   do_branch using-ruler-baseline ruler-n-t -o rules:numerics -o generate:taylor
-  do_branch main no-rules -o generate:rr -o generate:simplify
+  # do_branch main no-rules -o generate:rr -o generate:simplify
+  # Compare fast forwarding
+  # do_branch ruler-no-fast-forwarding ruler-no-ff
+  # do_branch ruler-no-fast-forwarding ruler-no-ff-n -o rules:numerics
+  do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
+  do_branch ruler-no-fast-forwarding ruler-no-ff-nt -o rules:numerics -o generate:taylor
 fi
 
 # Plots
 
-bash plot.sh $OUTDIR
+# bash plot.sh $OUTDIR

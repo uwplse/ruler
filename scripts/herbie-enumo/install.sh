@@ -41,4 +41,5 @@ pushd $BUILD_DIR
 git checkout "$BUILD_DIR/src/syntax/rules.rkt" # For patches
 git checkout using-ruler-baseline
 git checkout using-ruler-nightlies
+git checkout ruler-no-fast-forwarding
 popd
