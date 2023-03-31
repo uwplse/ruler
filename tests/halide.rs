@@ -317,23 +317,16 @@ mod halide;
 mod test {
     use crate::halide::halide_rules;
     use crate::Pred;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
 
     use ruler::{enumo::Ruleset, logger, Limits};
 
     #[test]
     fn recipe() {
-        // This is porting the halide recipe at incremental/halide.spec
-        // on the branch "maybe-useful" in the old recipes repo
-
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
         let all_rules = halide_rules();
         let duration = start.elapsed();
-
-        // let (can, cannot) =
-        //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
-        // println!("{} / {}", can.len(), can.len() + cannot.len());
 
         logger::write_output(
             &all_rules,
@@ -345,6 +338,27 @@ mod test {
                 node: 200000,
             },
             duration,
+        );
+
+        // oopsla-halide-baseline branch
+        // Run on leviathan 3/31/2023
+        // time cargo run --release --bin halide -- synth --iters 1 --use-smt
+        // real	0m3.354s
+        // user	0m3.274s
+        // sys	0m0.076s
+        let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
+        let oopsla_duration = Duration::from_secs_f32(3.354);
+
+        logger::write_output(
+            &oopsla_halide,
+            &baseline,
+            "oopsla halide (1 iter)",
+            "halide",
+            Limits {
+                iter: 2,
+                node: 200000,
+            },
+            oopsla_duration,
         )
     }
 }
