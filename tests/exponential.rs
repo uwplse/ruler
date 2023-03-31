@@ -321,22 +321,22 @@ mod test {
 
     #[test]
     fn run() {
-        // let herbie: Ruleset = Ruleset::from_file("baseline/herbie-rational.rules");
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
 
-        // let start = Instant::now();
-        // let rules = make_rules();
-        // let duration = start.elapsed();
+        let start = Instant::now();
+        let rules = make_rules();
+        let duration = start.elapsed();
 
-        // logger::write_output(
-        //     &rules,
-        //     &herbie,
-        //     "exponential",
-        //     "herbie",
-        //     Limits {
-        //         iter: 2,
-        //         node: 150000,
-        //     },
-        //     duration,
-        // )
+        logger::write_output(
+            &rules,
+            &herbie,
+            "exponential",
+            "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 }
