@@ -2,6 +2,7 @@ function getBaseline(data, baseline) {
   let keys = {
     baseline_name: "Baseline",
     enumo_spec_name: "Enumo Spec",
+    loc: "Enumo Spec LOC",
     num_rules: "# Enumo",
     num_baseline: "# Baseline",
     time: "Time (s)",
