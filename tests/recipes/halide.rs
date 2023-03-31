@@ -107,10 +107,38 @@ pub fn halide_rules() -> Ruleset<Pred> {
             all_rules.extend(full);
             all_rules.to_file("full-rules.rules");
     */
+
+    let nested_bops = Workload::new(&[
+        "(bop e e)",
+        "v"
+    ])
+    .plug("e", &Workload::new(&[
+        "(bop v v)",
+        "v"
+    ]))
+    .plug("bop", &Workload::new(&["+", "-", "*", "/", "<="]))
+    .plug("v", &Workload::new(&["a", "b", "c"]))
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string(),
+    ]));
+    let new = Pred::run_workload(
+        nested_bops,
+        all_rules.clone(),
+        Limits {
+            iter: 2,
+            node: 100000,
+        }
+    );
+    all_rules.extend(new);
+    println!("nested_bops finished.");
+    all_rules.to_file("nested-bops.rules");
+
     let select_max = Workload::new(&["(max s s)", "(min s s)"])
         .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
         .plug("v", &Workload::new(&["a", "b", "c"]))
-        .plug("bop", &Workload::new(&["+", "-", "*", "/", "<="]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "/", "<=", "min", "max"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
             "b".to_string(),
@@ -120,10 +148,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let new = Pred::run_workload(
         select_max,
         all_rules.clone(),
-        Limits {
-            iter: 2,
-            node: 200000,
-        },
+        Limits::default()
     );
     all_rules.extend(new);
     println!("select_max finished.");
@@ -142,17 +167,14 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "b".to_string(),
             "c".to_string(),
         ]));
-
     let new = Pred::run_workload(
         select_arith,
         all_rules.clone(),
-        Limits {
-            iter: 2,
-            node: 200000,
-        },
+        Limits::default()
     );
     println!("select_arith finished.");
     all_rules.extend(new);
+
     all_rules.to_file("select-arith.rules");
     all_rules
 }
