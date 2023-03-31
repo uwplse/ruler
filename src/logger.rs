@@ -21,8 +21,8 @@ pub fn write_output<L: SynthLanguage>(
         get_derivability_results(ruleset, DeriveType::Lhs, baseline, limits);
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
         get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, limits);
-    let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline, limits);
+    // let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
+    //    get_derivability_results(ruleset, DeriveType::AllRules, baseline, limits);
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
@@ -41,15 +41,15 @@ pub fn write_output<L: SynthLanguage>(
         "enumo_to_baseline_lhs_rhs": results_lhs_rhs,
         "enumo_to_baseline_lhsrhs_num": forwards_lhs_rhs,
         "enumo_to_baseline_lhsrhs_time": lhs_rhs_f.as_secs_f64(),
-        "enumo_to_baseline_all": results_all,
-        "enumo_to_baseline_all_num": forwards_all,
-        "enumo_to_baseline_all_time": all_f.as_secs_f64(),
+        // "enumo_to_baseline_all": results_all,
+        // "enumo_to_baseline_all_num": forwards_all,
+        // "enumo_to_baseline_all_time": all_f.as_secs_f64(),
         "baseline_to_enumo_lhs_num": backwards_lhs,
         "baseline_to_enumo_lhs_time": lhs_b.as_secs_f64(),
         "baseline_to_enumo_lhsrhs_num": backwards_lhs_rhs,
         "baseline_to_enumo_lhsrhs_time": lhs_rhs_b.as_secs_f64(),
-        "baseline_to_enumo_all_num": backwards_all,
-        "baseline_to_enumo_all_time": all_b.as_secs_f64(),
+        // "baseline_to_enumo_all_num": backwards_all,
+        // "baseline_to_enumo_all_time": all_b.as_secs_f64(),
         "minimization strategy": "compress",
     });
 
