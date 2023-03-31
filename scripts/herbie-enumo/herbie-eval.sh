@@ -78,6 +78,8 @@ function do_branch {
     git checkout 5a1accbc5ebcb1311f85421a3c6dd73e4f8575be
   fi
 
+  cp "$MYDIR/new-config.rkt" "$HERBIE_DIR/src/config.rkt"
+
   # Patch ruler-autogen rule branches
   if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
     # In case of broken nightlies, target different branch
@@ -102,6 +104,7 @@ function do_branch {
   make install
   popd
 
+  flags="$flags --timeout 300"
   if [ -z "$PARALLEL_SEEDS" ]; then
     HERBIE=$HERBIE_DIR \
       THREADS=$THREADS \
@@ -119,10 +122,9 @@ function do_branch {
 }
 
 if [ -z "$NO_RUN" ]; then
-  # All branch configuration
   # do_branch main main
-  # do_branch main main-n -o rules:numerics
-  do_branch main main-t -o generate:taylor
+  do_branch main main-n -o rules:numerics
+  # do_branch main main-t -o generate:taylor
   # do_branch main main-n-t -o rules:numerics -o generate:taylor
   # do_branch using-ruler-nightlies enumo
   # do_branch using-ruler-nightlies enumo-n -o rules:numerics
@@ -133,11 +135,10 @@ if [ -z "$NO_RUN" ]; then
   do_branch using-ruler-baseline ruler-t -o generate:taylor
   do_branch using-ruler-baseline ruler-n-t -o rules:numerics -o generate:taylor
   # do_branch main no-rules -o generate:rr -o generate:simplify
-  # Compare fast forwarding
   # do_branch ruler-no-fast-forwarding ruler-no-ff
   # do_branch ruler-no-fast-forwarding ruler-no-ff-n -o rules:numerics
   do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
-  do_branch ruler-no-fast-forwarding ruler-no-ff-nt -o rules:numerics -o generate:taylor
+  do_branch ruler-no-fast-forwarding ruler-no-ff-n-t -o rules:numerics -o generate:taylor
 fi
 
 # Plots

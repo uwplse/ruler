@@ -55,15 +55,24 @@ if field == "time":
 # n = ('N', pairs['no-rules'])
 # listify = [ht, hnt, et, ent,  rt, rnt, n]
 
-h = ('H', pairs['main'])
-e = ('E', pairs['enumo'])
-en = ('E[-N]', pairs['enumo-n'])
-f = ('F', pairs['ruler-no-ff'])
-fn = ('F[-N]', pairs['ruler-no-ff-n'])
-r = ('R', pairs['ruler'])
-rn = ('R[-N]', pairs['ruler-n'])
-n = ('N', pairs['no-rules'])
-listify = [h, e, en, f, fn, r, rn, n]
+# h = ('H', pairs['main'])
+# e = ('E', pairs['enumo'])
+# en = ('E[-N]', pairs['enumo-n'])
+# f = ('F', pairs['ruler-no-ff'])
+# fn = ('F[-N]', pairs['ruler-no-ff-n'])
+# r = ('R', pairs['ruler'])
+# rn = ('R[-N]', pairs['ruler-n'])
+# n = ('N', pairs['no-rules'])
+# listify = [h, e, en, f, fn, r, rn, n]
+
+h = ('H[-T]', pairs['main-t'])
+e = ('E[-T]', pairs['enumo-t'])
+en = ('E[-NT]', pairs['enumo-n-t'])
+f = ('F[-T]', pairs['ruler-no-ff-t'])
+fn = ('F[-NT]', pairs['ruler-no-ff-nt'])
+r = ('R[-T]', pairs['ruler-t'])
+rn = ('R[-NT]', pairs['ruler-n-t'])
+listify = [h, e, en, f, fn, r, rn]
 
 labs = []
 vals = []
