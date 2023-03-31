@@ -33,6 +33,26 @@ function getBaseline(data, baseline) {
     Object.keys(keys).forEach((key) => {
       newRow[keys[key]] = tryRound(row[key]);
     });
+    consolidateColumns(newRow, "Enumo derives Baseline (LHS, LHS/RHS, All)", [
+      "E derives B (LHS)",
+      "E derives B (LHSRHS)",
+      "E derives B (ALL)",
+    ]);
+    consolidateColumns(newRow, "Enumo derives Baseline Time (s)", [
+      "E derives B (LHS) Time (s)",
+      "E derives B (LHSRHS) Time (s)",
+      "E derives B (ALL) Time (s)",
+    ]);
+    consolidateColumns(newRow, "Baseline derives Enumo (LHS, LHS/RHS, All)", [
+      "B derives E (LHS)",
+      "B derives E (LHSRHS)",
+      "B derives E (ALL)",
+    ]);
+    consolidateColumns(newRow, "Baseline derives Enumo Time (s)", [
+      "B derives E (LHS) Time (s)",
+      "B derives E (LHSRHS) Time (s)",
+      "B derives E (ALL) Time (s)",
+    ]);
     newData.push(newRow);
   });
   return newData;
@@ -133,4 +153,13 @@ function generateLatex(baseline) {
   let elem = document.getElementById("latex");
   elem.innerHTML = s;
   elem.style.height = "200px";
+}
+
+function consolidateColumns(dataObj, consolidatedName, columnNames) {
+  let values = [];
+  columnNames.forEach((col) => {
+    values.push(dataObj[col]);
+    delete dataObj[col];
+  });
+  dataObj[consolidatedName] = values.join(", ");
 }
