@@ -327,36 +327,16 @@ mod test {
         // on the branch "maybe-useful" in the old recipes repo
 
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        // let rules: Ruleset<Pred> = Ruleset::from_file("select-arith.rules");
+        let rules: Ruleset<Pred> = Ruleset::from_file("select-arith.rules");
 
         let start = Instant::now();
-        let rules = halide_rules();
+        // let rules = halide_rules();
         let duration = start.elapsed();
 
-        // let (can, cannot) =
-        //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
-        // println!("{} / {}", can.len(), can.len() + cannot.len());
         println!("Rules collected.");
 
-        let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-        logger::get_derivability_results(&rules, DeriveType::Lhs, &baseline, Limits::default());
-        let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
-        logger::get_derivability_results(&rules, DeriveType::LhsAndRhs, &baseline, Limits::default());
-
-        println!("{} of {} derivable...", forwards_lhs, baseline.len());
-        println!("{} of {} derivable...", forwards_lhs_rhs, baseline.len());
-        logger::add_to_data_file("lhs_halide.json".to_string(), results_lhs);
-        logger::add_to_data_file("lhs_rhs_halide.json".to_string(), results_lhs_rhs);
-
-
-        logger::write_output(
-            &rules,
-            &baseline,
-            "halide",
-            "halide",
-            Limits::default(),
-            duration,
-        )
-
+        let (can, cannot) =
+            rules.derive(DeriveType::LhsAndRhs, &baseline, Limits::default());
+        println!("{} / {}", can.len(), can.len() + cannot.len());
     }
 }
