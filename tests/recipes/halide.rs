@@ -35,7 +35,10 @@ fn recursive_rules(
             .plug("bop", bops)
             .plug("top", tops);
         rec.extend(prior);
-        let new = Pred::run_workload(wkld, rec.clone(), Limits::default());
+        let new = Pred::run_workload(wkld, rec.clone(), Limits {
+            iter: 3,
+            node: 1_000_000,
+        });
         let mut all = new;
         all.extend(rec);
         all
@@ -45,68 +48,127 @@ fn recursive_rules(
 pub fn halide_rules() -> Ruleset<Pred> {
     // This is porting the halide recipe at incremental/halide.spec
     // on the branch "maybe-useful" in the old recipes repo
-    let thru_pred: Ruleset<Pred> = Ruleset::from_file("full-rules.rules");
+    // let thru_pred: Ruleset<Pred> = Ruleset::from_file("pred-rules.rules");
     let mut all_rules = Ruleset::default();
-    all_rules.extend(thru_pred);
-    /*
-            // Bool rules up to size 5:
-            let bool_only = recursive_rules(
-                Metric::Atoms,
-                5,
-                &Workload::new(&["0", "1"]),
-                &Workload::new(&["a", "b", "c"]),
-                &Workload::new(&["!"]),
-                &Workload::new(&["&&", "||", "^"]),
-                &Workload::Set(vec![]),
-                all_rules.clone(),
-            );
-            all_rules.extend(bool_only);
-            all_rules.to_file("halide-bool-rules.rules");
+   // all_rules.extend(thru_pred);
+/*
+    // Bool rules up to size 5:
+    let bool_only = recursive_rules(
+        Metric::Atoms,
+        5,
+        &Workload::new(&["0", "1"]),
+        &Workload::new(&["a", "b", "c"]),
+        &Workload::new(&["!"]),
+        &Workload::new(&["&&", "||", "^"]),
+        &Workload::Set(vec![]),
+        all_rules.clone(),
+    );
+    all_rules.extend(bool_only);
+    all_rules.to_file("halide-bool-rules.rules");
+    println!("bool finished.");
 
-            // Rational rules up to size 5:
-            let rat_only = recursive_rules(
-                Metric::Atoms,
-                5,
-                &Workload::new(&["-1", "0", "1"]),
-                &Workload::new(&["a", "b", "c"]),
-                &Workload::new(&["-"]),
-                &Workload::new(&["+", "-", "*", "min", "max"]), // No div for now
-                &Workload::Set(vec![]),
-                all_rules.clone(),
-            );
-            all_rules.extend(rat_only);
-            all_rules.to_file("halide-rat-rules.rules");
+    // Rational rules up to size 6:
+    let rat_only = recursive_rules(
+        Metric::Atoms,
+        6,
+        &Workload::new(&["-1", "0", "1"]),
+        &Workload::new(&["a", "b", "c"]),
+        &Workload::new(&["-"]),
+        &Workload::new(&["+", "-", "*", "min", "max"]), // No div for now
+        &Workload::Set(vec![]),
+        all_rules.clone(),
+    );
+    all_rules.extend(rat_only);
+    all_rules.to_file("halide-rat-rules.rules");
+    println!("rat finished.");
 
-            // Pred rules up to size 5
-            let pred_only = recursive_rules(
-                Metric::Atoms,
-                5,
-                &Workload::new(&["-1", "0", "1"]),
-                &Workload::new(&["a", "b", "c"]),
-                &Workload::new(&[""]),
-                &Workload::new(&["<", "<=", "==", "!="]),
-                &Workload::new(&["select"]),
-                all_rules.clone(),
-            );
-            all_rules.extend(pred_only);
-            all_rules.to_file("halide-pred-rules.rules");
+    // Pred rules up to size 6:
+    let pred_only = recursive_rules(
+        Metric::Atoms,
+        6,
+        &Workload::new(&["-1", "0", "1"]),
+        &Workload::new(&["a", "b", "c"]),
+        &Workload::new(&[""]),
+        &Workload::new(&["<", "<=", "==", "!="]),
+        &Workload::new(&["select"]),
+        all_rules.clone(),
+    );
+    all_rules.extend(pred_only);
+    all_rules.to_file("halide-pred-rules.rules");
+    println!("pred finished.");
+    // All terms up to size 4
+    let full = recursive_rules(
+        Metric::Atoms,
+        5,
+        &Workload::new(&["-1", "0", "1"]),
+        &Workload::new(&["a", "b", "c"]),
+        &Workload::new(&["-", "!"]),
+        &Workload::new(&[
+            "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+        ]),
+        &Workload::new(&["select"]),
+        all_rules.clone(),
+    );
+    all_rules.extend(full);
+    all_rules.to_file("full-rules.rules");
+    println!("full finished.");
+    
+    let triple_nested_bops_full = Workload::new(&[
+        "(bop (bop (bop v v) v) v)",
+        "(bop v (bop (bop v v) v))",
+        "v",
+        "0",
+        "1"
+    ])
+    .plug("bop", &Workload::new(&["&&", "||", "!=", "<=", "=="]))
+    .plug("v", &Workload::new(&["a", "b", "c"]))
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string()
+    ]));
+    let new = Pred::run_workload(
+        triple_nested_bops_full,
+        all_rules.clone(),
+        Limits {
+            iter: 3,
+            node: 1_000_000,
+        }
+    );
+    all_rules.extend(new.clone());
+    println!("triple_nested_bops_full finished.");
+    new.to_file("triple_nested_bops_full.rules");
 
-            // All terms up to size 4
-            let full = recursive_rules(
-                Metric::Atoms,
-                4,
-                &Workload::new(&["-1", "0", "1"]),
-                &Workload::new(&["a", "b", "c"]),
-                &Workload::new(&["-", "!"]),
-                &Workload::new(&[
-                    "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
-                ]),
-                &Workload::new(&["select"]),
-                all_rules.clone(),
-            );
-            all_rules.extend(full);
-            all_rules.to_file("full-rules.rules");
-    */
+    let double_nested_bops_full = Workload::new(&[
+        "(bop e e)",
+        "v",
+        "0",
+        "1"
+    ])
+    .plug("e", &Workload::new(&[
+        "(bop v v)",
+        "(uop v)",
+        "v"
+    ]))
+    .plug("bop", &Workload::new(&["&&", "||", "!=", "<=", "=="]))
+    .plug("uop", &Workload::new(&["-", "!"]))
+    .plug("v", &Workload::new(&["a", "b", "c"]))
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string(),
+    ]));
+    let new = Pred::run_workload(
+        double_nested_bops_full,
+        all_rules.clone(),
+        Limits {
+            iter: 3,
+            node: 1_000_000,
+        }
+    );
+    all_rules.extend(new.clone());
+    println!("double_nested_bops_full finished.");
+    new.to_file("double_nested_bops_full.rules");
 
     let nested_bops = Workload::new(&[
         "(bop e e)",
@@ -131,38 +193,17 @@ pub fn halide_rules() -> Ruleset<Pred> {
             node: 1_000_000,
         }
     );
-    all_rules.extend(new);
+    all_rules.extend(new.clone());
     println!("nested_bops finished.");
-    all_rules.to_file("nested-bops.rules");
+    new.to_file("nested-bops.rules");
 
-    let more_nested_bops = Workload::new(&[
-        "(bop v v)",
-        "(bop (bop (bop v v) v) v)",
-        "(bop v (bop (bop v v) v))",
-        "v"
-    ])
-    .plug("bop", &Workload::new(&["+", "-", "*", "<="]))
-    .plug("v", &Workload::new(&["a", "b", "c", "d"]))
-    .filter(Filter::Canon(vec![
-        "a".to_string(),
-        "b".to_string(),
-        "c".to_string(),
-        "d".to_string(),
-    ]));
-    let new = Pred::run_workload(
-        more_nested_bops,
-        all_rules.clone(),
-        Limits {
-            iter: 3,
-            node: 1_000_000,
-        }
-    );
-    all_rules.extend(new);
-    println!("more_nested_bops finished.");
-    all_rules.to_file("more-nested-bops.rules");
-
-    let select_max = Workload::new(&["(max s s)", "(min s s)"])
+    let select_max = Workload::new(&[
+        "(max s s)", 
+        "(min s s)",
+        "(select v m m)"
+        ])
         .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
+        .plug("m", &Workload::new(&["(max v v)", "(min v v)", "v"]))
         .plug("v", &Workload::new(&["a", "b", "c"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "/", "<=", "min", "max"]))
         .filter(Filter::Canon(vec![
@@ -179,9 +220,9 @@ pub fn halide_rules() -> Ruleset<Pred> {
             node: 1_000_000,
         }
     );
-    all_rules.extend(new);
+    all_rules.extend(new.clone());
     println!("select_max finished.");
-    all_rules.to_file("select-max.rules");
+    new.to_file("select-max.rules");
 
     let select_arith = Workload::new(&[
         "(select v e e)",
@@ -205,8 +246,9 @@ pub fn halide_rules() -> Ruleset<Pred> {
         }
     );
     println!("select_arith finished.");
-    all_rules.extend(new);
-
-    all_rules.to_file("select-arith.rules");
+    all_rules.extend(new.clone());
+    new.to_file("select-arith.rules");
+    all_rules.to_file("all-rules.rules");
+*/
     all_rules
 }
