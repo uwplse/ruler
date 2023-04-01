@@ -116,7 +116,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "(bop v v)",
         "v"
     ]))
-    .plug("bop", &Workload::new(&["+", "-", "*", "/", "<="]))
+    .plug("bop", &Workload::new(&["+", "-", "*", "/", "<=", "max", "min"]))
     .plug("v", &Workload::new(&["a", "b", "c"]))
     .filter(Filter::Canon(vec![
         "a".to_string(),
@@ -127,13 +127,39 @@ pub fn halide_rules() -> Ruleset<Pred> {
         nested_bops,
         all_rules.clone(),
         Limits {
-            iter: 2,
-            node: 100000,
+            iter: 3,
+            node: 1_000_000,
         }
     );
     all_rules.extend(new);
     println!("nested_bops finished.");
     all_rules.to_file("nested-bops.rules");
+
+    let more_nested_bops = Workload::new(&[
+        "(bop v v)",
+        "(bop (bop (bop v v) v) v)",
+        "(bop v (bop (bop v v) v))",
+        "v"
+    ])
+    .plug("bop", &Workload::new(&["+", "-", "*", "<="]))
+    .plug("v", &Workload::new(&["a", "b", "c", "d"]))
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string(),
+        "d".to_string(),
+    ]));
+    let new = Pred::run_workload(
+        more_nested_bops,
+        all_rules.clone(),
+        Limits {
+            iter: 3,
+            node: 1_000_000,
+        }
+    );
+    all_rules.extend(new);
+    println!("more_nested_bops finished.");
+    all_rules.to_file("more-nested-bops.rules");
 
     let select_max = Workload::new(&["(max s s)", "(min s s)"])
         .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
@@ -148,7 +174,10 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let new = Pred::run_workload(
         select_max,
         all_rules.clone(),
-        Limits::default()
+        Limits {
+            iter: 3,
+            node: 1_000_000,
+        }
     );
     all_rules.extend(new);
     println!("select_max finished.");
@@ -170,7 +199,10 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let new = Pred::run_workload(
         select_arith,
         all_rules.clone(),
-        Limits::default()
+        Limits {
+            iter: 3,
+            node: 1_000_000,
+        }
     );
     println!("select_arith finished.");
     all_rules.extend(new);
