@@ -345,7 +345,7 @@ mod test {
         let (can, cannot) =
             rules.derive(DeriveType::LhsAndRhs, &baseline, Limits {
                 iter: 3,
-                node: 100_000,
+                node: 25_000,
             });
         println!("LHS/RHS: {} / {}", can.len(), can.len() + cannot.len());
 

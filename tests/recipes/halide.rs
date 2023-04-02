@@ -46,10 +46,10 @@ fn recursive_rules(
 pub fn halide_rules() -> Ruleset<Pred> {
     // This is porting the halide recipe at incremental/halide.spec
     // on the branch "maybe-useful" in the old recipes repo
-    // let rules: Ruleset<Pred> = Ruleset::from_file("all-rules.rules");
+    let rules: Ruleset<Pred> = Ruleset::from_file("full-rules.rules");
     let mut all_rules = Ruleset::default();
-    // all_rules.extend(rules);
-
+    all_rules.extend(rules);
+/*
     // Bool rules up to size 5:
     let bool_only = recursive_rules(
         Metric::Atoms,
@@ -127,7 +127,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     all_rules.extend(full);
     all_rules.to_file("full-rules.rules");
     println!("full finished.");
-
+*/
     let nested_bops_full = Workload::new(&[
         "(bop e e)",
         "v",
@@ -222,12 +222,14 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "(select v s s)"
         ])
         .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
-        .plug("v", &Workload::new(&["a", "b", "c"]))
+        .plug("v", &Workload::new(&["a", "b", "c", "d", "e"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "min", "max"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
             "b".to_string(),
             "c".to_string(),
+            "d".to_string(),
+            "e".to_string()
         ]));
 
     let new = Pred::run_workload(
@@ -248,11 +250,13 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "(bop (select v v v) v)"])
         .plug("e", &Workload::new(&["(bop v v)", "v"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "<"]))
-        .plug("v", &Workload::new(&["a", "b", "c", "0"]))
+        .plug("v", &Workload::new(&["a", "b", "c", "d", "e"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
             "b".to_string(),
             "c".to_string(),
+            "d".to_string(),
+            "e".to_string()
         ]));
     let new = Pred::run_workload(
         select_arith,
