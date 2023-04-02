@@ -3,97 +3,22 @@
 
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+use egg::{AstSize, Extractor, RecExpr};
+use itertools::enumerate;
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use rayon::vec;
 use ruler::{
-    enumo::{Filter, Ruleset, Metric, Scheduler, Workload},
+    enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
     *,
 };
-use std::time::Instant;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::time::SystemTime;
+use std::{hash::Hash, time::Instant};
 
 pub type Constant = usize;
-
-
-fn get_nat_rules() -> Vec<&'static str> {
-    [
-        // Small subset of rat rules
-        // "(+ ?b ?a) ==> (+ ?a ?b)",
-        // "(* ?b ?a) ==> (* ?a ?b)",
-        // "(+ 0 ?a) ==> ?a",
-        // "?a ==> (+ 0 ?a)",
-        // "(* ?a 0) ==> 0",
-        // "(* 1 ?a) ==> ?a",
-        // "?a ==> (* 1 ?a)",
-        // "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
-        // "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
-        // "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
-
-        // "(+ ?a (max ?b ?c)) ==> (max (+ ?a ?b) (+ ?a ?c))",
-        // "(max (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (max ?b ?c))",
-        // "(+ ?a (min ?b ?c)) ==> (min (+ ?a ?b) (+ ?a ?c))",
-        // "(min (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (min ?b ?c))",
-        // "(max ?b ?a) ==> (max ?a ?b)",
-        // "(min ?b ?a) ==> (min ?a ?b)",
-        "(min (max ?a ?b) ?a) ==> ?a",
-        "(max (min ?a ?b) ?a) ==> ?a",
-        "(max ?a ?a) ==> ?a",
-        "(min ?a ?a) ==> ?a",
-
-
-        // Subst computing
-        "(subst x x ?to) ==> ?to",
-        "(subst x y ?to) ==> x",
-        "(subst x z ?to) ==> x",
-        "(subst y x ?to) ==> y",
-        "(subst y y ?to) ==> ?to",
-        "(subst y z ?to) ==> y",
-        "(subst z x ?to) ==> z",
-        "(subst z y ?to) ==> z",
-        "(subst z z ?to) ==> ?to",
-        "(subst (min ?a ?b) ?from ?to) ==> (min (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        "(subst (- ?a ?b) ?from ?to) ==> (- (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        "(subst (/ ?a ?b) ?from ?to) ==> (/ (subst ?a ?from ?to) (subst ?b ?from ?to))",
-
-        "(subst 1 ?from ?to) ==> 1",
-    ]
-    .into()
-}
-
-fn get_lifting_rules() -> Vec<&'static str> {
-    [
-        // Subst lifting
-        // "(/ x ?a) ==> (subst x x (/ x ?a))",
-        // "(/ y ?a) ==> (subst y y (/ y ?a))",
-        // "(/ z ?a) ==> (subst z z (/ z ?a))",
-        // "(min (subst ?e ?from ?to) ?a) ==> (subst (min ?e ?a) ?from ?to)",
-        // "(- ?a (subst ?e ?from ?to)) ==> (subst (- ?a ?e) ?from ?to)",
-
-        
-        "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
-        "(FRep (max ?a ?b)) ==> (Union (FRep ?a) (FRep ?b))",
-        "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
-        "(FRep (min ?a ?b)) ==> (Inter (FRep ?a) (FRep ?b))",
-        // "(Empty) ==> (FRep (~ 1))",
-
-
-        "(Scale (FRep ?e) ?a ?b ?c) ==> (FRep (subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c)))",
-        "(FRep (subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c))) ==> (Scale (FRep ?e) ?a ?b ?c)",
-
-        "(Cuboid ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
-        "(FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c)))) ==> (Cuboid ?a ?b ?c)",
-        // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
-        
-        // "(Scale (Cuboid ?w ?l? ?h) ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x (* ?w ?a)) (/ y (* ?l ?b))) (/ z (* ?h ?c)))))",
-        // "(Scale (Cuboid ?w ?l? ?h) ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x (* ?w ?a)) (/ y (* ?l ?b))) (/ z (* ?h ?c)))))",
-        // "(Scale (Cuboid 1 1 1) ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
-
-        "(Scale (Cuboid ?w ?l? ?h) ?a ?b ?c) ==> (Cheat ?a ?b ?c)",
-        "(Cheat ?a ?b ?c) ==> (Cuboid ?a ?b ?c)",
-    ].into()
-}
 
 egg::define_language! {
  pub enum CF  {
@@ -105,15 +30,15 @@ egg::define_language! {
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
     "/" = Div([Id; 2]),
-    // "~" = Neg(Id),
     "x" = DimX,
     "y" = DimY,
     "z" = DimZ,
     "subst" = Subst([Id; 3]),
 
     // Caddy
-    "Cuboid" = Cuboid([Id; 3]),
-    "Spheroid" = Spheroid([Id; 3]),
+    "Cube" = Cube([Id; 3]),
+    "Cylinder" = Cylinder([Id; 3]),
+    "Sphere" = Sphere(Id),
     "Trans" = Trans([Id; 4]),
     "Scale" = Scale([Id; 4]),
     "Union" = Union([Id; 2]),
@@ -127,58 +52,185 @@ egg::define_language! {
  }
 }
 
-fn compute_subst(egraph: &mut EGraph<CF, SynthAnalysis>, e: Id, from: &CF, to: &Id) -> Option<CF>{
-    // Choose arbitrary node to continue computation on
-    let nodes = egraph[e].nodes.clone();
+#[test]
+fn custom_modify() {
+    let term_expected_pairs = [
+        (
+            "(subst (- 1 (min (min x y) z)) x (/ x a))",
+            "(- 1 (min (min (/ x a) y) z))",
+        ),
+        ("(FRep (subst x x (/ x a)))", "(FRep (/ x a))"),
+        (
+            "(FRep (subst (min x y) x (/ x a)))",
+            "(FRep (min (/ x a) y))",
+        ),
+        (
+            "(FRep (subst (min x x) x (/ x a)))",
+            "(FRep (min (/ x a) (/ x a)))",
+        ),
+    ];
+
+    for (term, expected) in term_expected_pairs {
+        let mut egraph: EGraph<CF, SynthAnalysis> = EGraph::default();
+        let id = egraph.add_expr(&term.parse().unwrap());
+
+        CF::custom_modify(&mut egraph, id);
+
+        let id2 = egraph.add_expr(&expected.parse().unwrap());
+
+        assert_eq!(id, id2);
+    }
+}
+
+fn get_frep_rules() -> Vec<&'static str> {
+    [
+        "(/ ?a 1) ==> ?a",
+        "(min (max ?a ?b) ?a) ==> ?a",
+        "(max (min ?a ?b) ?a) ==> ?a",
+        "(max ?a ?a) ==> ?a",
+        "(min ?a ?a) ==> ?a",
+    ]
+    .into()
+}
+
+fn get_lifting_rules() -> Vec<&'static str> {
+    [
+        "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
+        "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
+        "(Scale (FRep ?e) ?a ?b ?c) ==> (FRep (subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c)))",
+        "(Cube ?a ?b ?c) ==> (FRep (min (/ x ?a)
+                                   (min (- 1 (/ x ?a))
+                                        (min (/ y ?b)
+                                             (min (- 1 (/ y ?b))
+                                                  (min (/ z ?c)
+                                                       (- 1 (/ z ?c))))))))",
+        "(Sphere ?r) ==> (FRep (- (- (- 1 (* (/ x ?r) (/ x ?r))) (* (/ y ?r) (/ y ?r))) (* (/ z ?r) (/ z ?r))))",
+        "(Cylinder ?r1 ?r2 ?h) ==> (FRep (min (/ z ?h)
+                                              (min (- 1 (/ z ?h))
+                                                   (- (- 1 (* (/ x ?r1) (/ x ?r1))) (* (/ y ?r2) (/ y ?r2))))))",
+    ].into()
+}
+
+fn get_dim_var(nodes: &[CF]) -> Option<CF> {
     for n in nodes {
+        if let CF::DimX = n {
+            return Some(CF::DimX);
+        } else if let CF::DimY = n {
+            return Some(CF::DimY);
+        } else if let CF::DimZ = n {
+            return Some(CF::DimZ);
+        }
+    }
+    None
+}
+
+fn to_idx(from_var: CF) -> usize {
+    if from_var == CF::DimX {
+        return 0;
+    } else if from_var == CF::DimY {
+        return 1;
+    } else if from_var == CF::DimZ {
+        return 2;
+    } else {
+        println!("not a dim var!");
+        return 0;
+    }
+}
+
+fn compute_substs<'a, const N: usize>(
+    egraph: &mut EGraph<CF, SynthAnalysis>,
+    ids: &[Id; N],
+    mapping: [Id; 3],
+    cache: &mut HashMap<(Id, [Id; 3]), Option<CF>>,
+) -> Option<[Id; N]> {
+    let mut v = vec![];
+    for id in ids {
+        if let Some(e_substed) = compute_subst(egraph, *id, mapping.clone(), cache) {
+            v.push(e_substed);
+        } else {
+            return None;
+        }
+    }
+    let mut ids_substed = ids.clone();
+    for (i, n) in enumerate(v.into_iter()) {
+        ids_substed[i] = egraph.add(n);
+    }
+    Some(ids_substed)
+}
+
+fn compute_subst(
+    egraph: &mut EGraph<CF, SynthAnalysis>,
+    id: Id,
+    mapping: [Id; 3],
+    cache: &mut HashMap<(Id, [Id; 3]), Option<CF>>,
+) -> Option<CF> {
+    if cache.contains_key(&(id, mapping)) {
+        return cache[&(id, mapping)].clone();
+    }
+    // We will replace this is we can successfully subst, but this just prevents
+    // infinite cycles.
+    cache.insert((id, mapping), None);
+
+    for n in egraph[id].nodes.clone() {
         match n {
-            CF::Min([a, b]) => {
-                if let Some(a_substed) = compute_subst(egraph, a, from, to) {
-                    if let Some(b_substed) = compute_subst(egraph, b, from, to) {
-                        // TODO: Only add to egraph if entire computation
-                        // is successful by maintaining a tree of terms only.
-                        let a_id = egraph.add(a_substed);
-                        let b_id = egraph.add(b_substed);
-                        return Some(CF::Min([a_id, b_id]));
-                    }
+            CF::Min(ids) => {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                    cache.insert((id, mapping), Some(CF::Min(ids_substed)));
+                    return cache[&(id, mapping)].clone();
                 }
             }
-
-            CF::Div([a, b]) => {
-                if let Some(a_substed) = compute_subst(egraph, a, from, to) {
-                    if let Some(b_substed) = compute_subst(egraph, b, from, to) {
-                        let a_id = egraph.add(a_substed);
-                        let b_id = egraph.add(b_substed);
-                        return Some(CF::Div([a_id, b_id]));
-                    }
+            CF::Div(ids) => {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                    cache.insert((id, mapping), Some(CF::Div(ids_substed)));
+                    return cache[&(id, mapping)].clone();
                 }
             }
-
-            CF::Sub([a, b]) => {
-                if let Some(a_substed) = compute_subst(egraph, a, from, to) {
-                    if let Some(b_substed) = compute_subst(egraph, b, from, to) {
-                        let a_id = egraph.add(a_substed);
-                        let b_id = egraph.add(b_substed);
-                        return Some(CF::Sub([a_id, b_id]));
-                    }
+            CF::Mul(ids) => {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                    cache.insert((id, mapping), Some(CF::Mul(ids_substed)));
+                    return cache[&(id, mapping)].clone();
                 }
             }
-
+            CF::Sub(ids) => {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                    cache.insert((id, mapping), Some(CF::Sub(ids_substed)));
+                    return cache[&(id, mapping)].clone();
+                }
+            }
             CF::DimX | CF::DimY | CF::DimZ => {
-                if *from == n {
-                    return Some(egraph[*to].nodes[0].clone());
-                } else {
-                    return Some(n);
-                }
+                let i = to_idx(n);
+                cache.insert((id, mapping), Some(egraph[mapping[i]].nodes[0].clone()));
+                return cache[&(id, mapping)].clone();
             }
-
             CF::Lit(i) => {
-                return Some(n);
+                cache.insert((id, mapping), Some(n));
+                return cache[&(id, mapping)].clone();
+            }
+            CF::Subst([e, from, to]) => {
+                if let Some(from_var) = get_dim_var(&egraph[from].nodes) {
+                    let mut mapping2 = [mapping[0], mapping[1], mapping[2]];
+                    let i = to_idx(from_var);
+                    mapping2[i] = to;
+                    if let Some(e_substed) = compute_subst(egraph, e, mapping2, cache) {
+                        let x = egraph.add(CF::DimX);
+                        let y = egraph.add(CF::DimY);
+                        let z = egraph.add(CF::DimZ);
+                        if mapping == [x, y, z] {
+                            let id2 = egraph.add(e_substed.clone());
+                            egraph.union(id, id2);
+                        }
+                        cache.insert((id, mapping), Some(e_substed.clone()));
+                        return cache[&(id, mapping)].clone();
+                    }
+                } else {
+                    println!("Subst wo var");
+                }
             }
             _ => (),
         }
     }
-    None
+    cache.insert((id, mapping), None);
+    return cache[&(id, mapping)].clone();
 }
 
 impl SynthLanguage for CF {
@@ -196,8 +248,9 @@ impl SynthLanguage for CF {
         matches!(
             self,
             CF::FRep(_)
-                | CF::Cuboid(_)
-                | CF::Spheroid(_)
+                | CF::Cube(_)
+                | CF::Sphere(_)
+                | CF::Cylinder(_)
                 | CF::Trans(_)
                 | CF::Scale(_)
                 | CF::Var(_)
@@ -240,32 +293,11 @@ impl SynthLanguage for CF {
     }
 
     fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-
-        let get_dim_var = |nodes: &[CF]| {
-            for n in nodes {
-                if let CF::DimX = n {
-                    return Some(CF::DimX);
-                } else if let CF::DimY = n {
-                    return Some(CF::DimY);
-                } else if let CF::DimZ = n {
-                    return Some(CF::DimZ);
-                }
-            }
-            None
-        };
-
-
-        for n in &egraph[id].nodes {
-            if let CF::Subst([e, from, to]) = egraph[id].nodes[0] {
-                if let Some(from_var) = get_dim_var(&egraph[from].nodes) {
-                    if let Some(substed) = compute_subst(egraph, e, &from_var, &to) {
-                        let id2 = egraph.add(substed);
-                        egraph.union(id, id2);
-                    }
-                    return;
-                }
-            }
-        }
+        let mut cache: HashMap<(Id, [Id; 3]), Option<CF>> = HashMap::new();
+        let x = egraph.add(CF::DimX);
+        let y = egraph.add(CF::DimY);
+        let z = egraph.add(CF::DimZ);
+        compute_subst(egraph, id, [x, y, z], &mut cache);
     }
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
@@ -298,9 +330,12 @@ impl CF {
     }
 }
 
-
 fn time() -> String {
-    let mut t = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() - 1680159600;
+    let mut t = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        - 1680159600;
     let days = t / (60 * 60 * 24);
     t %= 60 * 60 * 24;
     let hours = t / (60 * 60);
@@ -317,26 +352,30 @@ mod tests {
 
     fn iter_szalinski(n: usize) -> Workload {
         let lang = Workload::new([
-            // For union, inter
-            // "(FRep var)",
-            // "(bop shape shape)",
-
-            // "(Scale shape var var var)",
-            // "(Cuboid cnst cnst cnst)",
-            "(Scale (Cuboid cnst cnst cnst) var var var)",
+            "(FRep var)",
+            "(bop solid solid)",
+            "(Scale solid var var var)",
+            "(Cube scalar scalar scalar)",
+            "(Sphere scalar)",
+            "(Cylinder scalar scalar scalar)",
         ]);
-
-        let consts: &[&str] = &["1"];
+        let scalars: &[&str] = &["var", "1", "0"];
         let vars: &[&str] = &["a", "b", "c"];
         let bops: &[&str] = &["Union", "Inter"];
-        
-        let w = lang.iter_metric("shape", Metric::Atoms, n)
+
+        let w = lang
+            .iter_metric("solid", Metric::Atoms, n)
             // .filter(Filter::Contains("var".parse().unwrap()))
-            .plug("cnst", &consts.into())
+            .plug("scalar", &scalars.into())
             .plug("var", &vars.into())
             .plug("bop", &bops.into());
-        
-        let mut data = w.force().iter().map(|x| x.to_string()).collect::<Vec<String>>().join("\n");
+
+        let mut data = w
+            .force()
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join("\n");
         data = format!("{}\n{}\n", time(), data);
         fs::write("wl.txt", data).expect("Unable to write file");
         w
@@ -344,7 +383,7 @@ mod tests {
 
     #[test]
     fn rule_lifting_recipe() {
-        let nat_rules = get_nat_rules();
+        let nat_rules = get_frep_rules();
 
         let prior = Ruleset::new(&nat_rules);
 
@@ -380,35 +419,21 @@ mod tests {
 
     #[test]
     fn rule_lifting() {
-        let nat_rules = get_nat_rules();
+        let nat_rules = get_frep_rules();
 
         let mut all_rules = Ruleset::default();
         all_rules.extend(Ruleset::new(&nat_rules));
 
         let atoms3 = iter_szalinski(8);
-        // assert_eq!(atoms3.force().len(), 51);
 
         let rules3 = CF::run_workload(
             atoms3,
             all_rules.clone(),
             Limits {
-                iter: 20,
+                iter: 3,
                 node: 10000000,
             },
         );
         all_rules.extend(rules3);
-
-        // let atoms4 = iter_szalinski(8);
-
-        // let rules4 = CF::run_workload(
-        //     atoms4,
-        //     all_rules.clone(),
-        //     Limits {
-        //         iter: 3,
-        //         node: 1000000,
-        //     },
-        // );
-        // all_rules.extend(rules4);
-
     }
 }
