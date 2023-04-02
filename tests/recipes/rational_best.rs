@@ -8,7 +8,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
     let vars = &Workload::new(["a", "b", "c"]);
-    let consts = &Workload::new(["0", "-1", "1"]);
+    let consts = &Workload::new(["0", "-1", "1", "2"]);
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
 
