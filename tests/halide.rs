@@ -327,10 +327,10 @@ mod test {
         // on the branch "maybe-useful" in the old recipes repo
 
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        let rules: Ruleset<Pred> = Ruleset::from_file("all-rules.rules");
+        // let rules: Ruleset<Pred> = Ruleset::from_file("all-rules.rules");
 
         let start = Instant::now();
-        // let rules = halide_rules();
+        let rules = halide_rules();
         let duration = start.elapsed();
 
         // println!("Rules collected.");
@@ -344,8 +344,8 @@ mod test {
 
         let (can, cannot) =
             rules.derive(DeriveType::LhsAndRhs, &baseline, Limits {
-                iter: 3,
-                node: 25_000,
+                iter: 2,
+                node: 100_000,
             });
         println!("LHS/RHS: {} / {}", can.len(), can.len() + cannot.len());
 

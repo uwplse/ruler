@@ -139,7 +139,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "(uop v)",
         "v"
     ]))
-    .plug("bop", &Workload::new(&["&&", "||", "!=", "<=", "=="]))
+    .plug("bop", &Workload::new(&["&&", "||", "!=", "<=", "==", "max", "min"]))
     .plug("uop", &Workload::new(&["-", "!"]))
     .plug("v", &Workload::new(&["a", "b", "c"]))
     .filter(Filter::Canon(vec![
@@ -151,41 +151,13 @@ pub fn halide_rules() -> Ruleset<Pred> {
         nested_bops_full,
         all_rules.clone(),
         Limits {
-            iter: 3,
+            iter: 2,
             node: 100_000,
         }
     );
     all_rules.extend(new.clone());
     println!("nested_bops_full finished.");
     new.to_file("nested_bops_full.rules");
-
-/*
-    let triple_nested_bops_full = Workload::new(&[
-        "(bop (bop (bop v v) v) v)",
-        "(bop v (bop (bop v v) v))",
-        "v",
-        "0",
-        "1"
-    ])
-    .plug("bop", &Workload::new(&["&&", "||", "!=", "<=", "=="]))
-    .plug("v", &Workload::new(&["a", "b", "c"]))
-    .filter(Filter::Canon(vec![
-        "a".to_string(),
-        "b".to_string(),
-        "c".to_string()
-    ]));
-    let new = Pred::run_workload(
-        triple_nested_bops_full,
-        all_rules.clone(),
-        Limits {
-            iter: 3,
-            node: 1_000_000,
-        }
-    );
-    all_rules.extend(new.clone());
-    println!("triple_nested_bops_full finished.");
-    new.to_file("triple_nested_bops_full.rules");
-*/
 
     let nested_bops = Workload::new(&[
         "(bop e e)",
@@ -197,24 +169,53 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "(bop v v)",
         "v"
     ]))
-    .plug("bop", &Workload::new(&["+", "-", "*", "<=", "max", "min"]))
-    .plug("v", &Workload::new(&["a", "b", "c"]))
+    .plug("bop", &Workload::new(&["+", "-", "*", "max", "min"]))
+    .plug("v", &Workload::new(&["a", "b", "c", "d"]))
     .filter(Filter::Canon(vec![
         "a".to_string(),
         "b".to_string(),
         "c".to_string(),
+        "d".to_string()
     ]));
     let new = Pred::run_workload(
         nested_bops,
         all_rules.clone(),
         Limits {
-            iter: 3,
+            iter: 2,
             node: 100_000,
         }
     );
     all_rules.extend(new.clone());
     println!("nested_bops finished.");
     new.to_file("nested-bops.rules");
+
+    let triple_nested_bops = Workload::new(&[
+        "(bop e e)",
+        "(bop (bop (bop v v) v) v)",
+        "(bop v (bop v (bop v v)))",
+        "0",
+        "1"
+    ])
+    .plug("e", &Workload::new(&["(bop v v)", "v"]))
+    .plug("bop", &Workload::new(&["+", "-", "*", "max", "min"]))
+    .plug("v", &Workload::new(&["a", "b", "c", "d"]))
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string(),
+        "d".to_string()
+    ]));
+    let new = Pred::run_workload(
+        triple_nested_bops,
+        all_rules.clone(),
+        Limits {
+            iter: 2,
+            node: 100_000,
+        }
+    );
+    all_rules.extend(new.clone());
+    println!("triple_nested_bops finished.");
+    new.to_file("triple-nested-bops.rules");
 
     let select_max = Workload::new(&[
         "(max s s)", 
@@ -236,7 +237,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         select_max,
         all_rules.clone(),
         Limits {
-            iter: 3,
+            iter: 2,
             node: 100_000,
         }
     );
@@ -262,7 +263,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         select_arith,
         all_rules.clone(),
         Limits {
-            iter: 3,
+            iter: 2,
             node: 100_000,
         }
     );
