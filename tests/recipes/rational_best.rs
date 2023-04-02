@@ -8,7 +8,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
     let vars = &Workload::new(["a", "b", "c"]);
-    let consts = &Workload::new(["0", "-1", "1", "2"]);
+    let consts = &Workload::new(["0", "-1", "1"]);
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
 
@@ -18,7 +18,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .clone()
         .iter_metric("expr", enumo::Metric::Depth, 2)
         .filter(Filter::Contains("var".parse().unwrap()))
-        .plug_lang(vars, consts, uops, bops);
+        .plug_lang(vars, &consts.clone().append(Workload::new(["2"])), uops, bops);
     let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
     rules.extend(layer1_rules);
 
