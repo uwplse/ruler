@@ -333,7 +333,7 @@ mod test {
         // let rules = halide_rules();
         let duration = start.elapsed();
 
-        println!("Rules collected.");
+        // println!("Rules collected.");
 
 //        let (can, cannot) =
 //            rules.derive(DeriveType::Lhs, &baseline, Limits {
