@@ -152,7 +152,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
         Limits {
             iter: 2,
-            node: 100_000,
+            node: 300_000,
         }
     );
     all_rules.extend(new.clone());
@@ -182,7 +182,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
         Limits {
             iter: 2,
-            node: 100_000,
+            node: 300_000,
         }
     );
     all_rules.extend(new.clone());
@@ -210,7 +210,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
         Limits {
             iter: 2,
-            node: 100_000,
+            node: 300_000,
         }
     );
     all_rules.extend(new.clone());
@@ -238,7 +238,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
         Limits {
             iter: 2,
-            node: 100_000,
+            node: 300_000,
         }
     );
     all_rules.extend(new.clone());
@@ -247,10 +247,10 @@ pub fn halide_rules() -> Ruleset<Pred> {
   
     let select_arith = Workload::new(&[
         "(select v e e)",
-        "(bop v (select v v v))",
-        "(bop (select v v v) v)"])
-        .plug("e", &Workload::new(&["(bop v v)", "v"]))
-        .plug("bop", &Workload::new(&["+", "-", "*", "<"]))
+        "(bop v e)",
+        "(bop e v)"])
+        .plug("e", &Workload::new(&["(bop v v)", "(select v v v)", "v"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))
         .plug("v", &Workload::new(&["a", "b", "c", "d", "e"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
@@ -264,7 +264,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
         Limits {
             iter: 2,
-            node: 100_000,
+            node: 300_000,
         }
     );
     println!("select_arith finished.");
