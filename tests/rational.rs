@@ -307,7 +307,6 @@ impl Math {
         let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
 
         // here's the conditional stuff
-        /*
         let mut with_condition = Ruleset::<Math>(
             invalid
                 .0
@@ -330,8 +329,7 @@ impl Math {
         let chosen_conditional =
             with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
 
-        let result = chosen.union(&chosen_conditional);*/
-        let result = chosen;
+        let result = chosen.union(&chosen_conditional);
 
         let time = t.elapsed().as_secs_f64();
         println!(
