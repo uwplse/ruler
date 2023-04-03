@@ -121,7 +121,7 @@ impl Exponential {
         let num_prior = prior.len();
         let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
 
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits)).0;
         let time = t.elapsed().as_secs_f64();
 
         println!(

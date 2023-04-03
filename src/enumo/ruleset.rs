@@ -343,7 +343,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    fn select(&mut self, step_size: usize) -> Self {
+    fn select(&mut self, step_size: usize, invalid: &mut Ruleset<L>) -> Self {
         let mut chosen = Self::default();
         self.0
             .sort_by(|_, rule1, _, rule2| rule1.score().cmp(&rule2.score()));
@@ -355,6 +355,8 @@ impl<L: SynthLanguage> Ruleset<L> {
             if let Some((_, rule)) = popped {
                 if rule.is_valid() {
                     selected.add(rule.clone());
+                } else {
+                    invalid.add(rule.clone());
                 }
 
                 // If reverse direction is also in candidates, add it at the same time
@@ -362,6 +364,8 @@ impl<L: SynthLanguage> Ruleset<L> {
                 if let Some(reverse) = reverse {
                     if self.contains(&reverse) && reverse.is_valid() {
                         selected.add(reverse);
+                    } else {
+                        invalid.add(reverse);
                     }
                 }
             } else {
@@ -403,18 +407,24 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
     }
 
-    pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> Self {
+    pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
+        let before = self.len();
+        let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
         while !self.is_empty() {
-            let selected = self.select(step_size);
+            println!("Shrinking {}/{} candidates. Kept {} so far.", self.len(), before, chosen.len());
+            let selected = self.select(step_size, &mut invalid);
+            if let Some(selected) = selected.0.first() {
+                println!("Selected {}", selected.1);
+            }
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
         }
         // Return only the new rules
         chosen.remove_all(prior);
 
-        chosen
+        (chosen, invalid)
     }
 
     pub fn can_derive(

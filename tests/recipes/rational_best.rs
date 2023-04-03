@@ -3,7 +3,10 @@ use ruler::enumo::{Filter, Ruleset, Workload};
 
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
-    let limits = Limits::default();
+    let limits = Limits {
+        iter: 3,
+        node: 1_500_000,   
+    };
 
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
@@ -11,6 +14,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let consts = &Workload::new(["0", "-1", "1"]);
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
+    let empty = &Workload::Set(vec![]);
 
     // Layer 1 (one op)
     println!("layer1");
@@ -49,11 +53,18 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let vars = Workload::new(["a", "b", "c"]);
     let consts = Workload::new(["-1", "0", "1", "2"]);
 
-    // Div
-    println!("div");
-    let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-    let div_rules = Math::run_workload_conditional(div, rules.clone(), limits, true);
-    rules.extend(div_rules);
+    // Factorization
+    println!("factorization");
+    let factor_term = Workload::new(&["var", "(bop expr expr)"])
+        .iter_metric("expr", enumo::Metric::Depth, 3)
+        .plug_lang(&Workload::new(["a", "b"]), empty, empty, &Workload::new(["+", "-", "*"]));
+    let factor_div = Workload::new(["(/ v v)"]).plug("v", &factor_term)
+             .filter(Filter::Canon(vec!["a".to_string(), "b".to_string()]));
+    let factor_rules = Math::run_workload_conditional(factor_div, rules.clone(), Limits {
+        iter: 4,
+        node: 4_000_000,   
+    }, true);
+    rules.extend(factor_rules);
 
     // Nested fabs
     println!("nested fabs");

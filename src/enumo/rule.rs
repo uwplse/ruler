@@ -1,5 +1,5 @@
 use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, RecExpr, Rewrite, Subst};
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use crate::*;
@@ -10,6 +10,12 @@ pub struct Rule<L: SynthLanguage> {
     pub lhs: Pattern<L>,
     pub rhs: Pattern<L>,
     pub rewrite: Rewrite<L, SynthAnalysis>,
+}
+
+impl<L: SynthLanguage> Display for Rule<L> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ==> {}", self.lhs, self.rhs)
+    }
 }
 
 impl<L: SynthLanguage> Rule<L> {

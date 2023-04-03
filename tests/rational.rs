@@ -225,6 +225,9 @@ impl Math {
     fn add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
         let lhs_sexp = parse_str(&rule.lhs.to_string()).unwrap();
         let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
+
+        println!("Adding condition to rule: {} -> {}", rule.lhs, rule.rhs);
+
         let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
         let rhs_denoms = Self::all_denominators(rhs_sexp.clone());
         let intersection: HashSet<String> = lhs_denoms.intersection(&rhs_denoms).cloned().collect();
@@ -235,6 +238,8 @@ impl Math {
             .difference(&intersection)
             .cloned()
             .collect();
+
+        println!("all denoms: {:?}", all_denoms);
 
         if all_denoms.is_empty() {
             None
@@ -286,25 +291,23 @@ impl Math {
         let egraph = workload.to_egraph::<Self>();
         let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 
-        let candidates = if fast_match {
+        let mut candidates = if fast_match {
             Ruleset::fast_cvec_match(&compressed)
         } else {
             Ruleset::cvec_match(&compressed)
         };
 
-        println!(
-            "Partionioning {} candidates into valid/invalid",
-            candidates.len()
-        );
-        let (mut valid, invalid) = candidates.partition(|r| r.is_valid());
+        println!("Found {} candidates", candidates.len());
+
+        let num_prior = prior.len();
+        let (chosen, invalid) = candidates.minimize(prior.clone(), Scheduler::Compress(limits));
+
         println!(
             "Found {} valid and {} invalid rules",
-            valid.len(),
+            chosen.len(),
             invalid.len()
         );
 
-        let num_prior = prior.len();
-        let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
 
         // here's the conditional stuff
         let mut with_condition = Ruleset::<Math>(
@@ -327,7 +330,7 @@ impl Math {
         );
 
         let chosen_conditional =
-            with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
+            with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits)).0;
 
         let result = chosen.union(&chosen_conditional);
 
@@ -362,7 +365,7 @@ impl Math {
         };
 
         let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits)).0;
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -804,6 +807,25 @@ pub mod test {
             &herbie,
             "rational_best",
             "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+    }
+
+    #[test]
+    fn just_best() {
+        let start = Instant::now();
+        let best_rules = best_enumo_recipe();
+        let duration = start.elapsed();
+
+        logger::write_output(
+            &best_rules,
+            &best_rules,
+            "rational_best",
+            "oopsla",
             Limits {
                 iter: 2,
                 node: 150000,

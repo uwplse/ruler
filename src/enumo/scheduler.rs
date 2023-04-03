@@ -19,7 +19,7 @@ impl Scheduler {
         limits: &Limits,
     ) -> Runner<L, SynthAnalysis> {
         Runner::default()
-            .with_scheduler(egg::SimpleScheduler)
+            .with_scheduler(egg::BackoffScheduler::default().with_initial_match_limit(1_000_000))
             .with_node_limit(limits.node)
             .with_iter_limit(limits.iter)
             .with_time_limit(Duration::from_secs(600))
@@ -37,7 +37,7 @@ impl Scheduler {
                 let mut runner = Self::mk_runner(egraph.clone(), limits)
                     .with_iter_limit(limits.iter)
                     .with_node_limit(limits.node)
-                    .with_scheduler(egg::SimpleScheduler)
+                    .with_scheduler(egg::BackoffScheduler::default().with_initial_match_limit(1_000_000))
                     .run(rewrites);
                 runner.egraph.rebuild();
                 runner.egraph
