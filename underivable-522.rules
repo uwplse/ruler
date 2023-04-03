@@ -1,0 +1,203 @@
+(/ 0 x) ==> 0
+(select (< x y) x y) ==> (min x y)
+(max (min (max x y) z) y) ==> (max (min x z) y)
+(select (< x y) y x) ==> (max x y)
+(+ x x) ==> (* x 2)
+(max (min (max y x) z) y) ==> (max y (min x z))
+(max (select x (max z y) w) z) ==> (max (select x y w) z)
+(max z (select x (min y z) w)) ==> (select x z (max z w))
+(max z (select x y (min z w))) ==> (select x (max z y) z)
+(max (select x w (max z y)) y) ==> (max (select x w z) y)
+(max (select x y (min w z)) z) ==> (select x (max y z) z)
+(max (select x (min y z) w) z) ==> (select x z (max w z))
+(/ (+ z (* y x)) x) ==> (+ (/ z x) y)
+(- (select x y (+ w z)) z) ==> (select x (- y z) w)
+(select x (select y z w) (select y u w)) ==> (select y (select x z u) w)
+(max (select x (max z y) w) y) ==> (max (select x z w) y)
+(/ (* x y) x) ==> y
+(/ (* y x) x) ==> y
+(- y (select x y z)) ==> (select x 0 (- y z))
+(max (select x y (min z w)) z) ==> (select x (max y z) z)
+(select (< x 0) 0 (* x y)) ==> (* (max x 0) y)
+(max (select x (min z y) w) z) ==> (select x z (max w z))
+(/ (- (* x y) z) x) ==> (+ y (/ (- z) x))
+(max (select x w (max z y)) z) ==> (max (select x w y) z)
+(- (select x y z) (select x w u)) ==> (select x (- y w) (- z u))
+(max (select x y z) (select x w u)) ==> (select x (max y w) (max z u))
+(/ (+ (* x y) z) x) ==> (+ y (/ z x))
+(max z (select x y (min w z))) ==> (select x (max z y) z)
+(/ (- (* x c0) y) c0) ==> (+ x (/ (- 0 y) c0))
+(/ (- (* y x) z) x) ==> (+ y (/ (- z) x))
+(/ (+ (* y x) z) x) ==> (+ y (/ z x))
+(/ (- z (* x y)) x) ==> (- (/ z x) y)
+(+ (select x y z) (select x w u)) ==> (select x (+ y w) (+ z u))
+(- (- (select x y z) w) (select x u v)) ==> (- (select x (- y u) (- z v)) w)
+(/ (- z (* y x)) x) ==> (- (/ z x) y)
+(/ x -1) ==> (- x)
+(- z (select x y z)) ==> (select x (- z y) 0)
+(- (select x y z) (+ w (select x u v))) ==> (- (select x (- y u) (- z v)) w)
+(select x (* z y) (- 0 (* w y))) ==> (* (select x z (- 0 w)) y)
+(/ (+ z (* x y)) x) ==> (+ (/ z x) y)
+(- (select x (+ y (+ z w)) u) w) ==> (select x (+ y z) (- u w))
+(- (select x (+ (+ y z) w) u) y) ==> (select x (+ w z) (- u y))
+(- (+ (select x y z) w) (select x u v)) ==> (+ (select x (- y u) (- z v)) w)
+(+ (select x y z) (- w (select x u v))) ==> (+ (select x (- y u) (- z v)) w)
+(select x (/ z y) (/ w y)) ==> (/ (select x z w) y)
+(/ (- (- (* x c0) y) z) c0) ==> (+ x (/ (- (- 0 y) z) c0))
+(- y (select x (+ y w) z)) ==> (- 0 (select x w (- z y)))
+(- (select x (+ y w) z) y) ==> (select x w (- z y))
+(< (max y x) x) ==> false
+(- (select x y (+ z w)) z) ==> (select x (- y z) w)
+(< x (min x y)) ==> false
+(< x (min y x)) ==> false
+(select x (+ y z) (+ y w)) ==> (+ y (select x z w))
+(< (max y z) (min x y)) ==> false
+(select (< x 0) (* x y) 0) ==> (* (min x 0) y)
+(+ (select x y z) (+ (select x u v) w)) ==> (+ (select x (+ y u) (+ z v)) w)
+(< (max y z) (min y x)) ==> false
+(select x (+ y z) (+ w y)) ==> (+ y (select x z w))
+(< (max z y) (min x y)) ==> false
+(- (+ w (select x y z)) (select x u v)) ==> (+ (select x (- y u) (- z v)) w)
+(- (select x (+ y (+ z w)) u) z) ==> (select x (+ y w) (- u z))
+(- (select x (+ (+ y z) w) u) z) ==> (select x (+ w y) (- u z))
+(< (max z y) (min y x)) ==> false
+(max z (select x (min z y) w)) ==> (select x z (max z w))
+(- y (select x (+ w y) z)) ==> (- 0 (select x w (- z y)))
+(|| (<= y x) (< x y)) ==> true
+(select x (+ y (+ z w)) (+ (+ u w) v)) ==> (+ w (select x (+ z y) (+ u v)))
+(select x (+ (+ y z) w) (+ u (+ v z))) ==> (+ z (select x (+ y w) (+ u v)))
+(select x (+ (+ y z) u) (+ y w)) ==> (+ y (select x (+ z u) w))
+(&& (<= y x) (< x y)) ==> false
+(select x (+ (+ y z) w) (+ (+ u z) v)) ==> (+ z (select x (+ y w) (+ u v)))
+(select x (+ (+ y z) w) (+ (+ y u) v)) ==> (+ y (select x (+ z w) (+ v u)))
+(select x (+ (+ y z) w) (+ (+ z u) v)) ==> (+ z (select x (+ y w) (+ v u)))
+(select x (+ z y) (+ y w)) ==> (+ y (select x z w))
+(- (select x (+ y z) w) (+ u z)) ==> (- (select x y (- w z)) u)
+(select (<= x y) z w) ==> (select (< y x) w z)
+(- (select x (+ y z) w) (+ u y)) ==> (- (select x z (- w y)) u)
+(- (select x (+ w y) z) y) ==> (select x w (- z y))
+(/ (+ y x) x) ==> (+ (/ y x) 1)
+(min (max (min x y) z) y) ==> (min (max x z) y)
+(min (max (min y x) z) y) ==> (min y (max x z))
+(select x (+ z y) (+ w y)) ==> (+ (select x z w) y)
+(- (select x (+ y z) w) (+ y u)) ==> (- (select x z (- w y)) u)
+(+ (select x y z) (- (select x u v) w)) ==> (- (select x (+ y u) (+ z v)) w)
+(/ x 1) ==> x
+(/ x 0) ==> 0
+(/ x x) ==> 1
+(- (select x (+ y z) w) (+ z u)) ==> (- (select x y (- w z)) u)
+(+ (select x y z) (+ w (select x u v))) ==> (+ (select x (+ y u) (+ z v)) w)
+(select x (- (+ y z) u) (+ y w)) ==> (+ y (select x (- z u) w))
+(select x (- y z) (- y w)) ==> (- y (select x z w))
+(- z (select x y (+ z w))) ==> (- 0 (select x (- y z) w))
+(select x (+ (+ y z) w) (+ u (+ y v))) ==> (+ y (select x (+ z w) (+ u v)))
+(select x (+ z y) (+ (+ w y) u)) ==> (+ (select x z (+ w u)) y)
+(select x y (+ (+ y z) u)) ==> (+ y (select x 0 (+ z u)))
+(< x x) ==> false
+(select x (- y z) (+ y w)) ==> (+ y (select x (- z) w))
+(< (max x y) x) ==> false
+(/ (+ x y) x) ==> (+ (/ y x) 1)
+(select x (+ y z) (+ (+ y w) u)) ==> (+ y (select x z (+ w u)))
+(select x (+ y z) (+ (+ w y) u)) ==> (+ y (select x z (+ w u)))
+(select x y (- (+ z y) u)) ==> (+ y (select x 0 (- z u)))
+(select x (+ u (+ y z)) (+ y w)) ==> (+ y (select x (+ u z) w))
+(select x (+ y z) (- y w)) ==> (+ y (select x z (- w)))
+(select x (+ z y) (- (+ w y) u)) ==> (+ (select x z (- w u)) y)
+(select x (+ (+ y z) w) (+ u (+ z v))) ==> (+ z (select x (+ y w) (+ u v)))
+(- z (select x y (+ w z))) ==> (- 0 (select x (- y z) w))
+(select x y (- (+ y z) u)) ==> (+ y (select x 0 (- z u)))
+(select x y (+ u (+ y z))) ==> (+ y (select x 0 (+ u z)))
+(select x y (+ (+ z y) u)) ==> (+ y (select x 0 (+ z u)))
+(select x (+ z y) (+ (+ y w) u)) ==> (+ y (select x z (+ w u)))
+(select x (select y z w) (select y z u)) ==> (select y z (select x w u))
+(select x (- y z) (+ w y)) ==> (+ y (select x (- z) w))
+(select x (+ y z) (- (+ y w) u)) ==> (+ y (select x z (- w u)))
+(select x (+ y z) (- (+ w y) u)) ==> (+ y (select x z (- w u)))
+(select x (+ (+ z y) u) (+ w y)) ==> (+ (select x (+ z u) w) y)
+(select x (+ z y) (- y w)) ==> (+ y (select x z (- w)))
+(/ (- x y) x) ==> (+ (/ (- y) x) 1)
+(select x (+ y (- z w)) (- u w)) ==> (- (select x (+ y z) u) w)
+(select x (- (+ z y) u) (+ w y)) ==> (+ (select x (- z u) w) y)
+(/ (- y x) x) ==> (- (/ y x) 1)
+(select x (- z y) (- w y)) ==> (- (select x z w) y)
+(select x (+ (+ y z) w) (+ (+ u y) v)) ==> (+ y (select x (+ z w) (+ u v)))
+(select x (+ z y) (+ u (+ w y))) ==> (+ (select x z (+ u w)) y)
+(select x (+ (+ z y) u) (+ y w)) ==> (+ y (select x (+ z u) w))
+(select x y (+ u (+ z y))) ==> (+ y (select x 0 (+ u z)))
+(select x (+ z y) (- (+ y w) u)) ==> (+ y (select x z (- w u)))
+(select x (* y z) (* y w)) ==> (* y (select x z w))
+(select x (+ (+ y z) u) (+ w y)) ==> (+ y (select x (+ z u) w))
+(select x (* y z) (* w y)) ==> (* y (select x z w))
+(select x (+ (- y z) w) (- u z)) ==> (- (select x (+ w y) u) z)
+(select x (* z y) (* y w)) ==> (* y (select x z w))
+(select x (+ y z) (+ u (+ y w))) ==> (+ y (select x z (+ u w)))
+(select x (* z y) (* w y)) ==> (* (select x z w) y)
+(select x (+ (- y z) w) (+ (+ u y) v)) ==> (+ y (select x (- w z) (+ u v)))
+(select x (+ y z) (+ u (+ w y))) ==> (+ y (select x z (+ u w)))
+(select x (- (+ z y) u) (+ y w)) ==> (+ y (select x (- z u) w))
+(select x (+ y (+ z w)) (+ u (+ v z))) ==> (+ z (select x (+ y w) (+ u v)))
+(select x (+ u (+ z y)) (+ w y)) ==> (+ (select x (+ u z) w) y)
+(select x (- (+ y z) u) (+ w y)) ==> (+ y (select x (- z u) w))
+(select x (+ z y) (+ u (+ y w))) ==> (+ y (select x z (+ u w)))
+(select x (- 0 (* y z)) (* y w)) ==> (* y (select x (- 0 z) w))
+(select x (- 0 (* y z)) (* w y)) ==> (* y (select x (- 0 z) w))
+(/ (+ z (+ y x)) x) ==> (+ (/ (+ z y) x) 1)
+(select x (* y z) (- 0 (* y w))) ==> (* y (select x z (- 0 w)))
+(select x (+ u (+ y z)) (+ w y)) ==> (+ y (select x (+ u z) w))
+(select x (* y z) (- 0 (* w y))) ==> (* y (select x z (- 0 w)))
+(select x (- 0 (* z y)) (* y w)) ==> (* y (select x (- 0 z) w))
+(select x (* z y) (- 0 (* y w))) ==> (* y (select x z (- 0 w)))
+(select x (+ u (+ z y)) (+ y w)) ==> (+ y (select x (+ u z) w))
+(select x (- 0 (* z y)) (* w y)) ==> (* (select x (- 0 z) w) y)
+(select x (+ y (+ z w)) (+ u (+ v w))) ==> (+ w (select x (+ z y) (+ u v)))
+(/ (+ (+ x y) z) x) ==> (+ (/ (+ y z) x) 1)
+(select x (+ y (+ z w)) (+ u (+ w v))) ==> (+ w (select x (+ z y) (+ u v)))
+(/ (+ (+ y x) z) x) ==> (+ (/ (+ y z) x) 1)
+(/ (+ z (+ x y)) x) ==> (+ (/ (+ z y) x) 1)
+(select x (+ y (+ z w)) (+ u (+ z v))) ==> (+ z (select x (+ y w) (+ u v)))
+(&& (<= y x) (<= z x)) ==> (<= (max y z) x)
+(select x (+ y (+ z w)) (+ (+ u z) v)) ==> (+ z (select x (+ y w) (+ u v)))
+(select (!= x y) z w) ==> (select (== x y) w z)
+(&& (! x) x) ==> false
+(&& x (! x)) ==> false
+(|| (<= y x) (<= z x)) ==> (<= (min y z) x)
+(|| (< x y) (< x z)) ==> (< x (max y z))
+(select x y false) ==> (&& x y)
+(select x true y) ==> (|| x y)
+(/ x x) ==> (select (== x 0) 0 1)
+(select x false y) ==> (&& (! x) y)
+(|| (!= x y) (== y x)) ==> true
+(|| (!= x y) (== x y)) ==> true
+(&& (&& (== x y) z) (!= y x)) ==> false
+(select x y (select z y w)) ==> (select (|| x z) y w)
+(&& (&& (!= x y) z) (== x y)) ==> false
+(select x (select y z w) w) ==> (select (&& x y) z w)
+(&& (&& (!= x y) z) (== y x)) ==> false
+(|| (|| z (== x y)) (!= y x)) ==> true
+(select x y (select z w y)) ==> (select (|| x (! z)) y w)
+(select x (select y z w) z) ==> (select (&& x (! y)) w z)
+(&& (&& z (== x y)) (!= y x)) ==> false
+(! (! x)) ==> x
+(&& (&& z (== x y)) (!= x y)) ==> false
+(select x y true) ==> (|| (! x) y)
+(|| (|| (== x y) z) (!= y x)) ==> true
+(== (select x y 0) 0) ==> (|| (! x) (== y 0))
+(|| (|| (== x y) z) (!= x y)) ==> true
+(|| x (! x)) ==> true
+(|| (|| z (!= x y)) (== x y)) ==> true
+(== x 1) ==> x
+(&& (&& (== x y) z) (!= x y)) ==> false
+(|| (|| z (!= x y)) (== y x)) ==> true
+(select x (+ y (+ z w)) (+ (+ w u) v)) ==> (+ w (select x (+ z y) (+ v u)))
+(|| (|| (!= x y) z) (== x y)) ==> true
+(|| (! x) x) ==> true
+(|| (|| (!= x y) z) (== y x)) ==> true
+(&& (< x y) (< x z)) ==> (< x (min y z))
+(|| (|| z (== x y)) (!= x y)) ==> true
+(select x (+ y (+ z w)) (+ (+ z u) v)) ==> (+ z (select x (+ y w) (+ v u)))
+(- (select x y z) (+ (select x u v) w)) ==> (- (select x (- y u) (- z v)) w)
+(select x (+ (+ y z) w) (+ u (+ v y))) ==> (+ y (select x (+ z w) (+ u v)))
+(&& (!= x y) (== y x)) ==> false
+(&& (!= x y) (== x y)) ==> false
+(&& (&& z (!= x y)) (== y x)) ==> false
+(&& (&& z (!= x y)) (== x y)) ==> false

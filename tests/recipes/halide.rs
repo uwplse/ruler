@@ -223,14 +223,17 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "(select v s s)"
         ])
         .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
-        .plug("v", &Workload::new(&["a", "b", "c", "d", "e"]))
+        .plug("v", &Workload::new(&["a", "b", "c", "d", "e", "f", "0", "1"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "min", "max"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
             "b".to_string(),
             "c".to_string(),
             "d".to_string(),
-            "e".to_string()
+            "e".to_string(),
+            "f".to_string(),
+            "0".to_string(),
+            "1".to_string(),
         ]));
 
     let new = Pred::run_workload(
@@ -251,13 +254,16 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "(bop e v)"])
         .plug("e", &Workload::new(&["(bop v v)", "(select v v v)", "v"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))
-        .plug("v", &Workload::new(&["a", "b", "c", "d", "e"]))
+        .plug("v", &Workload::new(&["a", "b", "c", "d", "e", "f", "0", "1"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
             "b".to_string(),
             "c".to_string(),
             "d".to_string(),
-            "e".to_string()
+            "e".to_string(),
+            "f".to_string(),
+            "0".to_string(),
+            "1".to_string(),
         ]));
     let new = Pred::run_workload(
         select_arith,
