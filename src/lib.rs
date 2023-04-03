@@ -8,6 +8,7 @@ pub use util::*;
 mod bv;
 pub mod enumo;
 mod language;
+pub mod logger;
 mod util;
 
 pub type Id = egg::Id;

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="stylesheet.css" type="text/css" charset="utf-8" />
+<html>
+
+<head>
+  <script src="table.js"></script>
+  <script src="data/output.js"></script>
+  <script src="generate.js"></script>
+</head>
+
+<title>Nightlies</title>
+
+<body onload="load()">
+  <h2>Nightlies</h2>
+  <div>
+    <div class="table" id="baseline_table"></div>
+  </div>
+  <div>
+    <div class="table" id="herbie_table"></div>
+  </div>
+  <div>
+    <div class="table" id="halide_table"></div>
+  </div>
+
+  <h2>Latex</h2>
+  <button onclick="generateLatex('oopsla')">Generate Latex for Oopsla</button>
+  <button onclick="generateLatex('herbie')">Generate Latex for Herbie</button>
+  <button onclick="generateLatex('halide')">Generate Latex for Halide</button>
+  <div><textarea id="latex"></textarea></div>
+
+  <h2>Domain-specific Results</h2>
+  <p>
+    <a href="derive_detail.html?domain=bool">Bool</a>
+  </p>
+  <p>
+    <a href="derive_detail.html?domain=bv4">BV4</a>
+  </p>
+  <p>
+    <a href="derive_detail.html?domain=bv32">BV32</a>
+  </p>
+  <p>
+    <a href="derive_detail.html?domain=halide">Halide</a>
+  </p>
+  <p>
+    <a href="derive_detail.html?domain=rational_replicate">Rational (replicate)</a>
+  </p>
+  <p>
+    <a href="derive_detail.html?domain=rational_best">Rational (best)</a>
+  </p>
+  <h2>Raw</h2>
+  <p>
+    <a href="data/output.js">Data</a>
+  </p>
+</body>
+
+</html>

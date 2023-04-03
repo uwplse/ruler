@@ -9,6 +9,10 @@ use std::{ops::*, time::Instant};
 use symbolic_expressions::parser::parse_str;
 use symbolic_expressions::Sexp;
 use z3::ast::Ast;
+#[path = "./recipes/rational_best.rs"]
+pub mod rational_best;
+#[path = "./recipes/rational_replicate.rs"]
+pub mod rational_replicate;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
@@ -185,8 +189,8 @@ impl Math {
     fn z3_res_to_validationresult(res: z3::SatResult) -> ValidationResult {
         match res {
             z3::SatResult::Unsat => ValidationResult::Valid,
-            z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
+            z3::SatResult::Unknown => ValidationResult::Unknown,
         }
     }
 
@@ -589,6 +593,8 @@ pub mod test {
     use std::time::Duration;
 
     use super::*;
+    use crate::rational_best::best_enumo_recipe;
+    use crate::rational_replicate::replicate_ruler1_recipe;
     use ruler::enumo::{Filter, Ruleset, Workload};
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -746,41 +752,6 @@ pub mod test {
         );
     }
 
-    fn replicate_ruler1_recipe() -> Ruleset<Math> {
-        let mut rules = Ruleset::default();
-        let limits = Limits::default();
-
-        // Domain
-        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
-        let vars = &Workload::new(["a", "b", "c"]);
-        let consts = &Workload::new(["0", "-1", "1"]);
-        let uops = &Workload::new(["~", "fabs"]);
-        let bops = &Workload::new(["+", "-", "*", "/"]);
-
-        // Layer 1 (one op)
-        println!("layer1");
-        let layer1 = lang
-            .clone()
-            .iter_metric("expr", enumo::Metric::Depth, 2)
-            .filter(Filter::Contains("var".parse().unwrap()))
-            .plug_lang(vars, consts, uops, bops);
-        let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits, false);
-        rules.extend(layer1_rules);
-
-        // Layer 2 (two ops)
-        println!("layer2");
-        let layer2 = lang
-            .clone()
-            .iter_metric("expr", enumo::Metric::Depth, 3)
-            .filter(Filter::Contains("var".parse().unwrap()))
-            .plug_lang(vars, consts, uops, bops);
-        layer2.to_file("replicate_layer2_terms");
-        let layer2_rules = Math::run_workload(layer2.clone(), rules.clone(), limits, true);
-        rules.extend(layer2_rules);
-
-        rules
-    }
-
     pub fn conditional_rational_recipe() -> Ruleset<Math> {
         println!("Learning conditional rational rules");
         let mut rules = Ruleset::default();
@@ -819,124 +790,58 @@ pub mod test {
         rules
     }
 
-    pub fn best_enumo_recipe() -> Ruleset<Math> {
-        let mut rules = conditional_rational_recipe();
-        let limits = Limits::default();
-
-        // Contains var filter
-        let contains_var_filter = Filter::Or(vec![
-            Filter::Contains("a".parse().unwrap()),
-            Filter::Contains("b".parse().unwrap()),
-            Filter::Contains("c".parse().unwrap()),
-        ]);
-
-        // Safe filter
-        let safe_filter = Filter::Invert(Box::new(Filter::Contains("(/ ?x 0)".parse().unwrap())));
-
-        // Contains abs filter
-        let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
-
-        let vars = Workload::new(["a", "b", "c"]);
-        let consts = Workload::new(["-1", "0", "1", "2"]);
-
-        // Div
-        println!("div");
-        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-        let div_rules = Math::run_workload(div, rules.clone(), limits, false);
-        rules.extend(div_rules);
-
-        // Nested fabs
-        println!("nested fabs");
-        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-            .plug("uop", &Workload::new(&["~", "fabs"]))
-            .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
-        let layer1 = op_layer.clone().plug("expr", &vars.append(consts));
-        let layer2 = op_layer
-            .plug("expr", &layer1)
-            .filter(safe_filter.clone())
-            .filter(contains_var_filter.clone())
-            .filter(contains_abs_filter);
-        let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
-        let nested_abs_rules = Math::run_workload(nested_abs, rules.clone(), limits, true);
-        rules.extend(nested_abs_rules);
-
-        // Top level div
-        //println!("top level div");
-        //let top_level_div = Workload::new(["(/ size3 size3)");
-
-        rules
-    }
-
-    fn test_against_herbie(rules: &Ruleset<Math>, name: &str, duration: Duration) {
+    #[test]
+    fn run() {
+        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
-        println!("Comparing rational to herbie...");
-        rules.write_baseline_row(
-            herbie.clone(),
-            name,
-            "herbie_baseline",
-            "herbie.json",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-        rules.write_baseline_row_big_object(
-            herbie,
-            name,
-            "herbie_baseline",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-    }
-
-    #[test]
-    fn run_all() {
         let start = Instant::now();
-        let rules = replicate_ruler1_recipe();
+        let replicate_rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
-        rules.write_json_rules("rational_replicate.json");
-        test_against_ruler1(&rules, "rational_replicate", duration);
-        test_against_herbie(&rules, "herbie_rational_replicate", duration);
-
-        let start = Instant::now();
-        let rules = best_enumo_recipe();
-        let duration = start.elapsed();
-
-        let _flip_rule = Rule::<Math>::from_string(
-            "(+ ?a ?b) ==> (/ (- (* ?a ?a) (* ?b ?b))
-               (- ?a ?b))",
-        );
-
-        rules.write_json_rules("rational_best.json");
-        test_against_ruler1(&rules, "rational_best", duration);
-        test_against_herbie(&rules, "herbie_rational_best", duration);
-    }
-
-    fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
-        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-
-        println!("Comparing rational to ruler1...");
-        rules.write_baseline_row(
-            ruler1.clone(),
-            name,
-            "oopsla_rational",
-            "baseline.json",
+        logger::write_output(
+            &replicate_rules,
+            &ruler1,
+            "rational_replicate",
+            "oopsla",
             Limits {
                 iter: 2,
                 node: 150000,
             },
             duration,
         );
-        rules.write_baseline_row_big_object(
-            ruler1,
-            name,
-            "oopsla_rational",
+        logger::write_output(
+            &replicate_rules,
+            &herbie,
+            "rational_replicate",
+            "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+
+        let start = Instant::now();
+        let best_rules = best_enumo_recipe();
+        let duration = start.elapsed();
+
+        logger::write_output(
+            &best_rules,
+            &ruler1,
+            "rational_best",
+            "oopsla",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+        logger::write_output(
+            &best_rules,
+            &herbie,
+            "rational_best",
+            "herbie",
             Limits {
                 iter: 2,
                 node: 150000,
