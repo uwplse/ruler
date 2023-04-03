@@ -157,7 +157,14 @@ impl Workload {
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {
-        Workload::Append(vec![self, workload.into()])
+        match self {
+            Workload::Append(wklds) => {
+                let mut wklds = wklds.clone();
+                wklds.push(workload.into());
+                Workload::Append(wklds)
+            }
+            _ => Workload::Append(vec![self, workload.into()]),
+        }
     }
 
     pub fn filter(self, filter: Filter) -> Self {

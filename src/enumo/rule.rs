@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use crate::*;
 
+use super::{Sexp, Workload};
+
 #[derive(Clone, Debug)]
 pub struct Rule<L: SynthLanguage> {
     pub name: Arc<str>,
@@ -49,6 +51,21 @@ impl<L: SynthLanguage> Rule<L> {
         } else {
             Err(format!("Failed to parse {}", s))
         }
+    }
+
+    pub fn add_guard(&self) -> Workload {
+        let lhs: Sexp = self.lhs.to_string().parse().unwrap();
+        let rhs: Sexp = self.rhs.to_string().parse().unwrap();
+        let lhs_denoms: HashSet<String> = lhs.denominators();
+        let rhs_denoms: HashSet<String> = rhs.denominators();
+        let mut all = lhs_denoms;
+        all.extend(rhs_denoms);
+        let denoms = Workload::new(all);
+
+        Workload::new(["(if guard then else)"])
+            .plug("guard", &denoms)
+            .plug("then", &Workload::Set(vec![rhs]))
+            .plug("else", &Workload::Set(vec![lhs]))
     }
 }
 
@@ -154,6 +171,8 @@ fn apply_pat<L: Language, A: Analysis<L>>(
 
 #[cfg(test)]
 mod test {
+    use egg::SymbolLang;
+
     use crate::enumo::Rule;
 
     #[test]
@@ -179,5 +198,13 @@ mod test {
         assert!(backwards.is_some());
         assert_eq!(backwards.unwrap().name.to_string(), "(* c d) ==> (* a b)");
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+    }
+
+    #[test]
+    fn add_guard() {
+        let rule: Rule<SymbolLang> = Rule::from_string("(/ a a) ==> 1").ok().unwrap().0;
+        let wkld = rule.add_guard().force();
+        assert_eq!(wkld.len(), 1);
+        assert_eq!(wkld[0].to_string(), "(if a 1 (/ a a ) )");
     }
 }

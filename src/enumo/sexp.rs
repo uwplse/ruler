@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+use crate::HashSet;
+
 use super::*;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -111,6 +113,23 @@ impl Sexp {
                 Metric::Depth => s.iter().map(|x| x.measure(metric)).max().unwrap() + 1,
             },
         }
+    }
+
+    pub fn denominators(&self) -> HashSet<String> {
+        let mut res = HashSet::default();
+        match self {
+            Sexp::Atom(_) => (),
+            Sexp::List(list) => {
+                if list[0] == Sexp::Atom("/".to_string()) {
+                    res.insert(list[2].to_string());
+                }
+
+                for s in list {
+                    res.extend(s.denominators());
+                }
+            }
+        }
+        res
     }
 }
 
