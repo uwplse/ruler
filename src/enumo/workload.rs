@@ -157,7 +157,14 @@ impl Workload {
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {
-        Workload::Append(vec![self, workload.into()])
+        match self {
+            Workload::Append(wklds) => {
+                let mut wklds = wklds.clone();
+                wklds.push(workload.into());
+                Workload::Append(wklds)
+            }
+            _ => Workload::Append(vec![self, workload.into()]),
+        }
     }
 
     pub fn filter(self, filter: Filter) -> Self {
@@ -386,6 +393,22 @@ mod test {
         let actual = w1.plug("x", &w2).force();
         for t in expected.force() {
             assert!(actual.contains(&t));
+        }
+    }
+
+    #[test]
+    fn append() {
+        let w1 = Workload::new(["a", "b"]);
+        let w2 = Workload::new(["c", "d"]);
+        let wkld = w1.append(w2);
+        let w3 = Workload::new(["e", "f"]);
+        let wkld = wkld.append(w3);
+        assert_eq!(wkld.force().len(), 6);
+        assert!(matches!(wkld, Workload::Append(_)));
+        if let Workload::Append(lst) = wkld {
+            for w in lst {
+                assert!(matches!(w, Workload::Set(_)));
+            }
         }
     }
 }
