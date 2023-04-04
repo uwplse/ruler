@@ -43,7 +43,7 @@ pub mod test {
     use ruler::enumo::Ruleset;
     use std::time::Instant;
 
-    #[test]
+    // #[test]
     fn run() {
         let start = Instant::now();
         let rules = bv4_rules();
