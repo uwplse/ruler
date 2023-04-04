@@ -29,6 +29,7 @@ egg::define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
+        "if" = If([Id; 3]),
         // (for compatibility with rationals)
         "fabs" = Abs(Id),
 
