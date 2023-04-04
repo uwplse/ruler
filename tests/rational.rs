@@ -575,11 +575,11 @@ pub mod test {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         let start = Instant::now();
-        let rules = replicate_ruler1_recipe();
+        let replicate_rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
         logger::write_output(
-            &rules,
+            &replicate_rules,
             &ruler1,
             "rational_replicate",
             "oopsla",
@@ -590,7 +590,7 @@ pub mod test {
             duration,
         );
         logger::write_output(
-            &rules,
+            &replicate_rules,
             &herbie,
             "rational_replicate",
             "herbie",
@@ -602,11 +602,11 @@ pub mod test {
         );
 
         let start = Instant::now();
-        let rules = best_enumo_recipe();
+        let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
 
         logger::write_output(
-            &rules,
+            &best_rules,
             &ruler1,
             "rational_best",
             "oopsla",
@@ -617,9 +617,9 @@ pub mod test {
             duration,
         );
         logger::write_output(
-            &rules,
+            &best_rules,
             &herbie,
-            "rational_replicate",
+            "rational_best",
             "herbie",
             Limits {
                 iter: 2,
