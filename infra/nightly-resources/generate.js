@@ -2,8 +2,8 @@ function getBaseline(data, baseline) {
   let keys = {
     baseline_name: "Baseline",
     enumo_spec_name: "Enumo Spec",
-    num_rules: "# Enumo",
-    num_baseline: "# Baseline",
+    num_rules: "\\# Enumo",
+    num_baseline: "\\# Baseline",
     time: "Time (s)",
     enumo_to_baseline_lhs_num: "E derives B (LHS)",
     enumo_to_baseline_lhsrhs_num: "E derives B (LHSRHS)",
@@ -117,7 +117,7 @@ function generateLatex(baseline) {
     String.raw`\begin{tabular}{` + "l".repeat(columnNames.length) + "}",
   ];
 
-  lines.push(columnNames.join(" & ") + String.raw`\\\\ \\cline{1-${columnNames.length}}`);
+  lines.push(columnNames.join(" & ") + String.raw`\\ \cline{1-${columnNames.length}}`);
 
   baselineData.forEach((row) => {
     lines.push(Object.values(row).join(" & ") + " \\\\");
