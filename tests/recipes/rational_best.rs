@@ -8,6 +8,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         node: 1_500_000,   
     };
 
+    
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
     let vars = &Workload::new(["a", "b", "c"]);
@@ -34,7 +35,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .filter(Filter::Contains("var".parse().unwrap()))
         .plug_lang(vars, consts, uops, bops);
     layer2.to_file("replicate_layer2_terms");
-    let layer2_rules = Math::run_workload_conditional(layer2.clone(), rules.clone(), limits, true);
+    let layer2_rules = Math::run_workload_conditional(layer2.clone(), rules.clone(), limits, false);
     rules.extend(layer2_rules);
 
     // Contains var filter
@@ -63,7 +64,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let factor_rules = Math::run_workload_conditional(factor_div, rules.clone(), Limits {
         iter: 4,
         node: 4_000_000,   
-    }, true);
+    }, false);
     rules.extend(factor_rules);
 
     // Nested fabs

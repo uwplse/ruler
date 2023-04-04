@@ -40,7 +40,6 @@ egg::define_language! {
     "~" = Neg(Id),
     "fabs" = Abs(Id),
     "if" = If([Id; 3]),
-    "zero" = Z(Id),
     Lit(Constant),
     Var(egg::Symbol),
   }
@@ -71,12 +70,6 @@ impl SynthLanguage for Math {
             Math::If([x, y, z]) => {
                 map!(get_cvec, x, y, z => Some( if x.is_zero() {z.clone()} else {y.clone()}))
             }
-
-            Math::Z(x) => {
-                let zero = mk_rat(0, 1);
-                let one = mk_rat(1, 1);
-                map!(get_cvec, x => Some(if x.eq(&zero) {one.clone()} else {zero.clone()}))
-            }
         }
     }
 
@@ -94,7 +87,6 @@ impl SynthLanguage for Math {
             Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
             Math::Div([x, y]) => mul(get_interval(x), &recip(get_interval(y))),
             Math::If(_) => Interval::default(), // TODO?
-            Math::Z(_) => Interval::default(),
         }
     }
 
@@ -217,16 +209,9 @@ impl Math {
         res
     }
 
-    // currently does nothing
-    fn wrap_neqzero(sexp: Sexp) -> Sexp {
-        sexp
-    }
-
     fn add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
         let lhs_sexp = parse_str(&rule.lhs.to_string()).unwrap();
         let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
-
-        println!("Adding condition to rule: {} -> {}", rule.lhs, rule.rhs);
 
         let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
         let rhs_denoms = Self::all_denominators(rhs_sexp.clone());
@@ -239,14 +224,12 @@ impl Math {
             .cloned()
             .collect();
 
-        println!("all denoms: {:?}", all_denoms);
-
         if all_denoms.is_empty() {
             None
         } else {
             let mut iterator = all_denoms.iter();
             let mut condition: Sexp =
-                Self::wrap_neqzero(parse_str(iterator.next().unwrap()).unwrap());
+                parse_str(iterator.next().unwrap()).unwrap();
 
             // TODO doesn't handle multiple denominators
             if let Some(_) = iterator.next() {
@@ -256,7 +239,7 @@ impl Math {
                 condition = Sexp::List(vec![
                     Sexp::String("and".to_string()),
                     condition,
-                    Self::wrap_neqzero(parse_str(denom).unwrap()),
+                    parse_str(denom).unwrap(),
                 ]);
             }
             let rhs = Sexp::List(vec![
@@ -428,16 +411,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                     &cond,
                     &buf[usize::from(*y)],
                     &buf[usize::from(*z)],
-                ))
-            }
-            Math::Z(x) => {
-                let l = &buf[usize::from(*x)];
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                let one = z3::ast::Real::from_real(ctx, 1, 1);
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Real::_eq(l, &zero),
-                    &one,
-                    &zero,
                 ))
             }
         }
