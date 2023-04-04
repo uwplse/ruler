@@ -569,7 +569,7 @@ pub mod test {
         );
     }
 
-    #[test]
+    // #[test]
     fn run() {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");

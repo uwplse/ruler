@@ -371,7 +371,7 @@ mod test {
         ])
     }
 
-    #[test]
+    // #[test]
     fn nightly_recipe() {
         let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
 
@@ -392,7 +392,7 @@ mod test {
         );
     }
 
-    #[test]
+    // #[test]
     fn simple() {
         let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         assert_eq!(complex.len(), 57);

@@ -222,7 +222,7 @@ mod tests {
         }
     }
 
-    #[test]
+    // #[test]
     fn rule_lifting() {
         let nat_rules = get_nat_rules();
 

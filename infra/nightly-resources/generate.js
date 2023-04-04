@@ -117,7 +117,7 @@ function generateLatex(baseline) {
     String.raw`\begin{tabular}{` + "l".repeat(columnNames.length) + "}",
   ];
 
-  lines.push(columnNames.join(" & ") + " \\\\ cline{1-9}");
+  lines.push(columnNames.join(" & ") + String.raw`\\\\ \\cline{1-${columnNames.length}}`);
 
   baselineData.forEach((row) => {
     lines.push(Object.values(row).join(" & ") + " \\\\");
