@@ -21,13 +21,12 @@ float-cmp = "0.8.0"
 lazy_static = "1.4.0"
 itertools = "0.9.0"
 # fixed = "1.9.0"
-z3 = "0.10.0"
-#z3 = {version = "0.10.0", features = ["static-link-z3"]}
+#z3 = "0.10.0"
+z3 = {version = "0.10.0", features = ["static-link-z3"]}
 rustc-hash = "1"
 symbolic_expressions = "5"
 rayon = "1"
 smallstr = "0.3"
-
 [dependencies.egg]
 version = "0.9"
 # git = "https://github.com/egraphs-good/egg"

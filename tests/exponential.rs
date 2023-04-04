@@ -319,7 +319,7 @@ mod test {
         rules
     }
 
-    // #[test]
+    #[test]
     fn run() {
         let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
 

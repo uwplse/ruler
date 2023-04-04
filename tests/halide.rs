@@ -321,7 +321,7 @@ mod test {
 
     use ruler::{enumo::Ruleset, logger, Limits};
 
-    // #[test]
+    #[test]
     fn recipe() {
         // This is porting the halide recipe at incremental/halide.spec
         // on the branch "maybe-useful" in the old recipes repo
