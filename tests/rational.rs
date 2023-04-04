@@ -141,8 +141,7 @@ impl SynthLanguage for Math {
         let denominators = lhs_denom.union(&rhs_denom);
 
         let mut assert_equal = lexpr._eq(&rexpr);
-        let zero_pat = "0".parse::<Pattern<Math>>().unwrap();
-        let zero_z3 = egg_to_z3(&ctx, Self::instantiate(&zero_pat).as_ref());
+        let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
 
         for d in denominators {
             let expr = egg_to_z3(
@@ -172,8 +171,7 @@ impl SynthLanguage for Math {
 
 impl Math {
     fn one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
-        let zero_pat = "0".parse::<Pattern<Math>>().unwrap();
-        let zero_z3 = egg_to_z3(ctx, Self::instantiate(&zero_pat).as_ref());
+        let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
 
         let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
         for d in denoms {
