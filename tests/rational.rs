@@ -210,7 +210,7 @@ impl Math {
             "Partionioning {} candidates into valid/invalid",
             candidates.len()
         );
-        let (mut valid, invalid) = candidates.partition(|r| r.is_valid());
+        let (valid, invalid) = candidates.partition(|r| r.is_valid());
         println!(
             "Found {} valid and {} invalid rules",
             valid.len(),
@@ -218,46 +218,36 @@ impl Math {
         );
 
         let num_prior = prior.len();
-        let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
 
         // here's the conditional stuff
-        /*
-        let mut with_condition = Ruleset::<Math>(
-            invalid
-                .0
-                .iter()
-                .filter_map(|r| {
-                    if let Some(rewritten) = Self::add_condition(r.1.clone()) {
-                        Some((rewritten.name.clone(), rewritten))
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
-        );
+        let mut guarded_wkld = Workload::default();
+        for (_, rule) in invalid {
+            guarded_wkld = guarded_wkld.append(rule.add_guard());
+        }
+        let egraph = guarded_wkld.to_egraph::<Self>();
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 
-        println!(
-            "Instrumented {} rules with conditions",
-            with_condition.len()
-        );
+        let candidates = if fast_match {
+            Ruleset::fast_cvec_match(&compressed)
+        } else {
+            Ruleset::cvec_match(&compressed)
+        };
 
-        let chosen_conditional =
-            with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
+        let mut all_candidates = valid.union(&candidates);
 
-        let result = chosen.union(&chosen_conditional);*/
-        let result = chosen;
+        let chosen = all_candidates.minimize(prior, Scheduler::Compress(limits));
 
         let time = t.elapsed().as_secs_f64();
         println!(
             "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            result.bidir_len(),
-            result.len(),
+            chosen.bidir_len(),
+            chosen.len(),
             time,
             num_prior
         );
 
-        result.pretty_print();
-        result
+        chosen.pretty_print();
+        chosen
     }
 
     fn run_workload(
