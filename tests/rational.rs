@@ -619,7 +619,7 @@ pub mod test {
         logger::write_output(
             &rules,
             &herbie,
-            "rational_replicate",
+            "rational_best",
             "herbie",
             Limits {
                 iter: 2,
