@@ -68,7 +68,22 @@ impl SynthLanguage for Math {
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
             Math::If([x, y, z]) => {
-                map!(get_cvec, x, y, z => Some( if x.is_zero() {z.clone()} else {y.clone()}))
+                get_cvec(x).iter()
+                           .zip(get_cvec(y).iter())
+                        .zip(get_cvec(z).iter())
+                        .map(|tup| {
+                            let ((x, y), z) = tup;
+                            if let Some(cond) = x {
+                                if !cond.is_zero() {
+                                    y.clone()
+                                } else {
+                                    z.clone()
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>()
             }
         }
     }
@@ -112,9 +127,15 @@ impl SynthLanguage for Math {
                 }
                 _ => None,
             },
-            Math::If([x, y, z]) => match (get_const(x), get_const(y), get_const(z)) {
-                (Some(x), Some(y), Some(z)) => Some(if !x.is_zero() { y } else { z }),
-                _ => None,
+            Math::If([x, y, z]) => 
+             if let Some(x) = get_const(x) {
+                if !x.is_zero() {
+                    get_const(y)
+                } else {
+                    get_const(z)
+                }
+            } else {
+                None
             },
         }
         .map(|c| Interval::new(Some(c.clone()), Some(c)))
@@ -171,8 +192,6 @@ impl SynthLanguage for Math {
         );
 
         let mut assert_equal = lexpr._eq(&rexpr);
-        let zero_pat = "0".parse::<Pattern<Math>>().unwrap();
-        let zero_z3 = egg_to_z3(&ctx, Self::instantiate(&zero_pat).as_ref());
 
         for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
             assert_equal = condition.not().implies(&assert_equal);
@@ -185,8 +204,15 @@ impl SynthLanguage for Math {
         let error_preserved = rhs_errors.iff(&lhs_errors);
         let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
 
-        solver.assert(&assertion.not());
-        Self::z3_res_to_validationresult(solver.check())
+        
+
+        solver.assert(&assertion.clone().not());
+        let res = Self::z3_res_to_validationresult(solver.check());
+        /*if let ValidationResult::Valid = res {
+            eprintln!("verifying {} => {}", lhs, rhs);
+        eprintln!("assertion: {}", assertion);
+        }*/
+        res
     }
 
     fn is_constant(&self) -> bool {

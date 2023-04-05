@@ -4,8 +4,8 @@ use ruler::enumo::{Filter, Ruleset, Workload};
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 3,
-        node: 1_500_000,
+        iter: 4,
+        node: 1_000_000,
     };
 
     let cheat_domain = Workload::new(&[
@@ -75,10 +75,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let factor_rules = Math::run_workload_conditional(
         factor_div,
         rules.clone(),
-        Limits {
-            iter: 4,
-            node: 2_000_000,
-        },
+        limits,
         false,
     );
     rules.extend(factor_rules);
