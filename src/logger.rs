@@ -17,11 +17,11 @@ pub fn write_output<L: SynthLanguage>(
 ) {
     // get information about the derivability of our ruleset vs. the baseline ruleset
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-        get_derivability_results(ruleset, DeriveType::Lhs, baseline, Limits::deriving());
+        get_derivability_results(ruleset, DeriveType::Lhs, baseline);
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
-        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, Limits::deriving());
+        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline);
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline, Limits::deriving());
+        get_derivability_results(ruleset, DeriveType::AllRules, baseline);
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
@@ -112,13 +112,12 @@ pub fn get_derivability_results<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     derive_type: DeriveType,
     baseline: &Ruleset<L>,
-    limits: Limits,
 ) -> ((usize, usize), (Duration, Duration), Value) {
     let start_f = Instant::now();
-    let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, limits);
+    let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, Limits::deriving());
     let time_f = start_f.elapsed();
     let start_b = Instant::now();
-    let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
+    let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, Limits::deriving());
     let time_b = start_b.elapsed();
 
     let derivability_results = json!({

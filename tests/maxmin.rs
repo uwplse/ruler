@@ -448,34 +448,12 @@ impl SynthLanguage for CaddyAndFRep {
     }
 }
 
-impl CaddyAndFRep {
-    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let num_prior = prior.len();
-        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
-
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use ruler::enumo::{Ruleset, Scheduler, Workload};
+    use ruler::{
+        enumo::{Ruleset, Scheduler, Workload},
+        recipe_utils::run_rule_lifting,
+    };
 
     use super::*;
 
@@ -523,13 +501,13 @@ mod tests {
     fn rule_lifting() {
         let nat_rules = get_nat_rules();
 
-        let mut all_rules = Ruleset::default();
+        let mut all_rules: Ruleset<CaddyAndFRep> = Ruleset::default();
         all_rules.extend(Ruleset::new(&nat_rules));
 
         let atoms3 = iter_pos(5);
         // assert_eq!(atoms3.force().len(), 51);
 
-        let rules3 = CaddyAndFRep::run_workload(
+        let rules3 = run_rule_lifting(
             atoms3,
             all_rules.clone(),
             Limits {
@@ -543,7 +521,7 @@ mod tests {
         let atoms4 = iter_pos(5);
         // assert_eq!(atoms4.force().len(), 255);
 
-        let rules4 = CaddyAndFRep::run_workload(
+        let rules4 = run_rule_lifting(
             atoms4,
             all_rules.clone(),
             Limits {
@@ -557,7 +535,7 @@ mod tests {
         let atoms5 = iter_pos(5);
         // assert_eq!(atoms5.force().len(), 1527);
 
-        let rules4 = CaddyAndFRep::run_workload(
+        let rules4 = run_rule_lifting(
             atoms5,
             all_rules.clone(),
             Limits {

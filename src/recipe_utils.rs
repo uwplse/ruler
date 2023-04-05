@@ -39,6 +39,33 @@ pub fn run_workload<L: SynthLanguage>(
     chosen
 }
 
+pub fn run_rule_lifting<L: SynthLanguage>(
+    workload: Workload,
+    prior: Ruleset<L>,
+    limits: Limits,
+) -> Ruleset<L> {
+    let t = Instant::now();
+
+    let egraph = workload.to_egraph::<L>();
+    let num_prior = prior.len();
+    let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+
+    let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+    let time = t.elapsed().as_secs_f64();
+
+    println!(
+        "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+        chosen.bidir_len(),
+        chosen.len(),
+        time,
+        num_prior
+    );
+
+    chosen.pretty_print();
+
+    chosen
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Lang {
     pub consts: Vec<String>,

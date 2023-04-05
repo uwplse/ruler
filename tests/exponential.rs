@@ -6,7 +6,6 @@ use std::time::Instant;
 
 use num::rational::Ratio;
 use num::BigInt;
-use ruler::enumo::{Ruleset, Scheduler, Workload};
 use ruler::*;
 #[path = "./recipes/exponential.rs"]
 pub mod exponential;
@@ -113,38 +112,12 @@ impl SynthLanguage for Exponential {
     }
 }
 
-impl Exponential {
-    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let num_prior = prior.len();
-        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
-
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::exponential::make_rules;
     use ruler::enumo;
 
-    type Workload = enumo::Workload;
     type Ruleset = enumo::Ruleset<Exponential>;
 
     pub fn starting_exponential_rules() -> Ruleset {
@@ -306,18 +279,6 @@ mod test {
             "(fabs (* (fabs ?c) (* ?b ?a))) ==> (fabs (* (fabs ?a) (* ?b ?c)))",
             "(- (fabs ?c) (- ?b ?a)) ==> (+ (fabs ?c) (- ?a ?b))",
         ])
-    }
-
-    pub fn run_workload(terms: Workload, prev_rules: &Ruleset) -> Ruleset {
-        let rules = Exponential::run_workload(
-            terms,
-            prev_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 2_000_000,
-            },
-        );
-        rules
     }
 
     #[test]
