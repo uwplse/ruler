@@ -317,15 +317,12 @@ mod halide;
 mod test {
     use crate::halide::halide_rules;
     use crate::Pred;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
 
     use ruler::{enumo::Ruleset, logger, Limits, DeriveType};
 
     #[test]
     fn recipe() {
-        // This is porting the halide recipe at incremental/halide.spec
-        // on the branch "maybe-useful" in the old recipes repo
-
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         // let rules: Ruleset<Pred> = Ruleset::from_file("all-rules.rules");
 

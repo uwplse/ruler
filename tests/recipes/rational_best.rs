@@ -19,7 +19,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .iter_metric("expr", enumo::Metric::Depth, 2)
         .filter(Filter::Contains("var".parse().unwrap()))
         .plug_lang(vars, consts, uops, bops);
-    let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
+    let layer1_rules = Math::run_workload_conditional(layer1.clone(), rules.clone(), limits, false);
     rules.extend(layer1_rules);
 
     // Layer 2 (two ops)
@@ -30,7 +30,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .filter(Filter::Contains("var".parse().unwrap()))
         .plug_lang(vars, consts, uops, bops);
     layer2.to_file("replicate_layer2_terms");
-    let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
+    let layer2_rules = Math::run_workload_conditional(layer2.clone(), rules.clone(), limits, true);
     rules.extend(layer2_rules);
 
     // Contains var filter
@@ -52,7 +52,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Div
     println!("div");
     let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-    let div_rules = Math::run_workload(div, rules.clone(), limits);
+    let div_rules = Math::run_workload_conditional(div, rules.clone(), limits, true);
     rules.extend(div_rules);
 
     // Nested fabs
@@ -67,7 +67,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .filter(contains_var_filter.clone())
         .filter(contains_abs_filter);
     let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
-    let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
+    let nested_abs_rules = Math::run_workload_conditional(nested_abs, rules.clone(), limits, true);
     rules.extend(nested_abs_rules);
 
     rules

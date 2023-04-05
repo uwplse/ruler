@@ -2,8 +2,9 @@ function getBaseline(data, baseline) {
   let keys = {
     baseline_name: "Baseline",
     enumo_spec_name: "Enumo Spec",
-    num_rules: "# Enumo",
-    num_baseline: "# Baseline",
+    loc: "Enumo Spec LOC",
+    num_rules: "\\# Enumo",
+    num_baseline: "\\# Baseline",
     time: "Time (s)",
     enumo_to_baseline_lhs_num: "E derives B (LHS)",
     enumo_to_baseline_lhsrhs_num: "E derives B (LHSRHS)",
@@ -32,6 +33,26 @@ function getBaseline(data, baseline) {
     Object.keys(keys).forEach((key) => {
       newRow[keys[key]] = tryRound(row[key]);
     });
+    consolidateColumns(newRow, "Enumo derives Baseline (LHS, LHS/RHS, All)", [
+      "E derives B (LHS)",
+      "E derives B (LHSRHS)",
+      "E derives B (ALL)",
+    ]);
+    consolidateColumns(newRow, "Enumo derives Baseline Time (s)", [
+      "E derives B (LHS) Time (s)",
+      "E derives B (LHSRHS) Time (s)",
+      "E derives B (ALL) Time (s)",
+    ]);
+    consolidateColumns(newRow, "Baseline derives Enumo (LHS, LHS/RHS, All)", [
+      "B derives E (LHS)",
+      "B derives E (LHSRHS)",
+      "B derives E (ALL)",
+    ]);
+    consolidateColumns(newRow, "Baseline derives Enumo Time (s)", [
+      "B derives E (LHS) Time (s)",
+      "B derives E (LHSRHS) Time (s)",
+      "B derives E (ALL) Time (s)",
+    ]);
     newData.push(newRow);
   });
   return newData;
@@ -117,7 +138,7 @@ function generateLatex(baseline) {
     String.raw`\begin{tabular}{` + "l".repeat(columnNames.length) + "}",
   ];
 
-  lines.push(columnNames.join(" & ") + " \\\\ cline{1-9}");
+  lines.push(columnNames.join(" & ") + String.raw`\\ \cline{1-${columnNames.length}}`);
 
   baselineData.forEach((row) => {
     lines.push(Object.values(row).join(" & ") + " \\\\");
@@ -132,4 +153,13 @@ function generateLatex(baseline) {
   let elem = document.getElementById("latex");
   elem.innerHTML = s;
   elem.style.height = "200px";
+}
+
+function consolidateColumns(dataObj, consolidatedName, columnNames) {
+  let values = [];
+  columnNames.forEach((col) => {
+    values.push(dataObj[col]);
+    delete dataObj[col];
+  });
+  dataObj[consolidatedName] = values.join(", ");
 }

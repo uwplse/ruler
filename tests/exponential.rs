@@ -29,6 +29,7 @@ egg::define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
+        "if" = If([Id; 3]),
         // (for compatibility with rationals)
         "fabs" = Abs(Id),
 
@@ -321,22 +322,22 @@ mod test {
 
     #[test]
     fn run() {
-        // let herbie: Ruleset = Ruleset::from_file("baseline/herbie-rational.rules");
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
 
-        // let start = Instant::now();
-        // let rules = make_rules();
-        // let duration = start.elapsed();
+        let start = Instant::now();
+        let rules = make_rules();
+        let duration = start.elapsed();
 
-        // logger::write_output(
-        //     &rules,
-        //     &herbie,
-        //     "exponential",
-        //     "herbie",
-        //     Limits {
-        //         iter: 2,
-        //         node: 150000,
-        //     },
-        //     duration,
-        // )
+        logger::write_output(
+            &rules,
+            &herbie,
+            "exponential",
+            "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 }

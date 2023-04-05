@@ -103,13 +103,10 @@ pub fn count_lines(recipe_name: &str) -> usize {
     filepath.push_str(recipe_name);
     filepath.push_str(".rs");
 
-    let file = BufReader::new(File::open(filepath).expect("Unable to open file"));
-    let mut cnt = 0;
-
-    for _ in file.lines() {
-        cnt += 1;
+    match File::open(filepath) {
+        Ok(file) => BufReader::new(file).lines().count(),
+        Err(_) => 0,
     }
-    cnt
 }
 
 pub fn get_derivability_results<L: SynthLanguage>(
