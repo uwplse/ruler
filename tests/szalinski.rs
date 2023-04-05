@@ -32,7 +32,7 @@ egg::define_language! {
     "y" = DimY,
     "z" = DimZ,
     "subst" = Subst([Id; 4]),
-    "Cheat" = Cheat([Id; 3]),
+    "Cheat" = Cheat([Id; 7]),
     // Indicate that the containing expr cannot have x, y, or z
     "Scalar" = Scalar(Id),
     Lit(Constant),
@@ -183,6 +183,12 @@ fn get_frep_rules() -> Vec<&'static str> {
         "(min ?a ?a) ==> ?a",
         "(- ?a (Scalar 0)) ==> ?a",
         "(* ?a ?b) ==> (* ?b ?a)",
+
+
+        "(Scale ?sa ?sb ?sc (Trans ?ta ?tb ?tc ?a)) ==> (Cheat ?sa ?sb ?sc ?ta ?tb ?tc ?a)",
+        "(Trans (* ?ta ?sa) (* ?tb ?sb) (* ?tc ?sc) (Scale ?sa ?sb ?sc ?a))  ==> (Cheat ?sa ?sb ?sc ?ta ?tb ?tc ?a)",
+        // "(Trans ta tb tc (Scale sa sb sc a))",
+        // "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
 
         // "(subst ?v ?v ?to) ==> ?to",
         // "(subst x y ?to) ==> x",
@@ -598,10 +604,12 @@ mod tests {
             // "(Cylinder scalar scalar scalar)",
             // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
             // "(Cube sa sb sc)", "(Scale sa sb sc (Cube 1 1 1))",
-            // "(Scale sa sb sc (Trans ta tb tc a))", "(Trans (* ta sa) (* tb sb) (* tc sc) (Scale sa sb sc a))",
+            "(Scale sa sb sc (Trans ta tb tc a))",
+            "(Trans (* ta sa) (* tb sb) (* tc sc) (Scale sa sb sc a))",
             "(Trans ta tb tc (Scale sa sb sc a))",
-            // "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
+            "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
             // "(Trans 0 0 0 a)", "a",
+            // "(Scale 1 1 1 a)", "a",
             // "(Trans 0 0 0 a)", "(Scale ta tb tc a)",
 
         ]);
