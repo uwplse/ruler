@@ -1,7 +1,7 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
-use crate::{HashSet, SynthAnalysis, SynthLanguage};
+use crate::{SynthAnalysis, SynthLanguage};
 use std::{fs::OpenOptions, io::Write};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
