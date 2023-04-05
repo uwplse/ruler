@@ -3,7 +3,7 @@ use ruler::enumo::{Filter, Metric, Ruleset, Workload};
 
 pub fn bv32_rules() -> Ruleset<Bv> {
     let mut all_rules = Ruleset::default();
-    let initial_vals = Workload::new(["a", "b", "c"]);
+    let initial_vals = Workload::new(["a", "b", "c", "0"]);
     let uops = Workload::new(["~", "-"]);
     let bops = Workload::new(["&", "|", "*", "--", "+", "<<", ">>"]);
 
@@ -15,7 +15,7 @@ pub fn bv32_rules() -> Ruleset<Bv> {
         all_rules.clone(),
         Limits {
             iter: 2,
-            node: 300000,
+            node: 300_000,
         },
     );
     all_rules.extend(rules_1.clone());
@@ -29,7 +29,7 @@ pub fn bv32_rules() -> Ruleset<Bv> {
         all_rules.clone(),
         Limits {
             iter: 2,
-            node: 300000,
+            node: 300_000,
         },
     );
     all_rules.extend(rules_2.clone());

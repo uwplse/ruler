@@ -19,7 +19,7 @@ impl Bv {
         let mut candidates = Ruleset::cvec_match(&compressed);
 
         let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+        let chosen = candidates.minimize(prior, Scheduler::Saturating(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -48,8 +48,24 @@ pub mod test {
         let start = Instant::now();
         let rules = bv4_rules();
         let duration = start.elapsed();
-
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
+
+        println!("{} rules found.", rules.clone().len());
+        let (can, cannot) =
+            rules.derive(DeriveType::LhsAndRhs, &baseline, Limits {
+                iter: 5,
+                node: 100_000,
+            });
+        println!("LHS/RHS: {} / {}", can.len(), can.len() + cannot.len());
+        cannot.to_file("underivable.txt");
+        let (can, cannot) =
+            rules.derive(DeriveType::Lhs, &baseline, Limits {
+                iter: 5,
+                node: 100_000,
+            });
+        println!("LHS: {} / {}", can.len(), can.len() + cannot.len());
+        // cannot.to_file("underivable.txt");
+
         logger::write_output(
             &rules,
             &baseline,
