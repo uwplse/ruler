@@ -93,7 +93,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     rules.extend(cheat_domain_rules);*/
 
     // Nested fabs
-    println!("nested fabs");
+    /*println!("nested fabs");
     let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
         .plug("uop", &Workload::new(&["~", "fabs"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
@@ -105,7 +105,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .filter(contains_abs_filter);
     let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
     let nested_abs_rules = Math::run_workload_conditional(nested_abs, rules.clone(), limits, true);
-    rules.extend(nested_abs_rules);
+    rules.extend(nested_abs_rules);*/
 
     rules
 }
