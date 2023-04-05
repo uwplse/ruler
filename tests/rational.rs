@@ -270,6 +270,7 @@ impl Math {
     ) -> Ruleset<Self> {
         let t = Instant::now();
 
+        println!("Compressing workload with {} prior rules", prior.len());
         let egraph = workload.to_egraph::<Self>();
         let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 

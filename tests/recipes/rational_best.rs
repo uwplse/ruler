@@ -8,6 +8,12 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         node: 1_500_000,
     };
 
+    let cheat_domain = Workload::new(&[
+        "(+ a b)",
+        "(/ (- (* a a) (* b b))
+        (- a b))",
+    ]);
+
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
     let vars = &Workload::new(["a", "b", "c"]);
@@ -54,7 +60,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let consts = Workload::new(["-1", "0", "1", "2"]);
 
     // Factorization
-    /*println!("factorization");
+    println!("factorization");
     let factor_term = Workload::new(&["var", "(bop expr expr)"])
         .iter_metric("expr", enumo::Metric::Depth, 3)
         .plug_lang(
@@ -71,11 +77,20 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         rules.clone(),
         Limits {
             iter: 4,
-            node: 4_000_000,
+            node: 2_000_000,
         },
         false,
     );
     rules.extend(factor_rules);
+
+    // cheat domain TODO remove
+    /*let cheat_domain_rules = Math::run_workload_conditional(
+        cheat_domain,
+        rules.clone(),
+        limits,
+        false,
+    );
+    rules.extend(cheat_domain_rules);*/
 
     // Nested fabs
     println!("nested fabs");
@@ -90,7 +105,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .filter(contains_abs_filter);
     let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
     let nested_abs_rules = Math::run_workload_conditional(nested_abs, rules.clone(), limits, true);
-    rules.extend(nested_abs_rules);*/
+    rules.extend(nested_abs_rules);
 
     rules
 }
