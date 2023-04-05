@@ -268,6 +268,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
+        let time_start = std::time::Instant::now();
         // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
         // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
 
@@ -292,23 +293,46 @@ impl<L: SynthLanguage> Ruleset<L> {
         };
         let mut candidates = Ruleset::default();
         let extract = Extractor::new(egraph, AstSize);
-        for class1 in &not_all_none {
-            for class2 in &not_all_none {
-                if class1.id == class2.id {
-                    continue;
-                }
-                if compare(&class1.data.cvec, &class2.data.cvec) {
-                    let (_, e1) = extract.find_best(class1.id);
-                    let (_, e2) = extract.find_best(class2.id);
-                    if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
-                        candidates.add(rule);
-                    }
-                    if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
-                        candidates.add(rule);
+        let mut by_first: IndexMap<Option<L::Constant>, Vec<Id>> = IndexMap::default();
+        for class in &not_all_none {
+            by_first
+                .entry(class.data.cvec[0].clone())
+                .or_insert_with(Vec::new)
+                .push(class.id);
+        }
+
+        let empty = vec![];
+        let first_none = by_first.get(&None).cloned().unwrap_or(empty);
+
+        for (value, classes) in by_first {
+            let mut all_classes = classes.clone();
+            if value.is_some() {
+                all_classes.extend(first_none.clone());
+            }
+
+            for i in 0..all_classes.len() {
+                for j in i + 1..all_classes.len() {
+                    let class1 = &egraph[all_classes[i]];
+                    let class2 = &egraph[all_classes[j]];
+                    if compare(&class1.data.cvec, &class2.data.cvec) {
+                        let (_, e1) = extract.find_best(class1.id);
+                        let (_, e2) = extract.find_best(class2.id);
+                        if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
+                            candidates.add(rule);
+                        }
+                        if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
+                            candidates.add(rule);
+                        }
                     }
                 }
             }
         }
+
+        println!(
+            "cvec match finished in {} ms",
+            time_start.elapsed().as_millis()
+        );
+
         candidates
     }
 
