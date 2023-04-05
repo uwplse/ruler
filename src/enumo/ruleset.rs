@@ -311,7 +311,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
 
             for i in 0..all_classes.len() {
-                for j in i+1..all_classes.len() {
+                for j in i + 1..all_classes.len() {
                     let class1 = &egraph[all_classes[i]];
                     let class2 = &egraph[all_classes[j]];
                     if compare(&class1.data.cvec, &class2.data.cvec) {
@@ -437,7 +437,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut chosen = prior.clone();
         let step_size = 1;
         while !self.is_empty() {
-            println!("Shrinking {}/{} candidates. Kept {} so far.", self.len(), before, chosen.len());
+            println!(
+                "Shrinking {}/{} candidates. Kept {} so far.",
+                self.len(),
+                before,
+                chosen.len()
+            );
             let selected = self.select(step_size, &mut invalid);
             if let Some(selected) = selected.0.first() {
                 println!("Selected {}", selected.1);
