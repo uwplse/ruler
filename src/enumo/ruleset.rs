@@ -301,10 +301,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                     let (_, e1) = extract.find_best(class1.id);
                     let (_, e2) = extract.find_best(class2.id);
                     if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
-                        candidates.add(rule);
-                    }
-                    if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
-                        candidates.add(rule);
+                        candidates.add(rule.clone());
+                        if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                            candidates.add(reverse);
+                        }
                     }
                 }
             }
