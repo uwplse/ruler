@@ -358,7 +358,7 @@ mod test {
                 node: 1000000,
             },
         );
-        assert_eq!(can.len(), 10);
-        assert_eq!(cannot.len(), 12);
+        assert_eq!(can.len(), 13);
+        assert_eq!(cannot.len(), 14);
     }
 }
