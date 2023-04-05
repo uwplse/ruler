@@ -77,17 +77,48 @@ impl SynthLanguage for Math {
     where
         F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
     {
+        let mut get_const = |x: &'a Id| {
+            let ival = get_interval(x);
+            if ival.low == ival.high {
+                ival.low.clone()
+            } else {
+                None
+            }
+        };
         match self {
-            Math::Lit(n) => Interval::new(Some(n.clone()), Some(n.clone())),
-            Math::Var(_) => Interval::default(),
-            Math::Neg(x) => neg(get_interval(x)),
-            Math::Abs(a) => abs(get_interval(a)),
-            Math::Add([x, y]) => add(get_interval(x), get_interval(y)),
-            Math::Sub([x, y]) => add(get_interval(x), &neg(get_interval(y))),
-            Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
-            Math::Div([x, y]) => mul(get_interval(x), &recip(get_interval(y))),
-            Math::If(_) => Interval::default(), // TODO?
+            Math::Lit(n) => Some(n.clone()),
+            Math::Var(_) => None,
+            Math::Neg(x) => get_const(x).map(|c| -c),
+            Math::Abs(a) => get_const(a).map(|c| c.abs()),
+            Math::Add([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(x + y),
+                _ => None,
+            },
+            Math::Sub([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(x - y),
+                _ => None,
+            },
+            Math::Mul([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(x * y),
+                _ => None,
+            },
+            Math::Div([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => {
+                    if y.is_zero() {
+                        None
+                    } else {
+                        Some(x / y)
+                    }
+                }
+                _ => None,
+            },
+            Math::If([x, y, z]) => match (get_const(x), get_const(y), get_const(z)) {
+                (Some(x), Some(y), Some(z)) => Some(if !x.is_zero() { y } else { z }),
+                _ => None,
+            },
         }
+        .map(|c| Interval::new(Some(c.clone()), Some(c)))
+        .unwrap_or_default()
     }
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
@@ -128,24 +159,29 @@ impl SynthLanguage for Math {
         let solver = z3::Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        let lhs_denom = Self::all_denominators(Self::pat_to_sexp(lhs));
-        let rhs_denom = Self::all_denominators(Self::pat_to_sexp(rhs));
-        let denominators = lhs_denom.union(&rhs_denom);
+        let lhs_denom = Self::error_conditions(
+            &ctx,
+            Self::pat_to_sexp(lhs),
+            z3::ast::Bool::from_bool(&ctx, true),
+        );
+        let rhs_denom = Self::error_conditions(
+            &ctx,
+            Self::pat_to_sexp(rhs),
+            z3::ast::Bool::from_bool(&ctx, true),
+        );
 
         let mut assert_equal = lexpr._eq(&rexpr);
         let zero_pat = "0".parse::<Pattern<Math>>().unwrap();
         let zero_z3 = egg_to_z3(&ctx, Self::instantiate(&zero_pat).as_ref());
 
-        for d in denominators {
-            let expr = egg_to_z3(
-                &ctx,
-                Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
-            );
-            assert_equal = expr._eq(&zero_z3).not().implies(&assert_equal);
+        for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
+            assert_equal = condition.not().implies(&assert_equal);
         }
 
-        let rhs_errors = Self::one_of_errors(&ctx, rhs_denom);
-        let lhs_errors = Self::one_of_errors(&ctx, lhs_denom);
+        let rhs_errors =
+            z3::ast::Bool::or(&ctx, &rhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
+        let lhs_errors =
+            z3::ast::Bool::or(&ctx, &lhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
         let error_preserved = rhs_errors.iff(&lhs_errors);
         let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
 
@@ -204,6 +240,53 @@ impl Math {
             }
             Sexp::String(atom) => (),
             Empty => (),
+        }
+
+        res
+    }
+
+    fn error_conditions<'a>(
+        ctx: &'a z3::Context,
+        sexp: Sexp,
+        path: z3::ast::Bool<'a>,
+    ) -> Vec<z3::ast::Bool<'a>> {
+        let mut res = Vec::<z3::ast::Bool<'a>>::default();
+        match sexp {
+            Sexp::List(list) => {
+                if list[0] == Sexp::String("/".to_string()) {
+                    let denom = list[2].to_string();
+                    let expr = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(&denom.to_string().parse::<Pattern<Math>>().unwrap())
+                            .as_ref(),
+                    );
+                    let is_zero = expr._eq(&z3::ast::Real::from_real(ctx, 0, 1));
+
+                    res.push(z3::ast::Bool::and(ctx, &[&is_zero, &path]));
+                }
+
+                if list[0] == Sexp::String("if".to_string()) {
+                    let cond_real = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(&list[1].to_string().parse::<Pattern<Math>>().unwrap())
+                            .as_ref(),
+                    );
+                    let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                    let new_path_pos = z3::ast::Bool::and(
+                        &ctx,
+                        &[&path, &z3::ast::Bool::not(&cond_real._eq(&zero))],
+                    );
+                    let new_path_neg = z3::ast::Bool::and(&ctx, &[&path, &cond_real._eq(&zero)]);
+                    res.extend(Self::error_conditions(ctx, list[2].clone(), new_path_pos));
+                    res.extend(Self::error_conditions(ctx, list[3].clone(), new_path_neg));
+                } else {
+                    for s in list {
+                        res.extend(Self::error_conditions(ctx, s, path.clone()));
+                    }
+                };
+            }
+            Sexp::String(_atom) => (),
+            Sexp::Empty => (),
         }
 
         res

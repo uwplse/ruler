@@ -84,13 +84,9 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     rules.extend(factor_rules);
 
     // cheat domain TODO remove
-    /*let cheat_domain_rules = Math::run_workload_conditional(
-        cheat_domain,
-        rules.clone(),
-        limits,
-        false,
-    );
-    rules.extend(cheat_domain_rules);*/
+    let cheat_domain_rules =
+        Math::run_workload_conditional(cheat_domain, rules.clone(), limits, false);
+    rules.extend(cheat_domain_rules);
 
     // Nested fabs
     /*println!("nested fabs");
