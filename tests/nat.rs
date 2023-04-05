@@ -93,7 +93,7 @@ impl SynthLanguage for Nat {
                     .high
                     .clone()
                     .zip(y_int.high.clone())
-                    .map(|(a, b)| a + b);
+                    .map(|(a, b)| a * b);
 
                 Interval::new(Some(low), high)
             }
