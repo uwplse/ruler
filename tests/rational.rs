@@ -839,7 +839,7 @@ pub mod test {
         );
         all_rules.extend(basic_if_rules);
 
-        let terms = Workload::new(["(/ lit var)", "(if (zero var) (/ lit var) (op lit lit))"])
+        let terms = Workload::new(["(/ lit var)", "(if var (op lit lit) (/ lit var))"])
             .plug("lit", &Workload::new(["a", "0", "1"]))
             .plug("var", &Workload::new(["a"]))
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
@@ -848,6 +848,6 @@ pub mod test {
         let guarded_rules = Math::run_workload(terms, all_rules.clone(), Limits::default(), false);
         assert!(guarded_rules
             .0
-            .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
+            .contains_key("(/ ?a ?a) ==> (if ?a 1 (/ ?a ?a))"));
     }
 }
