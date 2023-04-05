@@ -35,6 +35,5 @@ pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
     layer2.to_file("replicate_layer2_terms");
     let layer2_rules = Math::run_workload(layer2.clone(), rules.clone(), limits, true);
     rules.extend(layer2_rules);
-
     rules
 }
