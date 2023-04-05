@@ -244,6 +244,9 @@ mod test {
         let atoms6 = lang.clone().iter_metric("expr", Metric::Atoms, 6).force();
         assert_eq!(atoms6.len(), 188);
 
+        let atoms6 = lang.clone().iter_metric("expr", Metric::Atoms, 7).force();
+        assert_eq!(atoms6.len(), 570);
+
         let depth1 = lang.clone().iter_metric("expr", Metric::Depth, 1).force();
         assert_eq!(depth1.len(), 2);
 

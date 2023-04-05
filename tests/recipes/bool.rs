@@ -21,9 +21,12 @@ pub fn bool_rules() -> Ruleset<Bool> {
     all.extend(r5);
 
     let a7_canon = base_lang()
+        .filter(Filter::Invert(Box::new(Filter::Contains(
+            "TOP".parse().unwrap(),
+        ))))
         .iter_metric("EXPR", Metric::Atoms, 7)
-        .plug("VAR", &Workload::new(["a", "b", "c"]))
         .plug("CONST", &Workload::empty())
+        .plug("VAR", &Workload::new(["a", "b", "c"]))
         .plug("UOP", &Workload::new(["~"]))
         .plug("BOP", &Workload::new(["&", "|", "^"]))
         .filter(Filter::Canon(vec![
