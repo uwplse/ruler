@@ -32,7 +32,6 @@ pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
         .iter_metric("expr", enumo::Metric::Depth, 3)
         .filter(Filter::Contains("var".parse().unwrap()))
         .plug_lang(vars, consts, uops, bops);
-    layer2.to_file("replicate_layer2_terms");
     let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
     rules.extend(layer2_rules);
 
