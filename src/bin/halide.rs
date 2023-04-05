@@ -131,9 +131,13 @@ impl SynthLanguage for Pred {
 
     fn init_synth(synth: &mut Synthesizer<Self>) {
         let consts = vec![
+            Some((-10).to_bigint().unwrap()),
             Some((-1).to_bigint().unwrap()),
-            Some((0).to_bigint().unwrap()),
-            Some((1).to_bigint().unwrap()),
+            Some(0.to_bigint().unwrap()),
+            Some(1.to_bigint().unwrap()),
+            Some(2.to_bigint().unwrap()),
+            Some(5.to_bigint().unwrap()),
+            Some(100.to_bigint().unwrap()),
         ];
 
         let cvecs = self_product(&consts, synth.params.variables);
