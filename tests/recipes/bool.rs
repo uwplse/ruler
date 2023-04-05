@@ -3,7 +3,7 @@ use ruler::enumo::{Filter, Metric, Ruleset, Workload};
 
 pub fn bool_rules() -> Ruleset<Bool> {
     let mut all_rules = Ruleset::default();
-    let initial_vals = Workload::new(["ba", "bb", "bc"]);
+    let initial_vals = Workload::new(["a", "b", "c"]);
     let uops = Workload::new(["~"]);
     let bops = Workload::new(["&", "|", "^"]);
 
