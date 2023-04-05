@@ -3,7 +3,7 @@
 
 #![allow(unused_imports)]
 #![allow(unused_variables)]
-use egg::{AstSize, Extractor, RecExpr};
+use egg::{AstSize, Extractor, RecExpr, Language, CostFunction};
 use itertools::enumerate;
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
@@ -12,7 +12,7 @@ use ruler::{
     enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
     *,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, usize};
 use std::collections::HashSet;
 use std::fs;
 use std::time::SystemTime;
@@ -23,17 +23,19 @@ pub type Constant = usize;
 egg::define_language! {
  pub enum CF  {
     // FRep
-    "FRep" = FRep([Id; 1]),
     "max" = Max([Id; 2]),
     "min" = Min([Id; 2]),
-    "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
     "/" = Div([Id; 2]),
     "x" = DimX,
     "y" = DimY,
     "z" = DimZ,
-    "subst" = Subst([Id; 3]),
+    "subst" = Subst([Id; 4]),
+    "Cheat" = Cheat([Id; 3]),
+    // Indicate that the containing expr cannot have x, y, or z
+    "Scalar" = Scalar(Id),
+    Lit(Constant),
 
     // Caddy
     "Cube" = Cube([Id; 3]),
@@ -45,28 +47,115 @@ egg::define_language! {
     "Inter" = Inter([Id; 2]),
     "Empty" = Empty,
 
-    "Cheat" = Cheat([Id; 3]),
 
-    Lit(Constant),
     Var(egg::Symbol),
  }
+}
+
+
+fn is_caddy(node: &CF) -> bool {
+    match node {
+        CF::Max(_) => false,
+        CF::Min(_) => false,
+        CF::Sub(_) => false,
+        CF::Mul(_) => false,
+        CF::Div(_) => false,
+        CF::DimX => false,
+        CF::DimY => false,
+        CF::DimZ => false,
+        CF::Subst(_) => false,
+        CF::Scalar(_) => false,
+        CF::Lit(_) => false,
+        CF::Cheat(_) => false,
+        CF::Cube(_) => true,
+        CF::Cylinder(_) => true,
+        CF::Sphere(_) => true,
+        CF::Trans(_) => true,
+        CF::Scale(_) => true,
+        CF::Union(_) => true,
+        CF::Inter(_) => true,
+        CF::Empty => true,
+        CF::Var(_) => false,
+    }
+}
+
+fn op_cost (enode: &CF) -> f64 {
+    if is_caddy(enode) {
+        return 1000.0;
+    }
+    if matches!(enode, CF::Subst(_)) {
+        return 100.0;
+    }
+    return 0.;
+}
+
+struct SillyCostFn;
+impl CostFunction<CF> for SillyCostFn {
+    type Cost = f64;
+    fn cost<C>(&mut self, enode: &CF, mut costs: C) -> Self::Cost
+    where
+        C: FnMut(Id) -> Self::Cost
+    {
+        enode.fold(op_cost(enode), |sum, id| sum + costs(id))
+    }
 }
 
 #[test]
 fn custom_modify() {
     let term_expected_pairs = [
         (
-            "(subst (- 1 (min (min x y) z)) x (/ x a))",
-            "(- 1 (min (min (/ x a) y) z))",
+            "(subst (/ x ?a) y z (- 1 (- (- x y) z)))",
+            "(- 1 (- (- (/ x ?a) y) z))",
         ),
-        ("(FRep (subst x x (/ x a)))", "(FRep (/ x a))"),
+        ("(subst (/ x a) y z x)", "(/ x a)"),
+
+        ("(subst (/ x a) y z (min x x))", "(min (/ x a) (/ x a))"),
         (
-            "(FRep (subst (min x y) x (/ x a)))",
-            "(FRep (min (/ x a) y))",
+            "(subst (/ x a) y z (- x y))",
+            "(- (/ x a) y)",
         ),
         (
-            "(FRep (subst (min x x) x (/ x a)))",
-            "(FRep (min (/ x a) (/ x a)))",
+            "(subst (/ x a) y z (* x x))",
+            "(* (/ x a) (/ x a))",
+        ),
+        (
+            "(subst (/ x ?a) (/ y ?b) (/ z ?c)
+                
+            (min (/ x 1)
+            (min (- 1 (/ x 1))
+               (min y
+                  (min (- 1 y)
+                     (min z
+                        (- 1 z))))))
+
+              )",
+
+
+            "(min (/ (/ x ?a) 1)
+            (min (- 1 (/ (/ x ?a) 1))
+               (min (/ y ?b)
+                  (min (- 1 (/ y ?b))
+                     (min (/ z ?c)
+                        (- 1 (/ z ?c)))))))",
+        ),
+        (
+            "(subst (/ x (Scalar sa)) (/ y (Scalar sb)) (/ z (Scalar sc))
+             (subst (- x (Scalar ta)) (- y (Scalar tb)) (- z (Scalar tc))
+                x
+            ))",
+            "(- (/ x (Scalar sa)) (Scalar ta))",
+        ),
+
+        (
+            "(subst (/ x (Scalar sa)) (/ y (Scalar sb)) (/ z (Scalar sc))
+             (subst (- x (Scalar ta)) (- y (Scalar tb)) (- z (Scalar tc))
+                ?b
+            ))",
+            "
+            (subst (- (/ x (Scalar sa)) (Scalar ta)) (- (/ y (Scalar sb)) (Scalar tb)) (- (/ z (Scalar sc)) (Scalar tc))
+            ?b
+            )
+            ",
         ),
     ];
 
@@ -84,45 +173,53 @@ fn custom_modify() {
 
 fn get_frep_rules() -> Vec<&'static str> {
     [
-        "(/ ?a 1) ==> ?a",
+        "(/ ?a (Scalar 1)) ==> ?a",
+        "(- (/ ?a ?b) (/ ?c ?b)) ==> (/ (- ?a ?c) ?b)",
+        "(/ (- ?a (Scalar ?b)) (Scalar ?c)) ==> (- (/ ?a (Scalar ?c)) (/ (Scalar ?b) (Scalar ?c)))",
+        "(- (/ ?a (Scalar ?b)) (Scalar ?c)) ==> (/ (- ?a (Scalar (* ?b ?c))) ?c)",
         "(min (max ?a ?b) ?a) ==> ?a",
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
+        "(- ?a (Scalar 0)) ==> ?a",
+        "(* ?a ?b) ==> (* ?b ?a)",
+
+        // "(subst ?v ?v ?to) ==> ?to",
+        // "(subst x y ?to) ==> x",
+        // "(subst x z ?to) ==> x",
+        // "(subst y x ?to) ==> y",
+        // "(subst y z ?to) ==> y",
+        // "(subst z x ?to) ==> z",
+        // "(subst z y ?to) ==> z",
+        // "(subst 1 ?from ?to) ==> 1",
+        // "(subst 0 ?from ?to) ==> 0",
+        // // "(subst (min ?a ?b) ?from ?to) ==> (min (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        // "(subst (- ?a ?b) ?from ?to) ==> (- (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        // "(subst (/ ?a ?b) ?from ?to) ==> (/ (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        // "(subst (* ?a ?b) ?from ?to) ==> (* (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        // "(subst (geq ?a ?b) ?from ?to) ==> (geq (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        // "(subst (& ?a ?b) ?from ?to) ==> (& (subst ?a ?from ?to) (subst ?b ?from ?to))",
+        // "(subst (| ?a ?b) ?from ?to) ==> (| (subst ?a ?from ?to) (subst ?b ?from ?to))",
     ]
     .into()
 }
 
 fn get_lifting_rules() -> Vec<&'static str> {
     [
-        "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
-        "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
-        "(Scale (FRep ?e) ?a ?b ?c) ==> (FRep (subst (subst (subst ?e x (/ x ?a)) y (/ y ?b)) z (/ z ?c)))",
-        "(Cube ?a ?b ?c) ==> (FRep (min (/ x ?a)
-                                   (min (- 1 (/ x ?a))
-                                        (min (/ y ?b)
-                                             (min (- 1 (/ y ?b))
-                                                  (min (/ z ?c)
-                                                       (- 1 (/ z ?c))))))))",
-        "(Sphere ?r) ==> (FRep (- (- (- 1 (* (/ x ?r) (/ x ?r))) (* (/ y ?r) (/ y ?r))) (* (/ z ?r) (/ z ?r))))",
-        "(Cylinder ?r1 ?r2 ?h) ==> (FRep (min (/ z ?h)
-                                              (min (- 1 (/ z ?h))
-                                                   (- (- 1 (* (/ x ?r1) (/ x ?r1))) (* (/ y ?r2) (/ y ?r2))))))",
+        "(Union ?a ?b) ==> (max ?a ?b)",
+        "(Inter ?a ?b) ==> (min ?a ?b)",
+        "(Scale ?w ?h ?l ?e) ==> (subst (/ x (Scalar ?w)) (/ y (Scalar ?h)) (/ z (Scalar ?l)) ?e)",
+        "(Cube ?a ?b ?c) ==> (min (/ x (Scalar ?a))
+                                  (min (- 1 (/ x (Scalar ?a)))
+                                       (min (/ y (Scalar ?b))
+                                            (min (- 1 (/ y (Scalar ?b)))
+                                                 (min (/ z (Scalar ?c))
+                                                      (- 1 (/ z (Scalar ?c))))))))",
+        "(Trans ?a ?b ?c ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
     ].into()
 }
 
-fn get_dim_var(nodes: &[CF]) -> Option<CF> {
-    for n in nodes {
-        if let CF::DimX = n {
-            return Some(CF::DimX);
-        } else if let CF::DimY = n {
-            return Some(CF::DimY);
-        } else if let CF::DimZ = n {
-            return Some(CF::DimZ);
-        }
-    }
-    None
-}
+const DEBUG: bool = true;
 
 fn to_idx(from_var: CF) -> usize {
     if from_var == CF::DimX {
@@ -142,10 +239,11 @@ fn compute_substs<'a, const N: usize>(
     ids: &[Id; N],
     mapping: [Id; 3],
     cache: &mut HashMap<(Id, [Id; 3]), Option<CF>>,
+    depth: usize,
 ) -> Option<[Id; N]> {
     let mut v = vec![];
     for id in ids {
-        if let Some(e_substed) = compute_subst(egraph, *id, mapping.clone(), cache) {
+        if let Some(e_substed) = compute_subst(egraph, *id, mapping.clone(), cache, depth) {
             v.push(e_substed);
         } else {
             return None;
@@ -163,36 +261,110 @@ fn compute_subst(
     id: Id,
     mapping: [Id; 3],
     cache: &mut HashMap<(Id, [Id; 3]), Option<CF>>,
+    depth: usize,
 ) -> Option<CF> {
+
+    if DEBUG {
+        for ii in 0..depth { print!(" "); }
+        println!("cs");
+        let extractor = Extractor::new(&egraph, SillyCostFn);
+        let (_, idex) = extractor.find_best(id);
+        for ii in 0..depth { print!(" "); }
+        println!("id: {} {}", id, idex);
+    }
     if cache.contains_key(&(id, mapping)) {
+        if DEBUG {     
+            for ii in 0..depth { print!(" "); }
+            println!("cached")
+        }
         return cache[&(id, mapping)].clone();
     }
     // We will replace this is we can successfully subst, but this just prevents
     // infinite cycles.
     cache.insert((id, mapping), None);
 
+    // If something is a scalar, then substitution doesn't change it
     for n in egraph[id].nodes.clone() {
+        if matches!(n, CF::Scalar(_)) {
+            return Some(n);
+        }
+    }
+    // If it's a non-scalar var, then we can't hope to perform this substitution
+    for n in egraph[id].nodes.clone() {
+        if matches!(n, CF::Var(_)) {
+            return None;
+        }
+    }
+
+    for n in egraph[id].nodes.clone() {
+        if DEBUG {
+            for ii in 0..depth { print!(" "); }
+            println!("anticipate node: {}", n.to_string());
+        }
+
+    }
+    for n in egraph[id].nodes.clone() {
+        // println!("node: {}", n.to_string());
         match n {
+            CF::Subst([x2, y2, z2, e]) => {
+                if let Some([x3, y3, z3]) = compute_substs(egraph, &[x2, y2, z2], mapping.clone(), cache, depth + 1) {
+                    if let Some(e_double_substed) = compute_subst(egraph, e, [x3, y3, z3], cache, depth + 1) {
+                        // println!("did double!");
+                        cache.insert((id, mapping), Some(e_double_substed));
+                        return cache[&(id, mapping)].clone();
+                    } else {
+                        if DEBUG {
+                            
+                            for ii in 0..depth { print!(" "); }
+                            println!("combined");
+                            let extractor = Extractor::new(&egraph, SillyCostFn);
+                            let (_, eex) = extractor.find_best(e);
+                            let (_, x3ex) = extractor.find_best(x3);
+                            let (_, y3ex) = extractor.find_best(y3);
+                            let (_, z3ex) = extractor.find_best(z3);
+                            for ii in 0..depth { print!(" "); }
+                            println!("e: {}", eex);
+                            for ii in 0..depth { print!(" "); }
+                            println!("x3: {}", x3ex);
+                            for ii in 0..depth { print!(" "); }
+                            println!("y3: {}", y3ex);
+                            for ii in 0..depth { print!(" "); }
+                            println!("z3: {}", z3ex);
+                        }
+
+
+                        // We couldn't compute through everything, at least combine the substs
+                        cache.insert((id, mapping), Some(CF::Subst([x3, y3, z3, e])));
+                        return cache[&(id, mapping)].clone();
+                    }
+                }
+            }
             CF::Min(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
                     cache.insert((id, mapping), Some(CF::Min(ids_substed)));
                     return cache[&(id, mapping)].clone();
                 }
             }
+            CF::Max(ids) => {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
+                    cache.insert((id, mapping), Some(CF::Max(ids_substed)));
+                    return cache[&(id, mapping)].clone();
+                }
+            }
             CF::Div(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
                     cache.insert((id, mapping), Some(CF::Div(ids_substed)));
                     return cache[&(id, mapping)].clone();
                 }
             }
             CF::Mul(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
                     cache.insert((id, mapping), Some(CF::Mul(ids_substed)));
                     return cache[&(id, mapping)].clone();
                 }
             }
             CF::Sub(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache) {
+                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
                     cache.insert((id, mapping), Some(CF::Sub(ids_substed)));
                     return cache[&(id, mapping)].clone();
                 }
@@ -206,27 +378,10 @@ fn compute_subst(
                 cache.insert((id, mapping), Some(n));
                 return cache[&(id, mapping)].clone();
             }
-            CF::Subst([e, from, to]) => {
-                if let Some(from_var) = get_dim_var(&egraph[from].nodes) {
-                    let mut mapping2 = [mapping[0], mapping[1], mapping[2]];
-                    let i = to_idx(from_var);
-                    mapping2[i] = to;
-                    if let Some(e_substed) = compute_subst(egraph, e, mapping2, cache) {
-                        let x = egraph.add(CF::DimX);
-                        let y = egraph.add(CF::DimY);
-                        let z = egraph.add(CF::DimZ);
-                        if mapping == [x, y, z] {
-                            let id2 = egraph.add(e_substed.clone());
-                            egraph.union(id, id2);
-                        }
-                        cache.insert((id, mapping), Some(e_substed.clone()));
-                        return cache[&(id, mapping)].clone();
-                    }
-                } else {
-                    println!("Subst wo var");
-                }
+            CF::Scalar(_) => {
+                return Some(n);
             }
-            _ => (),
+            _ => {},
         }
     }
     cache.insert((id, mapping), None);
@@ -245,19 +400,12 @@ impl SynthLanguage for CF {
     }
 
     fn is_allowed_op(&self) -> bool {
-        matches!(
-            self,
-            CF::FRep(_)
-                | CF::Cube(_)
-                | CF::Sphere(_)
-                | CF::Cylinder(_)
-                | CF::Trans(_)
-                | CF::Scale(_)
-                | CF::Var(_)
-                | CF::Union(_)
-                | CF::Inter(_)
-                | CF::Cheat(_)
+        is_caddy(self) || matches!(
+            self, CF::Var(_)
                 | CF::Lit(_)
+                | CF::Div(_)
+                | CF::Mul(_)
+                | CF::Sub(_)
         )
     }
 
@@ -292,12 +440,100 @@ impl SynthLanguage for CF {
         CF::Lit(c)
     }
 
-    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) {
-        let mut cache: HashMap<(Id, [Id; 3]), Option<CF>> = HashMap::new();
+    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) { 
+        // return;
+        // println!("TOP");
+        let mut all_subst_ids: Vec<Id> = vec![];
+        for class in egraph.classes() {
+            let mut all_subst = true;
+            let mut at_least_one_subst = false;
+            for node in &egraph[class.id].nodes {
+                if is_caddy(node) {
+                    continue;
+                }
+                // Check if there is any non-subst FRep node
+                if let CF::Subst(_) = node {
+                    at_least_one_subst = true;
+                } else {
+                    all_subst = false;
+                }
+            }
+            if at_least_one_subst && all_subst {
+                all_subst_ids.push(class.id.clone());
+            }
+        }
+
+        // println!("num is {}", all_subst_ids.len());
         let x = egraph.add(CF::DimX);
         let y = egraph.add(CF::DimY);
         let z = egraph.add(CF::DimZ);
-        compute_subst(egraph, id, [x, y, z], &mut cache);
+        for id in all_subst_ids {
+            // println!("cm");
+            for node in &egraph[id].nodes.clone() {
+                if let CF::Subst([x2, y2, z2, e]) = node.clone() {
+                    let mapping = [x2, y2, z2];
+                    if mapping == [x, y, z] {
+                        if egraph.find(id) != egraph.find(e) {
+                            egraph.union(id, e);
+                            if DEBUG { println!("redo1"); }
+                            return CF::custom_modify(egraph, id);
+                        } else {
+                            continue;
+                        }
+                    }
+                    let mut cache: HashMap<(Id, [Id; 3]), Option<CF>> = HashMap::new();
+                    
+                    if DEBUG {
+                        let extractor = Extractor::new(&egraph, SillyCostFn);
+                        let (_, eex) = extractor.find_best(e);
+                        let (_, x2ex) = extractor.find_best(x2);
+                        let (_, y2ex) = extractor.find_best(y2);
+                        let (_, z2ex) = extractor.find_best(z2);
+                        let (_, idex) = extractor.find_best(id);
+                        println!("custom modify start");
+                        println!("id: {} {}", id, idex); 
+                        println!("e: {} {}", e, eex);
+                        println!("x2: {}", x2ex);
+                        println!("y2: {}", y2ex);
+                        println!("z2: {}", z2ex);
+                    }
+
+                    if let Some(e_substed) = compute_subst(egraph, e, mapping, &mut cache, 0) {
+                        
+                        let id2 = egraph.add(e_substed.clone());
+                        
+                        if DEBUG {
+                            println!("custom modify SUCCESS");
+                            let extractor = Extractor::new(&egraph, SillyCostFn);
+                            let (_, eex) = extractor.find_best(e);
+                            let (_, x2ex) = extractor.find_best(x2);
+                            let (_, y2ex) = extractor.find_best(y2);
+                            let (_, z2ex) = extractor.find_best(z2);
+                            let (_, id2ex) = extractor.find_best(id2);
+                            let (_, idex) = extractor.find_best(id);
+                            println!("id: {} {}", id, idex); 
+                            println!("e: {} {}", e, eex);
+                            println!("x2: {}", x2ex);
+                            println!("y2: {}", y2ex);
+                            println!("z2: {}", z2ex);
+       
+                            println!("id2: {} {}", id2, id2ex);
+                        }
+
+
+                        // This algorithm runs until fixed-point
+                        // Only restart if we introduced a non-subst term
+                        if egraph.find(id) != egraph.find(id2) {
+                            egraph.union(id, id2);
+                            if DEBUG { println!("redo2"); }
+                            return CF::custom_modify(egraph, id);
+                        }
+                    } else {
+                        // println!("Custom modify fail");
+                    }
+                }
+            }
+        }
     }
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
@@ -344,22 +580,32 @@ fn time() -> String {
     t %= 60;
     format!("{}d {}:{:02}:{:02}", days, hours, minutes, t)
 }
+
 #[cfg(test)]
 mod tests {
+    use rayon::iter;
     use ruler::enumo::{Ruleset, Scheduler, Workload};
 
     use super::*;
 
     fn iter_szalinski(n: usize) -> Workload {
         let lang = Workload::new([
-            "(FRep var)",
-            "(bop solid solid)",
-            "(Scale solid var var var)",
-            "(Cube scalar scalar scalar)",
-            "(Sphere scalar)",
-            "(Cylinder scalar scalar scalar)",
+            // "var",
+            // "(bop solid solid)",
+            // "(Scale scalar scalar scalar solid)",
+            // "(Cube scalar scalar scalar)",
+            // "(Sphere scalar)",
+            // "(Cylinder scalar scalar scalar)",
+            // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
+            // "(Cube sa sb sc)", "(Scale sa sb sc (Cube 1 1 1))",
+            // "(Scale sa sb sc (Trans ta tb tc a))", "(Trans (* ta sa) (* tb sb) (* tc sc) (Scale sa sb sc a))",
+            "(Trans ta tb tc (Scale sa sb sc a))",
+            // "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
+            // "(Trans 0 0 0 a)", "a",
+            // "(Trans 0 0 0 a)", "(Scale ta tb tc a)",
+
         ]);
-        let scalars: &[&str] = &["var", "1", "0"];
+        let scalars: &[&str] = &["sa", "sb", "sc", "1"];
         let vars: &[&str] = &["a", "b", "c"];
         let bops: &[&str] = &["Union", "Inter"];
 
@@ -383,15 +629,15 @@ mod tests {
 
     #[test]
     fn rule_lifting_recipe() {
-        let nat_rules = get_frep_rules();
+        let frep_rules = get_frep_rules();
 
-        let prior = Ruleset::new(&nat_rules);
+        let prior = Ruleset::new(&frep_rules);
 
-        let atoms3 = iter_szalinski(8);
+        let atoms3 = iter_szalinski(3);
         // assert_eq!(atoms3.force().len(), 51);
 
         let limits = Limits {
-            iter: 4,
+            iter: 3,
             node: 10000000,
         };
 
@@ -423,15 +669,15 @@ mod tests {
 
         let mut all_rules = Ruleset::default();
         all_rules.extend(Ruleset::new(&nat_rules));
-
-        let atoms3 = iter_szalinski(8);
+        
+        let atoms3 = iter_szalinski(20);
 
         let rules3 = CF::run_workload(
             atoms3,
             all_rules.clone(),
             Limits {
-                iter: 3,
-                node: 10000000,
+                iter: 6,
+                node: 10000000000,
             },
         );
         all_rules.extend(rules3);
