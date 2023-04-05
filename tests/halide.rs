@@ -319,7 +319,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{enumo::Ruleset, logger, DeriveType, Limits};
+    use ruler::{enumo::Ruleset, logger, Limits};
 
     #[test]
     fn recipe() {
