@@ -228,8 +228,7 @@ impl Math {
             None
         } else {
             let mut iterator = all_denoms.iter();
-            let mut condition: Sexp =
-                parse_str(iterator.next().unwrap()).unwrap();
+            let mut condition: Sexp = parse_str(iterator.next().unwrap()).unwrap();
 
             // TODO doesn't handle multiple denominators
             if let Some(_) = iterator.next() {
@@ -291,7 +290,6 @@ impl Math {
             invalid.len()
         );
 
-
         // here's the conditional stuff
         let mut with_condition = Ruleset::<Math>(
             invalid
@@ -312,8 +310,9 @@ impl Math {
             with_condition.len()
         );
 
-        let chosen_conditional =
-            with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits)).0;
+        let chosen_conditional = with_condition
+            .minimize(prior.union(&chosen), Scheduler::Compress(limits))
+            .0;
 
         let result = chosen.union(&chosen_conditional);
 

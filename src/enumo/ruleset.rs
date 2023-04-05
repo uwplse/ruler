@@ -292,8 +292,20 @@ impl<L: SynthLanguage> Ruleset<L> {
         };
         let mut candidates = Ruleset::default();
         let extract = Extractor::new(egraph, AstSize);
+        let mut by_first: IndexMap<Option<L::Constant>, Vec<Id>> = IndexMap::default();
+        for class in &not_all_none {
+            by_first
+                .entry(class.data.cvec[0].clone())
+                .or_insert_with(Vec::new)
+                .push(class.id);
+        }
+
+        let empty = vec![];
+        let first_none = by_first.get(&None).unwrap_or(&empty);
         for class1 in &not_all_none {
-            for class2 in &not_all_none {
+            let others = by_first.get(&class1.data.cvec[0]).unwrap();
+            for class2_id in others.iter().chain(first_none.iter()) {
+                let class2 = &egraph[*class2_id];
                 if class1.id == class2.id {
                     continue;
                 }
@@ -413,7 +425,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut chosen = prior.clone();
         let step_size = 1;
         while !self.is_empty() {
-            println!("Shrinking {}/{} candidates. Kept {} so far.", self.len(), before, chosen.len());
+            println!(
+                "Shrinking {}/{} candidates. Kept {} so far.",
+                self.len(),
+                before,
+                chosen.len()
+            );
             let selected = self.select(step_size, &mut invalid);
             if let Some(selected) = selected.0.first() {
                 println!("Selected {}", selected.1);
