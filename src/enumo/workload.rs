@@ -59,18 +59,22 @@ impl Workload {
         // We have to do this before adding any other expressions to the
         // egraph so that the variable cvecs are properly initialized and
         // able to be used by other expressions that contain variables
-        let mut vars: HashSet<String> = HashSet::default();
+        // For some reason, it appears the order we initialize these variables
+        // can matter, so make sure we preserve the order in the workload.
+        // TODO: why does this order matter?
+        let mut vars: Vec<String> = vec![];
         for sexp in sexps.iter() {
             let expr: RecExpr<L> = sexp.to_string().parse().unwrap();
             for node in expr.as_ref() {
                 if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
                     let mut v = v.to_string();
                     v.remove(0);
-                    vars.insert(v);
+                    if !vars.contains(&v) {
+                        vars.push(v);
+                    }
                 }
             }
         }
-        let vars: Vec<String> = vars.into_iter().collect();
         L::initialize_vars(&mut egraph, &vars);
 
         for sexp in sexps.iter() {
