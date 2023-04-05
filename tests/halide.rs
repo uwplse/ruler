@@ -319,40 +319,26 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{enumo::Ruleset, logger, Limits, DeriveType};
+    use ruler::{enumo::Ruleset, logger, DeriveType, Limits};
 
     #[test]
     fn recipe() {
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        // let rules: Ruleset<Pred> = Ruleset::from_file("all-rules.rules");
 
         let start = Instant::now();
         let rules = halide_rules();
         let duration = start.elapsed();
 
-        // println!("Rules collected.");
-
-//        let (can, cannot) =
-//            rules.derive(DeriveType::Lhs, &baseline, Limits {
-//                iter: ,
-//                node: 1_000_000,
-//            });
-//        println!("LHS: {} / {}", can.len(), can.len() + cannot.len());
-
-        let (can, cannot) =
-            rules.derive(DeriveType::LhsAndRhs, &baseline, Limits {
+        logger::write_output(
+            &rules,
+            &baseline,
+            "halide",
+            "halide_handwritten",
+            Limits {
                 iter: 2,
                 node: 100_000,
-            });
-        println!("LHS/RHS: {} / {}", can.len(), can.len() + cannot.len());
-
-//        let (can, cannot) =
-//            rules.derive(DeriveType::AllRules, &baseline, Limits {
-//                iter: 2,
-//                node: 1_000_000,
-//            });
-//        println!("ALL: {} / {}", can.len(), can.len() + cannot.len());
-
-        cannot.to_file("underivable.rules");
+            },
+            duration,
+        );
     }
 }
