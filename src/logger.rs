@@ -31,7 +31,16 @@ pub fn write_output<L: SynthLanguage>(
         "baseline_derives_enumo_underivable": vec!([""]),
     });
 
-    if recipe_name != "halide" {
+    if recipe_name == "halide" {
+        let (forwards_all, backwards_all) = (0, 0);
+        let (all_f, all_b) = (Duration::default(), Duration::default());
+        let results_all = json!({
+            "enumo_derives_baseline_derivable": vec!([""]),
+            "enumo_derives_baseline_underivable": vec!([""]),
+            "baseline_derives_enumo_derivable": vec!([""]),
+            "baseline_derives_enumo_underivable": vec!([""]),
+        });
+    } else {
         let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
             get_derivability_results(ruleset, DeriveType::AllRules, baseline, limits);
     }
