@@ -54,7 +54,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let consts = Workload::new(["-1", "0", "1", "2"]);
 
     // Factorization
-    println!("factorization");
+    /*println!("factorization");
     let factor_term = Workload::new(&["var", "(bop expr expr)"])
         .iter_metric("expr", enumo::Metric::Depth, 3)
         .plug_lang(
@@ -90,7 +90,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .filter(contains_abs_filter);
     let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
     let nested_abs_rules = Math::run_workload_conditional(nested_abs, rules.clone(), limits, true);
-    rules.extend(nested_abs_rules);
+    rules.extend(nested_abs_rules);*/
 
     rules
 }

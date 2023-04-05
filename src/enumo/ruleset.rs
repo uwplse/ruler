@@ -268,6 +268,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
+        let time_start = std::time::Instant::now();
         // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
         // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
 
@@ -301,26 +302,37 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         let empty = vec![];
-        let first_none = by_first.get(&None).unwrap_or(&empty);
-        for class1 in &not_all_none {
-            let others = by_first.get(&class1.data.cvec[0]).unwrap();
-            for class2_id in others.iter().chain(first_none.iter()) {
-                let class2 = &egraph[*class2_id];
-                if class1.id == class2.id {
-                    continue;
-                }
-                if compare(&class1.data.cvec, &class2.data.cvec) {
-                    let (_, e1) = extract.find_best(class1.id);
-                    let (_, e2) = extract.find_best(class2.id);
-                    if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
-                        candidates.add(rule);
-                    }
-                    if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
-                        candidates.add(rule);
+        let first_none = by_first.get(&None).cloned().unwrap_or(empty);
+
+        for (value, classes) in by_first {
+            let mut all_classes = classes.clone();
+            if value.is_some() {
+                all_classes.extend(first_none.clone());
+            }
+
+            for i in 0..all_classes.len() {
+                for j in i+1..all_classes.len() {
+                    let class1 = &egraph[all_classes[i]];
+                    let class2 = &egraph[all_classes[j]];
+                    if compare(&class1.data.cvec, &class2.data.cvec) {
+                        let (_, e1) = extract.find_best(class1.id);
+                        let (_, e2) = extract.find_best(class2.id);
+                        if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
+                            candidates.add(rule);
+                        }
+                        if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
+                            candidates.add(rule);
+                        }
                     }
                 }
             }
         }
+
+        println!(
+            "cvec match finished in {} ms",
+            time_start.elapsed().as_millis()
+        );
+
         candidates
     }
 
@@ -425,12 +437,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut chosen = prior.clone();
         let step_size = 1;
         while !self.is_empty() {
-            println!(
-                "Shrinking {}/{} candidates. Kept {} so far.",
-                self.len(),
-                before,
-                chosen.len()
-            );
+            println!("Shrinking {}/{} candidates. Kept {} so far.", self.len(), before, chosen.len());
             let selected = self.select(step_size, &mut invalid);
             if let Some(selected) = selected.0.first() {
                 println!("Selected {}", selected.1);
