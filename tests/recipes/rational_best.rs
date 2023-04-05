@@ -3,7 +3,10 @@ use ruler::enumo::{Filter, Ruleset, Workload};
 
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
-    let limits = Limits::default();
+    let limits = Limits {
+        iter: 2,
+        node: 300_000,
+    };
 
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);

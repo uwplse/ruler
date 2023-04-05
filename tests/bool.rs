@@ -298,30 +298,14 @@ mod test {
         let duration = start.elapsed();
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 
-        println!("{} rules found.", rules.clone().len());
-
-        let (can, cannot) =
-            rules.derive(DeriveType::LhsAndRhs, &baseline, Limits {
-                iter: 5,
-                node: 100_000,
-            });
-        println!("LHS/RHS: {} / {}", can.len(), can.len() + cannot.len());
-
-        let (can, cannot) =
-            rules.derive(DeriveType::Lhs, &baseline, Limits {
-                iter: 5,
-                node: 100_000,
-            });
-        println!("LHS: {} / {}", can.len(), can.len() + cannot.len());
-
         logger::write_output(
             &rules,
             &baseline,
             "bool",
             "oopsla",
             Limits {
-                iter: 4,
-                node: 1_000_000,
+                iter: 5,
+                node: 100_000,
             },
             duration,
         );
