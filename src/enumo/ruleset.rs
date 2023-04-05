@@ -1,10 +1,8 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use serde_json::*;
-use std::fs::*;
 use std::sync::Mutex;
-use std::{io::Read, io::Write, sync::Arc, time::Duration};
+use std::{io::Write, sync::Arc};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -78,6 +76,12 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
+        Ruleset(map)
+    }
+
+    pub fn union(&self, other: &Self) -> Self {
+        let mut map = self.0.clone();
+        map.extend(other.0.clone());
         Ruleset(map)
     }
 
@@ -194,156 +198,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         for s in strs {
             println!("{s}");
         }
-    }
-
-    // Writes the ruleset to the json/ subdirectory, to be uploaded to the
-    // nightly server. The ruleset is written as a json object with a single
-    // field, "rules".
-    pub fn write_json_rules(&self, filename: &str) {
-        let mut filepath = "nightly/json/".to_owned();
-
-        std::fs::create_dir_all(filepath.clone())
-            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-
-        filepath.push_str(filename);
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(filepath)
-            .expect("Unable to open file");
-        let rules = json!({
-            "rules": &self.to_str_vec(),
-        })
-        .to_string();
-        file.write_all(rules.as_bytes())
-            .expect("Unable to write to file");
-    }
-
-    // Given two rulesets, computes bidirectional derivability between them
-    // and writes the results to the json/derivable_rules/ subdirectory,
-    // to be uploaded to the nightly server. The results are formatted as a
-    // json object with four fields: "forwards derivable", "forwards underivable",
-    // "backwards derivable", and "backwards underivable". Also updates the
-    // "output.json" file in the json/ subdirectory with the the derivability results
-    // and statistics about runtime and the number of rules in each ruleset.
-    pub fn write_json_equiderivability(
-        &self,
-        derive_type: DeriveType,
-        baseline: &Self,
-        name: &str,
-        limits: Limits,
-        duration: Duration,
-    ) {
-        let mut filepath = "nightly/json/derivable_rules/".to_owned();
-
-        std::fs::create_dir_all(filepath.clone())
-            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-
-        filepath.push_str(name);
-        let mut file = std::fs::File::create(filepath.clone())
-            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
-
-        let (can_f, cannot_f) = self.derive(derive_type, baseline, limits);
-
-        let (can_b, cannot_b) = baseline.derive(derive_type, self, limits);
-
-        let derivability_results = json!({
-            "forwards derivable": &can_f.to_str_vec(),
-            "forwards underivable": &cannot_f.to_str_vec(),
-            "backwards derivable": &can_b.to_str_vec(),
-            "backwards underivable": &cannot_b.to_str_vec(),
-        })
-        .to_string();
-
-        file.write_all(derivability_results.as_bytes())
-            .expect("Unable to write to file");
-
-        let num_rules = &self.len();
-        let forwards_derivable = &can_f.len();
-        let backwards_derivable = &can_b.len();
-
-        let mut outfile = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open("nightly/json/output.json")
-            .expect("Unable to open file");
-
-        let mut outfile_string = String::new();
-        outfile
-            .read_to_string(&mut outfile_string)
-            .expect("Unable to read file");
-        let mut json_arr = vec![];
-
-        if !(outfile_string.is_empty()) {
-            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile_string).unwrap();
-        }
-
-        let stats = json!({
-            "spec": name,
-            "num_rules": num_rules,
-            "num_baseline": baseline.len(),
-            "enumo_derives_oopsla": forwards_derivable,
-            "oopsla_derives_enumo": backwards_derivable,
-            "time": duration.as_secs(),
-        });
-
-        json_arr.push(stats);
-
-        let mut file = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open("nightly/json/output.json")
-            .expect("Unable to open file");
-
-        file.write_all("[".as_bytes()).expect("write failed");
-
-        for (object, is_last_element) in json_arr
-            .iter()
-            .enumerate()
-            .map(|(i, w)| (w, i == json_arr.len() - 1))
-        {
-            file.write_all(object.to_string().as_bytes())
-                .expect("write failed");
-            if !(is_last_element) {
-                file.write_all(", ".as_bytes()).expect("write failed");
-            }
-        }
-        file.write_all("]".as_bytes()).expect("write failed");
-    }
-
-    pub fn baseline_compare_to(
-        &self,
-        baseline: &Self,
-        baseline_name: &str,
-        domain_name: &str,
-        duration: Duration,
-        limits: Limits,
-    ) {
-        self.write_json_equiderivability(
-            DeriveType::Lhs,
-            baseline,
-            &format!("{}_{}_lhs.json", baseline_name, domain_name),
-            limits,
-            duration,
-        );
-        self.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
-            baseline,
-            &format!("{}_{}_lhs_rhs.json", baseline_name, domain_name),
-            limits,
-            duration,
-        );
-
-        self.write_json_equiderivability(
-            DeriveType::AllRules,
-            baseline,
-            &format!("{}_{}_allrules.json", baseline_name, domain_name),
-            limits,
-            duration,
-        )
     }
 
     pub fn extract_candidates(

@@ -310,131 +310,55 @@ impl Pred {
     }
 }
 
+#[cfg(test)]
+#[path = "./recipes/halide.rs"]
+mod halide;
+
 mod test {
-    use std::time::Instant;
-
-    use ruler::{
-        enumo::{Filter, Metric, Ruleset, Workload},
-        DeriveType, Limits,
-    };
-
+    use crate::halide::halide_rules;
     use crate::Pred;
+    use std::time::{Duration, Instant};
 
-    fn recursive_rules(
-        metric: Metric,
-        n: usize,
-        consts: &Workload,
-        vars: &Workload,
-        uops: &Workload,
-        bops: &Workload,
-        tops: &Workload,
-        prior: Ruleset<Pred>,
-    ) -> Ruleset<Pred> {
-        let lang = Workload::new(&[
-            "const",
-            "var",
-            "(uop expr)",
-            "(bop expr expr)",
-            "(top expr expr expr)",
-        ]);
-        if n < 1 {
-            Ruleset::default()
-        } else {
-            let mut rec =
-                recursive_rules(metric, n - 1, consts, vars, uops, bops, tops, prior.clone());
-            let wkld = lang
-                .iter_metric("expr", metric, n)
-                .filter(Filter::Contains("var".parse().unwrap()))
-                .plug("var", vars)
-                .plug("const", consts)
-                .plug("uop", uops)
-                .plug("bop", bops)
-                .plug("top", tops);
-            rec.extend(prior);
-            let new = Pred::run_workload(wkld, rec.clone(), Limits::default());
-            let mut all = new;
-            all.extend(rec);
-            all
-        }
-    }
+    use ruler::{enumo::Ruleset, logger, Limits};
 
     #[test]
     fn recipe() {
-        // This is porting the halide recipe at incremental/halide.spec
-        // on the branch "maybe-useful" in the old recipes repo
-
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
-
-        let mut all_rules = Ruleset::default();
-
-        // Bool rules up to size 5:
-        let bool_only = recursive_rules(
-            Metric::Atoms,
-            5,
-            &Workload::new(&["0", "1"]),
-            &Workload::new(&["a", "b", "c"]),
-            &Workload::new(&["!"]),
-            &Workload::new(&["&&", "||", "^"]),
-            &Workload::Set(vec![]),
-            all_rules.clone(),
-        );
-        all_rules.extend(bool_only);
-
-        // Rational rules up to size 5:
-        let rat_only = recursive_rules(
-            Metric::Atoms,
-            5,
-            &Workload::new(&["-1", "0", "1"]),
-            &Workload::new(&["a", "b", "c"]),
-            &Workload::new(&["-"]),
-            &Workload::new(&["+", "-", "*", "min", "max"]), // No div for now
-            &Workload::Set(vec![]),
-            all_rules.clone(),
-        );
-        all_rules.extend(rat_only);
-
-        // Pred rules up to size 5
-        let pred_only = recursive_rules(
-            Metric::Atoms,
-            5,
-            &Workload::new(&["-1", "0", "1"]),
-            &Workload::new(&["a", "b", "c"]),
-            &Workload::new(&[""]),
-            &Workload::new(&["<", "<=", "==", "!="]),
-            &Workload::new(&["select"]),
-            all_rules.clone(),
-        );
-        all_rules.extend(pred_only);
-
-        // All terms up to size 4
-        let full = recursive_rules(
-            Metric::Atoms,
-            4,
-            &Workload::new(&["-1", "0", "1"]),
-            &Workload::new(&["a", "b", "c"]),
-            &Workload::new(&["-", "!"]),
-            &Workload::new(&[
-                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
-            ]),
-            &Workload::new(&["select"]),
-            all_rules.clone(),
-        );
-        all_rules.extend(full);
-
+        let all_rules = halide_rules();
         let duration = start.elapsed();
 
-        // let (can, cannot) =
-        //     all_rules.derive(DeriveType::LhsAndRhs, baseline.clone(), Limits::default());
-        // println!("{} / {}", can.len(), can.len() + cannot.len());
-
-        all_rules.write_json_rules("halide.json");
-        all_rules.write_json_equiderivability(
-            DeriveType::LhsAndRhs,
+        logger::write_output(
+            &all_rules,
             &baseline,
-            "halide.json",
-            Limits::default(),
+            "halide",
+            "halide",
+            Limits {
+                iter: 2,
+                node: 200000,
+            },
             duration,
         );
+
+        // oopsla-halide-baseline branch
+        // Run on leviathan 3/31/2023
+        // time cargo run --release --bin halide -- synth --iters 1 --use-smt
+        // real	0m3.354s
+        // user	0m3.274s
+        // sys	0m0.076s
+        let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
+        let oopsla_duration = Duration::from_secs_f32(3.354);
+
+        logger::write_output(
+            &oopsla_halide,
+            &baseline,
+            "oopsla halide (1 iter)",
+            "halide",
+            Limits {
+                iter: 2,
+                node: 200000,
+            },
+            oopsla_duration,
+        )
     }
 }

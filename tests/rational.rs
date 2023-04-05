@@ -1,11 +1,18 @@
+use egg::Rewrite;
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
+    enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
 };
 use std::{ops::*, time::Instant};
+use symbolic_expressions::parser::parse_str;
+use symbolic_expressions::Sexp;
 use z3::ast::Ast;
+#[path = "./recipes/rational_best.rs"]
+pub mod rational_best;
+#[path = "./recipes/rational_replicate.rs"]
+pub mod rational_replicate;
 
 /// define `Constant` for rationals.
 pub type Constant = Ratio<BigInt>;
@@ -92,7 +99,14 @@ impl SynthLanguage for Math {
     }
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
-        let consts = vec![Some(mk_rat(-1, 1)), Some(mk_rat(0, 1)), Some(mk_rat(1, 1))];
+        let consts = vec![
+            Some(mk_rat(-1, 1)),
+            Some(mk_rat(0, 1)),
+            Some(mk_rat(1, 1)),
+            Some(mk_rat(2, 1)),
+            Some(mk_rat(-3, 1)),
+            Some(mk_rat(1238923, 2)),
+        ];
         let cvecs = self_product(&consts, vars.len());
 
         egraph.analysis.cvec_len = cvecs[0].len();
@@ -122,12 +136,28 @@ impl SynthLanguage for Math {
         let solver = z3::Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check() {
-            z3::SatResult::Unsat => ValidationResult::Valid,
-            z3::SatResult::Unknown => ValidationResult::Unknown,
-            z3::SatResult::Sat => ValidationResult::Invalid,
+        let lhs_denom = Self::all_denominators(Self::pat_to_sexp(lhs));
+        let rhs_denom = Self::all_denominators(Self::pat_to_sexp(rhs));
+        let denominators = lhs_denom.union(&rhs_denom);
+
+        let mut assert_equal = lexpr._eq(&rexpr);
+        let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
+
+        for d in denominators {
+            let expr = egg_to_z3(
+                &ctx,
+                Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
+            );
+            assert_equal = expr._eq(&zero_z3).not().implies(&assert_equal);
         }
+
+        let rhs_errors = Self::one_of_errors(&ctx, rhs_denom);
+        let lhs_errors = Self::one_of_errors(&ctx, lhs_denom);
+        let error_preserved = rhs_errors.iff(&lhs_errors);
+        let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
+
+        solver.assert(&assertion.not());
+        Self::z3_res_to_validationresult(solver.check())
     }
 
     fn is_constant(&self) -> bool {
@@ -140,41 +170,196 @@ impl SynthLanguage for Math {
 }
 
 impl Math {
-    fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
+    fn one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
+        let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
 
-        let egraph = workload.to_egraph::<Self>();
-        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-
-        let mut candidates = Ruleset::cvec_match(&compressed);
-
-        let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
+        let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
+        for d in denoms {
+            let expr = egg_to_z3(
+                ctx,
+                Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
+            );
+            one_of_rhs_errors = z3::ast::Bool::or(ctx, &[&one_of_rhs_errors, &expr._eq(&zero_z3)]);
+        }
+        one_of_rhs_errors
     }
 
-    fn run_workload_fast_match(
+    fn z3_res_to_validationresult(res: z3::SatResult) -> ValidationResult {
+        match res {
+            z3::SatResult::Unsat => ValidationResult::Valid,
+            z3::SatResult::Sat => ValidationResult::Invalid,
+            z3::SatResult::Unknown => ValidationResult::Unknown,
+        }
+    }
+
+    fn pat_to_sexp(pat: &Pattern<Math>) -> Sexp {
+        parse_str(&pat.to_string()).unwrap()
+    }
+
+    fn all_denominators(sexp: Sexp) -> HashSet<String> {
+        let mut res = HashSet::<String>::default();
+        match sexp {
+            Sexp::List(list) => {
+                if list[0] == Sexp::String("/".to_string()) {
+                    res.insert(list[2].to_string());
+                }
+
+                for s in list {
+                    res.extend(Self::all_denominators(s));
+                }
+            }
+            Sexp::String(atom) => (),
+            Empty => (),
+        }
+
+        res
+    }
+
+    // currently does nothing
+    fn wrap_neqzero(sexp: Sexp) -> Sexp {
+        sexp
+    }
+
+    fn add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
+        let lhs_sexp = parse_str(&rule.lhs.to_string()).unwrap();
+        let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
+        let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
+        let rhs_denoms = Self::all_denominators(rhs_sexp.clone());
+        let intersection: HashSet<String> = lhs_denoms.intersection(&rhs_denoms).cloned().collect();
+        let all_denoms: Vec<String> = lhs_denoms
+            .union(&rhs_denoms)
+            .cloned()
+            .collect::<HashSet<String>>()
+            .difference(&intersection)
+            .cloned()
+            .collect();
+
+        if all_denoms.is_empty() {
+            None
+        } else {
+            let mut iterator = all_denoms.iter();
+            let mut condition: Sexp =
+                Self::wrap_neqzero(parse_str(iterator.next().unwrap()).unwrap());
+
+            // TODO doesn't handle multiple denominators
+            if let Some(_) = iterator.next() {
+                return None;
+            }
+            for denom in iterator {
+                condition = Sexp::List(vec![
+                    Sexp::String("and".to_string()),
+                    condition,
+                    Self::wrap_neqzero(parse_str(denom).unwrap()),
+                ]);
+            }
+            let rhs = Sexp::List(vec![
+                Sexp::String("if".to_string()),
+                condition,
+                rhs_sexp,
+                lhs_sexp,
+            ])
+            .to_string()
+            .parse::<Pattern<Math>>()
+            .unwrap();
+
+            let name = format!("{} ==> {}", rule.lhs, rhs);
+            let rewrite = Rewrite::new(name.clone(), rule.lhs.clone(), rhs.clone()).unwrap();
+            Some(Rule {
+                lhs: rule.lhs,
+                rhs,
+                name: name.into(),
+                rewrite,
+            })
+        }
+    }
+
+    fn run_workload_conditional(
         workload: Workload,
         prior: Ruleset<Self>,
         limits: Limits,
+        fast_match: bool,
     ) -> Ruleset<Self> {
         let t = Instant::now();
 
         let egraph = workload.to_egraph::<Self>();
         let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-        let mut candidates = Ruleset::fast_cvec_match(&compressed);
+
+        let candidates = if fast_match {
+            Ruleset::fast_cvec_match(&compressed)
+        } else {
+            Ruleset::cvec_match(&compressed)
+        };
+
+        println!(
+            "Partionioning {} candidates into valid/invalid",
+            candidates.len()
+        );
+        let (mut valid, invalid) = candidates.partition(|r| r.is_valid());
+        println!(
+            "Found {} valid and {} invalid rules",
+            valid.len(),
+            invalid.len()
+        );
+
+        let num_prior = prior.len();
+        let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
+
+        // here's the conditional stuff
+        /*
+        let mut with_condition = Ruleset::<Math>(
+            invalid
+                .0
+                .iter()
+                .filter_map(|r| {
+                    if let Some(rewritten) = Self::add_condition(r.1.clone()) {
+                        Some((rewritten.name.clone(), rewritten))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        );
+
+        println!(
+            "Instrumented {} rules with conditions",
+            with_condition.len()
+        );
+
+        let chosen_conditional =
+            with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
+
+        let result = chosen.union(&chosen_conditional);*/
+        let result = chosen;
+
+        let time = t.elapsed().as_secs_f64();
+        println!(
+            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+            result.bidir_len(),
+            result.len(),
+            time,
+            num_prior
+        );
+
+        result.pretty_print();
+        result
+    }
+
+    fn run_workload(
+        workload: Workload,
+        prior: Ruleset<Self>,
+        limits: Limits,
+        fast_match: bool,
+    ) -> Ruleset<Self> {
+        let t = Instant::now();
+
+        let egraph = workload.to_egraph::<Self>();
+        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+
+        let mut candidates = if fast_match {
+            Ruleset::fast_cvec_match(&compressed)
+        } else {
+            Ruleset::cvec_match(&compressed)
+        };
 
         let num_prior = prior.len();
         let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
@@ -408,6 +593,8 @@ pub mod test {
     use std::time::Duration;
 
     use super::*;
+    use crate::rational_best::best_enumo_recipe;
+    use crate::rational_replicate::replicate_ruler1_recipe;
     use ruler::enumo::{Filter, Ruleset, Workload};
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -565,134 +752,64 @@ pub mod test {
         );
     }
 
-    fn replicate_ruler1_recipe() -> Ruleset<Math> {
-        let mut rules = Ruleset::default();
-        let limits = Limits::default();
-
-        // Domain
-        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
-        let vars = &Workload::new(["a", "b", "c"]);
-        let consts = &Workload::new(["0", "-1", "1"]);
-        let uops = &Workload::new(["~", "fabs"]);
-        let bops = &Workload::new(["+", "-", "*", "/"]);
-
-        // Layer 1 (one op)
-        println!("layer1");
-        let layer1 = lang
-            .clone()
-            .iter_metric("expr", enumo::Metric::Depth, 2)
-            .filter(Filter::Contains("var".parse().unwrap()))
-            .plug_lang(vars, consts, uops, bops);
-        let layer1_rules = Math::run_workload(layer1.clone(), rules.clone(), limits);
-        rules.extend(layer1_rules);
-
-        // Layer 2 (two ops)
-        println!("layer2");
-        let layer2 = lang
-            .clone()
-            .iter_metric("expr", enumo::Metric::Depth, 3)
-            .filter(Filter::Contains("var".parse().unwrap()))
-            .plug_lang(vars, consts, uops, bops);
-        layer2.to_file("replicate_layer2_terms");
-        let layer2_rules = Math::run_workload_fast_match(layer2.clone(), rules.clone(), limits);
-        rules.extend(layer2_rules);
-
-        rules
-    }
-
-    pub fn best_enumo_recipe() -> Ruleset<Math> {
-        let mut rules = replicate_ruler1_recipe();
-        let limits = Limits::default();
-
-        // Contains var filter
-        let contains_var_filter = Filter::Or(vec![
-            Filter::Contains("a".parse().unwrap()),
-            Filter::Contains("b".parse().unwrap()),
-            Filter::Contains("c".parse().unwrap()),
-        ]);
-
-        // Safe filter
-        let safe_filter = Filter::Invert(Box::new(Filter::Contains("(/ ?x 0)".parse().unwrap())));
-
-        // Contains abs filter
-        let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
-
-        let vars = Workload::new(["a", "b", "c"]);
-        let consts = Workload::new(["-1", "0", "1", "2"]);
-
-        // Div
-        println!("div");
-        let div = Workload::new(["(/ v (/ v v))"]).plug("v", &vars);
-        let div_rules = Math::run_workload(div, rules.clone(), limits);
-        rules.extend(div_rules);
-
-        // Nested fabs
-        println!("nested fabs");
-        let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-            .plug("uop", &Workload::new(&["~", "fabs"]))
-            .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
-        let layer1 = op_layer.clone().plug("expr", &vars.append(consts));
-        let layer2 = op_layer
-            .plug("expr", &layer1)
-            .filter(safe_filter.clone())
-            .filter(contains_var_filter.clone())
-            .filter(contains_abs_filter);
-        let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
-        let nested_abs_rules = Math::run_workload_fast_match(nested_abs, rules.clone(), limits);
-        rules.extend(nested_abs_rules);
-
-        rules
-    }
-
-    fn test_against_herbie(rules: &Ruleset<Math>, name: &str, duration: Duration) {
+    #[test]
+    fn run() {
+        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
-        println!("Comparing rational to herbie...");
-        rules.baseline_compare_to(
-            &herbie,
-            "herbie",
-            name,
-            duration,
-            Limits {
-                iter: 2,
-                node: 300000,
-            },
-        )
-    }
-
-    #[test]
-    fn run_all() {
         let start = Instant::now();
-        let rules = replicate_ruler1_recipe();
+        let replicate_rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
-        rules.write_json_rules("rational_replicate.json");
-        test_against_ruler1(&rules, "rational (replicate)", duration);
-        test_against_herbie(&rules, "rational (replicate)", duration);
-
-        let start = Instant::now();
-        let rules = best_enumo_recipe();
-        let duration = start.elapsed();
-
-        rules.write_json_rules("rational_best.json");
-        test_against_ruler1(&rules, "rational (best)", duration);
-        test_against_herbie(&rules, "rational (best)", duration);
-    }
-
-    fn test_against_ruler1(rules: &Ruleset<Math>, name: &str, duration: Duration) {
-        let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
-
-        println!("Comparing rational to ruler1...");
-        rules.baseline_compare_to(
+        logger::write_output(
+            &replicate_rules,
             &ruler1,
-            "ruler1",
-            name,
-            duration,
+            "rational_replicate",
+            "oopsla",
             Limits {
                 iter: 2,
                 node: 150000,
             },
-        )
+            duration,
+        );
+        logger::write_output(
+            &replicate_rules,
+            &herbie,
+            "rational_replicate",
+            "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+
+        let start = Instant::now();
+        let best_rules = best_enumo_recipe();
+        let duration = start.elapsed();
+
+        logger::write_output(
+            &best_rules,
+            &ruler1,
+            "rational_best",
+            "oopsla",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
+        logger::write_output(
+            &best_rules,
+            &herbie,
+            "rational_best",
+            "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 
     #[test]
@@ -714,6 +831,7 @@ pub mod test {
                 ),
             all_rules.clone(),
             Limits::default(),
+            false,
         );
         all_rules.extend(starting_rules);
 
@@ -722,6 +840,7 @@ pub mod test {
                 .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
             all_rules.clone(),
             Limits::default(),
+            false,
         );
         all_rules.extend(basic_if_rules);
 
@@ -731,7 +850,7 @@ pub mod test {
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
         terms.to_file("guard.terms");
 
-        let guarded_rules = Math::run_workload(terms, all_rules.clone(), Limits::default());
+        let guarded_rules = Math::run_workload(terms, all_rules.clone(), Limits::default(), false);
         assert!(guarded_rules
             .0
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));

@@ -8,8 +8,9 @@ use num::rational::Ratio;
 use num::BigInt;
 use ruler::enumo::{Ruleset, Scheduler, Workload};
 use ruler::*;
-
-mod rational;
+#[path = "./recipes/exponential.rs"]
+pub mod exponential;
+// mod rational;
 
 pub type Rational = Ratio<BigInt>;
 
@@ -28,6 +29,7 @@ egg::define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "/" = Div([Id; 2]),
+        "if" = If([Id; 3]),
         // (for compatibility with rationals)
         "fabs" = Abs(Id),
 
@@ -139,17 +141,13 @@ impl Exponential {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::exponential::make_rules;
     use ruler::enumo;
 
     type Workload = enumo::Workload;
     type Ruleset = enumo::Ruleset<Exponential>;
-    type Filter = enumo::Filter;
 
-    macro_rules! str_vec {
-        ($($x:expr),*) => (vec![$($x.to_string()),*]);
-    }
-
-    fn starting_exponential_rules() -> Ruleset {
+    pub fn starting_exponential_rules() -> Ruleset {
         Ruleset::new(&[
             // exponential properties (expand)
             "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
@@ -164,14 +162,153 @@ mod test {
         ])
     }
 
-    fn rational_rules() -> Ruleset {
-        let rules = rational::test::best_enumo_recipe();
-        let rule_strs = rules.to_str_vec();
-        let rule_strs: Vec<&str> = rule_strs.iter().map(|x| &**x).collect();
-        Ruleset::new(&rule_strs)
+    pub fn rational_rules() -> Ruleset {
+        Ruleset::new(&[
+            "(+ ?b ?a) ==> (+ ?a ?b)",
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(- ?a ?a) ==> 0",
+            "(+ ?a 0) ==> ?a",
+            "?a ==> (+ ?a 0)",
+            "(* ?a 1) ==> ?a",
+            "?a ==> (* ?a 1)",
+            "(- ?a 0) ==> ?a",
+            "?a ==> (- ?a 0)",
+            "(/ ?a 1) ==> ?a",
+            "?a ==> (/ ?a 1)",
+            "(/ ?a -1) ==> (~ ?a)",
+            "(~ ?a) ==> (/ ?a -1)",
+            "(- 0 ?a) ==> (~ ?a)",
+            "(~ ?a) ==> (- 0 ?a)",
+            "(* ?a -1) ==> (~ ?a)",
+            "(~ ?a) ==> (* ?a -1)",
+            "(- ?a ?a) ==> (* ?a 0)",
+            "(* ?a 0) ==> (- ?a ?a)",
+            "(+ ?a 1) ==> (- ?a -1)",
+            "(- ?a -1) ==> (+ ?a 1)",
+            "(+ ?a -1) ==> (- ?a 1)",
+            "(- ?a 1) ==> (+ ?a -1)",
+            "(* (+ ?a 1) (/ -1 ?a)) ==> (/ (- -1 ?a) ?a)",
+            "(/ (- -1 ?a) ?a) ==> (* (+ ?a 1) (/ -1 ?a))",
+            "(* (/ -1 ?a) (- 1 ?a)) ==> (/ (- ?a 1) ?a)",
+            "(/ (- ?a 1) ?a) ==> (* (/ -1 ?a) (- 1 ?a))",
+            "(- (/ ?a ?a) (/ 0 ?a)) ==> (* (~ ?a) (/ -1 ?a))",
+            "(* (~ ?a) (/ -1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",
+            "(* (- 1 ?a) (/ 1 ?a)) ==> (/ (- 1 ?a) ?a)",
+            "(/ (- 1 ?a) ?a) ==> (* (- 1 ?a) (/ 1 ?a))",
+            "(* ?a (/ 1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",
+            "(- (/ ?a ?a) (/ 0 ?a)) ==> (* ?a (/ 1 ?a))",
+            "(* (+ ?a 1) (/ 1 ?a)) ==> (/ (+ ?a 1) ?a)",
+            "(/ (+ ?a 1) ?a) ==> (* (+ ?a 1) (/ 1 ?a))",
+            "(* ?a (/ -1 ?a)) ==> (- (/ 0 ?a) (/ ?a ?a))",
+            "(- (/ 0 ?a) (/ ?a ?a)) ==> (* ?a (/ -1 ?a))",
+            "(/ (/ 0 ?a) ?a) ==> (/ (/ 0 ?a) (+ ?a ?a))",
+            "(/ (/ 0 ?a) (+ ?a ?a)) ==> (/ (/ 0 ?a) ?a)",
+            "(/ (/ 0 ?a) ?a) ==> (/ (/ 0 ?a) (* ?a ?a))",
+            "(/ (/ 0 ?a) (* ?a ?a)) ==> (/ (/ 0 ?a) ?a)",
+            "(/ (/ 0 ?a) ?a) ==> (/ (/ 0 ?a) (fabs ?a))",
+            "(/ (/ 0 ?a) (fabs ?a)) ==> (/ (/ 0 ?a) ?a)",
+            "(/ 0 (* ?a ?a)) ==> (/ 0 ?a)",
+            "(/ 0 ?a) ==> (/ 0 (* ?a ?a))",
+            "(/ 0 (+ ?a ?a)) ==> (/ 0 ?a)",
+            "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
+            "(* ?c (* ?b ?a)) ==> (* ?b (* ?c ?a))",
+            "(- ?c (- ?b ?a)) ==> (- ?a (- ?b ?c))",
+            "(- ?c (- ?b ?a)) ==> (+ ?a (- ?c ?b))",
+            "(+ (* ?b ?c) (* ?b ?a)) ==> (* ?b (+ ?a ?c))",
+            "(- (* ?a ?c) (* ?b ?a)) ==> (* ?a (- ?c ?b))",
+            "(* (/ ?c ?a) (* ?b ?a)) ==> (* (* ?c ?a) (/ ?b ?a))",
+            "(* (* ?c ?a) (/ ?b ?a)) ==> (* (/ ?c ?a) (* ?b ?a))",
+            "(- (+ ?c ?c) (+ ?b ?a)) ==> (- (- ?c ?b) (- ?a ?c))",
+            "(- (+ ?b ?c) (+ ?b ?a)) ==> (- (+ ?c ?c) (+ ?a ?c))",
+            "(fabs (- ?b ?a)) ==> (fabs (- ?a ?b))",
+            "(* (fabs ?b) (fabs ?a)) ==> (fabs (* ?a ?b))",
+            "(/ (- ?a ?b) (- ?b ?a)) ==> (/ (- ?b ?a) (- ?a ?b))",
+            "(/ (- ?b ?a) (- ?b ?a)) ==> (/ (- ?a ?b) (- ?a ?b))",
+            "(/ (* ?a ?b) (/ ?a ?a)) ==> (* (/ ?b ?a) (* ?a ?a))",
+            "(* (/ ?b ?a) (* ?a ?a)) ==> (/ (* ?a ?b) (/ ?a ?a))",
+            "(- (* ?b ?b) (* ?a ?a)) ==> (* (- ?b ?a) (+ ?a ?b))",
+            "(- ?a (+ ?b ?a)) ==> (/ (+ ?b ?b) -2)",
+            "(- (+ ?a ?b) ?a) ==> (/ (+ ?b ?b) 2)",
+            "(* (- ?b ?a) -2) ==> (- (+ ?a ?a) (+ ?b ?b))",
+            "(- (+ ?b ?b) (+ ?a ?a)) ==> (* (- ?b ?a) 2)",
+            "(* (- ?b ?a) 2) ==> (- (+ ?b ?b) (+ ?a ?a))",
+            "(/ (- ?b ?a) -2) ==> (/ (- ?a ?b) 2)",
+            "(/ 0 (- ?b ?a)) ==> (/ 0 (- ?a ?b))",
+            "(* (+ ?a ?b) (/ 0 ?a)) ==> (* ?b (/ 0 ?a))",
+            "(* ?b (/ 0 ?a)) ==> (* (+ ?a ?b) (/ 0 ?a))",
+            "(* (* ?a ?b) (/ 0 ?a)) ==> (* (fabs ?a) (/ 0 ?a))",
+            "(* (/ 0 ?b) (/ 0 ?a)) ==> (* (/ ?b ?a) (/ 0 ?b))",
+            "(fabs (fabs ?a)) ==> (fabs ?a)",
+            "(fabs ?a) ==> (fabs (fabs ?a))",
+            "(fabs (* ?a ?a)) ==> (* ?a ?a)",
+            "(* ?a ?a) ==> (fabs (* ?a ?a))",
+            "(/ ?a (fabs ?a)) ==> (/ (fabs ?a) ?a)",
+            "(/ (fabs ?a) ?a) ==> (/ ?a (fabs ?a))",
+            "(/ ?a ?a) ==> (/ (fabs ?a) (fabs ?a))",
+            "(/ (fabs ?a) (fabs ?a)) ==> (/ ?a ?a)",
+            "(fabs (+ ?a ?a)) ==> (+ (fabs ?a) (fabs ?a))",
+            "(+ (fabs ?a) (fabs ?a)) ==> (fabs (+ ?a ?a))",
+            "(/ (* ?a ?a) (* ?a ?a)) ==> (/ ?a ?a)",
+            "(/ ?a ?a) ==> (/ (* ?a ?a) (* ?a ?a))",
+            "(/ ?a ?a) ==> (/ (+ ?a ?a) (+ ?a ?a))",
+            "(/ (+ ?a ?a) (+ ?a ?a)) ==> (/ ?a ?a)",
+            "(+ ?a (/ 0 ?a)) ==> (/ (* ?a ?a) ?a)",
+            "(/ (* ?a ?a) ?a) ==> (+ ?a (/ 0 ?a))",
+            "(/ (* ?a ?a) (fabs ?a)) ==> (+ (fabs ?a) (/ 0 ?a))",
+            "(+ (fabs ?a) (/ 0 ?a)) ==> (/ (* ?a ?a) (fabs ?a))",
+            "(- (/ ?a ?a) ?a) ==> (* (/ ?a ?a) (- 1 ?a))",
+            "(* (/ ?a ?a) (- 1 ?a)) ==> (- (/ ?a ?a) ?a)",
+            "(* (/ ?a ?a) (- ?a 1)) ==> (- ?a (/ ?a ?a))",
+            "(- ?a (/ ?a ?a)) ==> (* (/ ?a ?a) (- ?a 1))",
+            "(/ 0 ?a) ==> (/ 0 (fabs ?a))",
+            "(/ 0 (fabs ?a)) ==> (/ 0 ?a)",
+            "(/ 0 ?a) ==> (/ 0 (+ ?a ?a))",
+            "?a ==> (/ ?a (/ ?a ?a))",
+            "(/ ?a (/ ?a ?a)) ==> ?a",
+            "(- (/ ?a 2) 1) ==> (/ (- ?a 2) 2)",
+            "(/ (- ?a 2) 2) ==> (- (/ ?a 2) 1)",
+            "(- 1 (/ ?a 2)) ==> (/ (- 2 ?a) 2)",
+            "(/ (- 2 ?a) 2) ==> (- 1 (/ ?a 2))",
+            "(/ (+ 2 ?a) 2) ==> (+ 1 (/ ?a 2))",
+            "(+ 1 (/ ?a 2)) ==> (/ (+ 2 ?a) 2)",
+            "(fabs (- (fabs ?a) (/ ?a 2))) ==> (- (fabs ?a) (/ ?a 2))",
+            "(- (fabs ?a) (/ ?a 2)) ==> (fabs (- (fabs ?a) (/ ?a 2)))",
+            "(+ (fabs ?a) (- 1 ?a)) ==> (fabs (+ (fabs ?a) (- 1 ?a)))",
+            "(fabs (+ (fabs ?a) (- 1 ?a))) ==> (+ (fabs ?a) (- 1 ?a))",
+            "(fabs (+ (fabs ?a) (/ ?a 2))) ==> (+ (fabs ?a) (/ ?a 2))",
+            "(+ (fabs ?a) (/ ?a 2)) ==> (fabs (+ (fabs ?a) (/ ?a 2)))",
+            "(* (fabs ?a) (/ 0 ?a)) ==> (/ 0 (/ ?a ?a))",
+            "(/ 0 (/ ?a ?a)) ==> (* (fabs ?a) (/ 0 ?a))",
+            "(/ 0 (/ ?a ?a)) ==> (fabs (/ 0 (/ ?a ?a)))",
+            "(fabs (/ 0 (/ ?a ?a))) ==> (/ 0 (/ ?a ?a))",
+            "(/ (fabs ?a) 4) ==> (fabs (/ (/ ?a 2) 2))",
+            "(fabs (/ (/ ?a 2) 2)) ==> (/ (fabs ?a) 4)",
+            "(/ (fabs ?a) 4) ==> (fabs (/ (fabs ?a) 4))",
+            "(fabs (/ (fabs ?a) 4)) ==> (/ (fabs ?a) 4)",
+            "(/ (fabs ?a) 3) ==> (fabs (/ (fabs ?a) 3))",
+            "(fabs (/ (fabs ?a) 3)) ==> (/ (fabs ?a) 3)",
+            "(fabs (- (fabs ?a) (/ 0 ?a))) ==> (fabs (/ (* ?a ?a) (fabs ?a)))",
+            "(fabs (/ (* ?a ?a) (fabs ?a))) ==> (fabs (- (fabs ?a) (/ 0 ?a)))",
+            "(/ (+ ?a ?a) (fabs ?a)) ==> (/ (fabs ?a) (/ ?a 2))",
+            "(/ (fabs ?a) (/ ?a 2)) ==> (/ (+ ?a ?a) (fabs ?a))",
+            "(/ (fabs ?a) (+ ?a ?a)) ==> (/ (/ ?a 2) (fabs ?a))",
+            "(/ (/ ?a 2) (fabs ?a)) ==> (/ (fabs ?a) (+ ?a ?a))",
+            "(- (fabs ?a) ?a) ==> (fabs (- (fabs ?a) ?a))",
+            "(fabs (- (fabs ?a) ?a)) ==> (- (fabs ?a) ?a)",
+            "(fabs (+ ?a (fabs ?a))) ==> (+ ?a (fabs ?a))",
+            "(+ ?a (fabs ?a)) ==> (fabs (+ ?a (fabs ?a)))",
+            "(fabs (* (fabs ?b) (/ ?a 2))) ==> (fabs (/ (* ?a ?b) 2))",
+            "(+ (fabs ?b) (fabs ?a)) ==> (fabs (+ (fabs ?b) (fabs ?a)))",
+            "(fabs (+ (fabs ?b) (fabs ?a))) ==> (+ (fabs ?b) (fabs ?a))",
+            "(fabs (/ ?b (fabs ?a))) ==> (fabs (/ ?b ?a))",
+            "(fabs (/ ?b ?a)) ==> (fabs (/ ?b (fabs ?a)))",
+            "(fabs (/ (fabs ?c) (- ?b ?a))) ==> (fabs (/ (fabs ?c) (- ?a ?b)))",
+            "(fabs (* (fabs ?c) (* ?b ?a))) ==> (fabs (* (fabs ?a) (* ?b ?c)))",
+            "(- (fabs ?c) (- ?b ?a)) ==> (+ (fabs ?c) (- ?a ?b))",
+        ])
     }
 
-    fn run_workload(terms: Workload, prev_rules: &Ruleset) -> Ruleset {
+    pub fn run_workload(terms: Workload, prev_rules: &Ruleset) -> Ruleset {
         let rules = Exponential::run_workload(
             terms,
             prev_rules.clone(),
@@ -180,176 +317,27 @@ mod test {
                 node: 2_000_000,
             },
         );
-
         rules
     }
 
-    fn constant_rules(prev_rules: &Ruleset) -> Ruleset {
-        let terms = Workload::new(vec![
-            "(exp 0)",
-            "(exp 1)",
-            "(log 1)",
-            "(sqrt 1)",
-            "(cbrt 1)",
-            "(pow a 1)",
-            "(pow 1 a)",
-        ]);
-
-        run_workload(terms, prev_rules)
-    }
-
-    fn exp_rules(prev_rules: &Ruleset) -> Ruleset {
-        let lower_layer = Workload::new(vec!["v", "(uop v)", "(bop v v)"])
-            .plug("v", &Workload::new(vec!["a", "b", "c"]))
-            .plug("uop", &Workload::new(vec!["exp"]))
-            .plug("bup", &Workload::new(vec!["+", "*"]));
-
-        let upper_layer = Workload::new(vec!["(uop v)", "(bop v v)"])
-            .plug("v", &lower_layer)
-            .plug("uop", &Workload::new(vec!["exp"]))
-            .plug("bop", &Workload::new(vec!["+", "*"]))
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(exp (exp ?a))".parse().unwrap(),
-            ))))
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(log (log ?a))".parse().unwrap(),
-            ))));
-
-        run_workload(upper_layer, prev_rules)
-    }
-
-    fn log_rules(prev_rules: &Ruleset) -> Ruleset {
-        let lower_layer = Workload::new(vec!["v", "(uop v)", "(bop v v)"])
-            .plug("v", &Workload::new(vec!["a", "b", "c"]))
-            .plug("uop", &Workload::new(vec!["log"]))
-            .plug("bup", &Workload::new(vec!["*"]));
-
-        let upper_layer = Workload::new(vec!["(uop v)", "(bop v v)"])
-            .plug("v", &lower_layer)
-            .plug("uop", &Workload::new(vec!["log"]))
-            .plug("bop", &Workload::new(vec!["+"]))
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(exp (exp ?a))".parse().unwrap(),
-            ))))
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(log (log ?a))".parse().unwrap(),
-            ))));
-
-        run_workload(upper_layer, prev_rules)
-    }
-
-    fn no_pow_rules(prev_rules: &Ruleset) -> Ruleset {
-        let vars = Workload::new(vec!["a", "b", "c"]);
-        let uops = Workload::new(vec!["exp", "log", "sqrt", "cbrt"]);
-        let bops = Workload::new(vec!["+", "*"]);
-        let lang = Workload::new(vec!["v", "(uop v)", "(bop v v)"]);
-
-        let lower_layer = lang
-            .clone()
-            .plug("v", &vars)
-            .plug("uop", &uops)
-            .plug("bup", &bops);
-
-        let upper_layer = lang
-            .plug("v", &Workload::Append(vec![lower_layer, vars]))
-            .plug("uop", &uops)
-            .plug("bop", &bops)
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(exp (exp ?a))".parse().unwrap(),
-            ))))
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(log (log ?a))".parse().unwrap(),
-            ))));
-
-        run_workload(upper_layer, prev_rules)
-    }
-
-    fn simple_rules(prev_rules: &Ruleset) -> Ruleset {
-        let vars = Workload::new(vec!["a", "b", "c"]);
-        let uops = Workload::new(vec!["exp", "log", "sqrt", "cbrt"]);
-        let bops = Workload::new(vec!["+", "*", "pow"]);
-        let lang = Workload::new(vec!["v", "(uop v)", "(bop v v)"]);
-
-        let lower_layer = lang
-            .clone()
-            .plug("v", &vars)
-            .plug("uop", &uops)
-            .plug("bup", &bops);
-
-        let upper_layer = lang
-            .plug("v", &Workload::Append(vec![lower_layer, vars]))
-            .plug("uop", &uops)
-            .plug("bop", &bops)
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(exp (exp ?a))".parse().unwrap(),
-            ))))
-            .filter(Filter::Invert(Box::new(Filter::Contains(
-                "(log (log ?a))".parse().unwrap(),
-            ))));
-
-        run_workload(upper_layer, prev_rules)
-    }
-
-    fn div_rules(prev_rules: &Ruleset) -> Ruleset {
-        let vars = Workload::new(vec!["a", "b"]);
-        let uops = Workload::new(vec!["sqrt", "cbrt"]);
-        let bops = Workload::new(vec!["/"]);
-        let lang = Workload::new(vec!["v", "(uop v)", "(bop v v)"]);
-
-        let lower_layer = lang
-            .clone()
-            .plug("v", &vars)
-            .plug("uop", &uops)
-            .plug("bup", &bops);
-
-        let upper_layer = lang
-            .plug("v", &Workload::Append(vec![lower_layer, vars]))
-            .plug("uop", &uops)
-            .plug("bop", &bops)
-            .filter(Filter::Canon(str_vec!["a", "b"]));
-
-        run_workload(upper_layer, prev_rules)
-    }
-
     #[test]
-    fn make_rules() {
-        let mut all_rules = rational_rules();
-        let mut new_rules = Ruleset::default();
+    fn run() {
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
 
-        all_rules.extend(starting_exponential_rules());
-        new_rules.extend(starting_exponential_rules());
+        let start = Instant::now();
+        let rules = make_rules();
+        let duration = start.elapsed();
 
-        // Constant layer
-        let const_rules = constant_rules(&all_rules);
-        all_rules.extend(const_rules.clone());
-        new_rules.extend(const_rules);
-
-        // Exponential layer
-        let exp_rules = exp_rules(&all_rules);
-        all_rules.extend(exp_rules.clone());
-        new_rules.extend(exp_rules);
-
-        // Logarithm layer
-        let log_rules = log_rules(&all_rules);
-        all_rules.extend(log_rules.clone());
-        new_rules.extend(log_rules);
-
-        // No `pow` layer
-        let no_pow_rules = no_pow_rules(&all_rules);
-        all_rules.extend(no_pow_rules.clone());
-        new_rules.extend(no_pow_rules);
-
-        // Simple layer
-        let simple_rules = simple_rules(&all_rules);
-        all_rules.extend(simple_rules.clone());
-        new_rules.extend(simple_rules);
-
-        // div layer
-        let div_rules = div_rules(&all_rules);
-        all_rules.extend(div_rules.clone());
-        new_rules.extend(div_rules);
-
-        // only upload new rules
-        new_rules.write_json_rules("exponential.json");
+        logger::write_output(
+            &rules,
+            &herbie,
+            "exponential",
+            "herbie",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 }
