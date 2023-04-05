@@ -157,7 +157,34 @@ impl Workload {
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {
-        Workload::Append(vec![self, workload.into()])
+        let into: Workload = workload.into();
+        match (self, into) {
+            (Workload::Set(xs), Workload::Set(ys)) => {
+                let mut all = vec![];
+                all.extend(xs);
+                all.extend(ys);
+                Workload::Set(all)
+            }
+            (Workload::Append(xs), Workload::Append(ys)) => {
+                let mut all = vec![];
+                all.extend(xs);
+                all.extend(ys);
+                Workload::Append(all)
+            }
+            (Workload::Append(xs), y) => {
+                let mut all = vec![];
+                all.extend(xs);
+                all.push(y);
+                Workload::Append(all)
+            }
+            (x, Workload::Append(ys)) => {
+                let mut all = vec![];
+                all.extend(ys);
+                all.push(x);
+                Workload::Append(all)
+            }
+            (x, y) => Workload::Append(vec![x, y]),
+        }
     }
 
     pub fn filter(self, filter: Filter) -> Self {
@@ -386,6 +413,46 @@ mod test {
         let actual = w1.plug("x", &w2).force();
         for t in expected.force() {
             assert!(actual.contains(&t));
+        }
+    }
+
+    #[test]
+    fn append() {
+        let empty = Workload::Set(vec![]);
+        let w1 = Workload::new(["a", "b"]);
+        let w2 = Workload::new(["c", "d"]);
+        let w3 = Workload::new(["e", "f"]);
+        let w4 = Workload::new(["a"]).plug("a", &empty);
+
+        let wkld = w1.clone().append(w2.clone());
+        let wkld = wkld.append(w3.clone());
+        assert_eq!(wkld.force().len(), 6);
+        assert!(matches!(wkld, Workload::Set(_)));
+
+        let wkld = w3.clone().append(w4.clone());
+        let wkld2 = wkld.clone().append(w1.clone());
+        assert!(matches!(wkld, Workload::Append(_)));
+        assert!(matches!(wkld2, Workload::Append(_)));
+        if let Workload::Append(lst) = wkld2 {
+            assert_eq!(lst.len(), 3);
+        }
+
+        let wkld = w3.clone().append(w4.clone());
+        let wkld2 = w1.clone().append(wkld.clone());
+        assert!(matches!(wkld, Workload::Append(_)));
+        assert!(matches!(wkld2, Workload::Append(_)));
+        if let Workload::Append(lst) = wkld2 {
+            assert_eq!(lst.len(), 3);
+        }
+
+        let wkld = w3.clone().append(w4.clone());
+        let wkld2 = w3.clone().append(w4.clone());
+        let wkld3 = wkld.clone().append(wkld2.clone());
+        assert!(matches!(wkld, Workload::Append(_)));
+        assert!(matches!(wkld2, Workload::Append(_)));
+        assert!(matches!(wkld3, Workload::Append(_)));
+        if let Workload::Append(lst) = wkld3 {
+            assert_eq!(lst.len(), 4);
         }
     }
 }
