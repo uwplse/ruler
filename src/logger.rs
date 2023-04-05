@@ -13,16 +13,15 @@ pub fn write_output<L: SynthLanguage>(
     baseline: &Ruleset<L>,
     recipe_name: &str,
     baseline_name: &str,
-    limits: Limits,
     time_rules: Duration,
 ) {
     // get information about the derivability of our ruleset vs. the baseline ruleset
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-        get_derivability_results(ruleset, DeriveType::Lhs, baseline, limits);
+        get_derivability_results(ruleset, DeriveType::Lhs, baseline, Limits::deriving());
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
-        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, limits);
+        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, Limits::deriving());
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline, limits);
+        get_derivability_results(ruleset, DeriveType::AllRules, baseline, Limits::deriving());
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);

@@ -379,17 +379,7 @@ mod test {
         let rules = trig_rules();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &rules,
-            &herbie,
-            "trig",
-            "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
+        logger::write_output(&rules, &herbie, "trig", "herbie", duration);
     }
 
     #[test]

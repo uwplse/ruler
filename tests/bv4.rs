@@ -50,16 +50,7 @@ pub mod test {
         let duration = start.elapsed();
 
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-        logger::write_output(
-            &rules,
-            &baseline,
-            "bv4",
-            "oopsla",
-            Limits {
-                iter: 3,
-                node: 200000,
-            },
-            duration,
-        );
+
+        logger::write_output(&rules, &baseline, "bv4", "oopsla", duration);
     }
 }

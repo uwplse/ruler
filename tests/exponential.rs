@@ -328,16 +328,6 @@ mod test {
         let rules = make_rules();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &rules,
-            &herbie,
-            "exponential",
-            "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
+        logger::write_output(&rules, &herbie, "exponential", "herbie", duration);
     }
 }

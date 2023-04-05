@@ -2,7 +2,7 @@ use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
 use crate::{SynthAnalysis, SynthLanguage};
-use std::{fs::OpenOptions, io::Write};
+use std::io::Write;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Workload {
@@ -31,6 +31,10 @@ impl Workload {
         )
     }
 
+    pub fn empty() -> Self {
+        Self::Set(vec![])
+    }
+
     pub fn to_file(&self, filename: &str) {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
@@ -52,6 +56,7 @@ impl Workload {
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
         let sexps = self.force();
+        println!("{} terms", sexps.len());
 
         // Have to find all the variables first so that we can initialize
         // their cvecs, which might require doing a multi-way cross product
@@ -80,6 +85,7 @@ impl Workload {
         for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
+        println!("{} eclassses", egraph.number_of_classes());
         egraph
     }
 
@@ -204,64 +210,6 @@ impl Workload {
         } else {
             Workload::Filter(filter, Box::new(self))
         }
-    }
-
-    pub fn make_layer(exprs: Workload, uops: Workload, bops: Workload) -> Self {
-        let lang = Workload::new(["expr", "(uop expr)", "(bop expr expr)"]);
-
-        lang.plug("expr", &exprs)
-            .plug("uop", &uops)
-            .plug("bop", &bops)
-    }
-
-    pub fn make_layer_clever(
-        l0: Workload,
-        l1: Workload,
-        l2: Workload,
-        uops: Workload,
-        bops: Workload,
-        list_len: usize,
-    ) -> Self {
-        let lang = Workload::new([
-            "l0",
-            "l1",
-            "l2",
-            "(uop l2)",
-            "(bop l1 l1)",
-            "(bop l0 l2)",
-            "(bop l2 l0)",
-        ]);
-        lang.plug("uop", &uops)
-            .plug("bop", &bops)
-            .plug("l0", &l0)
-            .plug("l1", &l1)
-            .plug("l2", &l2)
-            .filter(Filter::MetricLt(Metric::Lists, list_len + 1))
-            .filter(Filter::Invert(Box::new(Filter::MetricLt(
-                Metric::Lists,
-                std::cmp::max(0, list_len - 1),
-            ))))
-    }
-
-    pub fn write_terms_to_file(&self, filename: &str) {
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(filename)
-            .expect("Unable to open file");
-        let terms: Vec<String> = self
-            .clone()
-            .force()
-            .iter()
-            .map(|se| se.to_string())
-            .collect();
-        terms.iter().for_each(|t| {
-            file.write_all(t.as_bytes())
-                .expect("Unable to write to file");
-            file.write_all("\n".as_bytes())
-                .expect("Unable to write to file");
-        });
     }
 }
 

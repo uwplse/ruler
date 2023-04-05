@@ -9,6 +9,7 @@ mod bv;
 pub mod enumo;
 mod language;
 pub mod logger;
+pub mod recipe_utils;
 mod util;
 
 pub type Id = egg::Id;
@@ -76,6 +77,22 @@ impl Limits {
         Self {
             iter: usize::MAX,
             node: usize::MAX,
+        }
+    }
+
+    // match oopsla limits
+    pub fn rulefinding() -> Self {
+        Self {
+            iter: 2,
+            node: 300_000,
+        }
+    }
+
+    // match oopsla limits
+    pub fn deriving() -> Self {
+        Self {
+            iter: 5,
+            node: 100_000,
         }
     }
 }
