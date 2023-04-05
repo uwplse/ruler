@@ -101,11 +101,3 @@ pub fn base_lang() -> Workload {
         "(TOP EXPR EXPR EXPR)",
     ])
 }
-
-pub fn make_layer(exprs: Workload, uops: Workload, bops: Workload) -> Workload {
-    let lang = Workload::new(["expr", "(uop expr)", "(bop expr expr)"]);
-
-    lang.plug("expr", &exprs)
-        .plug("uop", &uops)
-        .plug("bop", &bops)
-}
