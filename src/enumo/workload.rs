@@ -1,7 +1,7 @@
-use egg::{EGraph, ENodeOrVar, RecExpr};
+use egg::{EGraph, RecExpr};
 
 use super::*;
-use crate::{HashSet, SynthAnalysis, SynthLanguage};
+use crate::{get_vars_from_recexprs, SynthAnalysis, SynthLanguage};
 use std::{fs::OpenOptions, io::Write};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -59,19 +59,11 @@ impl Workload {
         // We have to do this before adding any other expressions to the
         // egraph so that the variable cvecs are properly initialized and
         // able to be used by other expressions that contain variables
-        let mut vars: HashSet<String> = HashSet::default();
-        for sexp in sexps.iter() {
-            let expr: RecExpr<L> = sexp.to_string().parse().unwrap();
-            for node in expr.as_ref() {
-                if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
-                    let mut v = v.to_string();
-                    v.remove(0);
-                    vars.insert(v);
-                }
-            }
-        }
-        let vars: Vec<String> = vars.into_iter().collect();
-        L::initialize_vars(&mut egraph, &vars);
+        let exprs: Vec<RecExpr<L>> = sexps
+            .iter()
+            .map(|s| s.to_string().parse().unwrap())
+            .collect();
+        L::initialize_vars(&mut egraph, &get_vars_from_recexprs(&exprs));
 
         for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());

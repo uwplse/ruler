@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use std::{io::Write, sync::Arc};
 
 use crate::{
-    CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
-    SynthAnalysis, SynthLanguage,
+    get_vars_from_recexprs, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap,
+    Limits, Signature, SynthAnalysis, SynthLanguage,
 };
 
 use super::{Rule, Scheduler};
@@ -398,10 +398,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    fn shrink(&mut self, chosen: &Self, scheduler: Scheduler) {
+    fn shrink(&mut self, chosen: &Self, scheduler: Scheduler, vars: &[String]) {
         // 1. make new egraph
-        // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
         let mut egraph = EGraph::default();
+        L::initialize_vars(&mut egraph, vars);
 
         let mut initial = vec![];
         // 2. insert lhs and rhs of all candidates as roots
@@ -430,10 +430,18 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> Self {
         let mut chosen = prior.clone();
         let step_size = 1;
+
+        let mut exprs = vec![];
+        for rule in self.0.values() {
+            exprs.push(L::instantiate(&rule.lhs));
+            exprs.push(L::instantiate(&rule.rhs));
+        }
+        let vars = get_vars_from_recexprs(&exprs);
+
         while !self.is_empty() {
             let selected = self.select(step_size);
             chosen.extend(selected.clone());
-            self.shrink(&chosen, scheduler);
+            self.shrink(&chosen, scheduler, &vars);
         }
         // Return only the new rules
         chosen.remove_all(prior);
@@ -449,34 +457,42 @@ impl<L: SynthLanguage> Ruleset<L> {
         limits: Limits,
     ) -> bool {
         let scheduler = Scheduler::Saturating(limits);
-        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
-        let lexpr = &L::instantiate(&rule.lhs);
-        let rexpr = &L::instantiate(&rule.rhs);
+        let lexpr = L::instantiate(&rule.lhs);
+        let rexpr = L::instantiate(&rule.rhs);
+
+        let mut terms = vec![];
 
         match derive_type {
             DeriveType::Lhs => {
-                egraph.add_expr(lexpr);
+                terms.push(lexpr.clone());
             }
             DeriveType::LhsAndRhs => {
-                egraph.add_expr(lexpr);
-                egraph.add_expr(rexpr);
+                terms.push(lexpr.clone());
+                terms.push(rexpr.clone());
             }
             DeriveType::AllRules => {
                 for rule in allrules.0.values() {
-                    let lhs = &L::instantiate(&rule.lhs);
-                    let rhs = &L::instantiate(&rule.rhs);
-                    egraph.add_expr(lhs);
-                    egraph.add_expr(rhs);
+                    let lhs = L::instantiate(&rule.lhs);
+                    let rhs = L::instantiate(&rule.rhs);
+                    terms.push(lhs);
+                    terms.push(rhs);
                 }
             }
+        }
+
+        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
+        L::initialize_vars(&mut egraph, &get_vars_from_recexprs(&terms));
+
+        for term in terms {
+            egraph.add_expr(&term);
         }
 
         let out_egraph = scheduler.run_derive(&egraph, self, rule);
 
         let l_id = out_egraph
-            .lookup_expr(lexpr)
+            .lookup_expr(&lexpr)
             .unwrap_or_else(|| panic!("Did not find {}", lexpr));
-        let r_id = out_egraph.lookup_expr(rexpr);
+        let r_id = out_egraph.lookup_expr(&rexpr);
         if let Some(r_id) = r_id {
             l_id == r_id
         } else {

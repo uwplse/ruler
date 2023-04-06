@@ -1,3 +1,7 @@
+use egg::{ENodeOrVar, RecExpr};
+
+use crate::SynthLanguage;
+
 /// Return the `i`th letter from the English alphabet.
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
@@ -21,6 +25,25 @@ pub fn self_product<T: Clone>(ts: &[T], n: usize) -> Vec<Vec<T>> {
         res.push(entry);
     }
     res
+}
+
+/// Cvecs for variables must be explicitly initialized, so this helper function
+/// makes it easy to find the variables in a set of expressions that will be
+/// added to an e-graph.
+pub fn get_vars_from_recexprs<L: SynthLanguage>(recexprs: &[RecExpr<L>]) -> Vec<String> {
+    let mut vars = vec![];
+    for expr in recexprs {
+        for node in expr.as_ref() {
+            if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
+                let mut v = v.to_string();
+                v.remove(0);
+                if !vars.contains(&v) {
+                    vars.push(v);
+                }
+            }
+        }
+    }
+    vars
 }
 
 #[macro_export]
