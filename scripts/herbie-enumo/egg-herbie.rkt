@@ -472,8 +472,15 @@
 ;; (rules, reprs) -> (egg-rules, ffi-rules, name-map)
 (define ffi-rules-cache #f)
 
-(register-reset 
-  (λ () (set! ffi-rules-cache #f)))
+(define (free-ffi-cache)
+  (when ffi-rules-cache
+    (match-define (list _ ffi-rules _) (cdr ffi-rules-cache))
+    (free-ffi-rules ffi-rules)))
+
+(register-reset
+  (λ ()
+    (free-ffi-cache)
+    (set! ffi-rules-cache #f)))
 
 ;; Tries to look up the canonical name of a rule using the cache.
 ;; Obviously dangerous if the cache is invalid.
@@ -492,9 +499,7 @@
   (define key (cons rules (*needed-reprs*)))
   (unless (and ffi-rules-cache (equal? (car ffi-rules-cache) key))
     ; free any rules in the cache
-    (when ffi-rules-cache
-      (match-define (list _ ffi-rules _) (cdr ffi-rules-cache))
-      (free-ffi-rules ffi-rules))
+    (free-ffi-cache)
     ; instantiate rules
     (define-values (egg-rules canon-names)
       (for/fold ([rules* '()] [canon-names (hash)] #:result (values (reverse rules*) canon-names))

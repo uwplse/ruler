@@ -161,23 +161,9 @@
     (thread (lambda () (sync (system-idle-evt)))))
 
   (define eng (engine in-engine))
-  (define engine-running? #t)
-
-  ;; Engine custodian
-  ;; Waits a little longer and tries to forcefully kill the engine
-  ;; Custodian is killed if engine finishes
-  (define cid
-    (thread
-      (lambda ()
-        (sleep (+ (*timeout*) 5000))
-        (engine-kill eng))))
-
   (if (engine-run (*timeout*) eng)
-      (begin
-        (kill-thread cid)
-        (engine-result eng))
+      (engine-result eng)
       (parameterize ([*timeline-disabled* false])
-        (kill-thread cid)
         (timeline-load! timeline)
         (timeline-compact! 'outcomes)
         (print-warnings)

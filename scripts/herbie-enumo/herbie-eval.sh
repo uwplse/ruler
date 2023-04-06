@@ -50,7 +50,6 @@ for fpcore in $FPCORES; do
     --names "raw-angle from scale-rotated-ellipse ; \
              a from scale-rotated-ellipse ; \
              b from scale-rotated-ellipse ; \
-             raw-angle from scale-rotated-ellipse ; \
              Simplification of discriminant from scale-rotated-ellipse ; \
              Distance on a great circle ; \
              Harley's example" \
@@ -81,12 +80,12 @@ function do_branch {
 
   cp "$MYDIR/new-config.rkt" "$HERBIE_DIR/src/config.rkt"
   cp "$MYDIR/egg-herbie.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
-  cp "$MYDIR/sandbox.rkt" "$HERBIE_DIR/src/sandbox.rkt"
+  # cp "$MYDIR/lib.rs" "$HERBIE_DIR/egg-herbie/src/lib.rs"
 
   # Patch ruler-autogen rule branches
   if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
     # In case of broken nightlies, target different branch
-    # sed -i 's/main/new-tables/g' "$HERBIE_DIR/src/syntax/rules.rkt"
+    sed -i 's/main/oflatt-conditional-herbie/g' "$HERBIE_DIR/src/syntax/rules.rkt"
     if [[ "$flags" == *"-o rules:numerics"* ]]; then
       echo "skipping numerics patch"
     else
@@ -107,7 +106,7 @@ function do_branch {
   make install
   popd
 
-  flags="$flags --timeout 300"
+  # flags="$flags --timeout 300"
   if [ -z "$PARALLEL_SEEDS" ]; then
     HERBIE=$HERBIE_DIR \
       THREADS=$THREADS \
@@ -127,12 +126,12 @@ function do_branch {
 if [ -z "$NO_RUN" ]; then
   # do_branch main main
   # do_branch main main-n -o rules:numerics
-  # do_branch main main-t -o generate:taylor
+  do_branch main main-t -o generate:taylor
   # do_branch main main-n-t -o rules:numerics -o generate:taylor
   # do_branch using-ruler-nightlies enumo
   # do_branch using-ruler-nightlies enumo-n -o rules:numerics
-  # do_branch using-ruler-nightlies enumo-t -o generate:taylor
-  # do_branch using-ruler-nightlies enumo-n-t -o rules:numerics -o generate:taylor
+  do_branch using-ruler-nightlies enumo-t -o generate:taylor
+  do_branch using-ruler-nightlies enumo-n-t -o rules:numerics -o generate:taylor
   # do_branch using-ruler-baseline ruler
   # do_branch using-ruler-baseline ruler-n -o rules:numerics
   do_branch using-ruler-baseline ruler-t -o generate:taylor
@@ -146,4 +145,4 @@ fi
 
 # Plots
 
-# bash plot.sh $OUTDIR
+bash plot.sh $OUTDIR
