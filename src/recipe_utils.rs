@@ -142,78 +142,71 @@ pub fn base_lang() -> Workload {
 #[cfg(test)]
 mod test {
     use crate::{
-        enumo::{Metric, Workload},
+        enumo::{Filter, Metric},
         recipe_utils::{base_lang, iter_metric},
     };
 
     #[test]
     fn iter_metric_test() {
-        let atoms1 = iter_metric(base_lang(), "expr", Metric::Atoms, 1).force();
+        let lang = base_lang().filter(Filter::Invert(Box::new(Filter::Contains(
+            "TOP".parse().unwrap(),
+        ))));
+        let atoms1 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 1).force();
         assert_eq!(atoms1.len(), 2);
 
-        let atoms2 = iter_metric(base_lang(), "expr", Metric::Atoms, 2).force();
+        let atoms2 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 2).force();
         assert_eq!(atoms2.len(), 4);
 
-        let atoms3 = iter_metric(base_lang(), "expr", Metric::Atoms, 3).force();
+        let atoms3 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 3).force();
         assert_eq!(atoms3.len(), 10);
 
-        let atoms4 = iter_metric(base_lang(), "expr", Metric::Atoms, 4).force();
+        let atoms4 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 4).force();
         assert_eq!(atoms4.len(), 24);
 
-        let atoms5 = iter_metric(base_lang(), "expr", Metric::Atoms, 5).force();
+        let atoms5 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 5).force();
         assert_eq!(atoms5.len(), 66);
 
-        let atoms6 = iter_metric(base_lang(), "expr", Metric::Atoms, 6).force();
+        let atoms6 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 6).force();
         assert_eq!(atoms6.len(), 188);
 
-        let atoms6 = iter_metric(base_lang(), "expr", Metric::Atoms, 7).force();
+        let atoms6 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 7).force();
         assert_eq!(atoms6.len(), 570);
 
-        let depth1 = iter_metric(base_lang(), "expr", Metric::Depth, 1).force();
+        let depth1 = iter_metric(lang.clone(), "EXPR", Metric::Depth, 1).force();
         assert_eq!(depth1.len(), 2);
 
-        let depth2 = iter_metric(base_lang(), "expr", Metric::Depth, 2).force();
+        let depth2 = iter_metric(lang.clone(), "EXPR", Metric::Depth, 2).force();
         assert_eq!(depth2.len(), 8);
 
-        let depth3 = iter_metric(base_lang(), "expr", Metric::Depth, 3).force();
+        let depth3 = iter_metric(lang.clone(), "EXPR", Metric::Depth, 3).force();
         assert_eq!(depth3.len(), 74);
 
-        let depth4 = iter_metric(base_lang(), "expr", Metric::Depth, 4).force();
+        let depth4 = iter_metric(lang.clone(), "EXPR", Metric::Depth, 4).force();
         assert_eq!(depth4.len(), 5552);
 
-        let lists1 = iter_metric(base_lang(), "expr", Metric::Lists, 1).force();
+        let lists1 = iter_metric(lang.clone(), "EXPR", Metric::Lists, 1).force();
         assert_eq!(lists1.len(), 8);
 
-        let lists2 = iter_metric(base_lang(), "expr", Metric::Lists, 2).force();
+        let lists2 = iter_metric(lang.clone(), "EXPR", Metric::Lists, 2).force();
         assert_eq!(lists2.len(), 38);
 
-        let lists3 = iter_metric(base_lang(), "expr", Metric::Lists, 3).force();
+        let lists3 = iter_metric(lang.clone(), "EXPR", Metric::Lists, 3).force();
         assert_eq!(lists3.len(), 224);
     }
 
     #[test]
     fn iter_metric_fast() {
         // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
-        let six = iter_metric(base_lang(), "expr", Metric::Atoms, 6);
-        assert_eq!(six.force().len(), 188);
-
-        let extended = Workload::new([
-            "cnst",
-            "var",
-            "(uop expr)",
-            "(bop expr expr)",
-            "(top expr expr expr)",
-        ]);
-        let three = iter_metric(extended.clone(), "expr", Metric::Atoms, 3);
+        let three = iter_metric(base_lang(), "EXPR", Metric::Atoms, 3);
         assert_eq!(three.force().len(), 10);
 
-        let four = iter_metric(extended.clone(), "expr", Metric::Atoms, 4);
+        let four = iter_metric(base_lang(), "EXPR", Metric::Atoms, 4);
         assert_eq!(four.force().len(), 32);
 
-        let five = iter_metric(extended.clone(), "expr", Metric::Atoms, 5);
+        let five = iter_metric(base_lang(), "EXPR", Metric::Atoms, 5);
         assert_eq!(five.force().len(), 106);
 
-        let six = iter_metric(extended.clone(), "expr", Metric::Atoms, 6);
+        let six = iter_metric(base_lang(), "EXPR", Metric::Atoms, 6);
         assert_eq!(six.force().len(), 388);
     }
 }
