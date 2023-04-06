@@ -109,7 +109,9 @@ impl<L: SynthLanguage> Rule<L> {
     }
 
     pub fn is_saturating(&self) -> bool {
-        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
+        // We don't need to worry about initializing variable cvecs here because
+        // we're not actually running anything.
+        let mut egraph = make_egraph(&[]);
         let l_id = egraph.add_expr(&L::instantiate(&self.lhs));
         let initial_size = egraph.number_of_classes();
 

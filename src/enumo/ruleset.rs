@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use std::{io::Write, sync::Arc};
 
 use crate::{
-    get_vars_from_recexprs, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap,
-    Limits, Signature, SynthAnalysis, SynthLanguage,
+    get_vars_from_recexprs, make_egraph, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id,
+    IndexMap, Limits, Signature, SynthAnalysis, SynthLanguage,
 };
 
 use super::{Rule, Scheduler};
@@ -400,8 +400,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     fn shrink(&mut self, chosen: &Self, scheduler: Scheduler, vars: &[String]) {
         // 1. make new egraph
-        let mut egraph = EGraph::default();
-        L::initialize_vars(&mut egraph, vars);
+        let mut egraph = make_egraph(vars);
 
         let mut initial = vec![];
         // 2. insert lhs and rhs of all candidates as roots
@@ -480,8 +479,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
 
-        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
-        L::initialize_vars(&mut egraph, &get_vars_from_recexprs(&terms));
+        let mut egraph = make_egraph(&get_vars_from_recexprs(&terms));
 
         for term in terms {
             egraph.add_expr(&term);

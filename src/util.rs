@@ -1,6 +1,13 @@
 use egg::{ENodeOrVar, RecExpr};
 
-use crate::SynthLanguage;
+use crate::{EGraph, SynthAnalysis, SynthLanguage};
+
+/// Wrapper function to ensure we always initialize variables when we make an egraph
+pub fn make_egraph<L: SynthLanguage>(vars: &[String]) -> EGraph<L, SynthAnalysis> {
+    let mut egraph = EGraph::default();
+    L::initialize_vars(&mut egraph, vars);
+    egraph
+}
 
 /// Return the `i`th letter from the English alphabet.
 pub fn letter(i: usize) -> &'static str {

@@ -1,7 +1,7 @@
 use egg::{EGraph, RecExpr};
 
 use super::*;
-use crate::{get_vars_from_recexprs, SynthAnalysis, SynthLanguage};
+use crate::{get_vars_from_recexprs, make_egraph, SynthAnalysis, SynthLanguage};
 use std::{fs::OpenOptions, io::Write};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -50,7 +50,6 @@ impl Workload {
     }
 
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
-        let mut egraph = EGraph::default();
         let sexps = self.force();
 
         // Have to find all the variables first so that we can initialize
@@ -63,7 +62,8 @@ impl Workload {
             .iter()
             .map(|s| s.to_string().parse().unwrap())
             .collect();
-        L::initialize_vars(&mut egraph, &get_vars_from_recexprs(&exprs));
+
+        let mut egraph = make_egraph(&get_vars_from_recexprs(&exprs));
 
         for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
