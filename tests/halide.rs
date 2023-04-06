@@ -326,7 +326,12 @@ mod test {
     use ruler::{enumo::Ruleset, logger, Limits};
 
     #[test]
-    fn recipe() {
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
         let all_rules = halide_rules();
