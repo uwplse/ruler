@@ -62,7 +62,13 @@ pub fn minimal() {
         "(- (- ?c ?b) ?a) ==> (- (- ?c ?a) ?b)",
         "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
     ]);
-    let mut with_condition = Ruleset::from_file("condition_candidates");
+    let mut with_condition = Ruleset::new([
+        "(- (- ?b ?c) (- ?b ?a)) ==> (if ?c (* (/ ?c ?c) (- ?a ?c)) (- (- ?b ?c) (- ?b ?a)))",
+        "(- (- ?c ?a) (- ?b ?a)) ==> (if ?b (* (/ ?b ?b) (- ?c ?b)) (- (- ?c ?a) (- ?b ?a)))",
+        "(- (- ?c ?a) (- ?b ?a)) ==> (if ?c (* (- ?c ?b) (/ ?c ?c)) (- (- ?c ?a) (- ?b ?a)))",
+        "(- (+ ?c ?a) (+ ?b ?a)) ==> (if ?b (* (- ?c ?b) (/ ?b ?b)) (- (+ ?c ?a) (+ ?b ?a)))",
+        "(/ (/ 0 ?b) (+ ?b ?a)) ==> (if (+ ?b ?a) (/ 0 ?b) (/ (/ 0 ?b) (+ ?b ?a)))",
+    ]);
     let chosen_conditional = with_condition
         .minimize(prior, Scheduler::Compress(limits))
         .0;
