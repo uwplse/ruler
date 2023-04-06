@@ -125,19 +125,19 @@ mod test {
     use super::*;
     use crate::bool::bool_rules;
     use ruler::{
-        enumo::{Ruleset, Workload},
-        recipe_utils::run_workload,
+        enumo::{Filter, Metric, Ruleset, Workload},
+        recipe_utils::{base_lang, iter_metric, run_workload},
     };
     use std::time::Instant;
 
     fn iter_bool(n: usize) -> Workload {
-        Workload::iter_lang(
-            n,
-            &["true", "false"],
-            &["a", "b", "c"],
-            &["~"],
-            &["&", "|", "^", "->"],
-        )
+        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("CONST", &Workload::new(["true", "false"]))
+            .plug("VAR", &Workload::new(["a", "b", "c"]))
+            .plug("UOP", &Workload::new(["~"]))
+            .plug("BOP", &Workload::new(["&", "|", "^", "->"]))
+            .plug("TOP", &Workload::empty())
     }
 
     #[test]

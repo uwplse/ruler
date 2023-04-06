@@ -174,14 +174,20 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
 mod test {
 
     use ruler::{
-        enumo::{Ruleset, Workload},
-        recipe_utils::run_workload,
+        enumo::{Filter, Metric, Ruleset, Workload},
+        recipe_utils::{base_lang, iter_metric, run_workload},
     };
 
     use super::*;
 
     fn iter_nat(n: usize) -> Workload {
-        Workload::iter_lang(n, &["Z"], &["a", "b", "c"], &["S"], &["+", "*"])
+        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("CONST", &Workload::new(["Z"]))
+            .plug("VAR", &Workload::new(["a", "b", "c"]))
+            .plug("UOP", &Workload::new(["S"]))
+            .plug("BOP", &Workload::new(["+", "*"]))
+            .plug("TOP", &Workload::empty())
     }
 
     #[test]

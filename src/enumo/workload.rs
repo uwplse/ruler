@@ -121,49 +121,8 @@ impl Workload {
         }
     }
 
-    pub fn iter_metric(self, atom: &str, met: Metric, n: usize) -> Self {
-        let mut pegs = self.clone();
-        for i in 1..(n + 1) {
-            pegs = self
-                .clone()
-                .plug(atom, &pegs)
-                .filter(Filter::MetricLt(met, i + 1));
-        }
-        pegs
-    }
-
-    pub fn iter_lang(
-        n: usize,
-        consts: &[&str],
-        vars: &[&str],
-        uops: &[&str],
-        bops: &[&str],
-    ) -> Self {
-        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-
-        lang.iter_metric("expr", Metric::Atoms, n)
-            .filter(Filter::Contains("var".parse().unwrap()))
-            .plug("cnst", &consts.into())
-            .plug("var", &vars.into())
-            .plug("uop", &uops.into())
-            .plug("bop", &bops.into())
-    }
-
     pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
-    }
-
-    pub fn plug_lang(
-        self,
-        vars: &Workload,
-        consts: &Workload,
-        uops: &Workload,
-        bops: &Workload,
-    ) -> Self {
-        self.plug("var", vars)
-            .plug("const", consts)
-            .plug("uop", uops)
-            .plug("bop", bops)
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {
@@ -221,80 +180,9 @@ impl From<&[&str]> for Workload {
 
 #[cfg(test)]
 mod test {
+    use crate::recipe_utils::{base_lang, iter_metric};
+
     use super::*;
-
-    #[test]
-    fn iter_metric() {
-        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-        let atoms1 = lang.clone().iter_metric("expr", Metric::Atoms, 1).force();
-        assert_eq!(atoms1.len(), 2);
-
-        let atoms2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
-        assert_eq!(atoms2.len(), 4);
-
-        let atoms3 = lang.clone().iter_metric("expr", Metric::Atoms, 3).force();
-        assert_eq!(atoms3.len(), 10);
-
-        let atoms4 = lang.clone().iter_metric("expr", Metric::Atoms, 4).force();
-        assert_eq!(atoms4.len(), 24);
-
-        let atoms5 = lang.clone().iter_metric("expr", Metric::Atoms, 5).force();
-        assert_eq!(atoms5.len(), 66);
-
-        let atoms6 = lang.clone().iter_metric("expr", Metric::Atoms, 6).force();
-        assert_eq!(atoms6.len(), 188);
-
-        let atoms6 = lang.clone().iter_metric("expr", Metric::Atoms, 7).force();
-        assert_eq!(atoms6.len(), 570);
-
-        let depth1 = lang.clone().iter_metric("expr", Metric::Depth, 1).force();
-        assert_eq!(depth1.len(), 2);
-
-        let depth2 = lang.clone().iter_metric("expr", Metric::Depth, 2).force();
-        assert_eq!(depth2.len(), 8);
-
-        let depth3 = lang.clone().iter_metric("expr", Metric::Depth, 3).force();
-        assert_eq!(depth3.len(), 74);
-
-        let depth4 = lang.clone().iter_metric("expr", Metric::Depth, 4).force();
-        assert_eq!(depth4.len(), 5552);
-
-        let lists1 = lang.clone().iter_metric("expr", Metric::Lists, 1).force();
-        assert_eq!(lists1.len(), 8);
-
-        let lists2 = lang.clone().iter_metric("expr", Metric::Lists, 2).force();
-        assert_eq!(lists2.len(), 38);
-
-        let lists3 = lang.clone().iter_metric("expr", Metric::Lists, 3).force();
-        assert_eq!(lists3.len(), 224);
-    }
-
-    #[test]
-    fn iter_metric_fast() {
-        // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
-        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-        let six = lang.iter_metric("expr", Metric::Atoms, 6);
-        assert_eq!(six.force().len(), 188);
-
-        let extended = Workload::new([
-            "cnst",
-            "var",
-            "(uop expr)",
-            "(bop expr expr)",
-            "(top expr expr expr)",
-        ]);
-        let three = extended.clone().iter_metric("expr", Metric::Atoms, 3);
-        assert_eq!(three.force().len(), 10);
-
-        let four = extended.clone().iter_metric("expr", Metric::Atoms, 4);
-        assert_eq!(four.force().len(), 32);
-
-        let five = extended.clone().iter_metric("expr", Metric::Atoms, 5);
-        assert_eq!(five.force().len(), 106);
-
-        let six = extended.clone().iter_metric("expr", Metric::Atoms, 6);
-        assert_eq!(six.force().len(), 388);
-    }
 
     #[test]
     fn filter_optimization() {
@@ -308,48 +196,50 @@ mod test {
 
     #[test]
     fn contains() {
-        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-
-        let actual3 = lang
-            .clone()
-            .iter_metric("expr", Metric::Atoms, 3)
-            .filter(Filter::Contains("var".parse().unwrap()))
+        let actual3 = iter_metric(base_lang(), "EXPR", Metric::Atoms, 3)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
             .force();
 
         let expected3 = Workload::new([
-            "var",
-            "(uop var)",
-            "(uop (uop var))",
-            "(bop cnst var)",
-            "(bop var cnst)",
-            "(bop var var)",
+            "VAR",
+            "(UOP VAR)",
+            "(UOP (UOP VAR))",
+            "(BOP VAR VAR)",
+            "(BOP VAR CONST)",
+            "(BOP CONST VAR)",
         ])
         .force();
 
         assert_eq!(actual3, expected3);
 
-        let actual4 = lang
-            .iter_metric("expr", Metric::Atoms, 4)
-            .filter(Filter::Contains("var".parse().unwrap()))
+        let actual4 = iter_metric(base_lang(), "EXPR", Metric::Atoms, 4)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
             .force();
 
         let expected4 = Workload::new([
-            "var",
-            "(uop var)",
-            "(uop (uop var))",
-            "(uop (uop (uop var)))",
-            "(uop (bop cnst var))",
-            "(uop (bop var cnst))",
-            "(uop (bop var var))",
-            "(bop cnst var)",
-            "(bop cnst (uop var))",
-            "(bop var cnst)",
-            "(bop var var)",
-            "(bop var (uop cnst))",
-            "(bop var (uop var))",
-            "(bop (uop cnst) var)",
-            "(bop (uop var) cnst)",
-            "(bop (uop var) var)",
+            "VAR",
+            "(UOP VAR)",
+            "(UOP (UOP VAR))",
+            "(UOP (UOP (UOP VAR)))",
+            "(UOP (BOP VAR VAR))",
+            "(UOP (BOP VAR CONST))",
+            "(UOP (BOP CONST VAR))",
+            "(BOP VAR VAR)",
+            "(BOP VAR CONST)",
+            "(BOP VAR (UOP VAR))",
+            "(BOP VAR (UOP CONST))",
+            "(BOP CONST VAR)",
+            "(BOP CONST (UOP VAR))",
+            "(BOP (UOP VAR) VAR)",
+            "(BOP (UOP VAR) CONST)",
+            "(BOP (UOP CONST) VAR)",
+            "(TOP VAR VAR VAR)",
+            "(TOP VAR VAR CONST)",
+            "(TOP VAR CONST VAR)",
+            "(TOP VAR CONST CONST)",
+            "(TOP CONST VAR VAR)",
+            "(TOP CONST VAR CONST)",
+            "(TOP CONST CONST VAR)",
         ])
         .force();
 

@@ -99,6 +99,7 @@ impl SynthLanguage for Math {
     }
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
+        println!("initialize vars: {:?}", vars);
         let consts = vec![
             Some(mk_rat(-1, 1)),
             Some(mk_rat(0, 1)),
@@ -562,7 +563,7 @@ pub mod test {
     use crate::rational_replicate::replicate_ruler1_recipe;
     use ruler::{
         enumo::{Ruleset, Workload},
-        recipe_utils::run_workload,
+        recipe_utils::{base_lang, iter_metric, run_workload},
     };
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
@@ -754,21 +755,15 @@ pub mod test {
 
     #[test]
     fn cond_div_figure() {
-        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
-        let uops = &Workload::new(["~", "fabs"]);
-        let bops = &Workload::new(["+", "-", "*", "/"]);
-
         let mut all_rules: Ruleset<Math> = Ruleset::default();
 
         let starting_rules = run_workload(
-            lang.clone()
-                .iter_metric("expr", enumo::Metric::Atoms, 3)
-                .plug_lang(
-                    &Workload::new(["a", "b", "c"]),
-                    &Workload::new(["-1", "0", "1"]),
-                    uops,
-                    bops,
-                ),
+            iter_metric(base_lang(), "EXPR", enumo::Metric::Atoms, 3)
+                .plug("CONST", &Workload::new(["-1", "0", "1"]))
+                .plug("VAR", &Workload::new(["a", "b", "c"]))
+                .plug("UOP", &Workload::new(["~", "fabs"]))
+                .plug("BOP", &Workload::new(["+", "*", "-", "/"]))
+                .plug("TOP", &Workload::empty()),
             all_rules.clone(),
             Limits::default(),
             false,

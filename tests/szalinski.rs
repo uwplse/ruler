@@ -154,14 +154,20 @@ impl SynthLanguage for CaddyAndFRep {
 #[cfg(test)]
 mod tests {
     use ruler::{
-        enumo::{Ruleset, Scheduler, Workload},
-        recipe_utils::run_rule_lifting,
+        enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
+        recipe_utils::{base_lang, iter_metric, run_rule_lifting},
     };
 
     use super::*;
 
     fn iter_pos(n: usize) -> Workload {
-        Workload::iter_lang(n, &[], &["Empty", "a", "b"], &["FRep"], &["Union", "Inter"])
+        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("CONST", &Workload::new(["Empty"]))
+            .plug("VAR", &Workload::new(["a", "b"]))
+            .plug("UOP", &Workload::new(["FRep"]))
+            .plug("BOP", &Workload::new(["Union", "Inter"]))
+            .plug("TOP", &Workload::empty())
     }
 
     #[test]
