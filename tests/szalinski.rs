@@ -32,7 +32,7 @@ egg::define_language! {
     "y" = DimY,
     "z" = DimZ,
     "subst" = Subst([Id; 4]),
-    "Cheat" = Cheat([Id; 7]),
+    // "Cheat" = Cheat([Id; 7]),
     // Indicate that the containing expr cannot have x, y, or z
     "Scalar" = Scalar(Id),
     Lit(Constant),
@@ -66,7 +66,7 @@ fn is_caddy(node: &CF) -> bool {
         CF::Subst(_) => false,
         CF::Scalar(_) => false,
         CF::Lit(_) => false,
-        CF::Cheat(_) => false,
+        // CF::Cheat(_) => false,
         CF::Cube(_) => true,
         CF::Cylinder(_) => true,
         CF::Sphere(_) => true,
@@ -158,6 +158,29 @@ fn custom_modify() {
             )
             ",
         ),
+        (
+            "(subst 1 2 3 (* ?b ?c))",
+            "(* (subst 1 2 3 ?b) (subst 1 2 3 ?c))",
+        ),
+        (
+            "(subst 1 2 3 (* x ?c))",
+            "(* 1 (subst 1 2 3 ?c))",
+        ),
+        (
+            "(subst (/ x (Scalar sa)) (/ y (Scalar sb)) (/ z (Scalar sc))
+             (subst (- x (Scalar ta)) (- y (Scalar tb)) (- z (Scalar tc))
+                (* ?b x)
+            ))",
+            "
+            (*
+                (subst (- (/ x (Scalar sa)) (Scalar ta)) (- (/ y (Scalar sb)) (Scalar tb)) (- (/ z (Scalar sc)) (Scalar tc))
+                    ?b
+                )
+                (- (/ x (Scalar sa)) (Scalar ta))
+            )
+            ",
+        ),
+
     ];
 
     for (term, expected) in term_expected_pairs {
@@ -176,21 +199,34 @@ fn get_frep_rules() -> Vec<&'static str> {
     [
         "(Scalar 1) ==> 1",
         "(/ ?a 1) ==> ?a",
-        "(- (/ ?a ?b) (/ ?c ?b)) ==> (/ (- ?a ?c) ?b)",
-        "(/ (- ?a ?b) ?c) ==> (- (/ ?a ?c) (/ ?b ?c))",
-        "(- (/ ?a ?b) ?c) ==> (/ (- ?a (* ?b ?c)) ?b)",
-        "(/ (- ?a (* ?b ?c)) ?b) ==> (- (/ ?a ?b) ?c)",
-        "(/ ?a (Scalar ?a)) ==> 1",
-        "(/ (Scalar ?a) (Scalar ?b)) ==> (Scalar (/ (Scalar ?a) (Scalar ?b)))",
-        "(- (Scalar ?a) (Scalar ?b)) ==> (Scalar (- (Scalar ?a) (Scalar ?b)))",
-        "(* (Scalar ?a) (Scalar ?b)) ==> (Scalar (* (Scalar ?a) (Scalar ?b)))",
-        "(- (* ?a ?c) (* ?b ?c)) ==> (* (- ?a ?b) ?c)",
+
+        "(Scalar 0) ==> 0",
+        "(- ?a 0) ==> ?a",
+
+        // "(- (/ ?a ?b) (/ ?c ?b)) ==> (/ (- ?a ?c) ?b)",
+        // "(/ (- ?a ?b) ?c) ==> (- (/ ?a ?c) (/ ?b ?c))",
+        // "(- (/ ?a ?b) ?c) ==> (/ (- ?a (* ?b ?c)) ?b)",
+        // "(/ (- ?a (* ?b ?c)) ?b) ==> (- (/ ?a ?b) ?c)",
+        // "(/ ?a (Scalar ?a)) ==> 1",
+        // "(/ (Scalar ?a) (Scalar ?b)) ==> (Scalar (/ (Scalar ?a) (Scalar ?b)))",
+        // "(- (Scalar ?a) (Scalar ?b)) ==> (Scalar (- (Scalar ?a) (Scalar ?b)))",
+        // "(* (Scalar ?a) (Scalar ?b)) ==> (Scalar (* (Scalar ?a) (Scalar ?b)))",
+        // "(- (* ?a ?c) (* ?b ?c)) ==> (* (- ?a ?b) ?c)",
+
+
+        // "(* ?a ?b) ==> (* ?b ?a)",
+
+        "(Scalar (/ ?a ?b)) ==> (/ (Scalar ?a) (Scalar ?b))",
+        "(- (/ ?a ?c) (/ ?b ?c)) ==> (/ (- ?a ?b) ?c)",
+        
+        "(Scalar (* ?a ?b)) ==> (* (Scalar ?a) (Scalar ?b))",
+        "(- (/ ?a ?c) ?b) ==> (/ (- ?a (* ?b ?c)) ?c)",
+
         "(min (max ?a ?b) ?a) ==> ?a",
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
-        "(- ?a 0) ==> ?a",
-        "(* ?a ?b) ==> (* ?b ?a)",
+
         // "(/ (- ?a (* ?b ?c)) ?b) ="
 
 
@@ -230,7 +266,7 @@ fn get_lifting_rules() -> Vec<&'static str> {
     ].into()
 }
 
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 
 fn to_idx(from_var: CF) -> usize {
     if from_var == CF::DimX {
@@ -290,7 +326,7 @@ fn compute_subst(
         }
         return cache[&(id, mapping)].clone();
     }
-    // We will replace this is we can successfully subst, but this just prevents
+    // We will replace this if we can successfully subst, but this just prevents
     // infinite cycles.
     cache.insert((id, mapping), None);
 
@@ -300,10 +336,11 @@ fn compute_subst(
             return Some(n);
         }
     }
-    // If it's a non-scalar var, then we can't hope to perform this substitution
+    // If it's a non-scalar var
     for n in egraph[id].nodes.clone() {
         if matches!(n, CF::Var(_)) {
-            return None;
+            cache.insert((id, mapping), Some(CF::Subst([mapping[0], mapping[1], mapping[2], id])));
+            return cache[&(id, mapping)].clone();
         }
     }
 
@@ -324,29 +361,34 @@ fn compute_subst(
                         cache.insert((id, mapping), Some(e_double_substed));
                         return cache[&(id, mapping)].clone();
                     } else {
+
                         if DEBUG {
                             
                             for ii in 0..depth { print!(" "); }
-                            println!("combined");
                             let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
                             let (_, eex) = extractor.find_best(e);
+                            let (_, mxex) = extractor.find_best(mapping[0]);
+                            let (_, myex) = extractor.find_best(mapping[1]);
+                            let (_, mzex) = extractor.find_best(mapping[2]);
+                            let (_, x2ex) = extractor.find_best(x2);
+                            let (_, y2ex) = extractor.find_best(y2);
+                            let (_, z2ex) = extractor.find_best(z2);
                             let (_, x3ex) = extractor.find_best(x3);
                             let (_, y3ex) = extractor.find_best(y3);
                             let (_, z3ex) = extractor.find_best(z3);
-                            for ii in 0..depth { print!(" "); }
+                            println!("mapping: {} {} {}", mxex, myex, mzex);
+                            println!("xyz2   : {} {} {}", x2ex, y2ex, z2ex);
+                            println!("xyz3   : {} {} {}", x3ex, y3ex, z3ex);
                             println!("e: {}", eex);
-                            for ii in 0..depth { print!(" "); }
-                            println!("x3: {}", x3ex);
-                            for ii in 0..depth { print!(" "); }
-                            println!("y3: {}", y3ex);
-                            for ii in 0..depth { print!(" "); }
-                            println!("z3: {}", z3ex);
                         }
+                        
+                        panic!("should have been able to lower!");
 
 
-                        // We couldn't compute through everything, at least combine the substs
-                        cache.insert((id, mapping), Some(CF::Subst([x3, y3, z3, e])));
-                        return cache[&(id, mapping)].clone();
+
+                        // // We couldn't compute through everything, at least combine the substs
+                        // cache.insert((id, mapping), Some(CF::Subst([x3, y3, z3, e])));
+                        // return cache[&(id, mapping)].clone();
                     }
                 }
             }
@@ -560,8 +602,13 @@ impl CF {
         let num_prior = prior.len();
         let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
 
+        println!("All candidates:");
+        candidates.pretty_print();
+
         let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
+
+        println!();
 
         println!(
             "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
@@ -609,13 +656,15 @@ mod tests {
             // "(Cylinder scalar scalar scalar)",
             // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
             
-            // "(Scale sa sb sc (Cube 1 1 1))", "(Cube sa sb sc)",
-            // "(Scale sa sa sa (Sphere 1))", "(Sphere sa)",
+            "(Scale sa sb sc (Cube 1 1 1))", "(Cube sa sb sc)",
+            "(Scale sa sa sa (Sphere 1))",  "(Sphere sa)",
             "(Scale sa sb sc (Trans ta tb tc a))", "(Trans (* ta sa) (* tb sb) (* tc sc) (Scale sa sb sc a))",
             "(Trans ta tb tc (Scale sa sb sc a))", "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
-            // "(Trans 0 0 0 a)", "a",
-            // "(Scale 1 1 1 a)", "a",
-            // "(Trans 0 0 0 a)", "(Scale ta tb tc a)",
+            "(Trans 0 0 0 a)", "a",
+            "(Scale 1 1 1 a)", "a",
+
+            "(Union (Inter a b) a)", "a",
+            "(Inter (Union a b) a)", "a",
 
         ]);
         let scalars: &[&str] = &["sa", "sb", "sc", "1"];
@@ -678,10 +727,10 @@ mod tests {
 
     #[test]
     fn rule_lifting() {
-        let nat_rules = get_frep_rules();
+        let frep_rules = get_frep_rules();
 
         let mut all_rules = Ruleset::default();
-        all_rules.extend(Ruleset::new(&nat_rules));
+        all_rules.extend(Ruleset::new(&frep_rules));
         
         let atoms3 = iter_szalinski(20);
 
