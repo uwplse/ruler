@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use egg::{BackoffScheduler, Rewrite, Runner};
 
@@ -82,7 +82,6 @@ impl Scheduler {
                 let mut runner = get_runner(egraph.clone(), *limits);
 
                 for _ in 0..limits.iter {
-                    }
                     // Sat
                     runner = get_runner(runner.egraph, Limits::max()).run(&sat);
 
