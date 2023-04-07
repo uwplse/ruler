@@ -3,7 +3,7 @@ use ruler::enumo::{Filter, Ruleset, Workload};
 
 pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
-    let limits = Limits::default();
+    let limits = Limits::rulefinding();
 
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);

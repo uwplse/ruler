@@ -35,7 +35,7 @@ fn recursive_rules(
             .plug("bop", bops)
             .plug("top", tops);
         rec.extend(prior);
-        let new = Pred::run_workload(wkld, rec.clone(), Limits::default());
+        let new = Pred::run_workload(wkld, rec.clone(), Limits::rulefinding());
         let mut all = new;
         all.extend(rec);
         all

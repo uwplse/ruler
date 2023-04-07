@@ -835,7 +835,7 @@ pub mod test {
                     bops,
                 ),
             all_rules.clone(),
-            Limits::default(),
+            Limits::rulefinding(),
             false,
         );
         all_rules.extend(starting_rules);
@@ -844,7 +844,7 @@ pub mod test {
             Workload::new(["(if e e e)"])
                 .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
             all_rules.clone(),
-            Limits::default(),
+            Limits::rulefinding(),
             false,
         );
         all_rules.extend(basic_if_rules);
@@ -855,7 +855,8 @@ pub mod test {
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
         terms.to_file("guard.terms");
 
-        let guarded_rules = Math::run_workload(terms, all_rules.clone(), Limits::default(), false);
+        let guarded_rules =
+            Math::run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
         assert!(guarded_rules
             .0
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
