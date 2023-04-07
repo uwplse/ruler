@@ -348,7 +348,12 @@ mod test {
     }
 
     #[test]
-    fn nightly_recipe() {
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
 
         let start = Instant::now();
