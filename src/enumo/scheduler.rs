@@ -38,7 +38,7 @@ impl Scheduler {
                 let rexpr = L::instantiate(&rule.rhs);
 
                 Self::mk_runner(egraph, &limits)
-                    .with_scheduler(BackoffScheduler::default().with_initial_match_limit(200_000))
+                    .with_scheduler(BackoffScheduler::default())
                     .with_hook(move |r| {
                         let lhs = r.egraph.lookup_expr(&lexpr);
                         let rhs = r.egraph.lookup_expr(&rexpr);
