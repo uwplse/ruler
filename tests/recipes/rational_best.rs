@@ -4,7 +4,7 @@ use super::*;
 use ruler::enumo::{Filter, Ruleset, Workload};
 
 pub fn best_enumo_recipe() -> Ruleset<Math> {
-    let limits = Limits::default();
+    let limits = Limits::rulefinding();
 
     // Start from the "basic" rational rules
     let mut rules = replicate_ruler1_recipe();
