@@ -678,7 +678,7 @@ pub mod test {
     use std::time::Duration;
 
     use super::*;
-    use crate::rational_best::{best_enumo_recipe, minimal};
+    use crate::rational_best::best_enumo_recipe;
     use crate::rational_replicate::replicate_ruler1_recipe;
     use ruler::enumo::{Filter, Ruleset, Workload};
 
@@ -899,7 +899,21 @@ pub mod test {
 
     #[test]
     fn just_best() {
-        minimal();
+        let start = Instant::now();
+        let best_rules = best_enumo_recipe();
+        let duration = start.elapsed();
+
+        logger::write_output(
+            &best_rules,
+            &best_rules,
+            "rational_best",
+            "oopsla",
+            Limits {
+                iter: 2,
+                node: 150000,
+            },
+            duration,
+        );
     }
 
     #[test]
