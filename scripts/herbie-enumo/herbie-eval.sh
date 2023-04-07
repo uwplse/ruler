@@ -103,6 +103,10 @@ function do_branch {
     fi
   fi
 
+  if [[ "$flags" == *"-o rules:numerics"* ]]; then
+
+  then
+
   make install
   popd
 
@@ -124,23 +128,29 @@ function do_branch {
 }
 
 if [ -z "$NO_RUN" ]; then
+  ### Debugging ###
   # do_branch main main
   # do_branch main main-n -o rules:numerics
-  do_branch main main-t -o generate:taylor
+  # do_branch main main-t -o generate:taylor
   # do_branch main main-n-t -o rules:numerics -o generate:taylor
   # do_branch using-ruler-nightlies enumo
   # do_branch using-ruler-nightlies enumo-n -o rules:numerics
-  do_branch using-ruler-nightlies enumo-t -o generate:taylor
-  do_branch using-ruler-nightlies enumo-n-t -o rules:numerics -o generate:taylor
+  # do_branch using-ruler-nightlies enumo-t -o generate:taylor
+  # do_branch using-ruler-nightlies enumo-n-t -o rules:numerics -o generate:taylor
   # do_branch using-ruler-baseline ruler
   # do_branch using-ruler-baseline ruler-n -o rules:numerics
-  do_branch using-ruler-baseline ruler-t -o generate:taylor
-  do_branch using-ruler-baseline ruler-n-t -o rules:numerics -o generate:taylor
+  # do_branch using-ruler-baseline ruler-t -o generate:taylor
+  # do_branch using-ruler-baseline ruler-n-t -o rules:numerics -o generate:taylor
   # do_branch main no-rules -o generate:rr -o generate:simplify
   # do_branch ruler-no-fast-forwarding ruler-no-ff
   # do_branch ruler-no-fast-forwarding ruler-no-ff-n -o rules:numerics
+  # do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
+  # do_branch ruler-no-fast-forwarding ruler-no-ff-n-t -o rules:numerics -o generate:taylor
+  ### Final ###
+  do_branch main main-t -o generate:taylor
+  do_branch using-ruler-nightlies enumo-t -o generate:taylor
   do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
-  do_branch ruler-no-fast-forwarding ruler-no-ff-n-t -o rules:numerics -o generate:taylor
+  do_branch using-ruler-baseline ruler-t -o generate:taylor
 fi
 
 # Plots
