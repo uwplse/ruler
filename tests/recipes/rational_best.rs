@@ -5,14 +5,14 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
         iter: 4,
-        node: 1_000_000,
+        node: 2_000_000,
     };
 
-    let cheat_domain = Workload::new(&[
+    /*let cheat_domain = Workload::new(&[
         "(+ a b)",
         "(/ (- (* a a) (* b b))
         (- a b))",
-    ]);
+    ]);*/
 
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
@@ -44,7 +44,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     rules.extend(layer2_rules);
 
     // Contains var filter
-    let contains_var_filter = Filter::Or(vec![
+    /*let contains_var_filter = Filter::Or(vec![
         Filter::Contains("a".parse().unwrap()),
         Filter::Contains("b".parse().unwrap()),
         Filter::Contains("c".parse().unwrap()),
@@ -57,7 +57,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
 
     let vars = Workload::new(["a", "b", "c"]);
-    let consts = Workload::new(["-1", "0", "1", "2"]);
+    let consts = Workload::new(["-1", "0", "1", "2"]);*/
 
     // Factorization
     println!("factorization");
@@ -76,9 +76,9 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     rules.extend(factor_rules);
 
     // cheat domain TODO remove
-    let cheat_domain_rules =
+    /*let cheat_domain_rules =
         Math::run_workload_conditional(cheat_domain, rules.clone(), limits, false);
-    rules.extend(cheat_domain_rules);
+    rules.extend(cheat_domain_rules);*/
 
     // Nested fabs
     /*println!("nested fabs");
