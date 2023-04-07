@@ -6,7 +6,7 @@ use ruler::{
 
 pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
-    let limits = Limits::default();
+    let limits = Limits::rulefinding();
 
     // Domain
     let vars = &Workload::new(["a", "b", "c"]);
@@ -44,7 +44,6 @@ pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
         .filter(filter)
         .plug("CONST", &Workload::empty())
         .plug("VAR", &Workload::empty());
-    layer2.to_file("l2.terms");
     let layer2_rules = run_workload(layer2.clone(), rules.clone(), limits, true);
     rules.extend(layer2_rules);
 
