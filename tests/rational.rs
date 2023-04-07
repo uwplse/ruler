@@ -67,24 +67,23 @@ impl SynthLanguage for Math {
             Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
-            Math::If([x, y, z]) => {
-                get_cvec(x).iter()
-                           .zip(get_cvec(y).iter())
-                        .zip(get_cvec(z).iter())
-                        .map(|tup| {
-                            let ((x, y), z) = tup;
-                            if let Some(cond) = x {
-                                if !cond.is_zero() {
-                                    y.clone()
-                                } else {
-                                    z.clone()
-                                }
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>()
-            }
+            Math::If([x, y, z]) => get_cvec(x)
+                .iter()
+                .zip(get_cvec(y).iter())
+                .zip(get_cvec(z).iter())
+                .map(|tup| {
+                    let ((x, y), z) = tup;
+                    if let Some(cond) = x {
+                        if !cond.is_zero() {
+                            y.clone()
+                        } else {
+                            z.clone()
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>(),
         }
     }
 
@@ -127,16 +126,17 @@ impl SynthLanguage for Math {
                 }
                 _ => None,
             },
-            Math::If([x, y, z]) => 
-             if let Some(x) = get_const(x) {
-                if !x.is_zero() {
-                    get_const(y)
+            Math::If([x, y, z]) => {
+                if let Some(x) = get_const(x) {
+                    if !x.is_zero() {
+                        get_const(y)
+                    } else {
+                        get_const(z)
+                    }
                 } else {
-                    get_const(z)
+                    None
                 }
-            } else {
-                None
-            },
+            }
         }
         .map(|c| Interval::new(Some(c.clone()), Some(c)))
         .unwrap_or_default()
@@ -203,8 +203,6 @@ impl SynthLanguage for Math {
             z3::ast::Bool::or(&ctx, &lhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
         let error_preserved = rhs_errors.iff(&lhs_errors);
         let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
-
-        
 
         solver.assert(&assertion.clone().not());
         let res = Self::z3_res_to_validationresult(solver.check());

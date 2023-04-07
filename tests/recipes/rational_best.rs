@@ -72,12 +72,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let factor_div = Workload::new(["(/ v v)"])
         .plug("v", &factor_term)
         .filter(Filter::Canon(vec!["a".to_string(), "b".to_string()]));
-    let factor_rules = Math::run_workload_conditional(
-        factor_div,
-        rules.clone(),
-        limits,
-        false,
-    );
+    let factor_rules = Math::run_workload_conditional(factor_div, rules.clone(), limits, false);
     rules.extend(factor_rules);
 
     // cheat domain TODO remove
