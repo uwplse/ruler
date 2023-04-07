@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use egg::{Rewrite, Runner};
 
@@ -17,12 +17,13 @@ impl Scheduler {
     fn mk_runner<L: SynthLanguage>(
         egraph: EGraph<L, SynthAnalysis>,
         limits: &Limits,
+        timeout: Duration,
     ) -> Runner<L, SynthAnalysis> {
         Runner::default()
             .with_scheduler(egg::SimpleScheduler)
             .with_node_limit(limits.node)
             .with_iter_limit(limits.iter)
-            .with_time_limit(Duration::from_secs(600))
+            .with_time_limit(timeout)
             .with_egraph(egraph)
     }
 
@@ -31,13 +32,14 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
         rule: Option<&Rule<L>>,
+        timeout: Duration,
     ) -> EGraph<L, SynthAnalysis> {
         let get_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
             if let Some(rule) = rule {
                 let lexpr = L::instantiate(&rule.lhs);
                 let rexpr = L::instantiate(&rule.rhs);
 
-                Self::mk_runner(egraph, &limits).with_hook(move |r| {
+                Self::mk_runner(egraph, &limits, timeout).with_hook(move |r| {
                     let lhs = r.egraph.lookup_expr(&lexpr);
                     let rhs = r.egraph.lookup_expr(&rexpr);
                     match (lhs, rhs) {
@@ -52,7 +54,7 @@ impl Scheduler {
                     }
                 })
             } else {
-                Self::mk_runner(egraph, &limits)
+                Self::mk_runner(egraph, &limits, timeout)
             }
         };
         match self {
@@ -79,7 +81,15 @@ impl Scheduler {
 
                 let mut runner = get_runner(egraph.clone(), *limits);
 
+                let start = Instant::now();
                 for _ in 0..limits.iter {
+                    // Early out if we've passed the time limit
+                    let elapsed = start.elapsed();
+                    if elapsed > timeout {
+                        runner.egraph.rebuild();
+                        return runner.egraph;
+                    }
+
                     // Sat
                     runner = get_runner(runner.egraph, Limits::max()).run(&sat);
 
@@ -129,7 +139,11 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        self.run_internal(egraph, ruleset, None)
+        // Set timeout to something quite high (10 minutes) to reduce non-deterministic
+        // behavior. If egg terminates due to timeout, it's hard to reason about
+        // what did/didn't merge, and things vary a lot on different machines, so
+        // it is best to avoid terminating due to timeout.
+        self.run_internal(egraph, ruleset, None, Duration::from_secs(600))
     }
 
     pub fn run_derive<L: SynthLanguage>(
@@ -138,6 +152,14 @@ impl Scheduler {
         ruleset: &Ruleset<L>,
         rule: &Rule<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        self.run_internal(egraph, ruleset, Some(rule))
+        // We need to include a timeout for derivability checking because the ruler1
+        // baseline rules are not very well-behaved so they go off the rails if left
+        // unattended. The ruler1 derivability checker had a 10 second timeout,
+        // so we do the same here. Ours is actually more generous because (at least
+        // in the case of the saturating scheduler), it's possible to run for 30-40
+        // seconds because there are multiple runners strung together. In any case,
+        // the timeout gives the rules at least as long as the ruler1 derivability
+        // checker would have.
+        self.run_internal(egraph, ruleset, Some(rule), Duration::from_secs(10))
     }
 }

@@ -91,7 +91,7 @@ impl Limits {
     // match oopsla limits
     pub fn deriving() -> Self {
         Self {
-            iter: 3,
+            iter: 5,
             node: 100_000,
         }
     }
