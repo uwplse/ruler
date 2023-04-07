@@ -122,14 +122,11 @@ pub fn get_derivability_results<L: SynthLanguage>(
         Limits::deriving()
     };
 
-    println!("{:?}", derive_type);
     let start_f = Instant::now();
     let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, limits);
-    println!("{} / {}", can_f.len(), cannot_f.len());
     let time_f = start_f.elapsed();
     let start_b = Instant::now();
     let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
-    println!("{} / {}", can_b.len(), cannot_b.len());
     let time_b = start_b.elapsed();
 
     let derivability_results = json!({

@@ -99,7 +99,6 @@ impl SynthLanguage for Math {
     }
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
-        println!("initialize vars: {:?}", vars);
         let consts = vec![
             Some(mk_rat(-1, 1)),
             Some(mk_rat(0, 1)),
