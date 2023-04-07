@@ -3,6 +3,7 @@ use super::*;
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Filter {
     MetricLt(Metric, usize),
+    MetricEq(Metric, usize),
     Contains(Pattern),
     Canon(Vec<String>),
     And(Vec<Self>),
@@ -14,6 +15,7 @@ impl Filter {
     pub(crate) fn test(&self, sexp: &Sexp) -> bool {
         match self {
             Filter::MetricLt(metric, n) => sexp.measure(*metric) < *n,
+            Filter::MetricEq(metric, n) => sexp.measure(*metric) == *n,
             Filter::Contains(pat) => {
                 pat.matches(sexp)
                     || match sexp {

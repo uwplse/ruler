@@ -34,7 +34,7 @@ jobs:
           toolchain: 1.66
           override: true
       - run: rustup component add clippy
-    
+
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
@@ -43,22 +43,24 @@ jobs:
   unit:
     name: "Unit Tests"
     runs-on: ubuntu-latest
+    env:
+      SKIP_RECIPES: 1
     steps:
       - uses: actions/checkout@main
 
       - name: Install Rust compiler
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.66
-            default: true
-            override: true
-            components: rustfmt, clippy
+          toolchain: 1.66
+          default: true
+          override: true
+          components: rustfmt, clippy
 
       - name: "Build"
         run: cargo build --release
 
       - name: "Setup tests"
-        run: mkdir -p out/  
+        run: mkdir -p out/
 
       - name: "Unit tests"
         run: cargo test --release
