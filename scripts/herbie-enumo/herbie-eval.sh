@@ -57,9 +57,6 @@ for fpcore in $FPCORES; do
   mv "$fpcore.tmp" $fpcore
 done
 
-
-# "$HERBIE_DIR/bench/libraries" \
-
 # Run the branches!!!
 
 function do_branch {
@@ -85,7 +82,11 @@ function do_branch {
   # Patch ruler-autogen rule branches
   if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
     # In case of broken nightlies, target different branch
-    sed -i 's/main/oflatt-conditional-herbie/g' "$HERBIE_DIR/src/syntax/rules.rkt"
+    # sed -i 's/main/oflatt-conditional-herbie/g' "$HERBIE_DIR/src/syntax/rules.rkt"
+    if [[ -n "$COMMIT" ]]; then
+      sed -i "s/(define nightly-commit #f)/(define nightly-commit \"$COMMIT\")/g" "$HERBIE_DIR/src/syntax/rules.rkt"
+    fi
+
     if [[ "$flags" == *"-o rules:numerics"* ]]; then
       echo "skipping numerics patch"
     else
@@ -157,4 +158,4 @@ fi
 
 # Plots
 
-# bash plot.sh $OUTDIR
+bash plot.sh $OUTDIR
