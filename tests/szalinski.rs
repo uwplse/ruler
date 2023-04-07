@@ -89,8 +89,8 @@ fn op_cost (enode: &CF) -> f64 {
     return 0.;
 }
 
-struct SillyCostFn;
-impl CostFunction<CF> for SillyCostFn {
+struct SzalinskiCostFunction;
+impl CostFunction<CF> for SzalinskiCostFunction {
     type Cost = f64;
     fn cost<C>(&mut self, enode: &CF, mut costs: C) -> Self::Cost
     where
@@ -118,6 +118,7 @@ fn custom_modify() {
             "(subst (/ x a) y z (* x x))",
             "(* (/ x a) (/ x a))",
         ),
+
         (
             "(subst (/ x ?a) (/ y ?b) (/ z ?c)
                 
@@ -173,39 +174,39 @@ fn custom_modify() {
 
 fn get_frep_rules() -> Vec<&'static str> {
     [
-        "(/ ?a (Scalar 1)) ==> ?a",
+        "(Scalar 1) ==> 1",
+        "(/ ?a 1) ==> ?a",
         "(- (/ ?a ?b) (/ ?c ?b)) ==> (/ (- ?a ?c) ?b)",
-        "(/ (- ?a (Scalar ?b)) (Scalar ?c)) ==> (- (/ ?a (Scalar ?c)) (/ (Scalar ?b) (Scalar ?c)))",
-        "(- (/ ?a (Scalar ?b)) (Scalar ?c)) ==> (/ (- ?a (Scalar (* ?b ?c))) ?c)",
+        "(/ (- ?a ?b) ?c) ==> (- (/ ?a ?c) (/ ?b ?c))",
+        "(- (/ ?a ?b) ?c) ==> (/ (- ?a (* ?b ?c)) ?b)",
+        "(/ (- ?a (* ?b ?c)) ?b) ==> (- (/ ?a ?b) ?c)",
+        "(/ ?a (Scalar ?a)) ==> 1",
+        "(/ (Scalar ?a) (Scalar ?b)) ==> (Scalar (/ (Scalar ?a) (Scalar ?b)))",
+        "(- (Scalar ?a) (Scalar ?b)) ==> (Scalar (- (Scalar ?a) (Scalar ?b)))",
+        "(* (Scalar ?a) (Scalar ?b)) ==> (Scalar (* (Scalar ?a) (Scalar ?b)))",
+        "(- (* ?a ?c) (* ?b ?c)) ==> (* (- ?a ?b) ?c)",
         "(min (max ?a ?b) ?a) ==> ?a",
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
-        "(- ?a (Scalar 0)) ==> ?a",
+        "(- ?a 0) ==> ?a",
         "(* ?a ?b) ==> (* ?b ?a)",
+        // "(/ (- ?a (* ?b ?c)) ?b) ="
 
 
-        "(Scale ?sa ?sb ?sc (Trans ?ta ?tb ?tc ?a)) ==> (Cheat ?sa ?sb ?sc ?ta ?tb ?tc ?a)",
-        "(Trans (* ?ta ?sa) (* ?tb ?sb) (* ?tc ?sc) (Scale ?sa ?sb ?sc ?a))  ==> (Cheat ?sa ?sb ?sc ?ta ?tb ?tc ?a)",
+        // "(Scale ?sa ?sb ?sc (Trans ?ta ?tb ?tc ?a)) ==>
+        //     // (subst (- (/ x (Scalar ?sa)) (Scalar ?ta)) (- (/ y (Scalar ?sb)) (Scalar ?tb)) (- (/ z (Scalar ?sc)) (Scalar ?tc)) ?a)",
+
+        // "(Trans (* ?ta ?sa) (* ?tb ?sb) (* ?tc ?sc) (Scale ?sa ?sb ?sc ?a)) ==>
+        // (Cheat ?ta ?sa ?tb ?sb ?tc ?sc ?a)",
+
+        // "(Cheat ?ta ?sa ?tb ?sb ?tc ?sc ?a) ==>
+        //  (Scale ?sa ?sb ?sc (Trans ?ta ?tb ?tc ?a))",
+        // (subst (- (/ x (Scalar ?sa)) (Scalar ?ta)) (- (/ y (Scalar ?sb)) (Scalar ?tb)) (- (/ z (Scalar ?sc)) (Scalar ?tc)) ?a)",
+        // "(Trans (* 
+        // (subst (- (/ x ?sa) ?ta) (- (/ y ?sb) ?tb) (- (/ z ?sc) ?tc) ?a)",?ta ?sa) (* ?tb ?sb) (* ?tc ?sc) (Scale ?sa ?sb ?sc ?a)) ==>
         // "(Trans ta tb tc (Scale sa sb sc a))",
         // "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
-
-        // "(subst ?v ?v ?to) ==> ?to",
-        // "(subst x y ?to) ==> x",
-        // "(subst x z ?to) ==> x",
-        // "(subst y x ?to) ==> y",
-        // "(subst y z ?to) ==> y",
-        // "(subst z x ?to) ==> z",
-        // "(subst z y ?to) ==> z",
-        // "(subst 1 ?from ?to) ==> 1",
-        // "(subst 0 ?from ?to) ==> 0",
-        // // "(subst (min ?a ?b) ?from ?to) ==> (min (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        // "(subst (- ?a ?b) ?from ?to) ==> (- (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        // "(subst (/ ?a ?b) ?from ?to) ==> (/ (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        // "(subst (* ?a ?b) ?from ?to) ==> (* (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        // "(subst (geq ?a ?b) ?from ?to) ==> (geq (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        // "(subst (& ?a ?b) ?from ?to) ==> (& (subst ?a ?from ?to) (subst ?b ?from ?to))",
-        // "(subst (| ?a ?b) ?from ?to) ==> (| (subst ?a ?from ?to) (subst ?b ?from ?to))",
     ]
     .into()
 }
@@ -221,6 +222,10 @@ fn get_lifting_rules() -> Vec<&'static str> {
                                             (min (- 1 (/ y (Scalar ?b)))
                                                  (min (/ z (Scalar ?c))
                                                       (- 1 (/ z (Scalar ?c))))))))",
+        
+        "(Sphere ?r) ==> (- (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
+                               (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
+                            (* (/ z (Scalar ?r)) (/ z (Scalar ?r))))",
         "(Trans ?a ?b ?c ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
     ].into()
 }
@@ -273,7 +278,7 @@ fn compute_subst(
     if DEBUG {
         for ii in 0..depth { print!(" "); }
         println!("cs");
-        let extractor = Extractor::new(&egraph, SillyCostFn);
+        let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
         let (_, idex) = extractor.find_best(id);
         for ii in 0..depth { print!(" "); }
         println!("id: {} {}", id, idex);
@@ -323,7 +328,7 @@ fn compute_subst(
                             
                             for ii in 0..depth { print!(" "); }
                             println!("combined");
-                            let extractor = Extractor::new(&egraph, SillyCostFn);
+                            let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
                             let (_, eex) = extractor.find_best(e);
                             let (_, x3ex) = extractor.find_best(x3);
                             let (_, y3ex) = extractor.find_best(y3);
@@ -490,7 +495,7 @@ impl SynthLanguage for CF {
                     let mut cache: HashMap<(Id, [Id; 3]), Option<CF>> = HashMap::new();
                     
                     if DEBUG {
-                        let extractor = Extractor::new(&egraph, SillyCostFn);
+                        let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
                         let (_, eex) = extractor.find_best(e);
                         let (_, x2ex) = extractor.find_best(x2);
                         let (_, y2ex) = extractor.find_best(y2);
@@ -510,7 +515,7 @@ impl SynthLanguage for CF {
                         
                         if DEBUG {
                             println!("custom modify SUCCESS");
-                            let extractor = Extractor::new(&egraph, SillyCostFn);
+                            let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
                             let (_, eex) = extractor.find_best(e);
                             let (_, x2ex) = extractor.find_best(x2);
                             let (_, y2ex) = extractor.find_best(y2);
@@ -603,11 +608,11 @@ mod tests {
             // "(Sphere scalar)",
             // "(Cylinder scalar scalar scalar)",
             // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
-            // "(Cube sa sb sc)", "(Scale sa sb sc (Cube 1 1 1))",
-            "(Scale sa sb sc (Trans ta tb tc a))",
-            "(Trans (* ta sa) (* tb sb) (* tc sc) (Scale sa sb sc a))",
-            "(Trans ta tb tc (Scale sa sb sc a))",
-            "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
+            
+            // "(Scale sa sb sc (Cube 1 1 1))", "(Cube sa sb sc)",
+            // "(Scale sa sa sa (Sphere 1))", "(Sphere sa)",
+            "(Scale sa sb sc (Trans ta tb tc a))", "(Trans (* ta sa) (* tb sb) (* tc sc) (Scale sa sb sc a))",
+            "(Trans ta tb tc (Scale sa sb sc a))", "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
             // "(Trans 0 0 0 a)", "a",
             // "(Scale 1 1 1 a)", "a",
             // "(Trans 0 0 0 a)", "(Scale ta tb tc a)",
@@ -641,7 +646,7 @@ mod tests {
 
         let prior = Ruleset::new(&frep_rules);
 
-        let atoms3 = iter_szalinski(3);
+        let atoms3 = iter_szalinski(15);
         // assert_eq!(atoms3.force().len(), 51);
 
         let limits = Limits {
@@ -671,7 +676,7 @@ mod tests {
         }
     }
 
-    // #[test]
+    #[test]
     fn rule_lifting() {
         let nat_rules = get_frep_rules();
 
