@@ -173,7 +173,7 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let scheduler = Scheduler::Compress(Limits::default());
+        let scheduler = Scheduler::Compress(Limits::rulefinding());
 
         let egraph = scheduler.run(&atoms3.to_egraph(), &all_rules);
         let mut candidates = Ruleset::cvec_match(&egraph);
@@ -228,7 +228,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -239,19 +239,19 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::default());
+        let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::rulefinding());
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::default());
+        let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::rulefinding());
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
+        let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::rulefinding());
         all_rules.extend(rules5);
 
         let expected: Ruleset<Bool> = Ruleset::new(&[
@@ -286,13 +286,18 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
 
     #[test]
     fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let start = Instant::now();
         let rules = bool_rules();
         let duration = start.elapsed();

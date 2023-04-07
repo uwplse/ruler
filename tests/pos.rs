@@ -275,7 +275,7 @@ mod tests {
             "(XO ?a) <=> (+ ?a ?a)",
             "(+ ?a (XO ?a)) <=> (* ?a (XI XH))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }

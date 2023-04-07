@@ -111,9 +111,13 @@ impl SynthLanguage for Pred {
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let consts = vec![
+            Some((-10).to_bigint().unwrap()),
             Some((-1).to_bigint().unwrap()),
             Some(0.to_bigint().unwrap()),
             Some(1.to_bigint().unwrap()),
+            Some(2.to_bigint().unwrap()),
+            Some(5.to_bigint().unwrap()),
+            Some(100.to_bigint().unwrap()),
         ];
         let cvecs = self_product(&consts, vars.len());
 
@@ -322,7 +326,12 @@ mod test {
     use ruler::{enumo::Ruleset, logger, Limits};
 
     #[test]
-    fn recipe() {
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
         let all_rules = halide_rules();

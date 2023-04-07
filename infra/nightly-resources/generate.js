@@ -70,21 +70,53 @@ function load() {
   document.getElementById("halide_table").innerHTML = ConvertJsonToTable(
     getBaseline(data, "halide")
   );
+
+  document.getElementById("detail").innerHTML = populateDomainDetail();
 }
 
-function loadDeriveDetail() {
+function populateDomainDetail() {
+  let domains = data.map((x) => x.enumo_spec_name);
+  let str = "";
+  domains.forEach((domain) => {
+    str += "<p>";
+    str += `${domain}: `;
+    str += `<a href="rules.html?domain=${domain}">All Rules</a> `;
+    str += `<a href="derive_detail.html?domain=${domain}">Derivability</a>`;
+    str += "</p>";
+  });
+  return str;
+}
+
+function getDomainData() {
   let params = new URLSearchParams(window.location.search);
   let domain = Object.fromEntries(params).domain;
 
   if (!domain) {
     return;
   }
-  document.getElementById("domain_name").innerHTML = domain;
 
   let domainData = data.find((x) => x.enumo_spec_name == domain);
   if (!domainData) {
     return;
   }
+  return domainData;
+}
+
+function loadRules() {
+  let domainData = getDomainData();
+  document.getElementById("domain_name").innerHTML = domainData.enumo_spec_name;
+  let rules = domainData.rules.rules;
+  let str = "";
+  rules.forEach((rule) => {
+    str += `${rule} <br />`;
+  });
+  document.getElementById("all_rules").innerHTML = str;
+}
+
+function loadDeriveDetail() {
+  let domainData = getDomainData();
+  document.getElementById("domain_name").innerHTML = domainData.enumo_spec_name;
+
   let deriveTypes = ["lhs", "lhs_rhs", "all"];
   deriveTypes.forEach((deriveType) => {
     document.getElementById(`${deriveType}_etob_can`).innerHTML =
@@ -128,6 +160,8 @@ function tryRound(v) {
 }
 
 function generateLatex(baseline) {
+  let escape = (s) => s.replaceAll("#", "\\#");
+
   let baselineData = getBaseline(data, baseline);
 
   let columnNames = Object.keys(baselineData[0]);
@@ -138,7 +172,9 @@ function generateLatex(baseline) {
     String.raw`\begin{tabular}{` + "l".repeat(columnNames.length) + "}",
   ];
 
-  lines.push(columnNames.join(" & ") + " \\\\ cline{1-9}");
+  lines.push(
+    columnNames.join(" & ") + String.raw`\\ \cline{1-${columnNames.length}}`
+  );
 
   baselineData.forEach((row) => {
     lines.push(Object.values(row).join(" & ") + " \\\\");
@@ -149,7 +185,7 @@ function generateLatex(baseline) {
   lines.push(String.raw`\label{table:${baseline}}`);
   lines.push(String.raw`\end{table}`);
 
-  let s = lines.join("\n");
+  let s = lines.map((l) => escape(l)).join("\n");
   let elem = document.getElementById("latex");
   elem.innerHTML = s;
   elem.style.height = "200px";

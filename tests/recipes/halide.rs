@@ -35,7 +35,7 @@ fn recursive_rules(
             .plug("bop", bops)
             .plug("top", tops);
         rec.extend(prior);
-        let new = Pred::run_workload(wkld, rec.clone(), Limits::default());
+        let new = Pred::run_workload(wkld, rec.clone(), Limits::rulefinding());
         let mut all = new;
         all.extend(rec);
         all
@@ -67,7 +67,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         &Workload::new(&["-1", "0", "1"]),
         &Workload::new(&["a", "b", "c"]),
         &Workload::new(&["-"]),
-        &Workload::new(&["+", "-", "*", "min", "max"]), // No div for now
+        &Workload::new(&["+", "-", "*", "/", "min", "max"]),
         &Workload::Set(vec![]),
         all_rules.clone(),
     );
@@ -94,7 +94,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         &Workload::new(&["a", "b", "c"]),
         &Workload::new(&["-", "!"]),
         &Workload::new(&[
-            "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+            "&&", "||", "^", "+", "-", "*", "/", "min", "max", "<", "<=", "==", "!=",
         ]),
         &Workload::new(&["select"]),
         all_rules.clone(),
