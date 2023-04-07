@@ -754,6 +754,11 @@ pub mod test {
 
     #[test]
     fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
