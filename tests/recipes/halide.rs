@@ -29,11 +29,13 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let rat_only = recursive_rules(
         Metric::Atoms,
         5,
-        &Workload::new(&["-1", "0", "1"]),
-        &Workload::new(&["a", "b", "c"]),
-        &Workload::new(&["-"]),
-        &Workload::new(&["+", "-", "*", "/", "min", "max"]),
-        &Workload::Set(vec![]),
+        Lang::new(
+            &["-1", "0", "1"],
+            &["a", "b", "c"],
+            &["-"],
+            &["+", "-", "*", "/", "min", "max"],
+            &[],
+        ),
         all_rules.clone(),
     );
     all_rules.extend(rat_only);
@@ -57,6 +59,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let full = recursive_rules(
         Metric::Atoms,
         4,
+<<<<<<< HEAD
         &Workload::new(&["-1", "0", "1"]),
         &Workload::new(&["a", "b", "c"]),
         &Workload::new(&["-", "!"]),
@@ -64,6 +67,17 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "&&", "||", "^", "+", "-", "*", "/", "min", "max", "<", "<=", "==", "!=",
         ]),
         &Workload::new(&["select"]),
+=======
+        Lang::new(
+            &["-1", "0", "1"],
+            &["a", "b", "c"],
+            &["-", "!"],
+            &[
+                "&&", "||", "^", "+", "-", "*", "/", "min", "max", "<", "<=", "==", "!=",
+            ],
+            &["select"],
+        ),
+>>>>>>> 0e9874f405f4e0d5a75b70e45b0ff44c87147e77
         all_rules.clone(),
     );
     all_rules.extend(full);

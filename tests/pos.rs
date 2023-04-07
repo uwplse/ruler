@@ -112,14 +112,20 @@ impl SynthLanguage for Pos {
 #[cfg(test)]
 mod tests {
     use ruler::{
-        enumo::{Ruleset, Scheduler, Workload},
-        recipe_utils::run_rule_lifting,
+        enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
+        recipe_utils::{base_lang, iter_metric, run_rule_lifting},
     };
 
     use super::*;
 
     fn iter_pos(n: usize) -> Workload {
-        Workload::iter_lang(n, &["XH"], &["a", "b", "c"], &["XO", "XI"], &["+", "*"])
+        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("CONST", &Workload::new(["XH"]))
+            .plug("VAR", &Workload::new(["a", "b", "c"]))
+            .plug("UOP", &Workload::new(["XO", "XI"]))
+            .plug("BOP", &Workload::new(["+", "*"]))
+            .plug("TOP", &Workload::empty())
     }
 
     #[test]
