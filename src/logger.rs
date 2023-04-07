@@ -21,8 +21,29 @@ pub fn write_output<L: SynthLanguage>(
         get_derivability_results(ruleset, DeriveType::Lhs, baseline, limits);
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
         get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, limits);
-    let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline, limits);
+
+    let (forwards_all, backwards_all) = (0, 0);
+    let (all_f, all_b) = (Duration::default(), Duration::default());
+    let results_all = json!({
+        "enumo_derives_baseline_derivable": vec!([""]),
+        "enumo_derives_baseline_underivable": vec!([""]),
+        "baseline_derives_enumo_derivable": vec!([""]),
+        "baseline_derives_enumo_underivable": vec!([""]),
+    });
+
+    if recipe_name == "halide" {
+        let (forwards_all, backwards_all) = (0, 0);
+        let (all_f, all_b) = (Duration::default(), Duration::default());
+        let results_all = json!({
+            "enumo_derives_baseline_derivable": vec!([""]),
+            "enumo_derives_baseline_underivable": vec!([""]),
+            "baseline_derives_enumo_derivable": vec!([""]),
+            "baseline_derives_enumo_underivable": vec!([""]),
+        });
+    } else {
+        let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
+            get_derivability_results(ruleset, DeriveType::AllRules, baseline, limits);
+    }
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
