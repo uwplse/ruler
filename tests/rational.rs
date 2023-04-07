@@ -725,9 +725,13 @@ pub mod test {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
+        println!("Beginning rulefinding for rational (replicate)...");
+
         let start = Instant::now();
         let replicate_rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
+
+        println!("{} replicate rules found.", replicate_rules.len());
 
         logger::write_output(
             &replicate_rules,
@@ -736,6 +740,9 @@ pub mod test {
             "oopsla",
             duration,
         );
+
+        println!("Derivability with Ruler 1 complete.");
+
         logger::write_output(
             &replicate_rules,
             &herbie,
@@ -744,12 +751,20 @@ pub mod test {
             duration,
         );
 
+        println!("Derivability with Herbie complete.");
+
+        println!("Beginning rulefinding for rational (best)...");
+
         let start = Instant::now();
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
 
+        println!("{} best rules found.", best_rules.len());
+
         logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
+        println!("Derivability with Ruler 1 complete.");
         logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
+        println!("Derivability with Herbie complete.");
     }
 
     #[test]

@@ -6,7 +6,7 @@ use ruler::{
 
 pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
-    let limits = Limits::default();
+    let limits = Limits::rulefinding();
 
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
@@ -32,7 +32,7 @@ pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
         .iter_metric("expr", enumo::Metric::Depth, 3)
         .filter(Filter::Contains("var".parse().unwrap()))
         .plug_lang(vars, consts, uops, bops);
-    layer2.to_file("replicate_layer2_terms");
+    layer2.to_file("replicate_layer2_terms.terms");
     let layer2_rules = run_workload(layer2.clone(), rules.clone(), limits, true);
     rules.extend(layer2_rules);
 
