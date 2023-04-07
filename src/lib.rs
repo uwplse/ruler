@@ -8,6 +8,7 @@ pub use util::*;
 mod bv;
 pub mod enumo;
 mod language;
+pub mod logger;
 mod util;
 
 pub type Id = egg::Id;
@@ -54,6 +55,13 @@ pub struct Limits {
     pub node: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum DeriveType {
+    Lhs,
+    LhsAndRhs,
+    AllRules,
+}
+
 impl Default for Limits {
     fn default() -> Self {
         Self {
@@ -68,6 +76,22 @@ impl Limits {
         Self {
             iter: usize::MAX,
             node: usize::MAX,
+        }
+    }
+
+    // match oopsla limits
+    pub fn rulefinding() -> Self {
+        Self {
+            iter: 2,
+            node: 300_000,
+        }
+    }
+
+    // match oopsla limits
+    pub fn deriving() -> Self {
+        Self {
+            iter: 5,
+            node: 100_000,
         }
     }
 }

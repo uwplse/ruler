@@ -1,14 +1,12 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use serde_json::*;
-use std::fs::*;
 use std::sync::Mutex;
-use std::{io::Read, io::Write, sync::Arc, time::Duration};
+use std::{io::Write, sync::Arc};
 
 use crate::{
-    CVec, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature, SynthAnalysis,
-    SynthLanguage, ValidationResult,
+    CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
+    SynthAnalysis, SynthLanguage,
 };
 
 use super::{Rule, Scheduler};
@@ -81,6 +79,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         Ruleset(map)
     }
 
+    pub fn union(&self, other: &Self) -> Self {
+        let mut map = self.0.clone();
+        map.extend(other.0.clone());
+        Ruleset(map)
+    }
+
     pub fn iter(&self) -> Values<'_, Arc<str>, Rule<L>> {
         self.0.values()
     }
@@ -106,8 +110,8 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn bidir_len(&self) -> usize {
         let mut bidir = 0;
         let mut unidir = 0;
-        for (_, eq) in &self.0 {
-            let reverse = Rule::new(eq.rhs.clone(), eq.lhs.clone());
+        for (_, rule) in &self.0 {
+            let reverse = Rule::new(rule.rhs.clone(), rule.lhs.clone());
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
                 bidir += 1;
             } else {
@@ -117,12 +121,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         unidir + (bidir / 2)
     }
 
-    pub fn contains(&self, eq: &Rule<L>) -> bool {
-        self.0.contains_key(&eq.name)
+    pub fn contains(&self, rule: &Rule<L>) -> bool {
+        self.0.contains_key(&rule.name)
     }
 
-    pub fn add(&mut self, eq: Rule<L>) {
-        self.0.insert(eq.name.clone(), eq);
+    pub fn add(&mut self, rule: Rule<L>) {
+        self.0.insert(rule.name.clone(), rule);
     }
 
     pub fn remove_all(&mut self, other: Self) {
@@ -140,14 +144,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         F: Fn(&Rule<L>) -> bool + std::marker::Sync,
     {
         let results = Mutex::new((Ruleset::default(), Ruleset::default()));
-        let eqs: Vec<&Rule<L>> = self.0.values().collect();
-        eqs.into_par_iter().for_each(|eq| {
-            let f_eq = f(eq);
+        let rules: Vec<&Rule<L>> = self.0.values().collect();
+        rules.into_par_iter().for_each(|rule| {
+            let f_rule = f(rule);
             let mut results = results.lock().unwrap();
-            if f_eq {
-                results.0.add(eq.clone());
+            if f_rule {
+                results.0.add(rule.clone());
             } else {
-                results.1.add(eq.clone());
+                results.1.add(rule.clone());
             }
         });
         results.into_inner().unwrap()
@@ -164,27 +168,27 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn from_file(filename: &str) -> Self {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
-        let mut all_eqs = IndexMap::default();
+        let mut all_rules = IndexMap::default();
         for line in std::io::BufRead::lines(reader) {
             let line = line.unwrap();
             if let Ok((forwards, backwards)) = Rule::from_string(&line) {
-                all_eqs.insert(forwards.name.clone(), forwards);
+                all_rules.insert(forwards.name.clone(), forwards);
                 if let Some(backwards) = backwards {
-                    all_eqs.insert(backwards.name.clone(), backwards);
+                    all_rules.insert(backwards.name.clone(), backwards);
                 }
             }
         }
-        Self(all_eqs)
+        Self(all_rules)
     }
 
     pub fn pretty_print(&self) {
         let mut strs = vec![];
-        for (name, eq) in &self.0 {
-            let reverse = Rule::new(eq.rhs.clone(), eq.lhs.clone());
+        for (name, rule) in &self.0 {
+            let reverse = Rule::new(rule.rhs.clone(), rule.lhs.clone());
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
-                let reverse_name = format!("{} <=> {}", eq.rhs, eq.lhs);
+                let reverse_name = format!("{} <=> {}", rule.rhs, rule.lhs);
                 if !strs.contains(&reverse_name) {
-                    strs.push(format!("{} <=> {}", eq.lhs, eq.rhs));
+                    strs.push(format!("{} <=> {}", rule.lhs, rule.rhs));
                 }
             } else {
                 strs.push(name.to_string());
@@ -194,124 +198,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         for s in strs {
             println!("{s}");
         }
-    }
-
-    // Writes the ruleset to the json/ subdirectory, to be uploaded to the
-    // nightly server. The ruleset is written as a json object with a single
-    // field, "rules".
-    pub fn write_json_rules(&self, filename: &str) {
-        let mut filepath = "rep/json/".to_owned();
-
-        std::fs::create_dir_all(filepath.clone())
-            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-
-        filepath.push_str(filename);
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(filepath)
-            .expect("Unable to open file");
-        let rules = json!({
-            "rules": &self.to_str_vec(),
-        })
-        .to_string();
-        file.write_all(rules.as_bytes())
-            .expect("Unable to write to file");
-    }
-
-    // Given two rulesets, computes bidirectional derivability between them
-    // and writes the results to the json/derivable_rules/ subdirectory,
-    // to be uploaded to the nightly server. The results are formatted as a
-    // json object with four fields: "forwards derivable", "forwards underivable",
-    // "backwards derivable", and "backwards underivable". Also updates the
-    // "output.json" file in the json/ subdirectory with the the derivability results
-    // and statistics about runtime and the number of rules in each ruleset.
-    pub fn write_json_equiderivability(
-        &self,
-        baseline: Self,
-        name: &str,
-        limits: Limits,
-        duration: Duration,
-    ) {
-        let mut filepath = "rep/json/derivable_rules/".to_owned();
-
-        std::fs::create_dir_all(filepath.clone())
-            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-
-        filepath.push_str(name);
-        let mut file = std::fs::File::create(filepath.clone())
-            .unwrap_or_else(|_| panic!("Failed to open '{}'", filepath.clone()));
-
-        let (can_f, cannot_f) = self.derive(baseline.clone(), limits);
-
-        let (can_b, cannot_b) = baseline.derive(self.clone(), limits);
-
-        let derivability_results = json!({
-            "forwards derivable": &can_f.to_str_vec(),
-            "forwards underivable": &cannot_f.to_str_vec(),
-            "backwards derivable": &can_b.to_str_vec(),
-            "backwards underivable": &cannot_b.to_str_vec(),
-        })
-        .to_string();
-
-        file.write_all(derivability_results.as_bytes())
-            .expect("Unable to write to file");
-
-        let num_rules = &self.len();
-        let forwards_derivable = &can_f.len();
-        let backwards_derivable = &can_b.len();
-        let time = &duration.as_secs();
-
-        let mut outfile = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open("rep/json/output.json")
-            .expect("Unable to open file");
-
-        let mut outfile_string = String::new();
-        outfile
-            .read_to_string(&mut outfile_string)
-            .expect("Unable to read file");
-        let mut json_arr = vec![];
-
-        if !(outfile_string.is_empty()) {
-            json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&outfile_string).unwrap();
-        }
-
-        let stats = json!({
-            "spec": name,
-            "num_rules": num_rules,
-            "num_baseline": baseline.len(),
-            "enumo_derives_oopsla": forwards_derivable,
-            "oopsla_derives_enumo": backwards_derivable,
-            "time": time
-        });
-        json_arr.push(stats);
-
-        let mut file = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open("rep/json/output.json")
-            .expect("Unable to open file");
-        file.write_all("[".as_bytes()).expect("write failed");
-
-        let arr_str = json_arr.to_vec();
-
-        for (object, is_last_element) in arr_str
-            .iter()
-            .enumerate()
-            .map(|(i, w)| (w, i == arr_str.len() - 1))
-        {
-            file.write_all(object.to_string().as_bytes())
-                .expect("write failed");
-            if !(is_last_element) {
-                file.write_all(", ".as_bytes()).expect("write failed");
-            }
-        }
-        file.write_all("]".as_bytes()).expect("write failed");
     }
 
     pub fn extract_candidates(
@@ -338,17 +224,16 @@ impl<L: SynthLanguage> Ruleset<L> {
                         continue;
                     }
                     if e1 != e2 {
-                        if let Some(eq) = Rule::from_recexprs(&e1, &e2) {
-                            candidates.add(eq)
+                        if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
+                            candidates.add(rule)
                         }
-                        if let Some(eq) = Rule::from_recexprs(&e2, &e1) {
-                            candidates.add(eq)
+                        if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
+                            candidates.add(rule)
                         }
                     }
                 }
             }
         }
-
         candidates
     }
 
@@ -363,14 +248,9 @@ impl<L: SynthLanguage> Ruleset<L> {
          *         └─────────┘            └────────┘           └────────┘
          */
 
-        println!(
-            "starting allow/forbid rule synthesis with {} eclasses",
-            egraph.number_of_classes()
-        );
-
         let eg_init = egraph;
         // Allowed rules: run on clone, apply unions, no candidates
-        let (allowed, _) = prior.partition(|eq| L::is_allowed_rewrite(&eq.lhs, &eq.rhs));
+        let (allowed, _) = prior.partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
         let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
@@ -388,6 +268,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
+        let time_start = std::time::Instant::now();
         // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
         // ∀𝑖. 𝑎𝑖 = 𝑏𝑖 ∨ 𝑎𝑖 = null ∨ 𝑏𝑖 = null and ∃𝑖. 𝑎𝑖 = 𝑏𝑖 ∧ 𝑎𝑖 ≠ null ∧ 𝑏𝑖 ≠ null
 
@@ -412,23 +293,46 @@ impl<L: SynthLanguage> Ruleset<L> {
         };
         let mut candidates = Ruleset::default();
         let extract = Extractor::new(egraph, AstSize);
-        for class1 in &not_all_none {
-            for class2 in &not_all_none {
-                if class1.id == class2.id {
-                    continue;
-                }
-                if compare(&class1.data.cvec, &class2.data.cvec) {
-                    let (_, e1) = extract.find_best(class1.id);
-                    let (_, e2) = extract.find_best(class2.id);
-                    if let Some(eq) = Rule::from_recexprs(&e1, &e2) {
-                        candidates.add(eq);
-                    }
-                    if let Some(eq) = Rule::from_recexprs(&e2, &e1) {
-                        candidates.add(eq);
+        let mut by_first: IndexMap<Option<L::Constant>, Vec<Id>> = IndexMap::default();
+        for class in &not_all_none {
+            by_first
+                .entry(class.data.cvec[0].clone())
+                .or_insert_with(Vec::new)
+                .push(class.id);
+        }
+
+        let empty = vec![];
+        let first_none = by_first.get(&None).cloned().unwrap_or(empty);
+
+        for (value, classes) in by_first {
+            let mut all_classes = classes.clone();
+            if value.is_some() {
+                all_classes.extend(first_none.clone());
+            }
+
+            for i in 0..all_classes.len() {
+                for j in i + 1..all_classes.len() {
+                    let class1 = &egraph[all_classes[i]];
+                    let class2 = &egraph[all_classes[j]];
+                    if compare(&class1.data.cvec, &class2.data.cvec) {
+                        let (_, e1) = extract.find_best(class1.id);
+                        let (_, e2) = extract.find_best(class2.id);
+                        if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
+                            candidates.add(rule);
+                        }
+                        if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
+                            candidates.add(rule);
+                        }
                     }
                 }
             }
         }
+
+        println!(
+            "cvec match finished in {} ms",
+            time_start.elapsed().as_millis()
+        );
+
         candidates
     }
 
@@ -451,11 +355,11 @@ impl<L: SynthLanguage> Ruleset<L> {
 
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
-                    if let Some(eq) = Rule::from_recexprs(e1, e2) {
-                        candidates.add(eq);
+                    if let Some(rule) = Rule::from_recexprs(e1, e2) {
+                        candidates.add(rule);
                     }
-                    if let Some(eq) = Rule::from_recexprs(e2, e1) {
-                        candidates.add(eq);
+                    if let Some(rule) = Rule::from_recexprs(e2, e1) {
+                        candidates.add(rule);
                     }
                 }
             }
@@ -466,24 +370,22 @@ impl<L: SynthLanguage> Ruleset<L> {
     fn select(&mut self, step_size: usize) -> Self {
         let mut chosen = Self::default();
         self.0
-            .sort_by(|_, eq1, _, eq2| eq1.score().cmp(&eq2.score()));
+            .sort_by(|_, rule1, _, rule2| rule1.score().cmp(&rule2.score()));
 
         // 2. insert step_size best candidates into self.new_rws
         let mut selected: Ruleset<L> = Default::default();
         while selected.len() < step_size {
             let popped = self.0.pop();
-            if let Some((_, eq)) = popped {
-                if let ValidationResult::Valid = L::validate(&eq.lhs, &eq.rhs) {
-                    selected.add(eq.clone());
+            if let Some((_, rule)) = popped {
+                if rule.is_valid() {
+                    selected.add(rule.clone());
                 }
 
                 // If reverse direction is also in candidates, add it at the same time
-                let reverse = Rule::new(eq.rhs, eq.lhs);
+                let reverse = Rule::new(rule.rhs, rule.lhs);
                 if let Some(reverse) = reverse {
-                    if self.contains(&reverse) {
-                        if let ValidationResult::Valid = L::validate(&reverse.lhs, &reverse.rhs) {
-                            selected.add(reverse);
-                        }
+                    if self.contains(&reverse) && reverse.is_valid() {
+                        selected.add(reverse);
                     }
                 }
             } else {
@@ -496,46 +398,42 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    fn shrink(&mut self, chosen: &Self, limits: Limits) {
+    fn shrink(&mut self, chosen: &Self, scheduler: Scheduler) {
         // 1. make new egraph
         // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
         let mut egraph = EGraph::default();
 
         let mut initial = vec![];
         // 2. insert lhs and rhs of all candidates as roots
-        for eq in self.0.values() {
-            let lhs = egraph.add_expr(&L::instantiate(&eq.lhs));
-            let rhs = egraph.add_expr(&L::instantiate(&eq.rhs));
-            initial.push((lhs, rhs));
+        for rule in self.0.values() {
+            let lhs = egraph.add_expr(&L::instantiate(&rule.lhs));
+            let rhs = egraph.add_expr(&L::instantiate(&rule.rhs));
+            initial.push((lhs, rhs, rule.clone()));
         }
 
         // 3. compress with the rules we've chosen so far
-        let egraph = Scheduler::Compress(limits).run(&egraph, chosen);
+        let egraph = scheduler.run(&egraph, chosen);
 
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
-        let extract = Extractor::new(&egraph, AstSize);
         self.0 = Default::default();
-        for (l_id, r_id) in initial {
+        for (l_id, r_id, rule) in initial {
             if egraph.find(l_id) == egraph.find(r_id) {
                 // candidate has merged (derivable from other rewrites)
                 continue;
-            }
-            let (_, left) = extract.find_best(l_id);
-            let (_, right) = extract.find_best(r_id);
-            if let Some(eq) = Rule::from_recexprs(&left, &right) {
-                self.add(eq);
+            } else {
+                self.add(rule);
             }
         }
     }
 
-    pub fn minimize(&mut self, prior: Ruleset<L>, limits: Limits) -> Self {
+    pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> Self {
         let mut chosen = prior.clone();
         let step_size = 1;
         while !self.is_empty() {
             let selected = self.select(step_size);
             chosen.extend(selected.clone());
-            self.shrink(&chosen, limits);
+            self.shrink(&chosen, scheduler);
         }
         // Return only the new rules
         chosen.remove_all(prior);
@@ -543,27 +441,69 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
-    pub fn can_derive(&self, rule: &Rule<L>, limits: Limits) -> bool {
+    pub fn can_derive(
+        &self,
+        derive_type: DeriveType,
+        rule: &Rule<L>,
+        allrules: &Self,
+        limits: Limits,
+    ) -> bool {
         let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
         let rexpr = &L::instantiate(&rule.rhs);
-        egraph.add_expr(lexpr);
-        egraph.add_expr(rexpr);
-        let out_egraph = scheduler.run(&egraph, self);
+
+        match derive_type {
+            DeriveType::Lhs => {
+                egraph.add_expr(lexpr);
+            }
+            DeriveType::LhsAndRhs => {
+                egraph.add_expr(lexpr);
+                egraph.add_expr(rexpr);
+            }
+            DeriveType::AllRules => {
+                for rule in allrules.0.values() {
+                    let lhs = &L::instantiate(&rule.lhs);
+                    let rhs = &L::instantiate(&rule.rhs);
+                    egraph.add_expr(lhs);
+                    egraph.add_expr(rhs);
+                }
+            }
+        }
+
+        let out_egraph = scheduler.run_derive(&egraph, self, rule);
 
         let l_id = out_egraph
             .lookup_expr(lexpr)
             .unwrap_or_else(|| panic!("Did not find {}", lexpr));
-        let r_id = out_egraph
-            .lookup_expr(rexpr)
-            .unwrap_or_else(|| panic!("Did not find {}", rexpr));
-        l_id == r_id
+        let r_id = out_egraph.lookup_expr(rexpr);
+        if let Some(r_id) = r_id {
+            l_id == r_id
+        } else {
+            false
+        }
     }
 
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
-    pub fn derive(&self, against: Self, limits: Limits) -> (Self, Self) {
-        against.partition(|eq| self.can_derive(eq, limits))
+    pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
+        against.partition(|rule| self.can_derive(derive_type, rule, against, limits))
+    }
+
+    pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {
+        let r1: Ruleset<L> = Ruleset::from_file(one);
+        let r2: Ruleset<L> = Ruleset::from_file(two);
+
+        let (can, cannot) = r1.derive(derive_type, &r2, Limits::default());
+        println!(
+            "Using {} ({}) to derive {} ({}).\nCan derive {}, cannot derive {}. Missing:",
+            one,
+            r1.len(),
+            two,
+            r2.len(),
+            can.len(),
+            cannot.len()
+        );
+        cannot.pretty_print();
     }
 }

@@ -3,7 +3,8 @@
 !*/
 
 use std::time::Instant;
-
+#[path = "./recipes/bv4.rs"]
+pub mod bv4;
 use ruler::enumo::{Ruleset, Scheduler, Workload};
 
 ruler::impl_bv!(4);
@@ -18,7 +19,7 @@ impl Bv {
         let mut candidates = Ruleset::cvec_match(&compressed);
 
         let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, limits);
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -36,58 +37,34 @@ impl Bv {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
-    use ruler::enumo::{Filter, Metric, Ruleset, Workload};
+    use crate::bv4::bv4_rules;
+    use ruler::enumo::Ruleset;
     use std::time::Instant;
 
     #[test]
-    fn bv4_oopsla_equiv() {
-        let mut all_rules = Ruleset::default();
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let start = Instant::now();
-
-        let initial_vals = Workload::new(["a", "b", "c"]);
-        let uops = Workload::new(["~", "-"]);
-        let bops = Workload::new(["&", "|", "*", "--", "+"]);
-
-        let layer_1 = Workload::make_layer(initial_vals.clone(), uops.clone(), bops.clone())
-            .filter(Filter::MetricLt(Metric::Lists, 2));
-        let terms_1 = layer_1.clone().append(initial_vals.clone());
-        let rules_1 = Bv::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_1.clone());
-
-        let layer_2 = Workload::make_layer(layer_1.clone(), uops.clone(), bops.clone())
-            .filter(Filter::MetricLt(Metric::Lists, 3))
-            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::Lists, 1))));
-        let terms_2 = layer_2.clone().append(terms_1.clone());
-        let rules_2 = Bv::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_2.clone());
-
-        let layer_3 = Workload::make_layer_clever(
-            initial_vals,
-            layer_1,
-            layer_2,
-            uops.clone(),
-            bops.clone(),
-            3,
-        );
-        let terms_3 = layer_3.clone().append(terms_2.clone());
-        let rules_3 = Bv::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_3.clone());
+        let rules = bv4_rules();
         let duration = start.elapsed();
 
-        terms_3.write_terms_to_file("terms_bv4.txt");
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
-
-        all_rules.write_json_rules("bv4.json");
-        all_rules.write_json_equiderivability(
-            baseline.clone(),
-            "bv4.json",
+        logger::write_output(
+            &rules,
+            &baseline,
+            "bv4",
+            "oopsla",
             Limits {
                 iter: 3,
-                node: 300000,
+                node: 200000,
             },
-            duration.clone(),
+            duration,
         );
     }
 }

@@ -12,6 +12,12 @@ pub enum Workload {
     Append(Vec<Self>),
 }
 
+impl Default for Workload {
+    fn default() -> Self {
+        Workload::Set(vec![])
+    }
+}
+
 impl Workload {
     pub fn new<I>(vals: I) -> Self
     where
@@ -99,17 +105,21 @@ impl Workload {
         }
     }
 
-    fn iter(self, atom: &str, n: usize) -> Self {
-        if n == 0 {
-            Self::Set(vec![])
-        } else {
-            let rec = self.clone().iter(atom, n - 1);
-            self.plug(atom, &rec)
+    pub fn pretty_print(&self) {
+        for t in self.force() {
+            println!("{}", t);
         }
     }
 
     pub fn iter_metric(self, atom: &str, met: Metric, n: usize) -> Self {
-        self.iter(atom, n).filter(Filter::MetricLt(met, n + 1))
+        let mut pegs = self.clone();
+        for i in 1..(n + 1) {
+            pegs = self
+                .clone()
+                .plug(atom, &pegs)
+                .filter(Filter::MetricLt(met, i + 1));
+        }
+        pegs
     }
 
     pub fn iter_lang(
@@ -133,8 +143,48 @@ impl Workload {
         Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
     }
 
+    pub fn plug_lang(
+        self,
+        vars: &Workload,
+        consts: &Workload,
+        uops: &Workload,
+        bops: &Workload,
+    ) -> Self {
+        self.plug("var", vars)
+            .plug("const", consts)
+            .plug("uop", uops)
+            .plug("bop", bops)
+    }
+
     pub fn append(self, workload: impl Into<Workload>) -> Self {
-        Workload::Append(vec![self, workload.into()])
+        let into: Workload = workload.into();
+        match (self, into) {
+            (Workload::Set(xs), Workload::Set(ys)) => {
+                let mut all = vec![];
+                all.extend(xs);
+                all.extend(ys);
+                Workload::Set(all)
+            }
+            (Workload::Append(xs), Workload::Append(ys)) => {
+                let mut all = vec![];
+                all.extend(xs);
+                all.extend(ys);
+                Workload::Append(all)
+            }
+            (Workload::Append(xs), y) => {
+                let mut all = vec![];
+                all.extend(xs);
+                all.push(y);
+                Workload::Append(all)
+            }
+            (x, Workload::Append(ys)) => {
+                let mut all = vec![];
+                all.extend(ys);
+                all.push(x);
+                Workload::Append(all)
+            }
+            (x, y) => Workload::Append(vec![x, y]),
+        }
     }
 
     pub fn filter(self, filter: Filter) -> Self {
@@ -222,23 +272,46 @@ mod test {
     use super::*;
 
     #[test]
-    fn iter() {
-        let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-        let actual2 = lang.clone().iter("expr", 2).force();
-        assert_eq!(actual2.len(), 8);
-
-        let actual3 = lang.iter("expr", 3).force();
-        assert_eq!(actual3.len(), 74);
-    }
-
-    #[test]
     fn iter_metric() {
         let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
-        let actual2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
-        assert_eq!(actual2.len(), 4);
+        let atoms1 = lang.clone().iter_metric("expr", Metric::Atoms, 1).force();
+        assert_eq!(atoms1.len(), 2);
 
-        let actual3 = lang.iter_metric("expr", Metric::Atoms, 3).force();
-        assert_eq!(actual3.len(), 10);
+        let atoms2 = lang.clone().iter_metric("expr", Metric::Atoms, 2).force();
+        assert_eq!(atoms2.len(), 4);
+
+        let atoms3 = lang.clone().iter_metric("expr", Metric::Atoms, 3).force();
+        assert_eq!(atoms3.len(), 10);
+
+        let atoms4 = lang.clone().iter_metric("expr", Metric::Atoms, 4).force();
+        assert_eq!(atoms4.len(), 24);
+
+        let atoms5 = lang.clone().iter_metric("expr", Metric::Atoms, 5).force();
+        assert_eq!(atoms5.len(), 66);
+
+        let atoms6 = lang.clone().iter_metric("expr", Metric::Atoms, 6).force();
+        assert_eq!(atoms6.len(), 188);
+
+        let depth1 = lang.clone().iter_metric("expr", Metric::Depth, 1).force();
+        assert_eq!(depth1.len(), 2);
+
+        let depth2 = lang.clone().iter_metric("expr", Metric::Depth, 2).force();
+        assert_eq!(depth2.len(), 8);
+
+        let depth3 = lang.clone().iter_metric("expr", Metric::Depth, 3).force();
+        assert_eq!(depth3.len(), 74);
+
+        let depth4 = lang.clone().iter_metric("expr", Metric::Depth, 4).force();
+        assert_eq!(depth4.len(), 5552);
+
+        let lists1 = lang.clone().iter_metric("expr", Metric::Lists, 1).force();
+        assert_eq!(lists1.len(), 8);
+
+        let lists2 = lang.clone().iter_metric("expr", Metric::Lists, 2).force();
+        assert_eq!(lists2.len(), 38);
+
+        let lists3 = lang.clone().iter_metric("expr", Metric::Lists, 3).force();
+        assert_eq!(lists3.len(), 224);
     }
 
     #[test]
@@ -247,6 +320,35 @@ mod test {
         let lang = Workload::new(["cnst", "var", "(uop expr)", "(bop expr expr)"]);
         let six = lang.iter_metric("expr", Metric::Atoms, 6);
         assert_eq!(six.force().len(), 188);
+
+        let extended = Workload::new([
+            "cnst",
+            "var",
+            "(uop expr)",
+            "(bop expr expr)",
+            "(top expr expr expr)",
+        ]);
+        let three = extended.clone().iter_metric("expr", Metric::Atoms, 3);
+        assert_eq!(three.force().len(), 10);
+
+        let four = extended.clone().iter_metric("expr", Metric::Atoms, 4);
+        assert_eq!(four.force().len(), 32);
+
+        let five = extended.clone().iter_metric("expr", Metric::Atoms, 5);
+        assert_eq!(five.force().len(), 106);
+
+        let six = extended.clone().iter_metric("expr", Metric::Atoms, 6);
+        assert_eq!(six.force().len(), 388);
+    }
+
+    #[test]
+    fn filter_optimization() {
+        let wkld = Workload::new(["x"]);
+        let pegs = Workload::new(["a", "b", "c"]);
+        let plugged = wkld
+            .plug("x", &pegs)
+            .filter(Filter::MetricLt(Metric::Atoms, 2));
+        assert_eq!(plugged.force().len(), 3);
     }
 
     #[test]
@@ -297,5 +399,60 @@ mod test {
         .force();
 
         assert_eq!(actual4, expected4);
+    }
+
+    #[test]
+    fn plug() {
+        let w1 = Workload::new(["x", "(x x)", "(x x x)"]);
+        let w2 = Workload::new(["1", "2"]);
+
+        let expected = Workload::new([
+            "1", "2", "(1 1)", "(1 2)", "(2 1)", "(2 2)", "(1 1 1)", "(1 1 2)", "(1 2 1)",
+            "(1 2 2)", "(2 1 1)", "(2 1 2)", "(2 2 1)", "(2 2 2)",
+        ]);
+        let actual = w1.plug("x", &w2).force();
+        for t in expected.force() {
+            assert!(actual.contains(&t));
+        }
+    }
+
+    #[test]
+    fn append() {
+        let empty = Workload::Set(vec![]);
+        let w1 = Workload::new(["a", "b"]);
+        let w2 = Workload::new(["c", "d"]);
+        let w3 = Workload::new(["e", "f"]);
+        let w4 = Workload::new(["a"]).plug("a", &empty);
+
+        let wkld = w1.clone().append(w2.clone());
+        let wkld = wkld.append(w3.clone());
+        assert_eq!(wkld.force().len(), 6);
+        assert!(matches!(wkld, Workload::Set(_)));
+
+        let wkld = w3.clone().append(w4.clone());
+        let wkld2 = wkld.clone().append(w1.clone());
+        assert!(matches!(wkld, Workload::Append(_)));
+        assert!(matches!(wkld2, Workload::Append(_)));
+        if let Workload::Append(lst) = wkld2 {
+            assert_eq!(lst.len(), 3);
+        }
+
+        let wkld = w3.clone().append(w4.clone());
+        let wkld2 = w1.clone().append(wkld.clone());
+        assert!(matches!(wkld, Workload::Append(_)));
+        assert!(matches!(wkld2, Workload::Append(_)));
+        if let Workload::Append(lst) = wkld2 {
+            assert_eq!(lst.len(), 3);
+        }
+
+        let wkld = w3.clone().append(w4.clone());
+        let wkld2 = w3.clone().append(w4.clone());
+        let wkld3 = wkld.clone().append(wkld2.clone());
+        assert!(matches!(wkld, Workload::Append(_)));
+        assert!(matches!(wkld2, Workload::Append(_)));
+        assert!(matches!(wkld3, Workload::Append(_)));
+        if let Workload::Append(lst) = wkld3 {
+            assert_eq!(lst.len(), 4);
+        }
     }
 }

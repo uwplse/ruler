@@ -103,6 +103,7 @@ impl SynthLanguage for Nat {
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let mut rng = Pcg64::seed_from_u64(0);
+        egraph.analysis.cvec_len = 10;
         for v in vars {
             let id = egraph.add(Nat::Var(Symbol::from(v)));
             let mut vals = vec![];
@@ -163,7 +164,7 @@ impl Nat {
         let mut candidates = Ruleset::cvec_match(&compressed);
 
         let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, limits);
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -266,7 +267,7 @@ mod test {
             "(* ?c (* ?b ?a)) ==> (* ?a (* ?b ?c))",
             "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
         ]);
-        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }

@@ -1,0 +1,25 @@
+body {
+    font-family: monospace, monospace;
+}
+
+.table {
+    padding-top: 20px;
+}
+
+h3 {
+    text-align: center;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.derive_table {
+    display: inline-table;
+}
+
+.derive_container {
+    display: inline-block;
+}
+
+textarea {
+    width: 100%;
+}

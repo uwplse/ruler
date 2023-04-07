@@ -9,7 +9,7 @@ use std::time::Instant;
  * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
  */
 use ruler::{
-    enumo::{Ruleset, Workload},
+    enumo::{Ruleset, Scheduler, Workload},
     *,
 };
 
@@ -122,7 +122,7 @@ impl Pos {
         let num_prior = prior.len();
         let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
 
-        let chosen = candidates.minimize(prior, limits);
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -275,7 +275,7 @@ mod tests {
             "(XO ?a) <=> (+ ?a ?a)",
             "(+ ?a (XO ?a)) <=> (* ?a (XI XH))",
         ]);
-        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }

@@ -3,6 +3,8 @@ use ruler::{
     *,
 };
 use std::{ops::*, time::Instant};
+#[path = "./recipes/bool.rs"]
+pub mod bool;
 
 egg::define_language! {
   pub enum Bool {
@@ -131,7 +133,7 @@ impl Bool {
         let mut candidates = Ruleset::cvec_match(&compressed);
 
         let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, limits);
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
         let time = t.elapsed().as_secs_f64();
 
         println!(
@@ -151,7 +153,8 @@ impl Bool {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ruler::enumo::{Filter, Metric, Ruleset, Workload};
+    use crate::bool::bool_rules;
+    use ruler::enumo::{Ruleset, Workload};
     use std::time::Instant;
 
     fn iter_bool(n: usize) -> Workload {
@@ -170,25 +173,27 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let egraph = Scheduler::Compress(Limits::default()).run(&atoms3.to_egraph(), &all_rules);
+        let scheduler = Scheduler::Compress(Limits::rulefinding());
+
+        let egraph = scheduler.run(&atoms3.to_egraph(), &all_rules);
         let mut candidates = Ruleset::cvec_match(&egraph);
-        let rules3 = candidates.minimize(all_rules.clone(), Limits::default());
+        let rules3 = candidates.minimize(all_rules.clone(), scheduler);
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let egraph = Scheduler::Compress(Limits::default()).run(&atoms4.to_egraph(), &all_rules);
+        let egraph = scheduler.run(&atoms4.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
-        let rules4 = candidates.minimize(all_rules.clone(), Limits::default());
+        let rules4 = candidates.minimize(all_rules.clone(), scheduler);
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let egraph = Scheduler::Compress(Limits::default()).run(&atoms5.to_egraph(), &all_rules);
+        let egraph = scheduler.run(&atoms5.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
-        let rules5 = candidates.minimize(all_rules.clone(), Limits::default());
+        let rules5 = candidates.minimize(all_rules.clone(), scheduler);
         all_rules.extend(rules5);
 
         let expected: Ruleset<Bool> = Ruleset::new(&[
@@ -223,7 +228,7 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
@@ -234,19 +239,19 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::default());
+        let rules3 = Bool::run_workload(atoms3, all_rules.clone(), Limits::rulefinding());
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::default());
+        let rules4 = Bool::run_workload(atoms4, all_rules.clone(), Limits::rulefinding());
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::default());
+        let rules5 = Bool::run_workload(atoms5, all_rules.clone(), Limits::rulefinding());
         all_rules.extend(rules5);
 
         let expected: Ruleset<Bool> = Ruleset::new(&[
@@ -281,58 +286,33 @@ mod test {
             "(-> ?c (-> ?b ?a)) ==> (-> ?b (-> ?c ?a))",
             "(^ ?c (^ ?b ?a)) ==> (^ ?a (^ ?c ?b))",
         ]);
-        let (can, cannot) = all_rules.derive(expected.clone(), Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::LhsAndRhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
 
     #[test]
-    fn bool_oopsla_equiv() {
-        let mut all_rules = Ruleset::default();
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let start = Instant::now();
-
-        let initial_vals = Workload::new(["ba", "bb", "bc"]);
-        let uops = Workload::new(["~"]);
-        let bops = Workload::new(["&", "|", "^"]);
-
-        let layer_1 = Workload::make_layer(initial_vals.clone(), uops.clone(), bops.clone())
-            .filter(Filter::MetricLt(Metric::Lists, 2));
-        let terms_1 = layer_1.clone().append(initial_vals.clone());
-        let rules_1 = Bool::run_workload(terms_1.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_1.clone());
-
-        let layer_2 = Workload::make_layer(layer_1.clone(), uops.clone(), bops.clone())
-            .filter(Filter::MetricLt(Metric::Lists, 3))
-            .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::Lists, 1))));
-        let terms_2 = layer_2.clone().append(terms_1.clone());
-        let rules_2 = Bool::run_workload(terms_2.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_2.clone());
-
-        let layer_3 = Workload::make_layer_clever(
-            initial_vals,
-            layer_1,
-            layer_2,
-            uops.clone(),
-            bops.clone(),
-            3,
-        );
-        let terms_3 = layer_3.clone().append(terms_2.clone());
-        let rules_3 = Bool::run_workload(layer_3.clone(), all_rules.clone(), Limits::default());
-        all_rules.extend(rules_3.clone());
+        let rules = bool_rules();
         let duration = start.elapsed();
-
-        terms_3.write_terms_to_file("terms_bool.txt");
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 
-        all_rules.write_json_rules("bool.json");
-        all_rules.write_json_equiderivability(
-            baseline.clone(),
-            "bool.json",
+        logger::write_output(
+            &rules,
+            &baseline,
+            "bool",
+            "oopsla",
             Limits {
                 iter: 3,
-                node: 300000,
+                node: 200000,
             },
-            duration.clone(),
+            duration,
         );
     }
 
@@ -376,13 +356,14 @@ mod test {
         four.to_file("four.txt");
 
         let (can, cannot) = three.derive(
-            four,
+            DeriveType::LhsAndRhs,
+            &four,
             Limits {
                 iter: 10,
                 node: 1000000,
             },
         );
-        assert_eq!(can.len(), 16);
-        assert_eq!(cannot.len(), 7);
+        assert_eq!(can.len(), 12);
+        assert_eq!(cannot.len(), 12);
     }
 }

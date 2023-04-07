@@ -125,6 +125,10 @@ impl<L: SynthLanguage> Rule<L> {
     pub fn score(&self) -> impl Ord + Debug {
         L::score(&self.lhs, &self.rhs)
     }
+
+    pub fn is_valid(&self) -> bool {
+        matches!(L::validate(&self.lhs, &self.rhs), ValidationResult::Valid)
+    }
 }
 
 fn apply_pat<L: Language, A: Analysis<L>>(
