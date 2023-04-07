@@ -753,6 +753,40 @@ pub mod test {
     }
 
     #[test]
+    fn minimize() {
+        // This test fails if there are improperly initialized cvecs during minimize.
+        let limits = Limits {
+            iter: 4,
+            node: 1_000_000,
+        };
+
+        let prior: Ruleset<Math> = Ruleset::new([
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(- ?a ?a) ==> 0",
+            "?a ==> (+ ?a 0)",
+            "?a ==> (* ?a 1)",
+            "?a ==> (- ?a 0)",
+            "?a ==> (/ ?a 1)",
+            "(* (* ?c ?b) (/ 0 ?a)) ==> (/ 0 (fabs ?a))",
+            "(/ (- ?c ?b) (/ ?a ?a)) ==> (- (/ 0 ?a) (- ?b ?c))",
+            "(* (/ ?c ?c) (* ?b ?a)) ==> (/ (* ?b ?a) (/ ?c ?c))",
+            "(- (* ?a ?c) (* ?b ?a)) ==> (* ?a (- ?c ?b))",
+            "(/ (* ?c ?b) ?a) ==> (* ?b (/ ?c ?a))",
+            "(- ?c (- ?b ?a)) ==> (- ?a (- ?b ?c))",
+        ]);
+        let mut with_condition = Ruleset::new([
+            "(- (- ?b ?c) (- ?b ?a)) ==> (if ?c (* (/ ?c ?c) (- ?a ?c)) (- (- ?b ?c) (- ?b ?a)))",
+            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?b (* (/ ?b ?b) (- ?c ?b)) (- (- ?c ?a) (- ?b ?a)))",
+            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?c (* (- ?c ?b) (/ ?c ?c)) (- (- ?c ?a) (- ?b ?a)))",
+            "(- (+ ?c ?a) (+ ?b ?a)) ==> (if ?b (* (- ?c ?b) (/ ?b ?b)) (- (+ ?c ?a) (+ ?b ?a)))",
+            "(/ (/ 0 ?b) (+ ?b ?a)) ==> (if (+ ?b ?a) (/ 0 ?b) (/ (/ 0 ?b) (+ ?b ?a)))",
+        ]);
+        let chosen_conditional = with_condition.minimize(prior, Scheduler::Compress(limits));
+
+        assert_eq!(chosen_conditional.len(), 1);
+    }
+
+    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
@@ -835,7 +869,7 @@ pub mod test {
                     bops,
                 ),
             all_rules.clone(),
-            Limits::default(),
+            Limits::rulefinding(),
             false,
         );
         all_rules.extend(starting_rules);
@@ -844,7 +878,7 @@ pub mod test {
             Workload::new(["(if e e e)"])
                 .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
             all_rules.clone(),
-            Limits::default(),
+            Limits::rulefinding(),
             false,
         );
         all_rules.extend(basic_if_rules);
@@ -855,7 +889,8 @@ pub mod test {
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
         terms.to_file("guard.terms");
 
-        let guarded_rules = Math::run_workload(terms, all_rules.clone(), Limits::default(), false);
+        let guarded_rules =
+            Math::run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
         assert!(guarded_rules
             .0
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));

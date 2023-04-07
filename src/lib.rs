@@ -78,6 +78,22 @@ impl Limits {
             node: usize::MAX,
         }
     }
+
+    // match oopsla limits
+    pub fn rulefinding() -> Self {
+        Self {
+            iter: 2,
+            node: 300_000,
+        }
+    }
+
+    // match oopsla limits
+    pub fn deriving() -> Self {
+        Self {
+            iter: 5,
+            node: 100_000,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

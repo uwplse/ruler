@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use egg::{Rewrite, Runner};
+use egg::{BackoffScheduler, Rewrite, Runner};
 
 use crate::{EGraph, Id, Limits, SynthAnalysis, SynthLanguage};
 
@@ -37,20 +37,22 @@ impl Scheduler {
                 let lexpr = L::instantiate(&rule.lhs);
                 let rexpr = L::instantiate(&rule.rhs);
 
-                Self::mk_runner(egraph, &limits).with_hook(move |r| {
-                    let lhs = r.egraph.lookup_expr(&lexpr);
-                    let rhs = r.egraph.lookup_expr(&rexpr);
-                    match (lhs, rhs) {
-                        (Some(l), Some(r)) => {
-                            if l == r {
-                                Err("Done".to_owned())
-                            } else {
-                                Ok(())
+                Self::mk_runner(egraph, &limits)
+                    .with_scheduler(BackoffScheduler::default().with_initial_match_limit(200_000))
+                    .with_hook(move |r| {
+                        let lhs = r.egraph.lookup_expr(&lexpr);
+                        let rhs = r.egraph.lookup_expr(&rexpr);
+                        match (lhs, rhs) {
+                            (Some(l), Some(r)) => {
+                                if l == r {
+                                    Err("Done".to_owned())
+                                } else {
+                                    Ok(())
+                                }
                             }
+                            _ => Ok(()),
                         }
-                        _ => Ok(()),
-                    }
-                })
+                    })
             } else {
                 Self::mk_runner(egraph, &limits)
             }
