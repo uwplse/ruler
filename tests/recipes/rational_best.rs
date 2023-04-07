@@ -4,8 +4,8 @@ use ruler::enumo::{Filter, Ruleset, Workload};
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 4,
-        node: 2_000_000,
+        iter: 3,
+        node: 1_000_000,
     };
 
     /*let cheat_domain = Workload::new(&[
@@ -39,7 +39,6 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .iter_metric("expr", enumo::Metric::Depth, 3)
         .filter(Filter::Contains("var".parse().unwrap()))
         .plug_lang(vars, consts, uops, bops);
-    layer2.to_file("replicate_layer2_terms");
     let layer2_rules = Math::run_workload_conditional(layer2.clone(), rules.clone(), limits, false);
     rules.extend(layer2_rules);
 
@@ -58,7 +57,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
 
     let vars = Workload::new(["a", "b", "c"]);
     let consts = Workload::new(["-1", "0", "1", "2"]);*/
-
+    
     // Factorization
     println!("factorization");
     let factor_term = Workload::new(&["var", "(bop expr expr)"])

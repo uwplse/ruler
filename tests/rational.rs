@@ -127,7 +127,8 @@ impl SynthLanguage for Math {
                 _ => None,
             },
             Math::If([x, y, z]) => {
-                if let Some(x) = get_const(x) {
+                // TODO why does this result in unsoundness?
+                /*if let Some(x) = get_const(x) {
                     if !x.is_zero() {
                         get_const(y)
                     } else {
@@ -135,7 +136,8 @@ impl SynthLanguage for Math {
                     }
                 } else {
                     None
-                }
+                }*/
+                None
             }
         }
         .map(|c| Interval::new(Some(c.clone()), Some(c)))
@@ -149,7 +151,6 @@ impl SynthLanguage for Math {
             Some(mk_rat(1, 1)),
             Some(mk_rat(2, 1)),
             Some(mk_rat(-3, 1)),
-            Some(mk_rat(1238923, 2)),
         ];
         let cvecs = self_product(&consts, vars.len());
 
