@@ -14,6 +14,7 @@ pub struct SynthAnalysis {
     pub cvec_len: usize,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for SynthAnalysis {
     fn default() -> Self {
         // No cvecs by default. Domains that do cvec matching are responsible
