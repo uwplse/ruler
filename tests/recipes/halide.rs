@@ -82,32 +82,6 @@ pub fn halide_rules() -> Ruleset<Pred> {
     all_rules.extend(full);
     all_rules.to_file("thru-full.rules");
     println!("full complete.");
-    let select_max = Workload::new(&["(max s s)", "(min s s)", "(select v s s)"])
-        .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
-        .plug(
-            "v",
-            &Workload::new(&["a", "b", "c", "d", "e", "f", "0", "1"]),
-        )
-        .plug("bop", &Workload::new(&["+", "-", "*", "min", "max"]))
-        .filter(Filter::Canon(vec![
-            "a".to_string(),
-            "b".to_string(),
-            "c".to_string(),
-            "d".to_string(),
-            "e".to_string(),
-            "f".to_string(),
-            "0".to_string(),
-            "1".to_string(),
-        ]));
-    let new = run_workload(
-        select_max,
-        all_rules.clone(),
-        Limits::rulefinding(),
-        true
-    );
-    println!("select_max finished.");
-    new.to_file("select-max.rules");
-    all_rules.extend(new.clone());
     let nested_bops = Workload::new(&["(bop e e)", "v", "0", "1"])
         .plug("e", &Workload::new(&["(bop v v)", "v"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "max", "min"]))
@@ -127,7 +101,6 @@ pub fn halide_rules() -> Ruleset<Pred> {
     all_rules.extend(new.clone());
     println!("nested_bops finished.");
     new.to_file("nested-bops.rules");
-    /*
     let triple_nested_bops = Workload::new(&[
         "(bop e e)",
         "(bop (bop (bop v v) v) v)",
@@ -153,7 +126,6 @@ pub fn halide_rules() -> Ruleset<Pred> {
     println!("triple_nested_bops finished.");
     new.to_file("triple-nested-bops.rules");
     all_rules.extend(new.clone());
-    */
     let select_arith = Workload::new(&["(select v e e)", "(bop v e)", "(bop e v)"])
         .plug("e", &Workload::new(&["(bop v v)", "(select v v v)", "v"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))
@@ -179,6 +151,32 @@ pub fn halide_rules() -> Ruleset<Pred> {
     );
     println!("select_arith finished.");
     new.to_file("select-arith.rules");
+    all_rules.extend(new.clone());
+    let select_max = Workload::new(&["(max s s)", "(min s s)", "(select v s s)"])
+        .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
+        .plug(
+            "v",
+            &Workload::new(&["a", "b", "c", "d", "e", "f", "0", "1"]),
+        )
+        .plug("bop", &Workload::new(&["+", "-", "*", "min", "max"]))
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+            "f".to_string(),
+            "0".to_string(),
+            "1".to_string(),
+        ]));
+    let new = run_workload(
+        select_max,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        true
+    );
+    println!("select_max finished.");
+    new.to_file("select-max.rules");
     all_rules.extend(new.clone());
     let nested_bops_full = Workload::new(&["(bop e e)", "v", "0", "1"])
         .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
