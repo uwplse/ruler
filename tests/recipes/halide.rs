@@ -59,15 +59,6 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let full = recursive_rules(
         Metric::Atoms,
         4,
-<<<<<<< HEAD
-        &Workload::new(&["-1", "0", "1"]),
-        &Workload::new(&["a", "b", "c"]),
-        &Workload::new(&["-", "!"]),
-        &Workload::new(&[
-            "&&", "||", "^", "+", "-", "*", "/", "min", "max", "<", "<=", "==", "!=",
-        ]),
-        &Workload::new(&["select"]),
-=======
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
@@ -77,7 +68,6 @@ pub fn halide_rules() -> Ruleset<Pred> {
             ],
             &["select"],
         ),
->>>>>>> 0e9874f405f4e0d5a75b70e45b0ff44c87147e77
         all_rules.clone(),
     );
     all_rules.extend(full);
