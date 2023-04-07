@@ -109,11 +109,12 @@ pub fn recursive_rules<L: SynthLanguage>(
     n: usize,
     lang: Lang,
     prior: Ruleset<L>,
+    limits: Limits,
 ) -> Ruleset<L> {
     if n < 1 {
         Ruleset::default()
     } else {
-        let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone());
+        let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone(), limits);
         let wkld = iter_metric(base_lang(), "EXPR", metric, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .plug("VAR", &Workload::new(lang.vars))
@@ -122,7 +123,7 @@ pub fn recursive_rules<L: SynthLanguage>(
             .plug("BOP", &Workload::new(lang.bops))
             .plug("TOP", &Workload::new(lang.tops));
         rec.extend(prior);
-        let new = run_workload(wkld, rec.clone(), Limits::rulefinding(), true);
+        let new = run_workload(wkld, rec.clone(), limits, true);
         let mut all = new;
         all.extend(rec);
         all

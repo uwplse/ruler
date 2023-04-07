@@ -2,7 +2,6 @@ use num::{BigInt, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
 use ruler::*;
 use z3::ast::Ast;
-
 type Constant = BigInt;
 
 egg::define_language! {
@@ -291,7 +290,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{enumo::Ruleset, logger};
+    use ruler::{enumo::Ruleset, logger, Limits, DeriveType};
 
     #[test]
     fn run() {
@@ -304,15 +303,27 @@ mod test {
         let start = Instant::now();
         let all_rules = halide_rules();
         let duration = start.elapsed();
+        println!("Rules collected.");
+
+        let (can, cannot) =
+            all_rules.derive(DeriveType::LhsAndRhs, &baseline, Limits {
+                iter: 2,
+                node: 100_000,
+            });
+        println!("{} / {}", can.len(), can.len() + cannot.len());
+        cannot.to_file("underivable.rules");
 
         logger::write_output(&all_rules, &baseline, "halide", "halide", duration);
+        // Run on leviathan 4/4/2023
+        // real	0m6.829s
+        // user	0m19.784s
+        // sys	0m0.595s
 
-        // oopsla-halide-baseline branch
-        // Run on leviathan 3/31/2023
-        // time cargo run --release --bin halide -- synth --iters 1 --use-smt
-        // real	0m3.354s
-        // user	0m3.274s
-        // sys	0m0.076s
+        // With only Add, Sub, Mul, Div, Neg nodes added in make_layer
+        // time cargo run --release --bin halide -- synth --iters 2 --use-smt
+        // real	0m53.816s
+        // user	1m6.082s
+        // sys	0m1.259s
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);
 
