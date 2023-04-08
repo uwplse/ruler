@@ -14,7 +14,6 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         (- a b))",
     ]);
 
-
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
     let vars = &Workload::new(["a", "b", "c"]);
@@ -58,7 +57,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
 
     let vars = Workload::new(["a", "b", "c"]);
     let consts = Workload::new(["-1", "0", "1", "2"]);*/
-    
+
     // Factorization
     println!("factorization");
     let factor_term = Workload::new(&["var", "(bop expr expr)"])

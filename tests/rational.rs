@@ -1,5 +1,7 @@
 use egg::Rewrite;
-use num::{rational::{Rational64}, Signed, ToPrimitive, Zero, CheckedAdd, CheckedSub, CheckedDiv, CheckedMul};
+use num::{
+    rational::Rational64, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
+};
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
@@ -107,9 +109,7 @@ impl SynthLanguage for Math {
                 _ => None,
             },
             Math::Div([x, y]) => match (get_const(x), get_const(y)) {
-                (Some(x), Some(y)) => {
-                    x.checked_div(&y)
-                }
+                (Some(x), Some(y)) => x.checked_div(&y),
                 _ => None,
             },
             Math::If([x, y, z]) => {
@@ -797,7 +797,6 @@ pub mod test {
         );
     }
 
-    
     #[test]
     fn minimize() {
         // This test fails if there are improperly initialized cvecs during minimize.
