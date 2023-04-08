@@ -4,7 +4,7 @@ use ruler::enumo::{Filter, Ruleset, Workload};
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 3,
+        iter: 4,
         node: 1_000_000,
     };
 
@@ -14,9 +14,6 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         (- a b))",
     ]);
 
-    /*let cheat_domain_rules =
-        Math::run_workload_conditional(cheat_domain, rules.clone(), limits, false);
-    rules.extend(cheat_domain_rules);*/
 
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
@@ -79,24 +76,9 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     rules.extend(factor_rules);
 
     // cheat domain TODO remove
-    /*let cheat_domain_rules =
+    let cheat_domain_rules =
         Math::run_workload_conditional(cheat_domain, rules.clone(), limits, false);
-    rules.extend(cheat_domain_rules);*/
-
-    // Nested fabs
-    /*println!("nested fabs");
-    let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-        .plug("uop", &Workload::new(&["~", "fabs"]))
-        .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
-    let layer1 = op_layer.clone().plug("expr", &vars.append(consts));
-    let layer2 = op_layer
-        .plug("expr", &layer1)
-        .filter(safe_filter.clone())
-        .filter(contains_var_filter.clone())
-        .filter(contains_abs_filter);
-    let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
-    let nested_abs_rules = Math::run_workload_conditional(nested_abs, rules.clone(), limits, true);
-    rules.extend(nested_abs_rules);*/
+    rules.extend(cheat_domain_rules);
 
     rules
 }
