@@ -8,12 +8,6 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         node: 1_000_000,
     };
 
-    let cheat_domain = Workload::new(&[
-        "(+ a b)",
-        "(/ (- (* a a) (* b b))
-        (- a b))",
-    ]);
-
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
     let vars = &Workload::new(["a", "b", "c"]);
@@ -73,11 +67,6 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .filter(Filter::Canon(vec!["a".to_string(), "b".to_string()]));
     let factor_rules = Math::run_workload_conditional(factor_div, rules.clone(), limits, false);
     rules.extend(factor_rules);
-
-    // cheat domain TODO remove
-    let cheat_domain_rules =
-        Math::run_workload_conditional(cheat_domain, rules.clone(), limits, false);
-    rules.extend(cheat_domain_rules);
 
     rules
 }
