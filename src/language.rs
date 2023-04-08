@@ -7,7 +7,7 @@ use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
 };
 
-use crate::*;
+use crate::{enumo::Rule, *};
 
 #[derive(Clone)]
 pub struct SynthAnalysis {
@@ -258,7 +258,9 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         RecExpr::from(nodes)
     }
 
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
+    fn score(rule: &Rule<Self>) -> [i32; 6] {
+        let lhs = &rule.lhs;
+        let rhs = &rule.rhs;
         let l_size = AstSize.cost_rec(&lhs.ast) as i32;
         let r_size = AstSize.cost_rec(&rhs.ast) as i32;
         let mut vars: HashSet<Var> = Default::default();
@@ -283,7 +285,16 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
             })
             .count() as i32;
 
+        let is_sat = rule.is_saturating() as i32;
+        let reverse = rule.reverse();
+        let reverse_sat = if let Some(reverse) = reverse {
+            reverse.is_saturating() as i32
+        } else {
+            0
+        };
+
         [
+            is_sat + reverse_sat,
             vars.len() as i32,
             -num_consts,
             -i32::max(l_size, r_size),

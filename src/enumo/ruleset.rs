@@ -111,7 +111,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut bidir = 0;
         let mut unidir = 0;
         for (_, rule) in &self.0 {
-            let reverse = Rule::new(rule.rhs.clone(), rule.lhs.clone());
+            let reverse = rule.reverse();
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
                 bidir += 1;
             } else {
@@ -184,7 +184,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn pretty_print(&self) {
         let mut strs = vec![];
         for (name, rule) in &self.0 {
-            let reverse = Rule::new(rule.rhs.clone(), rule.lhs.clone());
+            let reverse = rule.reverse();
             if reverse.is_some() && self.contains(&reverse.unwrap()) {
                 let reverse_name = format!("{} <=> {}", rule.rhs, rule.lhs);
                 if !strs.contains(&reverse_name) {
@@ -226,7 +226,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                     if e1 != e2 {
                         if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
                             candidates.add(rule.clone());
-                            if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                            if let Some(reverse) = rule.reverse() {
                                 candidates.add(reverse);
                             }
                         }
@@ -319,7 +319,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                         let (_, e2) = extract.find_best(class2.id);
                         if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
                             candidates.add(rule.clone());
-                            if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                            if let Some(reverse) = rule.reverse() {
                                 candidates.add(reverse);
                             }
                         }
@@ -357,7 +357,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 for e2 in exprs[(idx + 1)..].iter() {
                     if let Some(rule) = Rule::from_recexprs(e1, e2) {
                         candidates.add(rule.clone());
-                        if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                        if let Some(reverse) = rule.reverse() {
                             candidates.add(reverse);
                         }
                     }
@@ -382,8 +382,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
 
                 // If reverse direction is also in candidates, add it at the same time
-                let reverse = Rule::new(rule.rhs, rule.lhs);
-                if let Some(reverse) = reverse {
+                if let Some(reverse) = rule.reverse() {
                     if self.contains(&reverse) && reverse.is_valid() {
                         selected.add(reverse);
                     }
