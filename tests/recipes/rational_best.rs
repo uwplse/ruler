@@ -1,3 +1,5 @@
+use crate::rational_replicate::replicate_ruler1_recipe;
+
 use super::*;
 use ruler::enumo::{Filter, Ruleset, Workload};
 
