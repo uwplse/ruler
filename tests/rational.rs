@@ -770,20 +770,25 @@ pub mod test {
 
         println!("{} rules found.", replicate_rules.clone().len());
 
-        let (can, cannot) =
-            replicate_rules.derive(DeriveType::LhsAndRhs, &ruler1, Limits {
+        let (can, cannot) = replicate_rules.derive(
+            DeriveType::LhsAndRhs,
+            &ruler1,
+            Limits {
                 iter: 5,
                 node: 100_000,
-            });
+            },
+        );
         println!("LHS/RHS: {} / {}", can.len(), can.len() + cannot.len());
 
-        let (can, cannot) =
-            replicate_rules.derive(DeriveType::Lhs, &ruler1, Limits {
+        let (can, cannot) = replicate_rules.derive(
+            DeriveType::Lhs,
+            &ruler1,
+            Limits {
                 iter: 5,
                 node: 100_000,
-            });
+            },
+        );
         println!("LHS: {} / {}", can.len(), can.len() + cannot.len());
-
 
         logger::write_output(
             &replicate_rules,
