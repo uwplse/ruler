@@ -39,7 +39,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
             &["-1", "0", "1"],
             &["a", "b", "c"],
             &["-"],
-            &["+", "-", "*", "min", "max"],
+            &["+", "-", "*", "/", "min", "max"],
             &[],
         ),
         all_rules.clone(),
@@ -72,7 +72,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
             &["a", "b", "c"],
             &["-", "!"],
             &[
-                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                "&&", "||", "^", "+", "-", "*", "/", "min", "max", "<", "<=", "==", "!=",
             ],
             &["select"],
         ),
@@ -84,7 +84,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     println!("full complete.");
     let nested_bops = Workload::new(&["(bop e e)", "v", "0", "1"])
         .plug("e", &Workload::new(&["(bop v v)", "v"]))
-        .plug("bop", &Workload::new(&["+", "-", "*", "max", "min"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "/", "max", "min"]))
         .plug("v", &Workload::new(&["a", "b", "c", "d"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
@@ -109,7 +109,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "1",
     ])
     .plug("e", &Workload::new(&["(bop v v)", "v"]))
-    .plug("bop", &Workload::new(&["+", "-", "*", "max", "min"]))
+    .plug("bop", &Workload::new(&["+", "-", "*", "/", "max", "min"]))
     .plug("v", &Workload::new(&["a", "b", "c", "d"]))
     .filter(Filter::Canon(vec![
         "a".to_string(),
@@ -128,7 +128,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     all_rules.extend(new.clone());
     let select_arith = Workload::new(&["(select v e e)", "(bop v e)", "(bop e v)"])
         .plug("e", &Workload::new(&["(bop v v)", "(select v v v)", "v"]))
-        .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "<", "/", "max", "min"]))
         .plug(
             "v",
             &Workload::new(&["a", "b", "c", "d", "e", "f", "0", "1"]),
@@ -158,7 +158,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "v",
             &Workload::new(&["a", "b", "c", "d", "e", "f", "0", "1"]),
         )
-        .plug("bop", &Workload::new(&["+", "-", "*", "min", "max"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "/", "min", "max"]))
         .filter(Filter::Canon(vec![
             "a".to_string(),
             "b".to_string(),
