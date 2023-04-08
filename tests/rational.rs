@@ -767,7 +767,7 @@ pub mod test {
         let start = Instant::now();
         let replicate_rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
-        
+
         logger::write_output(
             &replicate_rules,
             &ruler1,
