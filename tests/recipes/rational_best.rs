@@ -4,7 +4,7 @@ use ruler::enumo::{Filter, Ruleset, Workload};
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 4,
+        iter: 3,
         node: 1_000_000,
     };
 
