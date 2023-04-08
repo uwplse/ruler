@@ -1,7 +1,10 @@
 use crate::rational_replicate::replicate_ruler1_recipe;
 
 use super::*;
-use ruler::enumo::{Filter, Ruleset, Workload};
+use ruler::{
+    enumo::{Filter, Ruleset, Workload},
+    recipe_utils::iter_metric,
+};
 
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
@@ -20,21 +23,23 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
 
     // Layer 1 (one op)
     println!("layer1");
-    let layer1 = lang
-        .clone()
-        .iter_metric("expr", enumo::Metric::Depth, 2)
+    let layer1 = iter_metric(lang.clone(), "expr", enumo::Metric::Depth, 2)
         .filter(Filter::Contains("var".parse().unwrap()))
-        .plug_lang(vars, consts, uops, bops);
+        .plug("var", vars)
+        .plug("const", consts)
+        .plug("uop", uops)
+        .plug("bop", bops);
     let layer1_rules = Math::run_workload_conditional(layer1.clone(), rules.clone(), limits, false);
     rules.extend(layer1_rules);
 
     // Layer 2 (two ops)
     println!("layer2");
-    let layer2 = lang
-        .clone()
-        .iter_metric("expr", enumo::Metric::Depth, 3)
+    let layer2 = iter_metric(lang.clone(), "expr", enumo::Metric::Depth, 3)
         .filter(Filter::Contains("var".parse().unwrap()))
-        .plug_lang(vars, consts, uops, bops);
+        .plug("var", vars)
+        .plug("const", consts)
+        .plug("uop", uops)
+        .plug("bop", bops);
     let layer2_rules = Math::run_workload_conditional(layer2.clone(), rules.clone(), limits, false);
     rules.extend(layer2_rules);
 
@@ -56,14 +61,14 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
 
     // Factorization
     println!("factorization");
-    let factor_term = Workload::new(&["var", "(bop expr expr)"])
-        .iter_metric("expr", enumo::Metric::Depth, 3)
-        .plug_lang(
-            &Workload::new(["a", "b"]),
-            empty,
-            empty,
-            &Workload::new(["+", "-", "*"]),
-        );
+    let factor_term = iter_metric(
+        Workload::new(&["var", "(bop expr expr)"]),
+        "expr",
+        enumo::Metric::Depth,
+        3,
+    )
+    .plug("var", &Workload::new(["a", "b"]))
+    .plug("bop", &Workload::new(["+", "-", "*"]));
     let factor_div = Workload::new(["(/ v v)"])
         .plug("v", &factor_term)
         .filter(Filter::Canon(vec!["a".to_string(), "b".to_string()]));
