@@ -9,6 +9,7 @@ mod bv;
 pub mod enumo;
 mod language;
 pub mod logger;
+pub mod recipe_utils;
 mod util;
 
 pub type Id = egg::Id;

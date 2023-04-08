@@ -1,11 +1,6 @@
-use std::time::Instant;
-
 use num::{BigInt, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
-use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
-    *,
-};
+use ruler::*;
 use z3::ast::Ast;
 
 type Constant = BigInt;
@@ -287,33 +282,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
     buf.pop().unwrap()
 }
 
-impl Pred {
-    fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-
-        let mut candidates = Ruleset::fast_cvec_match(&compressed);
-
-        let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
-}
-
 #[cfg(test)]
 #[path = "./recipes/halide.rs"]
 mod halide;
@@ -323,7 +291,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{enumo::Ruleset, logger, Limits};
+    use ruler::{enumo::Ruleset, logger};
 
     #[test]
     fn run() {
@@ -337,17 +305,7 @@ mod test {
         let all_rules = halide_rules();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &all_rules,
-            &baseline,
-            "halide",
-            "halide",
-            Limits {
-                iter: 2,
-                node: 200000,
-            },
-            duration,
-        );
+        logger::write_output(&all_rules, &baseline, "halide", "halide", duration);
 
         // oopsla-halide-baseline branch
         // Run on leviathan 3/31/2023
@@ -363,10 +321,6 @@ mod test {
             &baseline,
             "oopsla halide (1 iter)",
             "halide",
-            Limits {
-                iter: 2,
-                node: 200000,
-            },
             oopsla_duration,
         )
     }

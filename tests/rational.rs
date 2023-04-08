@@ -343,40 +343,6 @@ impl Math {
         result.pretty_print();
         result
     }
-
-    fn run_workload(
-        workload: Workload,
-        prior: Ruleset<Self>,
-        limits: Limits,
-        fast_match: bool,
-    ) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-
-        let mut candidates = if fast_match {
-            Ruleset::fast_cvec_match(&compressed)
-        } else {
-            Ruleset::cvec_match(&compressed)
-        };
-
-        let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
 }
 
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
@@ -590,12 +556,14 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 
 #[cfg(test)]
 pub mod test {
-    use std::time::Duration;
 
     use super::*;
     use crate::rational_best::best_enumo_recipe;
     use crate::rational_replicate::replicate_ruler1_recipe;
-    use ruler::enumo::{Filter, Ruleset, Workload};
+    use ruler::{
+        enumo::{Ruleset, Workload},
+        recipe_utils::{base_lang, iter_metric, run_workload},
+    };
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
@@ -805,10 +773,6 @@ pub mod test {
             &ruler1,
             "rational_replicate",
             "oopsla",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
             duration,
         );
         logger::write_output(
@@ -816,10 +780,6 @@ pub mod test {
             &herbie,
             "rational_replicate",
             "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
             duration,
         );
 
@@ -827,54 +787,28 @@ pub mod test {
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &best_rules,
-            &ruler1,
-            "rational_best",
-            "oopsla",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-        logger::write_output(
-            &best_rules,
-            &herbie,
-            "rational_best",
-            "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
+        logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
+        logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
     }
 
     #[test]
     fn cond_div_figure() {
-        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
-        let uops = &Workload::new(["~", "fabs"]);
-        let bops = &Workload::new(["+", "-", "*", "/"]);
+        let mut all_rules: Ruleset<Math> = Ruleset::default();
 
-        let mut all_rules = Ruleset::default();
-
-        let starting_rules = Math::run_workload(
-            lang.clone()
-                .iter_metric("expr", enumo::Metric::Atoms, 3)
-                .plug_lang(
-                    &Workload::new(["a", "b", "c"]),
-                    &Workload::new(["-1", "0", "1"]),
-                    uops,
-                    bops,
-                ),
+        let starting_rules = run_workload(
+            iter_metric(base_lang(), "EXPR", enumo::Metric::Atoms, 3)
+                .plug("CONST", &Workload::new(["-1", "0", "1"]))
+                .plug("VAR", &Workload::new(["a", "b", "c"]))
+                .plug("UOP", &Workload::new(["~", "fabs"]))
+                .plug("BOP", &Workload::new(["+", "*", "-", "/"]))
+                .plug("TOP", &Workload::empty()),
             all_rules.clone(),
             Limits::rulefinding(),
             false,
         );
         all_rules.extend(starting_rules);
 
-        let basic_if_rules = Math::run_workload(
+        let basic_if_rules = run_workload(
             Workload::new(["(if e e e)"])
                 .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
             all_rules.clone(),
@@ -889,8 +823,7 @@ pub mod test {
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
         terms.to_file("guard.terms");
 
-        let guarded_rules =
-            Math::run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
+        let guarded_rules = run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
         assert!(guarded_rules
             .0
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));

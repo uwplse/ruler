@@ -1,7 +1,6 @@
 use super::*;
-use crate::test::run_workload;
 use crate::test::{rational_rules, starting_exponential_rules};
-use ruler::enumo;
+use ruler::{enumo, recipe_utils::run_rule_lifting};
 
 type Workload = enumo::Workload;
 type Ruleset = enumo::Ruleset<Exponential>;
@@ -9,6 +8,13 @@ type Filter = enumo::Filter;
 
 macro_rules! str_vec {
     ($($x:expr),*) => (vec![$($x.to_string()),*]);
+}
+
+fn limits() -> Limits {
+    Limits {
+        iter: 3,
+        node: 2_000_000,
+    }
 }
 
 fn constant_rules(prev_rules: &Ruleset) -> Ruleset {
@@ -22,7 +28,7 @@ fn constant_rules(prev_rules: &Ruleset) -> Ruleset {
         "(pow 1 a)",
     ]);
 
-    run_workload(terms, prev_rules)
+    run_rule_lifting(terms, prev_rules.clone(), limits())
 }
 
 fn exp_rules(prev_rules: &Ruleset) -> Ruleset {
@@ -42,7 +48,7 @@ fn exp_rules(prev_rules: &Ruleset) -> Ruleset {
             "(log (log ?a))".parse().unwrap(),
         ))));
 
-    run_workload(upper_layer, prev_rules)
+    run_rule_lifting(upper_layer, prev_rules.clone(), limits())
 }
 
 fn log_rules(prev_rules: &Ruleset) -> Ruleset {
@@ -62,7 +68,7 @@ fn log_rules(prev_rules: &Ruleset) -> Ruleset {
             "(log (log ?a))".parse().unwrap(),
         ))));
 
-    run_workload(upper_layer, prev_rules)
+    run_rule_lifting(upper_layer, prev_rules.clone(), limits())
 }
 
 fn no_pow_rules(prev_rules: &Ruleset) -> Ruleset {
@@ -88,7 +94,7 @@ fn no_pow_rules(prev_rules: &Ruleset) -> Ruleset {
             "(log (log ?a))".parse().unwrap(),
         ))));
 
-    run_workload(upper_layer, prev_rules)
+    run_rule_lifting(upper_layer, prev_rules.clone(), limits())
 }
 
 fn simple_rules(prev_rules: &Ruleset) -> Ruleset {
@@ -114,7 +120,7 @@ fn simple_rules(prev_rules: &Ruleset) -> Ruleset {
             "(log (log ?a))".parse().unwrap(),
         ))));
 
-    run_workload(upper_layer, prev_rules)
+    run_rule_lifting(upper_layer, prev_rules.clone(), limits())
 }
 
 fn div_rules(prev_rules: &Ruleset) -> Ruleset {
@@ -135,7 +141,7 @@ fn div_rules(prev_rules: &Ruleset) -> Ruleset {
         .plug("bop", &bops)
         .filter(Filter::Canon(str_vec!["a", "b"]));
 
-    run_workload(upper_layer, prev_rules)
+    run_rule_lifting(upper_layer, prev_rules.clone(), limits())
 }
 
 pub fn make_rules() -> Ruleset {
