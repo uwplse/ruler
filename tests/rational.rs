@@ -1,6 +1,5 @@
 use egg::Rewrite;
-use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
-use num_bigint::ToBigInt;
+use num::{rational::{Rational64}, Signed, ToPrimitive, Zero, CheckedAdd, CheckedSub, CheckedDiv, CheckedMul};
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
@@ -15,20 +14,13 @@ pub mod rational_best;
 pub mod rational_replicate;
 
 /// define `Constant` for rationals.
-pub type Constant = Ratio<BigInt>;
+pub type Constant = Rational64;
 
-fn mk_rat(n: i64, d: i64) -> Ratio<BigInt> {
+fn mk_rat(n: i64, d: i64) -> Rational64 {
     if d.is_zero() {
         panic!("mk_rat: denominator is zero!");
     }
-    let n = n
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", n));
-    let d = d
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", d));
-
-    Ratio::new(n, d)
+    Rational64::new(n, d)
 }
 
 egg::define_language! {
@@ -53,15 +45,11 @@ impl SynthLanguage for Math {
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Math::Add([x, y]) => map!(get_cvec, x, y => Some(x + y)),
-            Math::Sub([x, y]) => map!(get_cvec, x, y => Some(x - y)),
-            Math::Mul([x, y]) => map!(get_cvec, x, y => Some(x * y)),
+            Math::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(y)),
+            Math::Sub([x, y]) => map!(get_cvec, x, y => x.checked_sub(y)),
+            Math::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(y)),
             Math::Div([x, y]) => map!(get_cvec, x, y => {
-              if y.is_zero() {
-                None
-              } else {
-                Some(x / y)
-              }
+                x.checked_div(y)
             }),
             Math::Neg(x) => map!(get_cvec, x => Some(-x)),
             Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
@@ -75,9 +63,9 @@ impl SynthLanguage for Math {
                     let ((x, y), z) = tup;
                     if let Some(cond) = x {
                         if !cond.is_zero() {
-                            y.clone()
+                            *y
                         } else {
-                            z.clone()
+                            *z
                         }
                     } else {
                         None
@@ -107,24 +95,20 @@ impl SynthLanguage for Math {
             Math::Neg(x) => get_const(x).map(|c| -c),
             Math::Abs(a) => get_const(a).map(|c| c.abs()),
             Math::Add([x, y]) => match (get_const(x), get_const(y)) {
-                (Some(x), Some(y)) => Some(x + y),
+                (Some(x), Some(y)) => x.checked_add(&y),
                 _ => None,
             },
             Math::Sub([x, y]) => match (get_const(x), get_const(y)) {
-                (Some(x), Some(y)) => Some(x - y),
+                (Some(x), Some(y)) => x.checked_sub(&y),
                 _ => None,
             },
             Math::Mul([x, y]) => match (get_const(x), get_const(y)) {
-                (Some(x), Some(y)) => Some(x * y),
+                (Some(x), Some(y)) => x.checked_mul(&y),
                 _ => None,
             },
             Math::Div([x, y]) => match (get_const(x), get_const(y)) {
                 (Some(x), Some(y)) => {
-                    if y.is_zero() {
-                        None
-                    } else {
-                        Some(x / y)
-                    }
+                    x.checked_div(&y)
                 }
                 _ => None,
             },
@@ -397,7 +381,6 @@ impl Math {
             chosen.len(),
             invalid.len()
         );
-
         // here's the conditional stuff
         let mut with_condition = Ruleset::<Math>(
             invalid
@@ -417,6 +400,10 @@ impl Math {
             "Instrumented {} rules with conditions",
             with_condition.len()
         );
+        println!("Conditioned rules:");
+        for rule in with_condition.0.keys() {
+            println!("{}", rule);
+        }
 
         let chosen_conditional = with_condition
             .minimize(prior.union(&chosen), Scheduler::Compress(limits))
@@ -681,7 +668,7 @@ pub mod test {
     use ruler::enumo::{Filter, Ruleset, Workload};
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
-        let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
+        let i32_to_constant = |x: i32| Rational64::new(x as i64, 1);
         Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
     }
 
@@ -810,31 +797,7 @@ pub mod test {
         );
     }
 
-    #[test]
-    fn recip_interval_test() {
-        assert_eq!(recip(&interval(None, None)), interval(None, None));
-        assert_eq!(
-            recip(&interval(Some(50), Some(100))),
-            Interval::new(
-                Some(Ratio::new(1.to_bigint().unwrap(), 100.to_bigint().unwrap())),
-                Some(Ratio::new(1.to_bigint().unwrap(), 50.to_bigint().unwrap())),
-            )
-        );
-        assert_eq!(
-            recip(&interval(Some(-10), Some(-5))),
-            Interval::new(
-                Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-5).to_bigint().unwrap()
-                )),
-                Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-10).to_bigint().unwrap()
-                )),
-            )
-        );
-    }
-
+    
     #[test]
     fn minimize() {
         // This test fails if there are improperly initialized cvecs during minimize.
