@@ -91,6 +91,8 @@ impl SynthLanguage for Math {
     where
         F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
     {
+        //return Interval::default();
+        // TODO why does this result in unsoundness?
         let mut get_const = |x: &'a Id| {
             let ival = get_interval(x);
             if ival.low == ival.high {
@@ -127,8 +129,7 @@ impl SynthLanguage for Math {
                 _ => None,
             },
             Math::If([x, y, z]) => {
-                // TODO why does this result in unsoundness?
-                /*if let Some(x) = get_const(x) {
+                if let Some(x) = get_const(x) {
                     if !x.is_zero() {
                         get_const(y)
                     } else {
@@ -136,8 +137,7 @@ impl SynthLanguage for Math {
                     }
                 } else {
                     None
-                }*/
-                None
+                }
             }
         }
         .map(|c| Interval::new(Some(c.clone()), Some(c)))

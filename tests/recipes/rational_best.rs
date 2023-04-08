@@ -8,11 +8,15 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         node: 1_000_000,
     };
 
-    /*let cheat_domain = Workload::new(&[
+    let cheat_domain = Workload::new(&[
         "(+ a b)",
         "(/ (- (* a a) (* b b))
         (- a b))",
-    ]);*/
+    ]);
+
+    /*let cheat_domain_rules =
+        Math::run_workload_conditional(cheat_domain, rules.clone(), limits, false);
+    rules.extend(cheat_domain_rules);*/
 
     // Domain
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
