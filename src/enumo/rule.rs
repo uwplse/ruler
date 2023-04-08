@@ -125,7 +125,7 @@ impl<L: SynthLanguage> Rule<L> {
     }
 
     pub fn score(&self) -> impl Ord + Debug {
-        L::score(&self)
+        L::score(self)
     }
 
     pub fn is_valid(&self) -> bool {
