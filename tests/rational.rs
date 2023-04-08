@@ -899,25 +899,6 @@ pub mod test {
     }
 
     #[test]
-    fn just_best() {
-        let start = Instant::now();
-        let best_rules = best_enumo_recipe();
-        let duration = start.elapsed();
-
-        logger::write_output(
-            &best_rules,
-            &best_rules,
-            "rational_best",
-            "oopsla",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-    }
-
-    #[test]
     fn cond_div_figure() {
         let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
         let uops = &Workload::new(["~", "fabs"]);
