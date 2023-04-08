@@ -1,39 +1,44 @@
 use super::*;
-use ruler::enumo::{Filter, Metric, Ruleset, Workload};
+use ruler::{
+    enumo::{Filter, Metric, Ruleset, Workload},
+    recipe_utils::{base_lang, iter_metric, recursive_rules, run_workload, Lang},
+};
 
 pub fn bool_rules() -> Ruleset<Bool> {
-    let mut all_rules = Ruleset::default();
-    let initial_vals = Workload::new(["ba", "bb", "bc"]);
-    let uops = Workload::new(["~"]);
-    let bops = Workload::new(["&", "|", "^"]);
-    let limits = Limits {
-        iter: 2,
-        node: 300_000,
-    };
-
-    let layer_1 = Workload::make_layer(initial_vals.clone(), uops.clone(), bops.clone())
-        .filter(Filter::MetricLt(Metric::Lists, 2));
-    let terms_1 = layer_1.clone().append(initial_vals.clone());
-    let rules_1 = Bool::run_workload(terms_1.clone(), all_rules.clone(), limits);
-    all_rules.extend(rules_1.clone());
-
-    let layer_2 = Workload::make_layer(layer_1.clone(), uops.clone(), bops.clone())
-        .filter(Filter::MetricLt(Metric::Lists, 3))
-        .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::Lists, 1))));
-    let terms_2 = layer_2.clone().append(terms_1.clone());
-    let rules_2 = Bool::run_workload(terms_2.clone(), all_rules.clone(), limits);
-    all_rules.extend(rules_2.clone());
-
-    let layer_3 = Workload::make_layer_clever(
-        initial_vals,
-        layer_1,
-        layer_2,
-        uops.clone(),
-        bops.clone(),
-        3,
+    let mut all = Ruleset::default();
+    let r5 = recursive_rules(
+        Metric::Atoms,
+        5,
+        Lang::new(
+            &["true", "false"],
+            &["a", "b", "c"],
+            &["~"],
+            &["&", "|", "^"],
+            &[],
+        ),
+        Ruleset::default(),
     );
-    let terms_3 = layer_3.clone().append(terms_2.clone());
-    let rules_3 = Bool::run_workload(terms_3.clone(), all_rules.clone(), limits);
-    all_rules.extend(rules_3.clone());
-    all_rules
+    all.extend(r5);
+
+    let a7_canon = iter_metric(
+        base_lang().filter(Filter::Invert(Box::new(Filter::Contains(
+            "TOP".parse().unwrap(),
+        )))),
+        "EXPR",
+        Metric::Atoms,
+        7,
+    )
+    .plug("CONST", &Workload::empty())
+    .plug("VAR", &Workload::new(["a", "b", "c"]))
+    .plug("UOP", &Workload::new(["~"]))
+    .plug("BOP", &Workload::new(["&", "|", "^"]))
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string(),
+    ]));
+    let r7 = run_workload(a7_canon, all.clone(), Limits::rulefinding(), true);
+    all.extend(r7);
+
+    all
 }

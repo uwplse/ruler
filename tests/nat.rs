@@ -1,13 +1,8 @@
-use std::time::Instant;
-
 use num::{BigInt, Zero};
 use num_bigint::ToBigInt;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
-use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
-    *,
-};
+use ruler::*;
 use z3::ast::Ast;
 
 egg::define_language! {
@@ -93,7 +88,7 @@ impl SynthLanguage for Nat {
                     .high
                     .clone()
                     .zip(y_int.high.clone())
-                    .map(|(a, b)| a + b);
+                    .map(|(a, b)| a * b);
 
                 Interval::new(Some(low), high)
             }
@@ -103,6 +98,7 @@ impl SynthLanguage for Nat {
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let mut rng = Pcg64::seed_from_u64(0);
+        egraph.analysis.cvec_len = 10;
         for v in vars {
             let id = egraph.add(Nat::Var(Symbol::from(v)));
             let mut vals = vec![];
@@ -153,33 +149,6 @@ impl SynthLanguage for Nat {
     }
 }
 
-impl Nat {
-    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-
-        let mut candidates = Ruleset::cvec_match(&compressed);
-
-        let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
-}
-
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
     let mut buf = vec![];
     let zero = z3::ast::Int::from_i64(ctx, 0);
@@ -205,12 +174,21 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
 #[cfg(test)]
 mod test {
 
-    use ruler::enumo::{Ruleset, Workload};
+    use ruler::{
+        enumo::{Filter, Metric, Ruleset, Workload},
+        recipe_utils::{base_lang, iter_metric, run_workload},
+    };
 
     use super::*;
 
     fn iter_nat(n: usize) -> Workload {
-        Workload::iter_lang(n, &["Z"], &["a", "b", "c"], &["S"], &["+", "*"])
+        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("CONST", &Workload::new(["Z"]))
+            .plug("VAR", &Workload::new(["a", "b", "c"]))
+            .plug("UOP", &Workload::new(["S"]))
+            .plug("BOP", &Workload::new(["+", "*"]))
+            .plug("TOP", &Workload::empty())
     }
 
     #[test]
@@ -219,39 +197,42 @@ mod test {
         let atoms3 = iter_nat(3);
         assert_eq!(atoms3.force().len(), 39);
 
-        let rules3 = Nat::run_workload(
+        let rules3 = run_workload(
             atoms3,
             all_rules.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
             },
+            false,
         );
         all_rules.extend(rules3);
 
         let atoms4 = iter_nat(4);
         assert_eq!(atoms4.force().len(), 132);
 
-        let rules4 = Nat::run_workload(
+        let rules4 = run_workload(
             atoms4,
             all_rules.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
             },
+            false,
         );
         all_rules.extend(rules4);
 
         let atoms5 = iter_nat(5);
         assert_eq!(atoms5.force().len(), 819);
 
-        let rules5 = Nat::run_workload(
+        let rules5 = run_workload(
             atoms5,
             all_rules.clone(),
             Limits {
                 iter: 3,
                 node: 1000000,
             },
+            false,
         );
         all_rules.extend(rules5);
 
@@ -266,7 +247,7 @@ mod test {
             "(* ?c (* ?b ?a)) ==> (* ?a (* ?b ?c))",
             "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
