@@ -249,40 +249,6 @@ impl Math {
         chosen.pretty_print();
         chosen
     }
-
-    fn run_workload(
-        workload: Workload,
-        prior: Ruleset<Self>,
-        limits: Limits,
-        fast_match: bool,
-    ) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-
-        let mut candidates = if fast_match {
-            Ruleset::fast_cvec_match(&compressed)
-        } else {
-            Ruleset::cvec_match(&compressed)
-        };
-
-        let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
 }
 
 fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
@@ -500,7 +466,10 @@ pub mod test {
     use super::*;
     use crate::rational_best::best_enumo_recipe;
     use crate::rational_replicate::replicate_ruler1_recipe;
-    use ruler::enumo::{Ruleset, Workload};
+    use ruler::{
+        enumo::{Filter, Metric, Ruleset, Workload},
+        recipe_utils::{base_lang, iter_metric},
+    };
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
         let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
@@ -658,7 +627,46 @@ pub mod test {
     }
 
     #[test]
+    fn minimize() {
+        // This test fails if there are improperly initialized cvecs during minimize.
+        let limits = Limits {
+            iter: 4,
+            node: 1_000_000,
+        };
+
+        let prior: Ruleset<Math> = Ruleset::new([
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(- ?a ?a) ==> 0",
+            "?a ==> (+ ?a 0)",
+            "?a ==> (* ?a 1)",
+            "?a ==> (- ?a 0)",
+            "?a ==> (/ ?a 1)",
+            "(* (* ?c ?b) (/ 0 ?a)) ==> (/ 0 (fabs ?a))",
+            "(/ (- ?c ?b) (/ ?a ?a)) ==> (- (/ 0 ?a) (- ?b ?c))",
+            "(* (/ ?c ?c) (* ?b ?a)) ==> (/ (* ?b ?a) (/ ?c ?c))",
+            "(- (* ?a ?c) (* ?b ?a)) ==> (* ?a (- ?c ?b))",
+            "(/ (* ?c ?b) ?a) ==> (* ?b (/ ?c ?a))",
+            "(- ?c (- ?b ?a)) ==> (- ?a (- ?b ?c))",
+        ]);
+        let mut with_condition = Ruleset::new([
+            "(- (- ?b ?c) (- ?b ?a)) ==> (if ?c (* (/ ?c ?c) (- ?a ?c)) (- (- ?b ?c) (- ?b ?a)))",
+            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?b (* (/ ?b ?b) (- ?c ?b)) (- (- ?c ?a) (- ?b ?a)))",
+            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?c (* (- ?c ?b) (/ ?c ?c)) (- (- ?c ?a) (- ?b ?a)))",
+            "(- (+ ?c ?a) (+ ?b ?a)) ==> (if ?b (* (- ?c ?b) (/ ?b ?b)) (- (+ ?c ?a) (+ ?b ?a)))",
+            "(/ (/ 0 ?b) (+ ?b ?a)) ==> (if (+ ?b ?a) (/ 0 ?b) (/ (/ 0 ?b) (+ ?b ?a)))",
+        ]);
+        let chosen_conditional = with_condition.minimize(prior, Scheduler::Compress(limits));
+
+        assert_eq!(chosen_conditional.len(), 1);
+    }
+
+    #[test]
     fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
@@ -671,10 +679,6 @@ pub mod test {
             &ruler1,
             "rational_replicate",
             "oopsla",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
             duration,
         );
         logger::write_output(
@@ -682,10 +686,6 @@ pub mod test {
             &herbie,
             "rational_replicate",
             "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
             duration,
         );
 
@@ -693,43 +693,21 @@ pub mod test {
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &best_rules,
-            &ruler1,
-            "rational_best",
-            "oopsla",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-        logger::write_output(
-            &best_rules,
-            &herbie,
-            "rational_best",
-            "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
+        logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
+        logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
     }
 
     #[test]
     fn cond_div_figure() {
-        // Domain
-        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
-        let vars = &Workload::new(["a", "b", "c"]);
-        let consts = &Workload::new(["0", "-1", "1"]);
-        let uops = &Workload::new(["~", "fabs"]);
-        let bops = &Workload::new(["+", "-", "*", "/"]);
+        let lang = base_lang().filter(Filter::Invert(Box::new(Filter::Contains(
+            "TOP".parse().unwrap(),
+        ))));
 
-        let layer1 = lang
-            .clone()
-            .iter_metric("expr", enumo::Metric::Depth, 2)
-            .plug_lang(vars, consts, uops, bops);
+        let layer1 = iter_metric(lang, "EXPR", Metric::Atoms, 3)
+            .plug("VAR", &Workload::new(["a", "b", "c"]))
+            .plug("CONST", &Workload::new(["0", "-1", "1"]))
+            .plug("UOP", &Workload::new(["~", "fabs"]))
+            .plug("BOP", &Workload::new(["+", "-", "*", "/"]));
 
         let candidates: Ruleset<Math> = Ruleset::cvec_match(&layer1.to_egraph());
         let (sound_candidates, unsound) = candidates.partition(|r| r.is_valid());

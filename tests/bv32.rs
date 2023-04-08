@@ -44,21 +44,16 @@ mod test {
 
     #[test]
     fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let start = Instant::now();
         let rules = bv32_rules();
         let duration = start.elapsed();
-
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
-        logger::write_output(
-            &rules,
-            &baseline,
-            "bv32",
-            "oopsla",
-            Limits {
-                iter: 3,
-                node: 200000,
-            },
-            duration,
-        );
+
+        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration);
     }
 }

@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 /**
  * Pos is a datatype representing the strictly positive integers in a binary way.
  * XH represents 1
@@ -8,10 +6,7 @@ use std::time::Instant;
  * Example: 6 is represented as (XO (XI XH))
  * See https://coq.inria.fr/library/Coq.Numbers.BinNums.html
  */
-use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
-    *,
-};
+use ruler::{enumo::Ruleset, *};
 
 egg::define_language! {
  pub enum Pos {
@@ -114,39 +109,23 @@ impl SynthLanguage for Pos {
     }
 }
 
-impl Pos {
-    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let num_prior = prior.len();
-        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
-
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use ruler::enumo::{Ruleset, Scheduler, Workload};
+    use ruler::{
+        enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
+        recipe_utils::{base_lang, iter_metric, run_rule_lifting},
+    };
 
     use super::*;
 
     fn iter_pos(n: usize) -> Workload {
-        Workload::iter_lang(n, &["XH"], &["a", "b", "c"], &["XO", "XI"], &["+", "*"])
+        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("CONST", &Workload::new(["XH"]))
+            .plug("VAR", &Workload::new(["a", "b", "c"]))
+            .plug("UOP", &Workload::new(["XO", "XI"]))
+            .plug("BOP", &Workload::new(["+", "*"]))
+            .plug("TOP", &Workload::empty())
     }
 
     #[test]
@@ -221,7 +200,7 @@ mod tests {
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
 
-        let rules3 = Pos::run_workload(
+        let rules3 = run_rule_lifting(
             atoms3,
             all_rules.clone(),
             Limits {
@@ -234,7 +213,7 @@ mod tests {
         let atoms4 = iter_pos(4);
         assert_eq!(atoms4.force().len(), 255);
 
-        let rules4 = Pos::run_workload(
+        let rules4 = run_rule_lifting(
             atoms4,
             all_rules.clone(),
             Limits {
@@ -247,7 +226,7 @@ mod tests {
         let atoms5 = iter_pos(5);
         assert_eq!(atoms5.force().len(), 1527);
 
-        let rules4 = Pos::run_workload(
+        let rules4 = run_rule_lifting(
             atoms5,
             all_rules.clone(),
             Limits {
@@ -275,7 +254,7 @@ mod tests {
             "(XO ?a) <=> (+ ?a ?a)",
             "(+ ?a (XO ?a)) <=> (* ?a (XI XH))",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
