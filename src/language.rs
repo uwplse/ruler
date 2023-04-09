@@ -5,6 +5,7 @@ use std::{
 
 use egg::{
     Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
+    Runner,
 };
 
 use crate::*;
@@ -14,9 +15,12 @@ pub struct SynthAnalysis {
     pub cvec_len: usize,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for SynthAnalysis {
     fn default() -> Self {
-        Self { cvec_len: 10 }
+        // No cvecs by default. Domains that do cvec matching are responsible
+        // for setting the cvec length when they initialize variables.
+        Self { cvec_len: 0 }
     }
 }
 
@@ -152,6 +156,11 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     // Overrideable hook into the egraph analysis modify method
     // for language-specific purposes (such as custom constant folding)
     fn custom_modify(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
+
+    // Overrideable hook
+    fn hook(_runner: &mut Runner<Self, SynthAnalysis>) -> Result<(), String> {
+        Ok(())
+    }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where

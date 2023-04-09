@@ -372,7 +372,12 @@ mod test {
     }
 
     #[test]
-    fn nightly_recipe() {
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
 
         let start = Instant::now();
@@ -420,7 +425,7 @@ mod test {
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);
-        let (can, cannot) = rules.derive(DeriveType::Lhs, &expected, Limits::default());
+        let (can, cannot) = rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
