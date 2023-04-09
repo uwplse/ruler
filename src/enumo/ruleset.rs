@@ -225,10 +225,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                     }
                     if e1 != e2 {
                         if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
-                            candidates.add(rule)
-                        }
-                        if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
-                            candidates.add(rule)
+                            candidates.add(rule.clone());
+                            if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                                candidates.add(reverse);
+                            }
                         }
                     }
                 }
@@ -356,10 +356,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
                     if let Some(rule) = Rule::from_recexprs(e1, e2) {
-                        candidates.add(rule);
-                    }
-                    if let Some(rule) = Rule::from_recexprs(e2, e1) {
-                        candidates.add(rule);
+                        candidates.add(rule.clone());
+                        if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                            candidates.add(reverse);
+                        }
                     }
                 }
             }

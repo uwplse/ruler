@@ -24,7 +24,6 @@ pub mod test {
         let start = Instant::now();
         let rules = bv4_rules();
         let duration = start.elapsed();
-
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
 
         logger::write_output(&rules, &baseline, "bv4", "oopsla", duration);

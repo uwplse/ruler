@@ -336,6 +336,13 @@ mod test {
         // user	0m19.784s
         // sys	0m0.595s
 
+        // oopsla-halide-baseline branch
+        // Run on leviathan 4/4/2023
+        // time cargo run --release --bin halide -- synth --iters 1 --use-smt
+        // real	0m6.829s
+        // user	0m19.784s
+        // sys	0m0.595s
+
         // With only Add, Sub, Mul, Div, Neg nodes added in make_layer
         // time cargo run --release --bin halide -- synth --iters 2 --use-smt
         // real	0m53.816s
