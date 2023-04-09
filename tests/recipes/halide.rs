@@ -10,6 +10,9 @@ pub fn halide_rules() -> Ruleset<Pred> {
     // This is porting the halide recipe at incremental/halide.spec
     // on the branch "maybe-useful" in the old recipes repo
     let mut all_rules = Ruleset::default();
+    let rules: Ruleset<Pred> = Ruleset::from_file("thru-full.rules");
+    all_rules.extend(rules);
+    /*
     let limits = Limits {
         iter: 3,
         node: 100_000,
@@ -82,6 +85,32 @@ pub fn halide_rules() -> Ruleset<Pred> {
     all_rules.extend(full);
     all_rules.to_file("thru-full.rules");
     println!("full complete.");
+    */
+    let select_arith = Workload::new(&["(select v e e)", "(bop v e)", "(bop e v)"])
+        .plug("e", &Workload::new(&["(bop v v)", "(select v v v)", "v"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))
+        .plug(
+            "v",
+            &Workload::new(&["a", "b", "c", "d", "e", "f"]),
+        )
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+            "f".to_string()
+        ]));
+    println!("Writing select-arith workload...");
+    select_arith.to_file("select-arith.terms");
+    let new = run_workload(
+        select_arith,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        false
+    );
+    println!("select_arith finished.");
+    new.to_file("select-arith.rules");
     let nested_bops = Workload::new(&["(bop e e)", "v", "0", "1"])
         .plug("e", &Workload::new(&["(bop v v)", "v"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "max", "min"]))
@@ -92,6 +121,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "c".to_string(),
             "d".to_string(),
         ]));
+    println!("Writing nested-bops workload...");
+    nested_bops.to_file("nested-bops.terms");
     let new = run_workload(
         nested_bops,
         all_rules.clone(),
@@ -117,6 +148,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
         "c".to_string(),
         "d".to_string(),
     ]));
+    println!("Writing triple-nested-bops workload...");
+    triple_nested_bops.to_file("triple-nested-bops.terms");
     let new = run_workload(
         triple_nested_bops,
         all_rules.clone(),
@@ -143,6 +176,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "0".to_string(),
             "1".to_string(),
         ]));
+    println!("Writing select-arith workload...");
+    select_arith.to_file("select-arith.terms");
     let new = run_workload(
         select_arith,
         all_rules.clone(),
@@ -169,6 +204,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "0".to_string(),
             "1".to_string(),
         ]));
+    println!("Writing select-max workload...");
+    select_max.to_file("select-max.terms");
     let new = run_workload(
         select_max,
         all_rules.clone(),
@@ -191,6 +228,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "b".to_string(),
             "c".to_string(),
         ]));
+    println!("Writing nested-bops-full workload...");
+    nested_bops_full.to_file("nested-bops-full.terms");
     let new = run_workload(
         nested_bops_full,
         all_rules.clone(),

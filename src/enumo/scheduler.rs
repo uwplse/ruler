@@ -101,18 +101,37 @@ impl Scheduler {
                 runner.egraph
             }
             Scheduler::Compress(limits) => {
+                println!("Cloning...");
+                let start = Instant::now();
                 let mut clone = egraph.clone();
+                let duration = start.elapsed();
+                println!("Cloned the egraph in {} seconds.", duration.as_secs());
+
+                println!("Doing ID mapping...");
+                let start = Instant::now();
                 let ids: Vec<Id> = egraph.classes().map(|c| c.id).collect();
+                let duration = start.elapsed();
+                println!("Mapped IDs in {} seconds.", duration.as_secs());
 
+                println!("Running simple scheduler...");
+                let start = Instant::now();
                 let out = Self::Simple(*limits).run(egraph, ruleset);
+                let duration = start.elapsed();
+                println!("Ran simple scheduler in {} seconds.", duration.as_secs());
 
+                println!("Mapping equivalent IDs...");
+                let start = Instant::now();
                 // Build a map from id in out to all of the ids in egraph that are equivalent
                 let mut unions = HashMap::default();
                 for id in ids {
                     let new_id = out.find(id);
                     unions.entry(new_id).or_insert_with(Vec::new).push(id);
                 }
+                let duration = start.elapsed();
+                println!("Mapped equivalent IDs in {} seconds.", duration.as_secs());
 
+                println!("Unions...");
+                let start = Instant::now();
                 for ids in unions.values() {
                     if ids.len() > 1 {
                         let first = ids[0];
@@ -121,7 +140,14 @@ impl Scheduler {
                         }
                     }
                 }
+                let duration = start.elapsed();
+                println!("Unions on the cloned egraph completed in {} seconds.", duration.as_secs());
+
+                println!("Rebuilding...");
+                let start = Instant::now();
                 clone.rebuild();
+                let duration = start.elapsed();
+                println!("Rebuilt in {} seconds.", duration.as_secs());
                 clone
             }
         }

@@ -23,25 +23,44 @@ pub fn run_workload<L: SynthLanguage>(
     fast_match: bool,
 ) -> Ruleset<L> {
     let t = Instant::now();
-
+    
+    // Kinda slow—can't really do anything about this, though.
+    println!("Transferring workload to egraph...");
+    let start = Instant::now();
     let egraph = workload.to_egraph::<L>();
-    let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+    let duration = start.elapsed();
+    println!("Transferred workload to egraph in {} seconds.", duration.as_secs());
 
-    let mut candidates = if fast_match {
-        Ruleset::fast_cvec_match(&compressed)
+    println!("Beginning compress...");
+    let start = Instant::now();
+    let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+    let duration = start.elapsed();
+    println!("Compressed the egraph in {} seconds.", duration.as_secs());
+
+    let mut candidates = Ruleset::default();
+    
+    if fast_match {
+        println!("Beginning fast_cvec_match...");
+        let start = Instant::now();
+        candidates = Ruleset::fast_cvec_match(&compressed);
+        let duration = start.elapsed();
+        println!("fast_cvec_match finished in {} seconds.", duration.as_secs());
     } else {
-        Ruleset::cvec_match(&compressed)
+        candidates = Ruleset::cvec_match(&compressed);
     };
 
     let num_prior = prior.len();
+    println!("Beginning minimization...");
+    let start = Instant::now();
     let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-    let time = t.elapsed().as_secs_f64();
+    let duration = start.elapsed();
+    println!("Finished minimization in {} seconds.", duration.as_secs());
 
     println!(
         "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
         chosen.bidir_len(),
         chosen.len(),
-        time,
+        t.elapsed().as_secs_f64(),
         num_prior
     );
 
