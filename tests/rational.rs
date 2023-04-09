@@ -1,4 +1,4 @@
-use egg::Rewrite;
+use egg::{AstSize, CostFunction, ENodeOrVar, Language, Rewrite};
 use num::{
     rational::Rational64, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
 };
@@ -6,7 +6,7 @@ use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
 };
-use std::{ops::*, time::Instant};
+use std::{cmp::max, ops::*, time::Instant};
 use symbolic_expressions::parser::parse_str;
 use symbolic_expressions::Sexp;
 use z3::ast::Ast;
@@ -156,6 +156,40 @@ impl SynthLanguage for Math {
             Math::Var(v) => Some(*v),
             _ => None,
         }
+    }
+
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
+        let l_size = AstSize.cost_rec(&lhs.ast) as i32;
+        let r_size = AstSize.cost_rec(&rhs.ast) as i32;
+        let mut vars: HashSet<Var> = Default::default();
+        vars.extend(lhs.vars());
+        vars.extend(rhs.vars());
+
+        let mut ops: HashSet<String> = Default::default();
+        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+            if !node.is_leaf() {
+                ops.insert(node.to_string());
+            }
+        }
+
+        let num_consts = lhs
+            .ast
+            .as_ref()
+            .iter()
+            .chain(rhs.ast.as_ref())
+            .filter(|n| match n {
+                ENodeOrVar::ENode(n) => n.is_constant(),
+                ENodeOrVar::Var(_) => false,
+            })
+            .count() as i32;
+
+        [
+            vars.len() as i32,
+            -num_consts,
+            -i32::max(l_size, r_size),
+            -(l_size + r_size),
+            -(ops.len() as i32),
+        ]
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
@@ -810,10 +844,10 @@ pub mod test {
         logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
     }
 
-    #[test]
+    /*#[test]
     fn just_best() {
         best_enumo_recipe();
-    }
+    }*/
 
     #[test]
     fn cond_div_figure() {
