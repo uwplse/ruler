@@ -299,7 +299,7 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
-        
+
         // oopsla-halide-baseline branch
         // Run on leviathan 4/4/2023
         // time cargo run --release --bin halide -- synth --iters 1 --use-smt
