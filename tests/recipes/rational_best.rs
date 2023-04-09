@@ -65,9 +65,10 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         Workload::new(&["var", "(* expr expr)"]),
         "expr",
         enumo::Metric::Atoms,
-        5)
-        .plug("var", &Workload::new(["a", "b"]));
-    
+        5,
+    )
+    .plug("var", &Workload::new(["a", "b"]));
+
     variables_multiplied.to_file("replicate_variables.egg");
 
     let factor_term = iter_metric(

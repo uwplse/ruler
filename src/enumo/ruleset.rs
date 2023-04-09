@@ -1,7 +1,6 @@
 use egg::{AstSize, EClass, Extractor};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::sync::Mutex;
 use std::{io::Write, sync::Arc};
 
 use crate::{
@@ -129,6 +128,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.insert(rule.name.clone(), rule);
     }
 
+    pub fn add_all(&mut self, rules: Vec<&Rule<L>>) {
+        for rule in rules {
+            self.add(rule.clone());
+        }
+    }
+
     pub fn remove_all(&mut self, other: Self) {
         for (name, _) in other.0 {
             self.0.remove(&name);
@@ -143,18 +148,13 @@ impl<L: SynthLanguage> Ruleset<L> {
     where
         F: Fn(&Rule<L>) -> bool + std::marker::Sync,
     {
-        let results = Mutex::new((Ruleset::default(), Ruleset::default()));
         let rules: Vec<&Rule<L>> = self.0.values().collect();
-        rules.into_par_iter().for_each(|rule| {
-            let f_rule = f(rule);
-            let mut results = results.lock().unwrap();
-            if f_rule {
-                results.0.add(rule.clone());
-            } else {
-                results.1.add(rule.clone());
-            }
-        });
-        results.into_inner().unwrap()
+        let (yeses, nos): (Vec<_>, Vec<_>) = rules.into_par_iter().partition(|rule| f(rule));
+        let mut yes = Ruleset::default();
+        let mut no = Ruleset::default();
+        yes.add_all(yeses);
+        no.add_all(nos);
+        (yes, no)
     }
 
     pub fn to_file(&self, filename: &str) {
@@ -225,10 +225,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                     }
                     if e1 != e2 {
                         if let Some(rule) = Rule::from_recexprs(&e1, &e2) {
-                            candidates.add(rule)
-                        }
-                        if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
-                            candidates.add(rule)
+                            candidates.add(rule.clone());
+                            if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                                candidates.add(reverse);
+                            }
                         }
                     }
                 }
@@ -356,10 +356,10 @@ impl<L: SynthLanguage> Ruleset<L> {
             for (idx, e1) in exprs.iter().enumerate() {
                 for e2 in exprs[(idx + 1)..].iter() {
                     if let Some(rule) = Rule::from_recexprs(e1, e2) {
-                        candidates.add(rule);
-                    }
-                    if let Some(rule) = Rule::from_recexprs(e2, e1) {
-                        candidates.add(rule);
+                        candidates.add(rule.clone());
+                        if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
+                            candidates.add(reverse);
+                        }
                     }
                 }
             }
