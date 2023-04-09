@@ -25,6 +25,7 @@ egg::define_language! {
     // FRep
     "max" = Max([Id; 2]),
     "min" = Min([Id; 2]),
+    "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
     "/" = Div([Id; 2]),
@@ -41,12 +42,12 @@ egg::define_language! {
     "Cube" = Cube([Id; 3]),
     "Cylinder" = Cylinder([Id; 3]),
     "Sphere" = Sphere(Id),
-    "Trans" = Trans([Id; 4]),
-    "Scale" = Scale([Id; 4]),
+    "Trans" = Trans([Id; 2]),
+    "Scale" = Scale([Id; 2]),
     "Union" = Union([Id; 2]),
     "Inter" = Inter([Id; 2]),
+    "Vec3" = Vec3([Id; 3]),
     "Empty" = Empty,
-
 
     Var(egg::Symbol),
  }
@@ -56,6 +57,7 @@ egg::define_language! {
 fn is_caddy(node: &CF) -> bool {
     match node {
         CF::Max(_) => false,
+        CF::Add(_) => false,
         CF::Min(_) => false,
         CF::Sub(_) => false,
         CF::Mul(_) => false,
@@ -76,6 +78,9 @@ fn is_caddy(node: &CF) -> bool {
         CF::Inter(_) => true,
         CF::Empty => true,
         CF::Var(_) => false,
+        CF::Vec3(_) => true,
+        // CF::True => true,
+        // CF::False => true,
     }
 }
 
@@ -215,12 +220,22 @@ fn get_frep_rules() -> Vec<&'static str> {
 
 
         // "(* ?a ?b) ==> (* ?b ?a)",
+        // "(+ ?a ?b) ==> (+ ?b ?a)",
+        // "(- (- ?a ?b) ?c) ==> (- ?a (+ ?b ?c))",
+        // "(- (- ?a ?b) ?c) ==> (- (- ?a ?c) ?b))",
 
         "(Scalar (/ ?a ?b)) ==> (/ (Scalar ?a) (Scalar ?b))",
         "(- (/ ?a ?c) (/ ?b ?c)) ==> (/ (- ?a ?b) ?c)",
         
         "(Scalar (* ?a ?b)) ==> (* (Scalar ?a) (Scalar ?b))",
+
         "(- (/ ?a ?c) ?b) ==> (/ (- ?a (* ?b ?c)) ?c)",
+        
+        "(/ (/ ?a ?b) ?c) ==> (/ ?a (* ?b ?c))",
+
+        
+        "(Scalar (+ ?a ?b)) ==> (+ (Scalar ?a) (Scalar ?b))",
+        "(- ?a (+ ?b ?c)) ==> (- (- ?a ?b) ?c)",
 
         "(min (max ?a ?b) ?a) ==> ?a",
         "(max (min ?a ?b) ?a) ==> ?a",
@@ -251,7 +266,7 @@ fn get_lifting_rules() -> Vec<&'static str> {
     [
         "(Union ?a ?b) ==> (max ?a ?b)",
         "(Inter ?a ?b) ==> (min ?a ?b)",
-        "(Scale ?w ?h ?l ?e) ==> (subst (/ x (Scalar ?w)) (/ y (Scalar ?h)) (/ z (Scalar ?l)) ?e)",
+        "(Scale (Vec3 ?w ?h ?l) ?e) ==> (subst (/ x (Scalar ?w)) (/ y (Scalar ?h)) (/ z (Scalar ?l)) ?e)",
         "(Cube ?a ?b ?c) ==> (min (/ x (Scalar ?a))
                                   (min (- 1 (/ x (Scalar ?a)))
                                        (min (/ y (Scalar ?b))
@@ -262,7 +277,7 @@ fn get_lifting_rules() -> Vec<&'static str> {
         "(Sphere ?r) ==> (- (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
                                (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
                             (* (/ z (Scalar ?r)) (/ z (Scalar ?r))))",
-        "(Trans ?a ?b ?c ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
+        "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
     ].into()
 }
 
@@ -459,6 +474,7 @@ impl SynthLanguage for CF {
                 | CF::Div(_)
                 | CF::Mul(_)
                 | CF::Sub(_)
+                | CF::Add(_)
         )
     }
 
@@ -620,6 +636,24 @@ impl CF {
 
         chosen.pretty_print();
 
+        println!("\n\npaste these vvv\n\n");
+        let mut i = 1;
+
+        fn fix(s: String) -> String {
+            s.replace("Scale", "Affine Scale")
+             .replace("Trans", "Affine Trans")
+        }
+
+        for (s, rule) in &chosen {
+            println!(
+                "rw!(\"ruler{}\"; \"{}\" => \"{}\"),",
+                i,
+                fix(rule.lhs.to_string()),
+                fix(rule.rhs.to_string())
+            );
+            i += 1;
+        }
+        println!("\n");
         chosen
     }
 }
@@ -656,15 +690,20 @@ mod tests {
             // "(Cylinder scalar scalar scalar)",
             // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
             
-            "(Scale sa sb sc (Cube 1 1 1))", "(Cube sa sb sc)",
-            "(Scale sa sa sa (Sphere 1))",  "(Sphere sa)",
-            "(Scale sa sb sc (Trans ta tb tc a))", "(Trans (* ta sa) (* tb sb) (* tc sc) (Scale sa sb sc a))",
-            "(Trans ta tb tc (Scale sa sb sc a))", "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
-            "(Trans 0 0 0 a)", "a",
-            "(Scale 1 1 1 a)", "a",
+            // "(Scale (Vec3 sa sb sc) (Cube 1 1 1))", "(Cube sa sb sc)",
+            "(Scale (Vec3 sa sa sa) (Sphere 1))",  "(Sphere sa)",
+            "(Scale (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (* ta sa) (* tb sb) (* tc sc)) (Scale (Vec3 sa sb sc) a))",
+            "(Trans (Vec3 ta tb tc) (Scale (Vec3 sa sb sc) a))", "(Scale (Vec3 sa sb sc) (Trans (Vec3 (/ ta sa) (/ tb sb) (/ tc sc)) a))",
+            "(Trans (Vec3 0 0 0) a)", "a",
+            "(Scale (Vec3 1 1 1) a)", "a",
+            // "(Union (Inter a b) a)", "a",
+            // "(Inter (Union a b) a)", "a",
 
-            "(Union (Inter a b) a)", "a",
-            "(Inter (Union a b) a)", "a",
+            "(Scale (Vec3 sa sb sc) (Scale (Vec3 ta tb tc) a))",
+            "(Scale (Vec3 (* sa ta) (* sb tb) (* sc tc)) a)",
+
+            "(Trans (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))",
+            "(Trans (Vec3 (+ sa ta) (+ sb tb) (+ sc tc)) a)",
 
         ]);
         let scalars: &[&str] = &["sa", "sb", "sc", "1"];
