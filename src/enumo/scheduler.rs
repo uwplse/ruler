@@ -78,7 +78,7 @@ impl Scheduler {
                 let mut runner = get_runner(egraph.clone(), *limits);
 
                 for _ in 0..limits.iter {
-                    // Early
+                    // Early exit if we've passed the timeout
                     if start.elapsed() > timeout {
                         runner.egraph.rebuild();
                         return runner.egraph;
