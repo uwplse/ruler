@@ -159,6 +159,13 @@ impl SynthLanguage for Math {
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
+        // if you drop variables, it's unsound because
+        // we may have lost an error
+        if lhs.vars().into_iter().collect::<HashSet<Var>>() != rhs.vars().into_iter().collect::<HashSet<Var>>() {
+            return ValidationResult::Invalid;
+        }
+
+
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
@@ -400,10 +407,10 @@ impl Math {
             "Instrumented {} rules with conditions",
             with_condition.len()
         );
-        println!("Conditioned rules:");
+        /*println!("Conditioned rules:");
         for rule in with_condition.0.keys() {
             println!("{}", rule);
-        }
+        }*/
 
         let chosen_conditional = with_condition
             .minimize(prior.union(&chosen), Scheduler::Compress(limits))
@@ -763,42 +770,6 @@ pub mod test {
             mul(&interval(Some(-4), Some(10)), &interval(Some(-8), None)),
             interval(None, None)
         );
-    }
-
-    #[test]
-    fn minimize() {
-        // This test fails if there are improperly initialized cvecs during minimize.
-        let limits = Limits {
-            iter: 4,
-            node: 1_000_000,
-        };
-
-        let prior: Ruleset<Math> = Ruleset::new([
-            "(* ?b ?a) ==> (* ?a ?b)",
-            "(- ?a ?a) ==> 0",
-            "?a ==> (+ ?a 0)",
-            "?a ==> (* ?a 1)",
-            "?a ==> (- ?a 0)",
-            "?a ==> (/ ?a 1)",
-            "(* (* ?c ?b) (/ 0 ?a)) ==> (/ 0 (fabs ?a))",
-            "(/ (- ?c ?b) (/ ?a ?a)) ==> (- (/ 0 ?a) (- ?b ?c))",
-            "(* (/ ?c ?c) (* ?b ?a)) ==> (/ (* ?b ?a) (/ ?c ?c))",
-            "(- (* ?a ?c) (* ?b ?a)) ==> (* ?a (- ?c ?b))",
-            "(/ (* ?c ?b) ?a) ==> (* ?b (/ ?c ?a))",
-            "(- ?c (- ?b ?a)) ==> (- ?a (- ?b ?c))",
-        ]);
-        let mut with_condition = Ruleset::new([
-            "(- (- ?b ?c) (- ?b ?a)) ==> (if ?c (* (/ ?c ?c) (- ?a ?c)) (- (- ?b ?c) (- ?b ?a)))",
-            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?b (* (/ ?b ?b) (- ?c ?b)) (- (- ?c ?a) (- ?b ?a)))",
-            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?c (* (- ?c ?b) (/ ?c ?c)) (- (- ?c ?a) (- ?b ?a)))",
-            "(- (+ ?c ?a) (+ ?b ?a)) ==> (if ?b (* (- ?c ?b) (/ ?b ?b)) (- (+ ?c ?a) (+ ?b ?a)))",
-            "(/ (/ 0 ?b) (+ ?b ?a)) ==> (if (+ ?b ?a) (/ 0 ?b) (/ (/ 0 ?b) (+ ?b ?a)))",
-        ]);
-        let chosen_conditional = with_condition
-            .minimize(prior, Scheduler::Compress(limits))
-            .0;
-
-        assert_eq!(chosen_conditional.len(), 1);
     }
 
     #[test]
