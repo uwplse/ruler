@@ -300,13 +300,6 @@ mod test {
             return;
         }
 
-        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        let start = Instant::now();
-        let all_rules = halide_rules();
-        let duration = start.elapsed();
-
-        logger::write_output(&all_rules, &baseline, "halide", "halide", duration);
-
         // oopsla-halide-baseline branch
         // Run on leviathan 4/4/2023
         // time cargo run --release --bin halide -- synth --iters 1 --use-smt
@@ -319,6 +312,7 @@ mod test {
         // real	0m53.816s
         // user	1m6.082s
         // sys	0m1.259s
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);
 
