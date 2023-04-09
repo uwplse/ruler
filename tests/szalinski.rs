@@ -3,7 +3,7 @@
 
 #![allow(unused_imports)]
 #![allow(unused_variables)]
-use egg::{AstSize, Extractor, RecExpr, Language, CostFunction};
+use egg::{AstSize, Extractor, RecExpr, Language, CostFunction, Runner};
 use itertools::enumerate;
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
 use num_bigint::ToBigInt;
@@ -281,7 +281,7 @@ fn get_lifting_rules() -> Vec<&'static str> {
     ].into()
 }
 
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 
 fn to_idx(from_var: CF) -> usize {
     if from_var == CF::DimX {
@@ -293,6 +293,101 @@ fn to_idx(from_var: CF) -> usize {
     } else {
         println!("not a dim var!");
         return 0;
+    }
+}
+
+fn canonicalize_all_substs(egraph: &mut EGraph<CF, SynthAnalysis>) {
+    println!("TOP");
+    let mut all_subst_ids: Vec<Id> = vec![];
+    for class in egraph.classes() {
+        let mut all_subst = true;
+        let mut at_least_one_subst = false;
+        for node in &egraph[class.id].nodes {
+            if is_caddy(node) {
+                continue;
+            }
+            // Check if there is any non-subst FRep node
+            if let CF::Subst(_) = node {
+                at_least_one_subst = true;
+            } else {
+                all_subst = false;
+            }
+        }
+        if at_least_one_subst && all_subst {
+            all_subst_ids.push(class.id.clone());
+        }
+    }
+
+    // println!("num is {}", all_subst_ids.len());
+    let x = egraph.add(CF::DimX);
+    let y = egraph.add(CF::DimY);
+    let z = egraph.add(CF::DimZ);
+    for id in all_subst_ids {
+        // println!("cm");
+        for node in &egraph[id].nodes.clone() {
+            if let CF::Subst([x2, y2, z2, e]) = node.clone() {
+                let mapping = [x2, y2, z2];
+                if mapping == [x, y, z] {
+                    if egraph.find(id) != egraph.find(e) {
+                        egraph.union(id, e);
+                        if DEBUG { println!("redo1"); }
+                        return canonicalize_all_substs(egraph);
+                    } else {
+                        continue;
+                    }
+                }
+                let mut cache: HashMap<(Id, [Id; 3]), Option<CF>> = HashMap::new();
+                
+                if DEBUG {
+                    let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
+                    let (_, eex) = extractor.find_best(e);
+                    let (_, x2ex) = extractor.find_best(x2);
+                    let (_, y2ex) = extractor.find_best(y2);
+                    let (_, z2ex) = extractor.find_best(z2);
+                    let (_, idex) = extractor.find_best(id);
+                    println!("custom modify start");
+                    println!("id: {} {}", id, idex); 
+                    println!("e: {} {}", e, eex);
+                    println!("x2: {}", x2ex);
+                    println!("y2: {}", y2ex);
+                    println!("z2: {}", z2ex);
+                }
+
+                if let Some(e_substed) = compute_subst(egraph, e, mapping, &mut cache, 0) {
+                    
+                    let id2 = egraph.add(e_substed.clone());
+                    
+                    if DEBUG {
+                        println!("custom modify SUCCESS");
+                        let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
+                        let (_, eex) = extractor.find_best(e);
+                        let (_, x2ex) = extractor.find_best(x2);
+                        let (_, y2ex) = extractor.find_best(y2);
+                        let (_, z2ex) = extractor.find_best(z2);
+                        let (_, id2ex) = extractor.find_best(id2);
+                        let (_, idex) = extractor.find_best(id);
+                        println!("id: {} {}", id, idex); 
+                        println!("e: {} {}", e, eex);
+                        println!("x2: {}", x2ex);
+                        println!("y2: {}", y2ex);
+                        println!("z2: {}", z2ex);
+   
+                        println!("id2: {} {}", id2, id2ex);
+                    }
+
+
+                    // This algorithm runs until fixed-point
+                    // Only restart if we introduced a non-subst term
+                    if egraph.find(id) != egraph.find(id2) {
+                        egraph.union(id, id2);
+                        if DEBUG { println!("redo2"); }
+                        return canonicalize_all_substs(egraph);
+                    }
+                } else {
+                    // println!("Custom modify fail");
+                }
+            }
+        }
     }
 }
 
@@ -509,100 +604,10 @@ impl SynthLanguage for CF {
         CF::Lit(c)
     }
 
-    fn custom_modify(egraph: &mut EGraph<Self, SynthAnalysis>, id: Id) { 
-        // return;
-        // println!("TOP");
-        let mut all_subst_ids: Vec<Id> = vec![];
-        for class in egraph.classes() {
-            let mut all_subst = true;
-            let mut at_least_one_subst = false;
-            for node in &egraph[class.id].nodes {
-                if is_caddy(node) {
-                    continue;
-                }
-                // Check if there is any non-subst FRep node
-                if let CF::Subst(_) = node {
-                    at_least_one_subst = true;
-                } else {
-                    all_subst = false;
-                }
-            }
-            if at_least_one_subst && all_subst {
-                all_subst_ids.push(class.id.clone());
-            }
-        }
-
-        // println!("num is {}", all_subst_ids.len());
-        let x = egraph.add(CF::DimX);
-        let y = egraph.add(CF::DimY);
-        let z = egraph.add(CF::DimZ);
-        for id in all_subst_ids {
-            // println!("cm");
-            for node in &egraph[id].nodes.clone() {
-                if let CF::Subst([x2, y2, z2, e]) = node.clone() {
-                    let mapping = [x2, y2, z2];
-                    if mapping == [x, y, z] {
-                        if egraph.find(id) != egraph.find(e) {
-                            egraph.union(id, e);
-                            if DEBUG { println!("redo1"); }
-                            return CF::custom_modify(egraph, id);
-                        } else {
-                            continue;
-                        }
-                    }
-                    let mut cache: HashMap<(Id, [Id; 3]), Option<CF>> = HashMap::new();
-                    
-                    if DEBUG {
-                        let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
-                        let (_, eex) = extractor.find_best(e);
-                        let (_, x2ex) = extractor.find_best(x2);
-                        let (_, y2ex) = extractor.find_best(y2);
-                        let (_, z2ex) = extractor.find_best(z2);
-                        let (_, idex) = extractor.find_best(id);
-                        println!("custom modify start");
-                        println!("id: {} {}", id, idex); 
-                        println!("e: {} {}", e, eex);
-                        println!("x2: {}", x2ex);
-                        println!("y2: {}", y2ex);
-                        println!("z2: {}", z2ex);
-                    }
-
-                    if let Some(e_substed) = compute_subst(egraph, e, mapping, &mut cache, 0) {
-                        
-                        let id2 = egraph.add(e_substed.clone());
-                        
-                        if DEBUG {
-                            println!("custom modify SUCCESS");
-                            let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
-                            let (_, eex) = extractor.find_best(e);
-                            let (_, x2ex) = extractor.find_best(x2);
-                            let (_, y2ex) = extractor.find_best(y2);
-                            let (_, z2ex) = extractor.find_best(z2);
-                            let (_, id2ex) = extractor.find_best(id2);
-                            let (_, idex) = extractor.find_best(id);
-                            println!("id: {} {}", id, idex); 
-                            println!("e: {} {}", e, eex);
-                            println!("x2: {}", x2ex);
-                            println!("y2: {}", y2ex);
-                            println!("z2: {}", z2ex);
-       
-                            println!("id2: {} {}", id2, id2ex);
-                        }
-
-
-                        // This algorithm runs until fixed-point
-                        // Only restart if we introduced a non-subst term
-                        if egraph.find(id) != egraph.find(id2) {
-                            egraph.union(id, id2);
-                            if DEBUG { println!("redo2"); }
-                            return CF::custom_modify(egraph, id);
-                        }
-                    } else {
-                        // println!("Custom modify fail");
-                    }
-                }
-            }
-        }
+    fn hook(runner: &mut Runner<Self, SynthAnalysis>) -> Result<(), String> {
+        canonicalize_all_substs(&mut runner.egraph);
+        runner.egraph.rebuild();
+        Ok(())
     }
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
