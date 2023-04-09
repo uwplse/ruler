@@ -33,12 +33,10 @@ if field == "time":
 
 h = ('Herbie', pairs['main-t'])
 e = ('Enumo', pairs['enumo-t'])
-# en = ('E[-NT]', pairs['enumo-n-t'])
-f = ('Enumo-FF', pairs['ruler-no-ff-t'])
-# fn = ('F[-NT]', pairs['ruler-no-ff-n-t'])
+f = ('Enumo[-FF]', pairs['ruler-no-ff-t'])
+o = ('Enumo[Rational]', pairs['enumo-only-rat'])
 r = ('Ruler', pairs['ruler-t'])
-# rn = ('R[-NT]', pairs['ruler-n-t'])
-listify = [h, e, f, r]
+listify = [h, e, f, o, r]
 
 labs = []
 vals = []
@@ -46,7 +44,7 @@ for c, ds in listify:
     labs.append(c)
     vals.append(ds)
 
-fig, ax = plt.subplots(figsize=(3, 5))
+fig, ax = plt.subplots(figsize=(6, 10))
 ax.boxplot(vals)
 
 # manually set before deadline

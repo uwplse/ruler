@@ -94,6 +94,10 @@ function do_branch {
       echo "" >> "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
 
+    # if [[ "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
+    #   cat "$MYDIR/flip.patch" >> "$HERBIE_DIR/src/syntax/rules.rkt"
+    # fi
+
     if [[ "$name" = "enumo-only-rat" ]]; then
       sed -i 's#(ruler-manifest "exponential"#; (ruler-manifest "exponential"#g' "$HERBIE_DIR/src/syntax/rules.rkt"
       sed -i 's#(ruler-manifest "trig"#; (ruler-manifest "trig"#g' "$HERBIE_DIR/src/syntax/rules.rkt"
@@ -149,11 +153,11 @@ if [ -z "$NO_RUN" ]; then
   # do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
   # do_branch ruler-no-fast-forwarding ruler-no-ff-n-t -o rules:numerics -o generate:taylor
   ### Final ###
-  do_branch main main-t -o generate:taylor
+  # do_branch main main-t -o generate:taylor
   do_branch using-ruler-nightlies enumo-t -o generate:taylor
   do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
   do_branch using-ruler-baseline enumo-only-rat -o generate:taylor
-  do_branch using-ruler-baseline ruler-t -o generate:taylor
+  # do_branch using-ruler-baseline ruler-t -o generate:taylor
 fi
 
 # Plots

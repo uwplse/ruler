@@ -1,0 +1,11 @@
+(define-ruleset* difference-of-squares-flip (polynomials)
+  #:type ([a real] [b real])
+  ; [flip-+     (+ a b)  (/ (- (* a a) (* b b)) (- a b))]
+  [flip--     (- a b)  (/ (- (* a a) (* b b)) (+ a b))])
+
+(define-ruleset* difference-of-cubes (polynomials)
+  #:type ([a real] [b real])
+  [flip3-+          (+ a b)
+                    (/ (+ (pow a 3) (pow b 3)) (+ (* a a) (- (* b b) (* a b))))]
+  [flip3--          (- a b)
+                    (/ (- (pow a 3) (pow b 3)) (+ (* a a) (+ (* b b) (* a b))))])
