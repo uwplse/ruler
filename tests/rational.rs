@@ -839,6 +839,11 @@ pub mod test {
     }
 
     #[test]
+    fn just_best() {
+        best_enumo_recipe();
+    }
+
+    #[test]
     fn cond_div_figure() {
         let mut all_rules: Ruleset<Math> = Ruleset::default();
 

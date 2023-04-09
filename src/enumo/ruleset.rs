@@ -444,8 +444,8 @@ impl<L: SynthLanguage> Ruleset<L> {
                 chosen.len()
             );
             let selected = self.select(step_size, &mut invalid);
-            if let Some(selected) = selected.0.first() {
-                println!("Selected {}", selected.1);
+            for rule in selected.0.keys() {
+                println!("Selected: {}", rule);
             }
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);

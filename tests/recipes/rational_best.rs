@@ -9,7 +9,7 @@ use ruler::{
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 3,
+        iter: 5,
         node: 1_000_000,
     };
 
@@ -61,14 +61,23 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
 
     // Factorization
     println!("factorization");
+    let variables_multiplied = iter_metric(
+        Workload::new(&["var", "(* expr expr)"]),
+        "expr",
+        enumo::Metric::Atoms,
+        5)
+        .plug("var", &Workload::new(["a", "b"]));
+    
+    variables_multiplied.to_file("replicate_variables.egg");
+
     let factor_term = iter_metric(
         Workload::new(&["var", "(bop expr expr)"]),
         "expr",
         enumo::Metric::Depth,
-        3,
+        2,
     )
-    .plug("var", &Workload::new(["a", "b"]))
-    .plug("bop", &Workload::new(["+", "-", "*"]));
+    .plug("var", &variables_multiplied)
+    .plug("bop", &Workload::new(["+", "-"]));
     let factor_div = Workload::new(["(/ v v)"])
         .plug("v", &factor_term)
         .filter(Filter::Canon(vec!["a".to_string(), "b".to_string()]));
