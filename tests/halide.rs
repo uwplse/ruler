@@ -301,14 +301,14 @@ mod test {
 
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let start = Instant::now();
-        let all_rules = halide_rules();
-        // let all_rules: Ruleset<Pred> = Ruleset::from_file("all-rules.rules");
+        // let all_rules = halide_rules();
+        let all_rules: Ruleset<Pred> = Ruleset::from_file("all-rules-no-div.rules");
         let duration = start.elapsed();
         println!("Rules collected.");
 
         let (can, cannot) =
             all_rules.derive(DeriveType::Lhs, &baseline, Limits {
-                iter: 2,
+                iter: 5,
                 node: 100_000,
             });
         println!("LHS: {} / {}", can.len(), can.len() + cannot.len());
@@ -316,7 +316,7 @@ mod test {
 
         let (can, cannot) =
             all_rules.derive(DeriveType::LhsAndRhs, &baseline, Limits {
-                iter: 2,
+                iter: 5,
                 node: 100_000,
             });
         println!("LHS/RHS: {} / {}", can.len(), can.len() + cannot.len());
