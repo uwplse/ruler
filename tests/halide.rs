@@ -1,5 +1,4 @@
-use num::{BigInt, ToPrimitive, Zero};
-use num_bigint::ToBigInt;
+use num::{ToPrimitive, Zero};
 use ruler::*;
 use z3::ast::Ast;
 

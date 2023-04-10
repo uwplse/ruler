@@ -1,7 +1,7 @@
 use super::*;
 use ruler::{
     enumo::{Filter, Ruleset, Workload},
-    recipe_utils::{base_lang, iter_metric, run_workload},
+    recipe_utils::{base_lang, run_workload},
 };
 
 pub fn replicate_ruler1_recipe() -> Ruleset<Math> {

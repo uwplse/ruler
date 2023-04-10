@@ -1,9 +1,7 @@
 use egg::Rewrite;
 use num::{
-    rational::Ratio, BigInt, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive,
-    Zero,
+    rational::Ratio, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
 };
-use num_bigint::ToBigInt;
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
@@ -204,19 +202,13 @@ impl Math {
                     res.extend(Self::all_denominators(s));
                 }
             }
-            Sexp::String(atom) => (),
-            Empty => (),
+            _ => (),
         }
 
         res
     }
 
-    // currently does nothing
-    fn wrap_neqzero(sexp: Sexp) -> Sexp {
-        sexp
-    }
-
-    fn add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
+    fn _add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
         let lhs_sexp = parse_str(&rule.lhs.to_string()).unwrap();
         let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
         let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
@@ -234,8 +226,7 @@ impl Math {
             None
         } else {
             let mut iterator = all_denoms.iter();
-            let mut condition: Sexp =
-                Self::wrap_neqzero(parse_str(iterator.next().unwrap()).unwrap());
+            let mut condition: Sexp = parse_str(iterator.next().unwrap()).unwrap();
 
             // TODO doesn't handle multiple denominators
             if let Some(_) = iterator.next() {
@@ -245,7 +236,7 @@ impl Math {
                 condition = Sexp::List(vec![
                     Sexp::String("and".to_string()),
                     condition,
-                    Self::wrap_neqzero(parse_str(denom).unwrap()),
+                    parse_str(denom).unwrap(),
                 ]);
             }
             let rhs = Sexp::List(vec![
