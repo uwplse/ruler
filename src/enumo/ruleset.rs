@@ -434,6 +434,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             let selected = self.select(step_size);
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
+            println!("Selected {}, {} left", selected.len(), self.len());
         }
         // Return only the new rules
         chosen.remove_all(prior);
