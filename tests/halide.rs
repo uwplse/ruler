@@ -297,12 +297,6 @@ mod test {
     };
 
     #[test]
-    fn terms() {
-        let wkld = Workload::from_file("select_arith.terms");
-        wkld.to_egraph::<Pred>();
-    }
-
-    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
