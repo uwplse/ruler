@@ -16,20 +16,26 @@ pub fn write_output<L: SynthLanguage>(
     time_rules: Duration,
 ) {
     // get information about the derivability of our ruleset vs. the baseline ruleset
+    let start = Instant::now();
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
         get_derivability_results(ruleset, DeriveType::Lhs, baseline);
-    println!("LHS: {} / {} derivable.", forwards_lhs, baseline.len());
+    let duration = start.elapsed();
+    println!("LHS: {} / {} derivable in {} seconds.", forwards_lhs, baseline.len(), duration.as_secs());
+    let start = Instant::now();
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
         get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline);
+    let duration = start.elapsed();
     println!(
-        "LHS/RHS: {} / {} derivable.",
+        "LHS/RHS: {} / {} derivable in {} seconds.",
         forwards_lhs_rhs,
-        baseline.len()
+        baseline.len(),
+        duration.as_secs()
     );
+    let start = Instant::now();;
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
         get_derivability_results(ruleset, DeriveType::AllRules, baseline);
-    println!("ALL: {} / {} derivable.", forwards_all, baseline.len());
-
+    let duration = start.elapsed();
+    println!("ALL: {} / {} derivable in {} seconds.", forwards_all, baseline.len(), duration.as_secs());
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
 

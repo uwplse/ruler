@@ -15,18 +15,18 @@ pub mod rational_best;
 pub mod rational_replicate;
 
 /// define `Constant` for rationals.
-pub type Constant = Ratio<BigInt>;
+pub type Constant = Ratio<i64>;
 
-fn mk_rat(n: i64, d: i64) -> Ratio<BigInt> {
+fn mk_rat(n: i64, d: i64) -> Ratio<i64> {
     if d.is_zero() {
         panic!("mk_rat: denominator is zero!");
     }
     let n = n
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", n));
+        .to_i64()
+        .unwrap_or_else(|| panic!("could not make i64 from {}", n));
     let d = d
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", d));
+        .to_i64()
+        .unwrap_or_else(|| panic!("could not make i64 from {}", d));
 
     Ratio::new(n, d)
 }
@@ -566,7 +566,7 @@ pub mod test {
     };
 
     fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
-        let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
+        let i32_to_constant = |x: i32| Ratio::new(x.to_i64().unwrap(), 1.to_i64().unwrap());
         Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
     }
 
@@ -701,20 +701,20 @@ pub mod test {
         assert_eq!(
             recip(&interval(Some(50), Some(100))),
             Interval::new(
-                Some(Ratio::new(1.to_bigint().unwrap(), 100.to_bigint().unwrap())),
-                Some(Ratio::new(1.to_bigint().unwrap(), 50.to_bigint().unwrap())),
+                Some(Ratio::new(1.to_i64().unwrap(), 100.to_i64().unwrap())),
+                Some(Ratio::new(1.to_i64().unwrap(), 50.to_i64().unwrap())),
             )
         );
         assert_eq!(
             recip(&interval(Some(-10), Some(-5))),
             Interval::new(
                 Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-5).to_bigint().unwrap()
+                    1.to_i64().unwrap(),
+                    (-5).to_i64().unwrap()
                 )),
                 Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-10).to_bigint().unwrap()
+                    1.to_i64().unwrap(),
+                    (-10).to_i64().unwrap()
                 )),
             )
         );
@@ -764,9 +764,13 @@ pub mod test {
         let ruler1: Ruleset<Math> = Ruleset::from_file("baseline/rational.rules");
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
+        println!("Beginning rulefinding for rational (replicate)...");
+
         let start = Instant::now();
         let replicate_rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
+
+        println!("{} replicate rules found.", replicate_rules.len());
 
         logger::write_output(
             &replicate_rules,
@@ -775,6 +779,9 @@ pub mod test {
             "oopsla",
             duration,
         );
+
+        println!("Derivability with Ruler 1 complete.");
+
         logger::write_output(
             &replicate_rules,
             &herbie,
@@ -783,12 +790,20 @@ pub mod test {
             duration,
         );
 
+        println!("Derivability with Herbie complete.");
+
+        println!("Beginning rulefinding for rational (best)...");
+
         let start = Instant::now();
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
 
+        println!("{} best rules found.", best_rules.len());
+
         logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
+        println!("Derivability with Ruler 1 complete.");
         logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
+        println!("Derivability with Herbie complete.");
     }
 
     #[test]

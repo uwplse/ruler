@@ -291,10 +291,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{
-        enumo::{Ruleset, Workload},
-        logger,
-    };
+    use ruler::{enumo::Ruleset, logger, Limits, DeriveType};
 
     #[test]
     fn run() {
@@ -302,13 +299,6 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
-
-        let start = Instant::now();
-        let rules = halide_rules();
-        let duration = start.elapsed();
-
-        println!("Found {} in {} seconds.", rules.clone().len(), duration.as_secs());
-
         // oopsla-halide-baseline branch
         // Run on leviathan 4/4/2023
         // time cargo run --release --bin halide -- synth --iters 1 --use-smt
@@ -321,6 +311,14 @@ mod test {
         // real	0m53.816s
         // user	1m6.082s
         // sys	0m1.259s
+        println!("Beginning rulefinding...");
+        
+        let start = Instant::now();
+        let rules = halide_rules();
+        let duration = start.elapsed();
+
+        println!("Found {} in {} seconds.", rules.clone().len(), duration.as_secs());
+
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);

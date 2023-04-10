@@ -2,7 +2,8 @@ use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
 use crate::{SynthAnalysis, SynthLanguage};
-use std::{io::Write, time::Instant};
+use std::io::Write;
+use std::time::Instant;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Workload {
@@ -55,8 +56,11 @@ impl Workload {
 
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
+
+        let start = Instant::now();
         let sexps = self.force();
-        println!("{}", sexps.len());
+        let duration = start.elapsed();
+        // println!("Forced workload in {} seconds.", duration.as_secs());
 
         // Have to find all the variables first so that we can initialize
         // their cvecs, which might require doing a multi-way cross product
@@ -67,6 +71,8 @@ impl Workload {
         // For some reason, it appears the order we initialize these variables
         // can matter, so make sure we preserve the order in the workload.
         // TODO: why does this order matter?
+        // println!("Finding variables...");
+        let start = Instant::now();
         let mut vars: Vec<String> = vec![];
         for sexp in sexps.iter() {
             let expr: RecExpr<L> = sexp.to_string().parse().unwrap();
@@ -81,16 +87,27 @@ impl Workload {
             }
         }
         L::initialize_vars(&mut egraph, &vars);
+        let duration = start.elapsed();
+        // println!("Found and initialized variables in {} seconds.", duration.as_secs());
 
+        // println!("Adding exprs to egraph...");
+        let start = Instant::now();
+
+        let mut parsed = vec![];
         let start = Instant::now();
         for sexp in sexps.iter() {
-            egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
+            parsed.push(sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
-        println!(
-            "{} {}",
-            egraph.number_of_classes(),
-            start.elapsed().as_secs()
-        );
+        let duration = start.elapsed();
+        // println!("Parsing completed in {} seconds.", duration.as_secs());
+        let start = Instant::now();
+        for exp in parsed.iter() {
+            // Adding a single expr takes between 5 and 14 milliseconds
+            // and remains consistent as the egraph grows.
+            egraph.add_expr(&exp);
+        }
+        let duration = start.elapsed();
+        // println!("Added exprs to egraph in {} seconds.", duration.as_secs());
         egraph
     }
 
