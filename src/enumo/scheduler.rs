@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use egg::{Rewrite, Runner};
 
@@ -33,12 +33,11 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
         rule: Option<&Rule<L>>,
+        match_limit: usize,
     ) -> EGraph<L, SynthAnalysis> {
         let get_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
             let base_runner = Runner::default()
-                .with_scheduler(MatchScheduler {
-                    match_limit: 1_000_000,
-                })
+                .with_scheduler(MatchScheduler { match_limit })
                 .with_node_limit(limits.node)
                 .with_iter_limit(limits.iter)
                 .with_time_limit(Duration::from_secs(600))
@@ -47,22 +46,20 @@ impl Scheduler {
                 let lexpr = L::instantiate(&rule.lhs);
                 let rexpr = L::instantiate(&rule.rhs);
 
-                base_runner
-                    .with_scheduler(MatchScheduler { match_limit: 1000 })
-                    .with_hook(move |r| {
-                        let lhs = r.egraph.lookup_expr(&lexpr);
-                        let rhs = r.egraph.lookup_expr(&rexpr);
-                        match (lhs, rhs) {
-                            (Some(l), Some(r)) => {
-                                if l == r {
-                                    Err("Done".to_owned())
-                                } else {
-                                    Ok(())
-                                }
+                base_runner.with_hook(move |r| {
+                    let lhs = r.egraph.lookup_expr(&lexpr);
+                    let rhs = r.egraph.lookup_expr(&rexpr);
+                    match (lhs, rhs) {
+                        (Some(l), Some(r)) => {
+                            if l == r {
+                                Err("Done".to_owned())
+                            } else {
+                                Ok(())
                             }
-                            _ => Ok(()),
                         }
-                    })
+                        _ => Ok(()),
+                    }
+                })
             } else {
                 base_runner
             }
@@ -78,7 +75,6 @@ impl Scheduler {
                 runner.egraph
             }
             Scheduler::Saturating(limits) => {
-                let start = Instant::now();
                 let (sat, other) = ruleset.partition(|rule| rule.is_saturating());
                 let (sat, other): (Vec<Rewrite<_, _>>, Vec<Rewrite<_, _>>) = (
                     (sat.0.iter().map(|(_, rule)| rule.rewrite.clone()).collect()),
@@ -141,7 +137,7 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        self.run_internal(egraph, ruleset, None)
+        self.run_internal(egraph, ruleset, None, 1_000_000)
     }
 
     pub fn run_derive<L: SynthLanguage>(
@@ -150,6 +146,7 @@ impl Scheduler {
         ruleset: &Ruleset<L>,
         rule: &Rule<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        self.run_internal(egraph, ruleset, Some(rule))
+        // Use a small match limit for deriving
+        self.run_internal(egraph, ruleset, Some(rule), 1000)
     }
 }
