@@ -291,10 +291,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{
-        enumo::{Ruleset, Workload},
-        logger,
-    };
+    use ruler::{enumo::Ruleset, logger};
 
     #[test]
     fn run() {
@@ -302,6 +299,13 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
+
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        let start = Instant::now();
+        let all_rules = halide_rules();
+        let duration = start.elapsed();
+
+        logger::write_output(&all_rules, &baseline, "halide", "halide", duration);
 
         // oopsla-halide-baseline branch
         // Run on leviathan 4/4/2023

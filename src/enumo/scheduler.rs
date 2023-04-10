@@ -13,27 +13,42 @@ pub enum Scheduler {
     Compress(Limits),
 }
 
+struct MatchScheduler {
+    match_limit: usize,
+}
+impl<L: SynthLanguage> egg::RewriteScheduler<L, SynthAnalysis> for MatchScheduler {
+    fn search_rewrite<'a>(
+        &mut self,
+        _iteration: usize,
+        egraph: &egg::EGraph<L, SynthAnalysis>,
+        rewrite: &'a Rewrite<L, SynthAnalysis>,
+    ) -> Vec<egg::SearchMatches<'a, L>> {
+        rewrite.search_with_limit(egraph, self.match_limit)
+    }
+}
+
 impl Scheduler {
     pub fn run_internal<L: SynthLanguage>(
         &self,
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
         rule: Option<&Rule<L>>,
-        timeout: Duration,
     ) -> EGraph<L, SynthAnalysis> {
         let get_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
             let base_runner = Runner::default()
-                .with_scheduler(egg::SimpleScheduler)
+                .with_scheduler(MatchScheduler {
+                    match_limit: 1_000_000,
+                })
                 .with_node_limit(limits.node)
                 .with_iter_limit(limits.iter)
-                .with_time_limit(timeout)
+                .with_time_limit(Duration::from_secs(600))
                 .with_egraph(egraph);
             if let Some(rule) = rule {
                 let lexpr = L::instantiate(&rule.lhs);
                 let rexpr = L::instantiate(&rule.rhs);
 
                 base_runner
-                    .with_scheduler(egg::SimpleScheduler)
+                    .with_scheduler(MatchScheduler { match_limit: 1000 })
                     .with_hook(move |r| {
                         let lhs = r.egraph.lookup_expr(&lexpr);
                         let rhs = r.egraph.lookup_expr(&rexpr);
@@ -58,7 +73,6 @@ impl Scheduler {
                 let mut runner = get_runner(egraph.clone(), *limits)
                     .with_iter_limit(limits.iter)
                     .with_node_limit(limits.node)
-                    .with_scheduler(egg::SimpleScheduler)
                     .run(rewrites);
                 runner.egraph.rebuild();
                 runner.egraph
@@ -78,11 +92,6 @@ impl Scheduler {
                 let mut runner = get_runner(egraph.clone(), *limits);
 
                 for _ in 0..limits.iter {
-                    // Early exit if we've passed the timeout
-                    if start.elapsed() > timeout {
-                        runner.egraph.rebuild();
-                        return runner.egraph;
-                    }
                     // Sat
                     runner = get_runner(runner.egraph, Limits::max()).run(&sat);
 
@@ -132,11 +141,7 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        // Set timeout to something quite high (10 minutes) to reduce non-deterministic
-        // behavior. If egg terminates due to timeout, it's hard to reason about
-        // what did/didn't merge, and things vary a lot on different machines, so
-        // it is best to avoid terminating due to timeout.
-        self.run_internal(egraph, ruleset, None, Duration::from_secs(600))
+        self.run_internal(egraph, ruleset, None)
     }
 
     pub fn run_derive<L: SynthLanguage>(
@@ -145,14 +150,6 @@ impl Scheduler {
         ruleset: &Ruleset<L>,
         rule: &Rule<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        // We need to include a timeout for derivability checking because with 5 iters,
-        // misbehaving rules can really go off the rails.
-        // The ruler1 derivability checker had a 10 second timeout,
-        // so we do the same here. Ours is actually more generous because (at least
-        // in the case of the saturating scheduler), it's possible to run for 30-40
-        // seconds because there are multiple runners strung together. In any case,
-        // the timeout gives the rules at least as long as the ruler1 derivability
-        // checker would have.
-        self.run_internal(egraph, ruleset, Some(rule), Duration::from_secs(10))
+        self.run_internal(egraph, ruleset, Some(rule))
     }
 }
