@@ -207,7 +207,7 @@ mod tests {
     }
 
     // #[test]
-    fn rule_lifting() {
+    fn _rule_lifting() {
         let nat_rules = get_nat_rules();
 
         let mut all_rules: Ruleset<CaddyAndFRep> = Ruleset::default();

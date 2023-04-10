@@ -1,6 +1,7 @@
 use egg::Rewrite;
-use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
-use num_bigint::ToBigInt;
+use num::{
+    rational::Ratio, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
+};
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
@@ -15,19 +16,12 @@ pub mod rational_best;
 pub mod rational_replicate;
 
 /// define `Constant` for rationals.
-pub type Constant = Ratio<BigInt>;
+pub type Constant = Ratio<i64>;
 
-fn mk_rat(n: i64, d: i64) -> Ratio<BigInt> {
+fn mk_rat(n: i64, d: i64) -> Constant {
     if d.is_zero() {
         panic!("mk_rat: denominator is zero!");
     }
-    let n = n
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", n));
-    let d = d
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", d));
-
     Ratio::new(n, d)
 }
 
@@ -54,14 +48,14 @@ impl SynthLanguage for Math {
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Math::Add([x, y]) => map!(get_cvec, x, y => Some(x + y)),
-            Math::Sub([x, y]) => map!(get_cvec, x, y => Some(x - y)),
-            Math::Mul([x, y]) => map!(get_cvec, x, y => Some(x * y)),
+            Math::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(y)),
+            Math::Sub([x, y]) => map!(get_cvec, x, y => x.checked_sub(y)),
+            Math::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(y)),
             Math::Div([x, y]) => map!(get_cvec, x, y => {
               if y.is_zero() {
                 None
               } else {
-                Some(x / y)
+                x.checked_div(y)
               }
             }),
             Math::Neg(x) => map!(get_cvec, x => Some(-x)),
@@ -208,19 +202,13 @@ impl Math {
                     res.extend(Self::all_denominators(s));
                 }
             }
-            Sexp::String(atom) => (),
-            Empty => (),
+            _ => (),
         }
 
         res
     }
 
-    // currently does nothing
-    fn wrap_neqzero(sexp: Sexp) -> Sexp {
-        sexp
-    }
-
-    fn add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
+    fn _add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
         let lhs_sexp = parse_str(&rule.lhs.to_string()).unwrap();
         let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
         let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
@@ -238,8 +226,7 @@ impl Math {
             None
         } else {
             let mut iterator = all_denoms.iter();
-            let mut condition: Sexp =
-                Self::wrap_neqzero(parse_str(iterator.next().unwrap()).unwrap());
+            let mut condition: Sexp = parse_str(iterator.next().unwrap()).unwrap();
 
             // TODO doesn't handle multiple denominators
             if let Some(_) = iterator.next() {
@@ -249,7 +236,7 @@ impl Math {
                 condition = Sexp::List(vec![
                     Sexp::String("and".to_string()),
                     condition,
-                    Self::wrap_neqzero(parse_str(denom).unwrap()),
+                    parse_str(denom).unwrap(),
                 ]);
             }
             let rhs = Sexp::List(vec![
@@ -565,9 +552,9 @@ pub mod test {
         recipe_utils::{base_lang, iter_metric, run_workload},
     };
 
-    fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
-        let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
-        Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
+    fn interval(low: Option<i64>, high: Option<i64>) -> Interval<Constant> {
+        let i64_to_constant = |x: i64| Ratio::new(x, 1);
+        Interval::new(low.map(i64_to_constant), high.map(i64_to_constant))
     }
 
     #[test]
@@ -700,23 +687,11 @@ pub mod test {
         assert_eq!(recip(&interval(None, None)), interval(None, None));
         assert_eq!(
             recip(&interval(Some(50), Some(100))),
-            Interval::new(
-                Some(Ratio::new(1.to_bigint().unwrap(), 100.to_bigint().unwrap())),
-                Some(Ratio::new(1.to_bigint().unwrap(), 50.to_bigint().unwrap())),
-            )
+            Interval::new(Some(Ratio::new(1, 100)), Some(Ratio::new(1, 50)),)
         );
         assert_eq!(
             recip(&interval(Some(-10), Some(-5))),
-            Interval::new(
-                Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-5).to_bigint().unwrap()
-                )),
-                Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-10).to_bigint().unwrap()
-                )),
-            )
+            Interval::new(Some(Ratio::new(1, -5)), Some(Ratio::new(1, -10)),)
         );
     }
 
