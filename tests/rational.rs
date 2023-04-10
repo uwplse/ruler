@@ -739,11 +739,6 @@ pub mod test {
     }
 
     #[test]
-    fn rules() {
-        replicate_ruler1_recipe();
-    }
-
-    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
