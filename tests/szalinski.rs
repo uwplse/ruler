@@ -264,8 +264,8 @@ fn get_frep_rules() -> Vec<&'static str> {
 
 fn get_lifting_rules() -> Vec<&'static str> {
     [
-        "(Union ?a ?b) ==> (max ?a ?b)",
-        "(Inter ?a ?b) ==> (min ?a ?b)",
+        // "(Union ?a ?b) ==> (max ?a ?b)",
+        // "(Inter ?a ?b) ==> (min ?a ?b)",
         "(Scale (Vec3 ?w ?h ?l) ?e) ==> (subst (/ x (Scalar ?w)) (/ y (Scalar ?h)) (/ z (Scalar ?l)) ?e)",
         "(Cube ?a ?b ?c) ==> (min (/ x (Scalar ?a))
                                   (min (- 1 (/ x (Scalar ?a)))
@@ -274,10 +274,10 @@ fn get_lifting_rules() -> Vec<&'static str> {
                                                  (min (/ z (Scalar ?c))
                                                       (- 1 (/ z (Scalar ?c))))))))",
         
-        "(Sphere ?r) ==> (- (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
-                               (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
-                            (* (/ z (Scalar ?r)) (/ z (Scalar ?r))))",
-        "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
+        // "(Sphere ?r) ==> (- (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
+        //                        (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
+        //                     (* (/ z (Scalar ?r)) (/ z (Scalar ?r))))",
+        // "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
     ].into()
 }
 
@@ -399,6 +399,10 @@ fn compute_substs<'a, const N: usize>(
     depth: usize,
 ) -> Option<[Id; N]> {
     let mut v = vec![];
+    if DEBUG {
+        for ii in 0..depth { print!(" "); }
+        println!("{} children", N);
+    }
     for id in ids {
         if let Some(e_substed) = compute_subst(egraph, *id, mapping.clone(), cache, depth) {
             v.push(e_substed);
@@ -420,7 +424,6 @@ fn compute_subst(
     cache: &mut HashMap<(Id, [Id; 3]), Option<CF>>,
     depth: usize,
 ) -> Option<CF> {
-
     if DEBUG {
         for ii in 0..depth { print!(" "); }
         println!("cs");
@@ -432,12 +435,17 @@ fn compute_subst(
     if cache.contains_key(&(id, mapping)) {
         if DEBUG {     
             for ii in 0..depth { print!(" "); }
-            println!("cached")
+            println!("cached {:?}", cache[&(id, mapping)]);
         }
         return cache[&(id, mapping)].clone();
     }
     // We will replace this if we can successfully subst, but this just prevents
     // infinite cycles.
+
+    if DEBUG {     
+        for ii in 0..depth { print!(" "); }
+        println!("cached {:?}", cache[&(id, mapping)]);
+    }
     cache.insert((id, mapping), None);
 
     // If something is a scalar, then substitution doesn't change it
@@ -462,7 +470,10 @@ fn compute_subst(
 
     }
     for n in egraph[id].nodes.clone() {
-        // println!("node: {}", n.to_string());
+        if DEBUG { 
+            for ii in 0..depth { print!(" "); }
+            println!("node: {}", n.to_string());
+        }
         match n {
             CF::Subst([x2, y2, z2, e]) => {
                 if let Some([x3, y3, z3]) = compute_substs(egraph, &[x2, y2, z2], mapping.clone(), cache, depth + 1) {
@@ -695,20 +706,20 @@ mod tests {
             // "(Cylinder scalar scalar scalar)",
             // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
             
-            // "(Scale (Vec3 sa sb sc) (Cube 1 1 1))", "(Cube sa sb sc)",
-            "(Scale (Vec3 sa sa sa) (Sphere 1))",  "(Sphere sa)",
-            "(Scale (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (* ta sa) (* tb sb) (* tc sc)) (Scale (Vec3 sa sb sc) a))",
-            "(Trans (Vec3 ta tb tc) (Scale (Vec3 sa sb sc) a))", "(Scale (Vec3 sa sb sc) (Trans (Vec3 (/ ta sa) (/ tb sb) (/ tc sc)) a))",
-            "(Trans (Vec3 0 0 0) a)", "a",
-            "(Scale (Vec3 1 1 1) a)", "a",
+            "(Scale (Vec3 sa sb sc) (Cube 1 1 1))", "(Cube sa sb sc)",
+            // "(Scale (Vec3 sa sa sa) (Sphere 1))",  "(Sphere sa)",
+            // "(Scale (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (* ta sa) (* tb sb) (* tc sc)) (Scale (Vec3 sa sb sc) a))",
+            // "(Trans (Vec3 ta tb tc) (Scale (Vec3 sa sb sc) a))", "(Scale (Vec3 sa sb sc) (Trans (Vec3 (/ ta sa) (/ tb sb) (/ tc sc)) a))",
+            // "(Trans (Vec3 0 0 0) a)", "a",
+            // "(Scale (Vec3 1 1 1) a)", "a",
             // "(Union (Inter a b) a)", "a",
             // "(Inter (Union a b) a)", "a",
 
-            "(Scale (Vec3 sa sb sc) (Scale (Vec3 ta tb tc) a))",
-            "(Scale (Vec3 (* sa ta) (* sb tb) (* sc tc)) a)",
+            // "(Scale (Vec3 sa sb sc) (Scale (Vec3 ta tb tc) a))",
+            // "(Scale (Vec3 (* sa ta) (* sb tb) (* sc tc)) a)",
 
-            "(Trans (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))",
-            "(Trans (Vec3 (+ sa ta) (+ sb tb) (+ sc tc)) a)",
+            // "(Trans (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))",
+            // "(Trans (Vec3 (+ sa ta) (+ sb tb) (+ sc tc)) a)",
 
         ]);
         let scalars: &[&str] = &["sa", "sb", "sc", "1"];
