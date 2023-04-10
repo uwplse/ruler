@@ -2,7 +2,7 @@ use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
 use crate::{SynthAnalysis, SynthLanguage};
-use std::{io::Write, time::Instant};
+use std::io::Write;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Workload {
