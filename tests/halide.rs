@@ -291,7 +291,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{enumo::Ruleset, logger, Limits, DeriveType};
+    use ruler::{enumo::Ruleset, logger, DeriveType, Limits};
 
     #[test]
     fn run() {
@@ -312,24 +312,22 @@ mod test {
         // user	1m6.082s
         // sys	0m1.259s
         println!("Beginning rulefinding...");
-        
+
         let start = Instant::now();
         let rules = halide_rules();
         let duration = start.elapsed();
 
-        println!("Found {} in {} seconds.", rules.clone().len(), duration.as_secs());
+        println!(
+            "Found {} in {} seconds.",
+            rules.clone().len(),
+            duration.as_secs()
+        );
 
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);
 
-        logger::write_output(
-            &rules,
-            &baseline,
-            "halide",
-            "halide",
-            duration,
-        );
+        logger::write_output(&rules, &baseline, "halide", "halide", duration);
 
         logger::write_output(
             &oopsla_halide,

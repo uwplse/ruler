@@ -2,6 +2,7 @@ use super::*;
 use ruler::{
     enumo::{Metric, Ruleset},
     recipe_utils::{recursive_rules, Lang},
+    Limits,
 };
 
 pub fn bv4_rules() -> Ruleset<Bv> {
@@ -16,5 +17,6 @@ pub fn bv4_rules() -> Ruleset<Bv> {
             &[],
         ),
         Ruleset::default(),
+        Limits::rulefinding(),
     )
 }

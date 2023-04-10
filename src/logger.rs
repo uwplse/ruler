@@ -20,7 +20,12 @@ pub fn write_output<L: SynthLanguage>(
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
         get_derivability_results(ruleset, DeriveType::Lhs, baseline);
     let duration = start.elapsed();
-    println!("LHS: {} / {} derivable in {} seconds.", forwards_lhs, baseline.len(), duration.as_secs());
+    println!(
+        "LHS: {} / {} derivable in {} seconds.",
+        forwards_lhs,
+        baseline.len(),
+        duration.as_secs()
+    );
     let start = Instant::now();
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
         get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline);
@@ -31,11 +36,16 @@ pub fn write_output<L: SynthLanguage>(
         baseline.len(),
         duration.as_secs()
     );
-    let start = Instant::now();;
+    let start = Instant::now();
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
         get_derivability_results(ruleset, DeriveType::AllRules, baseline);
     let duration = start.elapsed();
-    println!("ALL: {} / {} derivable in {} seconds.", forwards_all, baseline.len(), duration.as_secs());
+    println!(
+        "ALL: {} / {} derivable in {} seconds.",
+        forwards_all,
+        baseline.len(),
+        duration.as_secs()
+    );
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
 

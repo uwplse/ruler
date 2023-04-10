@@ -23,7 +23,7 @@ pub fn run_workload<L: SynthLanguage>(
     fast_match: bool,
 ) -> Ruleset<L> {
     let t = Instant::now();
-    
+
     // Kinda slow—can't really do anything about this, though.
     // println!("Transferring workload to egraph...");
     let start = Instant::now();
@@ -38,7 +38,7 @@ pub fn run_workload<L: SynthLanguage>(
     // println!("Compressed the egraph in {} seconds.", duration.as_secs());
 
     let mut candidates = Ruleset::default();
-    
+
     if fast_match {
         // println!("Beginning fast_cvec_match...");
         let start = Instant::now();

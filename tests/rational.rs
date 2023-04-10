@@ -708,14 +708,8 @@ pub mod test {
         assert_eq!(
             recip(&interval(Some(-10), Some(-5))),
             Interval::new(
-                Some(Ratio::new(
-                    1.to_i64().unwrap(),
-                    (-5).to_i64().unwrap()
-                )),
-                Some(Ratio::new(
-                    1.to_i64().unwrap(),
-                    (-10).to_i64().unwrap()
-                )),
+                Some(Ratio::new(1.to_i64().unwrap(), (-5).to_i64().unwrap())),
+                Some(Ratio::new(1.to_i64().unwrap(), (-10).to_i64().unwrap())),
             )
         );
     }

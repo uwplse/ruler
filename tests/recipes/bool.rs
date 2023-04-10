@@ -17,6 +17,7 @@ pub fn bool_rules() -> Ruleset<Bool> {
             &[],
         ),
         Ruleset::default(),
+        Limits::rulefinding(),
     );
     all.extend(r5);
 
