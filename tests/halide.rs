@@ -1,9 +1,8 @@
-use num::{BigInt, ToPrimitive, Zero};
-use num_bigint::ToBigInt;
+use num::{ToPrimitive, Zero};
 use ruler::*;
 use z3::ast::Ast;
 
-type Constant = BigInt;
+type Constant = i64;
 
 egg::define_language! {
   pub enum Pred {
@@ -36,8 +35,8 @@ impl SynthLanguage for Pred {
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
-        let one = 1.to_bigint().unwrap();
-        let zero = 0.to_bigint().unwrap();
+        let one = 1.to_i64().unwrap();
+        let zero = 0.to_i64().unwrap();
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Lt([x, y]) => {
@@ -84,14 +83,14 @@ impl SynthLanguage for Pred {
                     if xbool ^ ybool { Some(one.clone()) } else { Some(zero.clone()) }
                 })
             }
-            Pred::Add([x, y]) => map!(get_cvec, x, y => Some(x + y)),
-            Pred::Sub([x, y]) => map!(get_cvec, x, y => Some(x - y)),
-            Pred::Mul([x, y]) => map!(get_cvec, x, y => Some(x * y)),
+            Pred::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(*y)),
+            Pred::Sub([x, y]) => map!(get_cvec, x, y => x.checked_sub(*y)),
+            Pred::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(*y)),
             Pred::Div([x, y]) => map!(get_cvec, x, y => {
               if y.is_zero() {
                 Some(zero.clone())
               } else {
-                Some(x / y)
+                x.checked_div(*y)
               }
             }),
             Pred::Min([x, y]) => map!(get_cvec, x, y => Some(x.min(y).clone())),
@@ -106,13 +105,13 @@ impl SynthLanguage for Pred {
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let consts = vec![
-            Some((-10).to_bigint().unwrap()),
-            Some((-1).to_bigint().unwrap()),
-            Some(0.to_bigint().unwrap()),
-            Some(1.to_bigint().unwrap()),
-            Some(2.to_bigint().unwrap()),
-            Some(5.to_bigint().unwrap()),
-            Some(100.to_bigint().unwrap()),
+            Some((-10).to_i64().unwrap()),
+            Some((-1).to_i64().unwrap()),
+            Some(0.to_i64().unwrap()),
+            Some(1.to_i64().unwrap()),
+            Some(2.to_i64().unwrap()),
+            Some(5.to_i64().unwrap()),
+            Some(100.to_i64().unwrap()),
         ];
         let cvecs = self_product(&consts, vars.len());
 
@@ -299,6 +298,13 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
+
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        let start = Instant::now();
+        let all_rules = halide_rules();
+        let duration = start.elapsed();
+
+        logger::write_output(&all_rules, &baseline, "halide", "halide", duration);
 
         // oopsla-halide-baseline branch
         // Run on leviathan 4/4/2023

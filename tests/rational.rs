@@ -16,13 +16,13 @@ pub mod rational_best;
 pub mod rational_replicate;
 
 /// define `Constant` for rationals.
-pub type Constant = Rational64;
+pub type Constant = Ratio<i64>;
 
-fn mk_rat(n: i64, d: i64) -> Rational64 {
+fn mk_rat(n: i64, d: i64) -> Constant {
     if d.is_zero() {
         panic!("mk_rat: denominator is zero!");
     }
-    Rational64::new(n, d)
+    Ratio::new(n, d)
 }
 
 egg::define_language! {
@@ -259,8 +259,7 @@ impl Math {
                     res.extend(Self::all_denominators(s));
                 }
             }
-            Sexp::String(atom) => (),
-            Empty => (),
+            _ => (),
         }
 
         res
@@ -646,14 +645,15 @@ pub mod test {
     use super::*;
     use crate::rational_best::best_enumo_recipe;
     use crate::rational_replicate::replicate_ruler1_recipe;
+    use num::rational::Ratio;
     use ruler::{
         enumo::{Ruleset, Workload},
         recipe_utils::{base_lang, iter_metric, run_workload},
     };
 
-    fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
-        let i32_to_constant = |x: i32| Rational64::new(x as i64, 1);
-        Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
+    fn interval(low: Option<i64>, high: Option<i64>) -> Interval<Constant> {
+        let i64_to_constant = |x: i64| Ratio::new(x, 1);
+        Interval::new(low.map(i64_to_constant), high.map(i64_to_constant))
     }
 
     #[test]
@@ -779,6 +779,53 @@ pub mod test {
             mul(&interval(Some(-4), Some(10)), &interval(Some(-8), None)),
             interval(None, None)
         );
+    }
+
+    #[test]
+    fn recip_interval_test() {
+        assert_eq!(recip(&interval(None, None)), interval(None, None));
+        assert_eq!(
+            recip(&interval(Some(50), Some(100))),
+            Interval::new(Some(Ratio::new(1, 100)), Some(Ratio::new(1, 50)),)
+        );
+        assert_eq!(
+            recip(&interval(Some(-10), Some(-5))),
+            Interval::new(Some(Ratio::new(1, -5)), Some(Ratio::new(1, -10)),)
+        );
+    }
+
+    #[test]
+    fn minimize() {
+        // This test fails if there are improperly initialized cvecs during minimize.
+        let limits = Limits {
+            iter: 4,
+            node: 1_000_000,
+        };
+
+        let prior: Ruleset<Math> = Ruleset::new([
+            "(* ?b ?a) ==> (* ?a ?b)",
+            "(- ?a ?a) ==> 0",
+            "?a ==> (+ ?a 0)",
+            "?a ==> (* ?a 1)",
+            "?a ==> (- ?a 0)",
+            "?a ==> (/ ?a 1)",
+            "(* (* ?c ?b) (/ 0 ?a)) ==> (/ 0 (fabs ?a))",
+            "(/ (- ?c ?b) (/ ?a ?a)) ==> (- (/ 0 ?a) (- ?b ?c))",
+            "(* (/ ?c ?c) (* ?b ?a)) ==> (/ (* ?b ?a) (/ ?c ?c))",
+            "(- (* ?a ?c) (* ?b ?a)) ==> (* ?a (- ?c ?b))",
+            "(/ (* ?c ?b) ?a) ==> (* ?b (/ ?c ?a))",
+            "(- ?c (- ?b ?a)) ==> (- ?a (- ?b ?c))",
+        ]);
+        let mut with_condition = Ruleset::new([
+            "(- (- ?b ?c) (- ?b ?a)) ==> (if ?c (* (/ ?c ?c) (- ?a ?c)) (- (- ?b ?c) (- ?b ?a)))",
+            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?b (* (/ ?b ?b) (- ?c ?b)) (- (- ?c ?a) (- ?b ?a)))",
+            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?c (* (- ?c ?b) (/ ?c ?c)) (- (- ?c ?a) (- ?b ?a)))",
+            "(- (+ ?c ?a) (+ ?b ?a)) ==> (if ?b (* (- ?c ?b) (/ ?b ?b)) (- (+ ?c ?a) (+ ?b ?a)))",
+            "(/ (/ 0 ?b) (+ ?b ?a)) ==> (if (+ ?b ?a) (/ 0 ?b) (/ (/ 0 ?b) (+ ?b ?a)))",
+        ]);
+        let chosen_conditional = with_condition.minimize(prior, Scheduler::Compress(limits));
+
+        assert_eq!(chosen_conditional.len(), 1);
     }
 
     #[test]
