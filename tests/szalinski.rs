@@ -47,7 +47,7 @@ egg::define_language! {
     "Union" = Union([Id; 2]),
     "Inter" = Inter([Id; 2]),
     "Vec3" = Vec3([Id; 3]),
-    "True" = True,
+    "true" = True,
     "false" = False,
     "Empty" = Empty,
 
