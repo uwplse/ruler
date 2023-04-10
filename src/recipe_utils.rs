@@ -16,6 +16,15 @@ pub fn iter_metric(wkld: Workload, atom: &str, met: Metric, n: usize) -> Workloa
     pegs
 }
 
+pub fn substitute(wklod: Workload, sub: Workload, atom: &str) -> Workload {
+    let mut pegs = Workload::Set(vec![]);
+    let substitutions = sub.force();
+    for sub in substitutions {
+        pegs = pegs.append(wklod.clone().plug(atom, &Workload::Set(vec![sub])));
+    }
+    pegs
+}
+
 pub fn run_workload<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,

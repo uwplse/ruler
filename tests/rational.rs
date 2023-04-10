@@ -193,45 +193,16 @@ impl SynthLanguage for Math {
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
-        // if you drop variables, it's unsound because
-        // we may have lost an error
-        if lhs.vars().into_iter().collect::<HashSet<Var>>()
-            != rhs.vars().into_iter().collect::<HashSet<Var>>()
-        {
-            return ValidationResult::Invalid;
-        }
-
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
         let solver = z3::Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        let lhs_denom = Self::error_conditions(
-            &ctx,
-            Self::pat_to_sexp(lhs),
-            z3::ast::Bool::from_bool(&ctx, true),
-        );
-        let rhs_denom = Self::error_conditions(
-            &ctx,
-            Self::pat_to_sexp(rhs),
-            z3::ast::Bool::from_bool(&ctx, true),
-        );
 
-        let mut assert_equal = lexpr._eq(&rexpr);
+        let assert_equal = lexpr._eq(&rexpr);
 
-        for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
-            assert_equal = condition.not().implies(&assert_equal);
-        }
-
-        let rhs_errors =
-            z3::ast::Bool::or(&ctx, &rhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
-        let lhs_errors =
-            z3::ast::Bool::or(&ctx, &lhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
-        let error_preserved = rhs_errors.iff(&lhs_errors);
-        let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
-
-        solver.assert(&assertion.clone().not());
+        solver.assert(&assert_equal.not());
         let res = Self::z3_res_to_validationresult(solver.check());
         /*if let ValidationResult::Valid = res {
             eprintln!("verifying {} => {}", lhs, rhs);
@@ -484,10 +455,13 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
             Math::Div([x, y]) => {
-                // Do NOT assume denominator is non-zero
-                buf.push(z3::ast::Real::div(
-                    &buf[usize::from(*x)],
-                    &buf[usize::from(*y)],
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                let one = z3::ast::Real::from_real(ctx, 1, 1);
+                // Division by zero set to one
+                buf.push(z3::ast::Bool::ite(
+                    &buf[usize::from(*y)]._eq(&zero),
+                    &one,
+                    &z3::ast::Real::div(&buf[usize::from(*x)], &buf[usize::from(*y)]),
                 ))
             }
             Math::Neg(x) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*x)])),
@@ -844,10 +818,10 @@ pub mod test {
         logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
     }
 
-    /*#[test]
+    #[test]
     fn just_best() {
-        best_enumo_recipe();
-    }*/
+        best_enumo_recipe().to_file("rational_best.rules");
+    }
 
     #[test]
     fn cond_div_figure() {
