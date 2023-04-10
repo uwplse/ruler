@@ -448,7 +448,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         allrules: &Self,
         limits: Limits,
     ) -> bool {
-        let scheduler = Scheduler::Saturating(limits);
+        let scheduler = Scheduler::Simple(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
         let rexpr = &L::instantiate(&rule.rhs);

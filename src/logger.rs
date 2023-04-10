@@ -18,17 +18,10 @@ pub fn write_output<L: SynthLanguage>(
     // get information about the derivability of our ruleset vs. the baseline ruleset
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
         get_derivability_results(ruleset, DeriveType::Lhs, baseline);
-    println!("LHS: {} / {} derivable.", forwards_lhs, baseline.len());
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
         get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline);
-    println!(
-        "LHS/RHS: {} / {} derivable.",
-        forwards_lhs_rhs,
-        baseline.len()
-    );
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
         get_derivability_results(ruleset, DeriveType::AllRules, baseline);
-    println!("ALL: {} / {} derivable.", forwards_all, baseline.len());
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
@@ -134,6 +127,7 @@ pub fn get_derivability_results<L: SynthLanguage>(
     let time_f = start_f.elapsed();
     let start_b = Instant::now();
     let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
+    println!("{} / {} ({})", can_b.len(), cannot_b.len(), ruleset.len());
     let time_b = start_b.elapsed();
 
     let derivability_results = json!({
