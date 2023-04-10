@@ -1,11 +1,9 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
-
-use num::ToPrimitive;
-use rug::Integer;
+use num::{BigInt, ToPrimitive, Zero};
+use num_bigint::ToBigInt;
 use ruler::*;
 use z3::ast::Ast;
 
-type Constant = Integer;
+type Constant = i64;
 
 egg::define_language! {
   pub enum Pred {
@@ -38,8 +36,8 @@ impl SynthLanguage for Pred {
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
-        let one = Integer::from(1);
-        let zero = Integer::from(0);
+        let one = 1.to_i64().unwrap();
+        let zero = 0.to_i64().unwrap();
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Lt([x, y]) => {
@@ -64,7 +62,7 @@ impl SynthLanguage for Pred {
             Pred::Not(x) => {
                 map!(get_cvec, x => if x.clone() == zero { Some(one.clone())} else {Some(zero.clone())})
             }
-            Pred::Neg(x) => map!(get_cvec, x => Some(x.clone().mul(&Integer::from(-1)))),
+            Pred::Neg(x) => map!(get_cvec, x => Some(-x)),
             Pred::And([x, y]) => {
                 map!(get_cvec, x, y => {
                     let xbool = x.clone() != zero;
@@ -86,14 +84,14 @@ impl SynthLanguage for Pred {
                     if xbool ^ ybool { Some(one.clone()) } else { Some(zero.clone()) }
                 })
             }
-            Pred::Add([x, y]) => map!(get_cvec, x, y => Some(x.clone().add(y.clone()))),
-            Pred::Sub([x, y]) => map!(get_cvec, x, y => Some(x.clone().sub(y.clone()))),
-            Pred::Mul([x, y]) => map!(get_cvec, x, y => Some(x.clone().mul(y.clone()))),
+            Pred::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(*y)),
+            Pred::Sub([x, y]) => map!(get_cvec, x, y => x.checked_sub(*y)),
+            Pred::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(*y)),
             Pred::Div([x, y]) => map!(get_cvec, x, y => {
-              if y.eq(&zero) {
+              if y.is_zero() {
                 Some(zero.clone())
               } else {
-                Some(x.clone().div(y.clone()))
+                x.checked_div(*y)
               }
             }),
             Pred::Min([x, y]) => map!(get_cvec, x, y => Some(x.min(y).clone())),
@@ -108,13 +106,13 @@ impl SynthLanguage for Pred {
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let consts = vec![
-            Some(Integer::from(-10)),
-            Some(Integer::from(-1)),
-            Some(Integer::from(0)),
-            Some(Integer::from(1)),
-            Some(Integer::from(2)),
-            Some(Integer::from(5)),
-            Some(Integer::from(100)),
+            Some((-10).to_i64().unwrap()),
+            Some((-1).to_i64().unwrap()),
+            Some(0.to_i64().unwrap()),
+            Some(1.to_i64().unwrap()),
+            Some(2.to_i64().unwrap()),
+            Some(5.to_i64().unwrap()),
+            Some(100.to_i64().unwrap()),
         ];
         let cvecs = self_product(&consts, vars.len());
 
@@ -297,6 +295,12 @@ mod test {
         enumo::{Ruleset, Workload},
         logger,
     };
+
+    #[test]
+    fn terms() {
+        let wkld = Workload::from_file("select_arith.terms");
+        wkld.to_egraph::<Pred>();
+    }
 
     #[test]
     fn run() {
