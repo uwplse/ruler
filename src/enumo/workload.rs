@@ -56,7 +56,6 @@ impl Workload {
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
         let sexps = self.force();
-        println!("{}", sexps.len());
 
         // Have to find all the variables first so that we can initialize
         // their cvecs, which might require doing a multi-way cross product
@@ -86,11 +85,6 @@ impl Workload {
         for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
-        println!(
-            "{} {}",
-            egraph.number_of_classes(),
-            start.elapsed().as_secs()
-        );
         egraph
     }
 
