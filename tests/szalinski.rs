@@ -12,7 +12,7 @@ use ruler::{
     enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
     *,
 };
-use std::{collections::HashMap, usize};
+use std::{collections::HashMap, usize, io::{self, Write}};
 use std::collections::HashSet;
 use std::fs;
 use std::time::SystemTime;
@@ -39,14 +39,16 @@ egg::define_language! {
     Lit(Constant),
 
     // Caddy
-    "Cube" = Cube([Id; 3]),
+    "Cube" = Cube([Id; 2]),
     "Cylinder" = Cylinder([Id; 3]),
-    "Sphere" = Sphere(Id),
+    "Sphere" = Sphere([Id; 2]),
     "Trans" = Trans([Id; 2]),
     "Scale" = Scale([Id; 2]),
     "Union" = Union([Id; 2]),
     "Inter" = Inter([Id; 2]),
     "Vec3" = Vec3([Id; 3]),
+    "True" = True,
+    "false" = False,
     "Empty" = Empty,
 
     Var(egg::Symbol),
@@ -79,8 +81,8 @@ fn is_caddy(node: &CF) -> bool {
         CF::Empty => true,
         CF::Var(_) => false,
         CF::Vec3(_) => true,
-        // CF::True => true,
-        // CF::False => true,
+        CF::True => true,
+        CF::False => true,
     }
 }
 
@@ -202,27 +204,33 @@ fn custom_modify() {
 
 fn get_frep_rules() -> Vec<&'static str> {
     [
+        "0 ==> (Scalar 0)",
+        "1 ==> (Scalar 1)",
+        "2 ==> (Scalar 2)",
+        "(Scalar 0) ==> 0",
         "(Scalar 1) ==> 1",
+        "(Scalar 2) ==> 2",
         "(/ ?a 1) ==> ?a",
 
-        "(Scalar 0) ==> 0",
         "(- ?a 0) ==> ?a",
 
-        // "(- (/ ?a ?b) (/ ?c ?b)) ==> (/ (- ?a ?c) ?b)",
-        // "(/ (- ?a ?b) ?c) ==> (- (/ ?a ?c) (/ ?b ?c))",
-        // "(- (/ ?a ?b) ?c) ==> (/ (- ?a (* ?b ?c)) ?b)",
-        // "(/ (- ?a (* ?b ?c)) ?b) ==> (- (/ ?a ?b) ?c)",
-        // "(/ ?a (Scalar ?a)) ==> 1",
-        // "(/ (Scalar ?a) (Scalar ?b)) ==> (Scalar (/ (Scalar ?a) (Scalar ?b)))",
-        // "(- (Scalar ?a) (Scalar ?b)) ==> (Scalar (- (Scalar ?a) (Scalar ?b)))",
-        // "(* (Scalar ?a) (Scalar ?b)) ==> (Scalar (* (Scalar ?a) (Scalar ?b)))",
-        // "(- (* ?a ?c) (* ?b ?c)) ==> (* (- ?a ?b) ?c)",
+        "(subst ?x ?y ?z (Scalar ?a)) ==> (Scalar ?a)",
+        "(subst ?x ?y ?z x) ==> ?x",
+        "(subst ?x ?y ?z y) ==> ?y",
+        "(subst ?x ?y ?z z) ==> ?z",
+        "(subst ?x ?y ?z (min ?a ?b)) ==> (min (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (max ?a ?b)) ==> (max (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (- ?a ?b)) ==> (- (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (+ ?a ?b)) ==> (+ (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (* ?a ?b)) ==> (* (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (/ ?a ?b)) ==> (/ (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (subst ?x2 ?y2 ?z2 ?a)) ==>
+            (subst (subst ?x ?y ?z ?x2)
+                   (subst ?x ?y ?z ?y2)
+                   (subst ?x ?y ?z ?z2)
+                   ?a)",
+        "(subst x y z ?a) ==> ?a",
 
-
-        // "(* ?a ?b) ==> (* ?b ?a)",
-        // "(+ ?a ?b) ==> (+ ?b ?a)",
-        // "(- (- ?a ?b) ?c) ==> (- ?a (+ ?b ?c))",
-        // "(- (- ?a ?b) ?c) ==> (- (- ?a ?c) ?b))",
 
         "(Scalar (/ ?a ?b)) ==> (/ (Scalar ?a) (Scalar ?b))",
         "(- (/ ?a ?c) (/ ?b ?c)) ==> (/ (- ?a ?b) ?c)",
@@ -241,6 +249,23 @@ fn get_frep_rules() -> Vec<&'static str> {
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
+
+
+        // "(- (/ ?a ?b) (/ ?c ?b)) ==> (/ (- ?a ?c) ?b)",
+        // "(/ (- ?a ?b) ?c) ==> (- (/ ?a ?c) (/ ?b ?c))",
+        // "(- (/ ?a ?b) ?c) ==> (/ (- ?a (* ?b ?c)) ?b)",
+        // "(/ (- ?a (* ?b ?c)) ?b) ==> (- (/ ?a ?b) ?c)",
+        // "(/ ?a (Scalar ?a)) ==> 1",
+        // "(/ (Scalar ?a) (Scalar ?b)) ==> (Scalar (/ (Scalar ?a) (Scalar ?b)))",
+        // "(- (Scalar ?a) (Scalar ?b)) ==> (Scalar (- (Scalar ?a) (Scalar ?b)))",
+        // "(* (Scalar ?a) (Scalar ?b)) ==> (Scalar (* (Scalar ?a) (Scalar ?b)))",
+        // "(- (* ?a ?c) (* ?b ?c)) ==> (* (- ?a ?b) ?c)",
+
+
+        // "(* ?a ?b) ==> (* ?b ?a)",
+        // "(+ ?a ?b) ==> (+ ?b ?a)",
+        // "(- (- ?a ?b) ?c) ==> (- ?a (+ ?b ?c))",
+        // "(- (- ?a ?b) ?c) ==> (- (- ?a ?c) ?b))",
 
         // "(/ (- ?a (* ?b ?c)) ?b) ="
 
@@ -267,17 +292,21 @@ fn get_lifting_rules() -> Vec<&'static str> {
         // "(Union ?a ?b) ==> (max ?a ?b)",
         // "(Inter ?a ?b) ==> (min ?a ?b)",
         "(Scale (Vec3 ?w ?h ?l) ?e) ==> (subst (/ x (Scalar ?w)) (/ y (Scalar ?h)) (/ z (Scalar ?l)) ?e)",
-        "(Cube ?a ?b ?c) ==> (min (/ x (Scalar ?a))
-                                  (min (- 1 (/ x (Scalar ?a)))
-                                       (min (/ y (Scalar ?b))
-                                            (min (- 1 (/ y (Scalar ?b)))
-                                                 (min (/ z (Scalar ?c))
-                                                      (- 1 (/ z (Scalar ?c))))))))",
-        
-        // "(Sphere ?r) ==> (- (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
-        //                        (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
-        //                     (* (/ z (Scalar ?r)) (/ z (Scalar ?r))))",
-        // "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
+        "(Cube (Vec3 ?a ?b ?c) false) ==> (min (/ x (Scalar ?a))
+                                        (min (- 1 (/ x (Scalar ?a)))
+                                             (min (/ y (Scalar ?b))
+                                                  (min (- 1 (/ y (Scalar ?b)))
+                                                       (min (/ z (Scalar ?c))
+                                                            (- 1 (/ z (Scalar ?c))))))))",
+        "(Cylinder (Vec3 ?h ?r ?r) ?params true) ==>
+         (min (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
+                 (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
+              (min (- (/ 1 2) (/ z (Scalar ?h)))
+                   (+ (/ 1 2) (/ z (Scalar ?h)))))",
+        "(Sphere ?r ?params) ==> (- (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
+                               (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
+                            (* (/ z (Scalar ?r)) (/ z (Scalar ?r))))",
+        "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
     ].into()
 }
 
@@ -432,6 +461,14 @@ fn compute_subst(
         for ii in 0..depth { print!(" "); }
         println!("id: {} {}", id, idex);
     }
+
+    // If something is a scalar, then substitution doesn't change it
+    for n in egraph[id].nodes.clone() {
+        if matches!(n, CF::Scalar(_) | CF::Lit(_)) {
+            return Some(n);
+        }
+    }
+
     if cache.contains_key(&(id, mapping)) {
         if DEBUG {     
             for ii in 0..depth { print!(" "); }
@@ -441,19 +478,8 @@ fn compute_subst(
     }
     // We will replace this if we can successfully subst, but this just prevents
     // infinite cycles.
-
-    if DEBUG {     
-        for ii in 0..depth { print!(" "); }
-        println!("cached {:?}", cache[&(id, mapping)]);
-    }
     cache.insert((id, mapping), None);
 
-    // If something is a scalar, then substitution doesn't change it
-    for n in egraph[id].nodes.clone() {
-        if matches!(n, CF::Scalar(_)) {
-            return Some(n);
-        }
-    }
     // If it's a non-scalar var
     for n in egraph[id].nodes.clone() {
         if matches!(n, CF::Var(_)) {
@@ -615,15 +641,47 @@ impl SynthLanguage for CF {
         CF::Lit(c)
     }
 
-    fn hook(runner: &mut Runner<Self, SynthAnalysis>) -> Result<(), String> {
-        canonicalize_all_substs(&mut runner.egraph);
-        runner.egraph.rebuild();
-        Ok(())
-    }
+    // fn hook(runner: &mut Runner<Self, SynthAnalysis>) -> Result<(), String> {
+    //     canonicalize_all_substs(&mut runner.egraph);
+    //     runner.egraph.rebuild();
+    //     Ok(())
+    // }
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
         ValidationResult::Valid
     }
+}
+
+fn flush() {
+    if let Err(error) = io::stdout().flush() {
+        println!("couldn't flush {}", error);
+    }
+}
+
+fn timekeep(msg: String) {
+    println!("{} {}", time(), msg);
+    flush();
+}
+
+fn paste_print(rs: &Ruleset<CF>) {
+    println!("\n\npaste these vvv\n\n");
+    let mut i = 1;
+
+    fn fix(s: String) -> String {
+        s.replace("Scale", "Affine Scale")
+         .replace("Trans", "Affine Trans")
+    }
+
+    for (s, rule) in rs {
+        println!(
+            "rw!(\"ruler{}\"; \"{}\" => \"{}\"),",
+            i,
+            fix(rule.lhs.to_string()),
+            fix(rule.rhs.to_string())
+        );
+        i += 1;
+    }
+    println!("\n");
 }
 
 impl CF {
@@ -632,12 +690,24 @@ impl CF {
 
         let egraph = workload.to_egraph::<Self>();
         let num_prior = prior.len();
+        
+        timekeep("starting allow_forbid_actual".into());
+        
         let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
 
-        println!("All candidates:");
+
+        timekeep("allow_forbid_actual done".into());
+        
         candidates.pretty_print();
 
+        paste_print(&candidates);
+
+        timekeep("starting minimize".into());
+
         let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+
+        timekeep("minimize done".into());
+
         let time = t.elapsed().as_secs_f64();
 
         println!();
@@ -652,24 +722,7 @@ impl CF {
 
         chosen.pretty_print();
 
-        println!("\n\npaste these vvv\n\n");
-        let mut i = 1;
-
-        fn fix(s: String) -> String {
-            s.replace("Scale", "Affine Scale")
-             .replace("Trans", "Affine Trans")
-        }
-
-        for (s, rule) in &chosen {
-            println!(
-                "rw!(\"ruler{}\"; \"{}\" => \"{}\"),",
-                i,
-                fix(rule.lhs.to_string()),
-                fix(rule.rhs.to_string())
-            );
-            i += 1;
-        }
-        println!("\n");
+        paste_print(&chosen);
         chosen
     }
 }
@@ -706,20 +759,19 @@ mod tests {
             // "(Cylinder scalar scalar scalar)",
             // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
             
-            "(Scale (Vec3 sa sb sc) (Cube 1 1 1))", "(Cube sa sb sc)",
-            // "(Scale (Vec3 sa sa sa) (Sphere 1))",  "(Sphere sa)",
-            // "(Scale (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (* ta sa) (* tb sb) (* tc sc)) (Scale (Vec3 sa sb sc) a))",
-            // "(Trans (Vec3 ta tb tc) (Scale (Vec3 sa sb sc) a))", "(Scale (Vec3 sa sb sc) (Trans (Vec3 (/ ta sa) (/ tb sb) (/ tc sc)) a))",
-            // "(Trans (Vec3 0 0 0) a)", "a",
-            // "(Scale (Vec3 1 1 1) a)", "a",
+
             // "(Union (Inter a b) a)", "a",
             // "(Inter (Union a b) a)", "a",
 
-            // "(Scale (Vec3 sa sb sc) (Scale (Vec3 ta tb tc) a))",
-            // "(Scale (Vec3 (* sa ta) (* sb tb) (* sc tc)) a)",
-
-            // "(Trans (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))",
-            // "(Trans (Vec3 (+ sa ta) (+ sb tb) (+ sc tc)) a)",
+            "(Scale (Vec3 sa sb sc) (Cube (Vec3 1 1 1) false))", "(Cube (Vec3 sa sb sc) false)",
+            "(Scale (Vec3 sa sa sa) (Sphere 1 ?params))",  "(Sphere sa ?params)",
+            "(Scale (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (* ta sa) (* tb sb) (* tc sc)) (Scale (Vec3 sa sb sc) a))",
+            "(Trans (Vec3 ta tb tc) (Scale (Vec3 sa sb sc) a))", "(Scale (Vec3 sa sb sc) (Trans (Vec3 (/ ta sa) (/ tb sb) (/ tc sc)) a))",
+            "(Trans (Vec3 0 0 0) a)", "a",
+            "(Scale (Vec3 1 1 1) a)", "a",
+            "(Scale (Vec3 sa sb sc) (Scale (Vec3 ta tb tc) a))", "(Scale (Vec3 (* sa ta) (* sb tb) (* sc tc)) a)",
+            "(Trans (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (+ sa ta) (+ sb tb) (+ sc tc)) a)",
+            "(Cylinder (Vec3 h r r) params true)", "(Scale (Vec3 r r h) (Cylinder (Vec3 1 1 1) params true))",
 
         ]);
         let scalars: &[&str] = &["sa", "sb", "sc", "1"];
