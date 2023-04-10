@@ -23,7 +23,7 @@ impl Scheduler {
     ) -> EGraph<L, SynthAnalysis> {
         let get_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
             let base_runner = Runner::default()
-                .with_scheduler(egg::SimpleScheduler)
+                .with_scheduler(egg::BackoffScheduler::default().with_initial_match_limit(200_000))
                 .with_node_limit(limits.node)
                 .with_iter_limit(limits.iter)
                 .with_time_limit(timeout)

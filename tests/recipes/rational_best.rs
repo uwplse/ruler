@@ -9,13 +9,13 @@ use ruler::{
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 3,
-        node: 1_000_000,
+        iter: 5,
+        node: 600_000,
     };
 
     // Domain
     let vars = &Workload::new(["a", "b", "c"]);
-    let vars_4 = &Workload::new(["a", "b", "c"]);
+    let vars_4 = &Workload::new(["a", "b", "c", "d"]);
     let consts = &Workload::new(["0", "-1", "1"]);
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
@@ -23,7 +23,13 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .plug("var", &vars)
         .plug("const", &consts)
         .plug("uop", &uops)
-        .plug("bop", &bops);
+        .plug("bop", &bops)
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ]));
     let lang_with_if = Workload::new(&[
         "var",
         "const",
@@ -34,7 +40,13 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     .plug("var", &vars_4)
     .plug("const", &consts)
     .plug("uop", &uops)
-    .plug("bop", &bops);
+    .plug("bop", &bops)
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string(),
+        "d".to_string(),
+    ]));
 
     let empty = &Workload::Set(vec![]);
 
@@ -59,7 +71,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
 
     // Layer 2
     println!("layer2");
-    let layer2 = iter_metric(lang_with_if.clone(), "expr", enumo::Metric::Atoms, 4);
+    let layer2 = iter_metric(lang.clone(), "expr", enumo::Metric::Atoms, 4);
     let layer2_rules = Math::run_workload_conditional(layer2, rules.clone(), limits, false);
     rules.extend(layer2_rules);
 
@@ -68,6 +80,14 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let layer3 = iter_metric(lang, "expr", enumo::Metric::Depth, 3);
     let layer3_rules = Math::run_workload_conditional(layer3, rules.clone(), limits, false);
     rules.extend(layer3_rules);
+
+    // Division
+    println!("division");
+    let division = Workload::new(&["(/ expr e)"])
+        .plug("expr", &layer1)
+        .append(Workload::new(&["(/ e expr)"]).plug("expr", &layer1));
+    let division_rules = Math::run_workload_conditional(division, rules.clone(), limits, false);
+    rules.extend(division_rules);
 
     // Factorization
     println!("factorization");
