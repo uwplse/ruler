@@ -81,7 +81,6 @@ impl Workload {
         }
         L::initialize_vars(&mut egraph, &vars);
 
-        let start = Instant::now();
         for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
