@@ -1,9 +1,10 @@
 use ruler::{
-    enumo::{Metric, Ruleset},
-    recipe_utils::{recursive_rules, Lang},
+    enumo::{Metric, Ruleset, Workload, Filter},
+    recipe_utils::{recursive_rules, run_workload, Lang},
 };
 
 use crate::Pred;
+use crate::Limits;
 
 pub fn halide_rules() -> Ruleset<Pred> {
     // This is porting the halide recipe at incremental/halide.spec
@@ -71,5 +72,120 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
     );
     all_rules.extend(full);
+    let nested_bops = Workload::new(&["(bop e e)", "v", "0", "1"])
+        .plug("e", &Workload::new(&["(bop v v)", "v"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "max", "min"]))
+        .plug("v", &Workload::new(&["a", "b", "c", "d"]))
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ]));
+    let new = run_workload(
+        nested_bops,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        true
+    );
+    all_rules.extend(new.clone());
+    println!("nested_bops finished.");
+    new.to_file("nested-bops.rules");
+    let triple_nested_bops = Workload::new(&[
+        "(bop e e)",
+        "(bop (bop (bop v v) v) v)",
+        "(bop v (bop v (bop v v)))",
+        "0",
+        "1",
+    ])
+    .plug("e", &Workload::new(&["(bop v v)", "v"]))
+    .plug("bop", &Workload::new(&["+", "-", "*", "/", "max", "min"]))
+    .plug("v", &Workload::new(&["a", "b", "c", "d"]))
+    .filter(Filter::Canon(vec![
+        "a".to_string(),
+        "b".to_string(),
+        "c".to_string(),
+        "d".to_string(),
+    ]));
+    let new = run_workload(
+        triple_nested_bops,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        true
+    );
+    println!("triple_nested_bops finished.");
+    new.to_file("triple-nested-bops.rules");
+    all_rules.extend(new.clone());
+    let select_arith = Workload::new(&["(select v e e)", "(bop v e)", "(bop e v)"])
+        .plug("e", &Workload::new(&["(bop v v)", "(select v v v)", "v"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "<", "/", "max", "min"]))
+        .plug(
+            "v",
+            &Workload::new(&["a", "b", "c", "d", "e", "f"]),
+        )
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+            "f".to_string()
+        ]));
+    let new = run_workload(
+        select_arith,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        true
+    );
+    println!("select_arith finished.");
+    new.to_file("select-arith.rules");
+    all_rules.extend(new.clone());
+    let select_max = Workload::new(&["(max s s)", "(min s s)", "(select v s s)"])
+        .plug("s", &Workload::new(&["(select v v v)", "(bop v v)", "v"]))
+        .plug(
+            "v",
+            &Workload::new(&["a", "b", "c", "d", "e", "f"]),
+        )
+        .plug("bop", &Workload::new(&["+", "-", "*", "/", "min", "max"]))
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+            "f".to_string()
+        ]));
+    let new = run_workload(
+        select_max,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        true
+    );
+    println!("select_max finished.");
+    new.to_file("select-max.rules");
+    all_rules.extend(new.clone());
+    let nested_bops_full = Workload::new(&["(bop e e)", "v", "0", "1"])
+        .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
+        .plug(
+            "bop",
+            &Workload::new(&["&&", "||", "!=", "<=", "==", "max", "min"]),
+        )
+        .plug("uop", &Workload::new(&["-", "!"]))
+        .plug("v", &Workload::new(&["a", "b", "c"]))
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ]));
+    let new = run_workload(
+        nested_bops_full,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        true
+    );
+    all_rules.extend(new.clone());
+    println!("nested_bops_full finished.");
+    new.to_file("nested_bops_full.rules");
+    all_rules.to_file("all-rules.rules");
     all_rules
 }

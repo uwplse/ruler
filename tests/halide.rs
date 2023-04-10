@@ -297,17 +297,17 @@ mod test {
     };
 
     #[test]
-    fn terms() {
-        let wkld = Workload::from_file("select_arith.terms");
-        wkld.to_egraph::<Pred>();
-    }
-
-    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
+
+        let start = Instant::now();
+        let rules = halide_rules();
+        let duration = start.elapsed();
+
+        println!("Found {} in {} seconds.", rules.clone().len(), duration.as_secs());
 
         // oopsla-halide-baseline branch
         // Run on leviathan 4/4/2023
@@ -324,6 +324,14 @@ mod test {
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);
+
+        logger::write_output(
+            &rules,
+            &baseline,
+            "halide",
+            "halide",
+            duration,
+        );
 
         logger::write_output(
             &oopsla_halide,
