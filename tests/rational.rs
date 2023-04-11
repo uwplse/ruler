@@ -786,6 +786,9 @@ pub mod test {
         let guarded_rules = run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
         guarded_rules.to_file("guard.rules");
         assert!(guarded_rules.0.contains_key("(if ?a 1 (/ 1 ?a)) ==> 1"));
+        assert!(guarded_rules
+            .0
+            .contains_key("(/ 0 ?a) ==> (if ?a 0 (/ 1 ?a))"));
     }
 
     #[test]
