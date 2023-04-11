@@ -159,33 +159,68 @@ function tryRound(v) {
   }
 }
 
-function generateLatex(baseline) {
-  let escape = (s) => s.replaceAll("#", "\\#");
+function getFormattedHeader(baseline, columnNames) {
+  if (baseline === "oopsla") {
+    return String.raw`Domain & \enumo LOC & \# \enumo & \# \ruler & Time (s) & \enumo $\rightarrow$ \ruler & \enumo $\rightarrow$ \ruler Time (s) & \ruler $\rightarrow$ \enumo & \ruler $\rightarrow$ \enumo Time (s)\\ \cline{1-9}`;
+  } else {
+    return (
+      columnNames.join(" & ") + String.raw`\\ \cline{1-${columnNames.length}}`
+    );
+  }
+}
 
+function getCaption(baseline) {
+  if (baseline === "oopsla") {
+    return [
+      String.raw`\caption{Results comparing \slide to \ruler.`,
+      String.raw`  $ R_1 ~ \rightarrow ~ R_2$ indicates using $R_1$ to derive`,
+      String.raw`  $R_2$ rules.`,
+      String.raw`  The three numbers correspond to using the three`,
+      String.raw`  derivability metrics (\T{lhs-only}, \T{lhs-rhs}, \T{all})`,
+      String.raw`  defined in \autoref{subsec:derivability}.`,
+      String.raw`  \todo{update with final results. also add ruler times, if not, take`,
+      String.raw`  out enumo times}}`,
+    ];
+  }
+}
+
+function generateLatex(baseline) {
   let baselineData = getBaseline(data, baseline);
 
   let columnNames = Object.keys(baselineData[0]);
 
+  if (baseline === "oopsla") {
+    var ignoreColumns = ["Baseline", "Minimization"];
+  } else {
+    var ignoreColumns = [];
+  }
+
   var lines = [
-    String.raw`\begin{table}[]`,
+    String.raw`\begin{table}`,
     String.raw`\resizebox{\textwidth}{!}{%`,
-    String.raw`\begin{tabular}{` + "l".repeat(columnNames.length) + "}",
+    String.raw`\begin{tabular}{` +
+      "l".repeat(columnNames.length - ignoreColumns.length) +
+      "}",
   ];
 
-  lines.push(
-    columnNames.join(" & ") + String.raw`\\ \cline{1-${columnNames.length}}`
-  );
+  lines.push(getFormattedHeader(baseline, columnNames));
 
   baselineData.forEach((row) => {
-    lines.push(Object.values(row).join(" & ") + " \\\\");
+    lines.push(
+      Object.keys(row)
+        .filter((key) => !ignoreColumns.includes(key))
+        .map((key) => row[key])
+        .join(" & ") + " \\\\"
+    );
   });
 
   lines.push(String.raw`\end{tabular}%`);
   lines.push(String.raw`}`);
+  lines = lines.concat(getCaption(baseline));
   lines.push(String.raw`\label{table:${baseline}}`);
   lines.push(String.raw`\end{table}`);
 
-  let s = lines.map((l) => escape(l)).join("\n");
+  let s = lines.join("\n");
   let elem = document.getElementById("latex");
   elem.innerHTML = s;
   elem.style.height = "200px";
