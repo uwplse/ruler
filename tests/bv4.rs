@@ -28,4 +28,12 @@ pub mod test {
 
         logger::write_output(&rules, &baseline, "bv4", "oopsla", duration);
     }
+
+    #[test]
+    fn read_bv4() {
+        let bv4_rules: Ruleset<Bv> = Ruleset::from_file("bv4.rules");
+        bv4_rules.pretty_print();
+        let (sound, unsound) = bv4_rules.partition(|rule| rule.is_valid());
+        println!("{} {}", sound.len(), unsound.len());
+    }
 }
