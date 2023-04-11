@@ -9,15 +9,9 @@ use ruler::{
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 5,
-        node: 600_000,
+        iter: 4,
+        node: 2_000_000,
     };
-
-    // If rules
-    let test = Workload::new(&["(if a b b)", "b"]);
-    let test_rules = run_workload(test, rules.clone(), limits, false);
-    rules.extend(test_rules);
-    return rules;
 
     // Domain
     let vars = &Workload::new(["a", "b", "c"]);
@@ -25,17 +19,13 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let consts = &Workload::new(["0", "-1", "1"]);
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
+
     let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"])
         .plug("var", &vars)
         .plug("const", &consts)
         .plug("uop", &uops)
-        .plug("bop", &bops)
-        .filter(Filter::Canon(vec![
-            "a".to_string(),
-            "b".to_string(),
-            "c".to_string(),
-            "d".to_string(),
-        ]));
+        .plug("bop", &bops);
+
     let lang_with_if = Workload::new(&[
         "var",
         "const",
@@ -46,13 +36,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     .plug("var", &vars_4)
     .plug("const", &consts)
     .plug("uop", &uops)
-    .plug("bop", &bops)
-    .filter(Filter::Canon(vec![
-        "a".to_string(),
-        "b".to_string(),
-        "c".to_string(),
-        "d".to_string(),
-    ]));
+    .plug("bop", &bops);
 
     let empty = &Workload::Set(vec![]);
 
@@ -62,17 +46,20 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let layer1_rules = Math::run_workload_conditional(layer1.clone(), rules.clone(), limits, false);
     rules.extend(layer1_rules);
 
+    /*println!("if rules");
     let if_vars = Workload::new(&["(if expr expr expr)", "expr"]).plug("expr", &vars_4);
-    println!("if rules");
     let if_rules = Math::run_workload_conditional(
         Workload::new(&["(if var expr expr)", "expr"])
             .plug("expr", &if_vars)
             .plug("var", &vars_4),
         rules.clone(),
-        limits,
+        Limits {
+            iter: 3,
+            node: 500_000,
+        },
         false,
     );
-    rules.extend(if_rules);
+    rules.extend(if_rules);*/
 
     // Layer 2
     println!("layer2");
@@ -83,7 +70,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Layer 3
     println!("layer3");
     let layer3 = iter_metric(lang, "expr", enumo::Metric::Depth, 3);
-    let layer3_rules = Math::run_workload_conditional(layer3, rules.clone(), limits, false);
+    let layer3_rules = run_workload(layer3, rules.clone(), limits, false);
     rules.extend(layer3_rules);
 
     // Division
@@ -113,9 +100,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     .plug("var", &variables_multiplied)
     .plug("bop", &Workload::new(["+", "-"]));
 
-    let factor_div = Workload::new(["(/ v v)"])
-        .plug("v", &factor_term)
-        .filter(Filter::Canon(vec!["a".to_string(), "b".to_string()]));
+    let factor_div = Workload::new(["(/ v v)"]).plug("v", &factor_term);
 
     let factor_rules = Math::run_workload_conditional(factor_div, rules.clone(), limits, false);
     rules.extend(factor_rules);

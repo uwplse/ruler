@@ -294,13 +294,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut candidates = Ruleset::default();
         let extract = Extractor::new(egraph, AstSize);
         let mut by_first: IndexMap<Option<L::Constant>, Vec<Id>> = IndexMap::default();
-        let mut last = vec![];
         for class in &not_all_none {
-            println!("cvec: {:?}", class.data.cvec);
-            println!("eclass: {:?}", class.nodes);
-            println!("{}", last == class.data.cvec);
-            last = class.data.cvec.clone();
-
             by_first
                 .entry(class.data.cvec[0].clone())
                 .or_insert_with(Vec::new)
@@ -328,6 +322,8 @@ impl<L: SynthLanguage> Ruleset<L> {
                             if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
                                 candidates.add(reverse);
                             }
+                        } else if let Some(rule) = Rule::from_recexprs(&e2, &e1) {
+                            candidates.add(rule.clone());
                         }
                     }
                 }
@@ -366,6 +362,8 @@ impl<L: SynthLanguage> Ruleset<L> {
                         if let Some(reverse) = Rule::new(rule.rhs, rule.lhs) {
                             candidates.add(reverse);
                         }
+                    } else if let Some(rule) = Rule::from_recexprs(e2, e1) {
+                        candidates.add(rule.clone());
                     }
                 }
             }
@@ -450,9 +448,8 @@ impl<L: SynthLanguage> Ruleset<L> {
                 chosen.len()
             );
             let selected = self.select(step_size, &mut invalid);
-            for rule in selected.0.keys() {
-                println!("Selected: {}", rule);
-            }
+            print!("Selected: ");
+            selected.pretty_print();
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
         }
