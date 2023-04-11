@@ -806,14 +806,12 @@ pub mod test {
 
     #[test]
     fn reverse_candidate() {
-        let limits = Limits {
-            iter: 5,
-            node: 600_000,
-        };
+        // regression test that captures a bug where we were not properly adding both directions
+        // when we add candidates. See https://github.com/uwplse/ruler/pull/183
 
-        // If rules
         let test = Workload::new(&["(if a b b)", "b"]);
-        let test_rules: Ruleset<Math> = run_workload(test, Ruleset::default(), limits, false);
+        let test_rules: Ruleset<Math> =
+            run_workload(test, Ruleset::default(), Limits::default(), false);
         assert_eq!(test_rules.len(), 1);
     }
 }
