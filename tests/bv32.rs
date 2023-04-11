@@ -18,7 +18,7 @@ impl Bv {
         let mut candidates = Ruleset::cvec_match(&compressed);
 
         let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+        let chosen = candidates.minimize(prior, Scheduler::Compress(limits)).0;
         let time = t.elapsed().as_secs_f64();
 
         println!(
