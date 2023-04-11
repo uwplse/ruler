@@ -4,9 +4,14 @@
 
 ruler::impl_bv!(16);
 
+#[path = "./recipes/bv4.rs"]
+pub mod bv4;
+
 #[cfg(test)]
 pub mod test {
     use std::time::{Duration, Instant};
+
+    use crate::bv4::bv4_rules;
 
     use ruler::{
         enumo::{self, Filter, Ruleset, Workload},
@@ -59,9 +64,10 @@ pub mod test {
     }
 
     fn from_bv4() -> (Ruleset<Bv>, Duration) {
-        let bv4_rules: Ruleset<Bv> = Ruleset::from_file("bv4.rules_");
+        let actual_bv4_rules: Ruleset<_> = bv4_rules();
+        let ported_bv4_rules: Ruleset<Bv> = Ruleset::new(actual_bv4_rules.to_str_vec());
         let start = Instant::now();
-        let (sound, _) = bv4_rules.partition(|rule| rule.is_valid());
+        let (sound, _) = ported_bv4_rules.partition(|rule| rule.is_valid());
         (sound, start.elapsed())
     }
 
@@ -70,11 +76,9 @@ pub mod test {
         let domain = "BV16";
         // Generate the rules directly
         let (gen, gen_time): (Ruleset<Bv>, Duration) = gen();
-        gen.to_file(&format!("gen-{}.rules_", domain));
 
         // Validate bv4 rules
         let (sound_bv4, sound_bv4_time) = from_bv4();
-        sound_bv4.to_file(&format!("sound-bv4-{}.rules_", domain));
 
         println!("Summary for {}", domain);
         println!(
