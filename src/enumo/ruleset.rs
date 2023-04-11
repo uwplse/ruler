@@ -294,7 +294,13 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut candidates = Ruleset::default();
         let extract = Extractor::new(egraph, AstSize);
         let mut by_first: IndexMap<Option<L::Constant>, Vec<Id>> = IndexMap::default();
+        let mut last = vec![];
         for class in &not_all_none {
+            println!("cvec: {:?}", class.data.cvec);
+            println!("eclass: {:?}", class.nodes);
+            println!("{}", last == class.data.cvec);
+            last = class.data.cvec.clone();
+
             by_first
                 .entry(class.data.cvec[0].clone())
                 .or_insert_with(Vec::new)

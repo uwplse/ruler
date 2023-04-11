@@ -1,6 +1,7 @@
 use egg::{AstSize, CostFunction, ENodeOrVar, Language, Rewrite};
 use num::{
-    rational::Rational64, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
+    rational::{Ratio, Rational64},
+    CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
 };
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
@@ -823,7 +824,9 @@ pub mod test {
             "(- (+ ?c ?a) (+ ?b ?a)) ==> (if ?b (* (- ?c ?b) (/ ?b ?b)) (- (+ ?c ?a) (+ ?b ?a)))",
             "(/ (/ 0 ?b) (+ ?b ?a)) ==> (if (+ ?b ?a) (/ 0 ?b) (/ (/ 0 ?b) (+ ?b ?a)))",
         ]);
-        let chosen_conditional = with_condition.minimize(prior, Scheduler::Compress(limits));
+        let chosen_conditional = with_condition
+            .minimize(prior, Scheduler::Compress(limits))
+            .0;
 
         assert_eq!(chosen_conditional.len(), 1);
     }

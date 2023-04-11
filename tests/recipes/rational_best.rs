@@ -13,6 +13,12 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         node: 600_000,
     };
 
+    // If rules
+    let test = Workload::new(&["(if a b b)", "b"]);
+    let test_rules = run_workload(test, rules.clone(), limits, false);
+    rules.extend(test_rules);
+    return rules;
+
     // Domain
     let vars = &Workload::new(["a", "b", "c"]);
     let vars_4 = &Workload::new(["a", "b", "c", "d"]);
@@ -56,7 +62,6 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let layer1_rules = Math::run_workload_conditional(layer1.clone(), rules.clone(), limits, false);
     rules.extend(layer1_rules);
 
-    // If rules
     let if_vars = Workload::new(&["(if expr expr expr)", "expr"]).plug("expr", &vars_4);
     println!("if rules");
     let if_rules = Math::run_workload_conditional(
