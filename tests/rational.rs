@@ -159,40 +159,6 @@ impl SynthLanguage for Math {
         }
     }
 
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
-        let l_size = AstSize.cost_rec(&lhs.ast) as i32;
-        let r_size = AstSize.cost_rec(&rhs.ast) as i32;
-        let mut vars: HashSet<Var> = Default::default();
-        vars.extend(lhs.vars());
-        vars.extend(rhs.vars());
-
-        let mut ops: HashSet<String> = Default::default();
-        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-            if !node.is_leaf() {
-                ops.insert(node.to_string());
-            }
-        }
-
-        let num_consts = lhs
-            .ast
-            .as_ref()
-            .iter()
-            .chain(rhs.ast.as_ref())
-            .filter(|n| match n {
-                ENodeOrVar::ENode(n) => n.is_constant(),
-                ENodeOrVar::Var(_) => false,
-            })
-            .count() as i32;
-
-        [
-            vars.len() as i32,
-            -num_consts,
-            -i32::max(l_size, r_size),
-            -(l_size + r_size),
-            -(ops.len() as i32),
-        ]
-    }
-
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
@@ -261,53 +227,6 @@ impl Math {
                 }
             }
             _ => (),
-        }
-
-        res
-    }
-
-    fn error_conditions<'a>(
-        ctx: &'a z3::Context,
-        sexp: Sexp,
-        path: z3::ast::Bool<'a>,
-    ) -> Vec<z3::ast::Bool<'a>> {
-        let mut res = Vec::<z3::ast::Bool<'a>>::default();
-        match sexp {
-            Sexp::List(list) => {
-                if list[0] == Sexp::String("/".to_string()) {
-                    let denom = list[2].to_string();
-                    let expr = egg_to_z3(
-                        &ctx,
-                        Self::instantiate(&denom.to_string().parse::<Pattern<Math>>().unwrap())
-                            .as_ref(),
-                    );
-                    let is_zero = expr._eq(&z3::ast::Real::from_real(ctx, 0, 1));
-
-                    res.push(z3::ast::Bool::and(ctx, &[&is_zero, &path]));
-                }
-
-                if list[0] == Sexp::String("if".to_string()) {
-                    let cond_real = egg_to_z3(
-                        &ctx,
-                        Self::instantiate(&list[1].to_string().parse::<Pattern<Math>>().unwrap())
-                            .as_ref(),
-                    );
-                    let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                    let new_path_pos = z3::ast::Bool::and(
-                        &ctx,
-                        &[&path, &z3::ast::Bool::not(&cond_real._eq(&zero))],
-                    );
-                    let new_path_neg = z3::ast::Bool::and(&ctx, &[&path, &cond_real._eq(&zero)]);
-                    res.extend(Self::error_conditions(ctx, list[2].clone(), new_path_pos));
-                    res.extend(Self::error_conditions(ctx, list[3].clone(), new_path_neg));
-                } else {
-                    for s in list {
-                        res.extend(Self::error_conditions(ctx, s, path.clone()));
-                    }
-                };
-            }
-            Sexp::String(_atom) => (),
-            Sexp::Empty => (),
         }
 
         res
@@ -830,11 +749,6 @@ pub mod test {
 
         logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
         logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
-    }
-
-    #[test]
-    fn just_best() {
-        best_enumo_recipe().to_file("rational_best.rules");
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, RecExpr, Rewrite, Subst};
+use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, Rewrite, Subst};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
