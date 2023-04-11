@@ -10,7 +10,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
         iter: 4,
-        node: 2_000_000,
+        node: 1_000_000,
     };
 
     // Domain
@@ -24,6 +24,10 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         .plug("var", &vars)
         .plug("const", &consts)
         .plug("uop", &uops)
+        .plug("bop", &bops);
+
+    let lang_4_var = Workload::new(&["var", "(bop expr expr)"])
+        .plug("var", &vars_4)
         .plug("bop", &bops);
 
     let lang_with_if = Workload::new(&[
@@ -64,7 +68,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Layer 2
     println!("layer2");
     let layer2 = iter_metric(lang.clone(), "expr", enumo::Metric::Atoms, 4);
-    let layer2_rules = Math::run_workload_conditional(layer2, rules.clone(), limits, false);
+    let layer2_rules = Math::run_workload_conditional(layer2.clone(), rules.clone(), limits, false);
     rules.extend(layer2_rules);
 
     // Layer 3
@@ -74,12 +78,20 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     rules.extend(layer3_rules);
 
     // Division
-    println!("division");
+    /*println!("division");
     let division = Workload::new(&["(/ expr e)"])
-        .plug("expr", &layer1)
-        .append(Workload::new(&["(/ e expr)"]).plug("expr", &layer1));
+        .plug(
+            "expr",
+            &iter_metric(lang_4_var.clone(), "expr", enumo::Metric::Depth, 3),
+        )
+        .append(Workload::new(&["(/ e expr)"]))
+        .plug(
+            "expr",
+            &iter_metric(lang_4_var.clone(), "expr", enumo::Metric::Depth, 3),
+        );
+    println!("Division size {}", division.force().len());
     let division_rules = Math::run_workload_conditional(division, rules.clone(), limits, false);
-    rules.extend(division_rules);
+    rules.extend(division_rules);*/
 
     // Factorization
     println!("factorization");
@@ -87,7 +99,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         Workload::new(&["var", "(* expr expr)"]),
         "expr",
         enumo::Metric::Atoms,
-        5,
+        3,
     )
     .plug("var", &Workload::new(["a", "b"]));
 
