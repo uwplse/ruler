@@ -26,7 +26,7 @@ function getBaseline(data, baseline) {
   };
   let newData = [];
   data.forEach((row) => {
-    if (!row["baseline_name"].includes(baseline)) {
+    if (!row["baseline_name"]?.includes(baseline)) {
       return;
     }
     let newRow = {};
@@ -75,7 +75,7 @@ function load() {
 }
 
 function populateDomainDetail() {
-  let domains = data.map((x) => x.enumo_spec_name);
+  let domains = data.map((x) => x.enumo_spec_name).filter((x) => !!x);
   let str = "";
   domains.forEach((domain) => {
     str += "<p>";
@@ -198,4 +198,26 @@ function consolidateColumns(dataObj, consolidatedName, columnNames) {
     delete dataObj[col];
   });
   dataObj[consolidatedName] = values.join(", ");
+}
+
+function toPercentage(v, b) {
+  return (tryRound(v / b) * 100).toFixed(0).toString() + "%";
+}
+
+function loadBvExp() {
+  let exps = data.filter((x) => !!x.from_bv4);
+
+  var columns = ["domain", "generated", "from bv4", "% derivable"];
+  let rows = [];
+  exps.forEach((exp) => {
+    rows.push({
+      domain: exp.domain,
+      generated: exp.direct_gen.rules.length,
+      "gen time (s)": tryRound(exp.direct_gen.time),
+      from_bv4: exp.from_bv4.rules.length,
+      "from_bv4 time (s)": tryRound(exp.from_bv4.time),
+      derive: toPercentage(exp.derive.can, exp.derive.can + exp.derive.cannot),
+    });
+  });
+  document.getElementById("container").innerHTML = ConvertJsonToTable(rows);
 }
