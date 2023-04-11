@@ -23,7 +23,7 @@ pub mod test {
 
     use crate::Bv;
 
-    fn gen() -> (Ruleset<Bv>, Duration) {
+    fn gen(prior: Ruleset<Bv>) -> (Ruleset<Bv>, Duration) {
         let start = Instant::now();
         let mut rules: Ruleset<Bv> = Ruleset::default();
         let lang = Lang::new(
@@ -37,7 +37,7 @@ pub mod test {
             enumo::Metric::Atoms,
             5,
             lang.clone(),
-            Ruleset::default(),
+            prior,
         ));
 
         let base_lang = Workload::new(["VAR", "CONST", "(UOP EXPR)", "(BOP EXPR EXPR)"]);
@@ -75,7 +75,7 @@ pub mod test {
     fn compare() {
         let domain = "BV16";
         // Generate the rules directly
-        let (gen, gen_time): (Ruleset<Bv>, Duration) = gen();
+        let (gen, gen_time): (Ruleset<Bv>, Duration) = gen(Ruleset::default());
 
         // Validate bv4 rules
         let (sound_bv4, sound_bv4_time) = from_bv4();
@@ -120,5 +120,35 @@ pub mod test {
 
         });
         logger::add_to_data_file("nightly/data/output.json".to_string(), stat);
+    }
+
+    #[test]
+    fn start_from_sound() {
+        let domain = "BV16";
+        let sound = Ruleset::<Bv>::from_file(&format!("sound-bv4-{}.rules_", domain));
+        let generated = Ruleset::<Bv>::from_file(&format!("gen-{}.rules_", domain));
+
+        let (mut new_rules, duration) = gen(sound.clone());
+        println!("generated in {}", duration.as_secs_f32());
+
+        let (can, cannot) =
+            sound.derive(ruler::DeriveType::LhsAndRhs, &generated, Limits::deriving());
+        println!(
+            "using just the sound bv4 rules: {} {}",
+            can.len(),
+            cannot.len()
+        );
+        let (can, cannot) =
+            new_rules.derive(ruler::DeriveType::LhsAndRhs, &generated, Limits::deriving());
+        println!(
+            "sound bv4 + incrementally generated: {} {}",
+            can.len(),
+            cannot.len()
+        );
+
+        new_rules.remove_all(sound);
+
+        println!("new: ");
+        new_rules.pretty_print();
     }
 }
