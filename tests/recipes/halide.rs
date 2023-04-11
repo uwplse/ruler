@@ -1,6 +1,7 @@
 use ruler::{
-    enumo::{Metric, Ruleset},
-    recipe_utils::{recursive_rules, Lang},
+    enumo::{Metric, Ruleset, Filter, Workload},
+    recipe_utils::{recursive_rules, Lang, run_workload},
+    Limits
 };
 
 use crate::Pred;
@@ -71,5 +72,30 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
     );
     all_rules.extend(full);
+    let nested_bops_full = Workload::new(&["(bop e e)", "v", "0", "1"])
+        .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
+        .plug(
+            "bop",
+            &Workload::new(&["&&", "||", "!=", "<=", "==", "max", "min"]),
+        )
+        .plug("uop", &Workload::new(&["-", "!"]))
+        .plug("v", &Workload::new(&["a", "b", "c"]))
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ]));
+    println!("Writing nested-bops-full workload...");
+    nested_bops_full.to_file("nested-bops-full.terms");
+    let new = run_workload(
+        nested_bops_full,
+        all_rules.clone(),
+        Limits::rulefinding(),
+        true,
+    );
+    all_rules.extend(new.clone());
+    println!("nested_bops_full finished.");
+    new.to_file("nested_bops_full.rules");
+    all_rules.to_file("all-rules.rules");
     all_rules
 }
