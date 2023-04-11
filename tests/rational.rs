@@ -803,4 +803,15 @@ pub mod test {
             .0
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
     }
+
+    #[test]
+    fn reverse_candidate() {
+        // regression test that captures a bug where we were not properly adding both directions
+        // when we add candidates. See https://github.com/uwplse/ruler/pull/183
+
+        let test = Workload::new(&["(if a b b)", "b"]);
+        let test_rules: Ruleset<Math> =
+            run_workload(test, Ruleset::default(), Limits::default(), false);
+        assert_eq!(test_rules.len(), 1);
+    }
 }
