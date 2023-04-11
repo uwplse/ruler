@@ -137,7 +137,7 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        self.run_internal(egraph, ruleset, None, 1_000_000)
+        self.run_internal(egraph, ruleset, None, 100_000)
     }
 
     pub fn run_derive<L: SynthLanguage>(
