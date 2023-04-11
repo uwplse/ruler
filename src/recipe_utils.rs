@@ -45,7 +45,7 @@ pub fn run_workload<L: SynthLanguage>(
         num_prior
     );
 
-    chosen.pretty_print();
+    // chosen.pretty_print();
 
     chosen
 }
@@ -80,10 +80,10 @@ pub fn run_rule_lifting<L: SynthLanguage>(
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Lang {
     pub consts: Vec<String>,
-    vars: Vec<String>,
-    uops: Vec<String>,
-    bops: Vec<String>,
-    tops: Vec<String>,
+    pub vars: Vec<String>,
+    pub uops: Vec<String>,
+    pub bops: Vec<String>,
+    pub tops: Vec<String>,
 }
 
 impl Lang {
