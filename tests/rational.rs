@@ -82,8 +82,6 @@ impl SynthLanguage for Math {
     where
         F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
     {
-        //return Interval::default();
-        // TODO why does this result in unsoundness?
         let mut get_const = |x: &'a Id| {
             let ival = get_interval(x);
             if ival.low == ival.high {
@@ -303,8 +301,6 @@ impl Math {
             Ruleset::cvec_match(&compressed)
         };
 
-        println!("Found {} candidates", candidates.len());
-
         let num_prior = prior.len();
         let (chosen, invalid) = candidates.minimize(prior.clone(), Scheduler::Compress(limits));
 
@@ -332,10 +328,6 @@ impl Math {
             "Instrumented {} rules with conditions",
             with_condition.len()
         );
-        /*println!("Conditioned rules:");
-        for rule in with_condition.0.keys() {
-            println!("{}", rule);
-        }*/
 
         let chosen_conditional = with_condition
             .minimize(prior.union(&chosen), Scheduler::Compress(limits))
@@ -790,6 +782,8 @@ pub mod test {
             .0
             .contains_key("(/ 0 ?a) ==> (if ?a 0 (/ 1 ?a))"));
     }
+
+    // TODO write test that catches if cvecs are not initialized
 
     #[test]
     fn reverse_candidate() {
