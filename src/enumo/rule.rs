@@ -1,4 +1,4 @@
-use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, RecExpr, Rewrite, Subst};
+use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, Rewrite, Subst};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -88,24 +88,17 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 }
 
 impl<L: SynthLanguage> Rule<L> {
-    pub fn new(l_pat: Pattern<L>, r_pat: Pattern<L>) -> Option<Self> {
+    pub fn new(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Option<Self> {
         let name = format!("{} ==> {}", l_pat, r_pat);
         let rhs = Rhs { rhs: r_pat.clone() };
         let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
 
         rewrite.map(|rw| Rule {
             name: name.into(),
-            lhs: l_pat,
-            rhs: r_pat,
+            lhs: l_pat.clone(),
+            rhs: r_pat.clone(),
             rewrite: rw,
         })
-    }
-
-    pub fn from_recexprs(e1: &RecExpr<L>, e2: &RecExpr<L>) -> Option<Self> {
-        let map = &mut HashMap::default();
-        let l_pat = L::generalize(e1, map);
-        let r_pat = L::generalize(e2, map);
-        Self::new(l_pat, r_pat)
     }
 
     pub fn is_saturating(&self) -> bool {

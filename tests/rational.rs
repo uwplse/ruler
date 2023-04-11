@@ -803,4 +803,17 @@ pub mod test {
             .0
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
     }
+
+    #[test]
+    fn reverse_candidate() {
+        let limits = Limits {
+            iter: 5,
+            node: 600_000,
+        };
+
+        // If rules
+        let test = Workload::new(&["(if a b b)", "b"]);
+        let test_rules: Ruleset<Math> = run_workload(test, Ruleset::default(), limits, false);
+        assert_eq!(test_rules.len(), 1);
+    }
 }
