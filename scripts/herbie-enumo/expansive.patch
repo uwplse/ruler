@@ -1,0 +1,32 @@
+
+(let ()
+  (define ops (mutable-set))
+  (define (letter-at idx)
+    (string->symbol (string (integer->char (+ idx 97)))))
+  (define (ops-in-expr expr)
+    (let loop ([expr expr])
+      (match expr
+        [(list op arg args ...)
+         (set-add! ops op)
+         (for-each loop (cons arg args))]
+        [_
+         (void)])))
+  (for ([rs (in-list (*rulesets*))])
+    (match-define (list rules groups types) rs)
+    (for ([r (in-list rules)])
+      (ops-in-expr (rule-input r))
+      (ops-in-expr (rule-output r))))
+  (define ops*
+    (reap [sow]
+      (for ([op (in-set ops)])
+        (unless (equal? op 'if)
+          (when (equal? (real-operator-info op 'otype) 'real)
+            (sow op))))))
+  (register-ruleset*!
+    'oliver-expand '(arithmetic) '((a . real) (b . real) (c . real))
+    (for/list ([op (in-list ops*)] [i (in-naturals)])
+      (define len (length (real-operator-info op 'itype)))
+      (define lhs (cons op (for/list ([i (in-range len)]) (letter-at i))))
+      (list (string->symbol (format "oliver-~a" i))
+            lhs
+            (list '+ lhs 0)))))

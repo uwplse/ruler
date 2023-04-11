@@ -75,14 +75,13 @@ function do_branch {
     git checkout 5a1accbc5ebcb1311f85421a3c6dd73e4f8575be
   fi
 
-  cp "$MYDIR/new-config.rkt" "$HERBIE_DIR/src/config.rkt"
-  cp "$MYDIR/egg-herbie.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
+  # cp "$MYDIR/new-config.rkt" "$HERBIE_DIR/src/config.rkt"
   # cp "$MYDIR/lib.rs" "$HERBIE_DIR/egg-herbie/src/lib.rs"
 
   # Patch ruler-autogen rule branches
   if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
     # In case of broken nightlies, target different branch
-    # sed -i 's/main/oflatt-conditional-herbie/g' "$HERBIE_DIR/src/syntax/rules.rkt"
+    sed -i 's/main/oflatt-better-herbie/g' "$HERBIE_DIR/src/syntax/rules.rkt"
     if [[ -n "$COMMIT" ]]; then
       sed -i "s/(define nightly-commit #f)/(define nightly-commit \"$COMMIT\")/g" "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
@@ -94,20 +93,20 @@ function do_branch {
       echo "" >> "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
 
-    # if [[ "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
-    #   cat "$MYDIR/flip.patch" >> "$HERBIE_DIR/src/syntax/rules.rkt"
-    # fi
-
+    cp "$MYDIR/egg-herbie-expansive.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
+    cat "$MYDIR/expansive.patch" >> "$HERBIE_DIR/src/syntax/rules.rkt"
     if [[ "$name" = "enumo-only-rat" ]]; then
       sed -i 's#(ruler-manifest "exponential"#; (ruler-manifest "exponential"#g' "$HERBIE_DIR/src/syntax/rules.rkt"
       sed -i 's#(ruler-manifest "trig"#; (ruler-manifest "trig"#g' "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
   # Patch no-rules branch
   elif [[ "$name" == "no-rules" ]]; then
+    cp "$MYDIR/egg-herbie.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
     cp "$MYDIR/empty-rules.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
   # Patch any other branch
   else
     # Patch bug where rules cannot be disabled
+    cp "$MYDIR/egg-herbie.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
     if [[ "$flags" == *"-o rules:numerics"* ]]; then
       cp "$MYDIR/no-numerics.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
@@ -115,7 +114,7 @@ function do_branch {
 
   make install
   popd
-
+W
   flags="$flags --timeout 300"
   if [ -z "$PARALLEL_SEEDS" ]; then
     HERBIE=$HERBIE_DIR \
@@ -134,25 +133,6 @@ function do_branch {
 }
 
 if [ -z "$NO_RUN" ]; then
-  ### Debugging ###
-  # do_branch main main
-  # do_branch main main-n -o rules:numerics
-  # do_branch main main-t -o generate:taylor
-  # do_branch main main-n-t -o rules:numerics -o generate:taylor
-  # do_branch using-ruler-nightlies enumo
-  # do_branch using-ruler-nightlies enumo-n -o rules:numerics
-  # do_branch using-ruler-nightlies enumo-t -o generate:taylor
-  # do_branch using-ruler-nightlies enumo-n-t -o rules:numerics -o generate:taylor
-  # do_branch using-ruler-baseline ruler
-  # do_branch using-ruler-baseline ruler-n -o rules:numerics
-  # do_branch using-ruler-baseline ruler-t -o generate:taylor
-  # do_branch using-ruler-baseline ruler-n-t -o rules:numerics -o generate:taylor
-  # do_branch main no-rules -o generate:rr -o generate:simplify
-  # do_branch ruler-no-fast-forwarding ruler-no-ff
-  # do_branch ruler-no-fast-forwarding ruler-no-ff-n -o rules:numerics
-  # do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
-  # do_branch ruler-no-fast-forwarding ruler-no-ff-n-t -o rules:numerics -o generate:taylor
-  ### Final ###
   # do_branch main main-t -o generate:taylor
   do_branch using-ruler-nightlies enumo-t -o generate:taylor
   do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
