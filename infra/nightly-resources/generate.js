@@ -217,6 +217,7 @@ function loadBvExp() {
       from_bv4: exp.from_bv4.rules.length,
       "from_bv4 time (s)": tryRound(exp.from_bv4.time),
       derive: toPercentage(exp.derive.can, exp.derive.can + exp.derive.cannot),
+      missing: exp.derive.missing_rules.join("<br/>"),
     });
   });
   document.getElementById("container").innerHTML = ConvertJsonToTable(rows);
