@@ -164,12 +164,13 @@ fn get_lifting_rules() -> Vec<&'static str> {
         // "(Union ?a ?b) ==> (max ?a ?b)",
         // "(Inter ?a ?b) ==> (min ?a ?b)",
         "(Scale (Vec3 ?w ?h ?l) ?e) ==> (subst (/ x (Scalar ?w)) (/ y (Scalar ?h)) (/ z (Scalar ?l)) ?e)",
-        "(Cube (Vec3 ?a ?b ?c) false) ==> (min (/ x (Scalar ?a))
-                                          (min (- 1 (/ x (Scalar ?a)))
-                                               (min (/ y (Scalar ?b))
-                                                    (min (- 1 (/ y (Scalar ?b)))
-                                                         (min (/ z (Scalar ?c))
-                                                              (- 1 (/ z (Scalar ?c))))))))",
+        "(Cube (Vec3 ?a ?b ?c) false) ==>
+         (min (min (min (/ x (Scalar ?a))
+                        (/ y (Scalar ?b)))
+                   (/ z (Scalar ?c)))
+              (min (min (- 1 (/ x (Scalar ?a)))
+                        (- 1 (/ y (Scalar ?b))))
+                   (- 1 (/ z (Scalar ?c)))))",
         "(Cylinder (Vec3 ?h ?r ?r) ?params true) ==>
          (min (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
                  (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
@@ -349,7 +350,7 @@ mod tests {
         let w = Workload::new([
             "(Scale (Vec3 sa sb sc) (Cube (Vec3 1 1 1) false))", "(Cube (Vec3 sa sb sc) false)",
             "(Scale (Vec3 sa sa sa) (Sphere 1 ?params))",  "(Sphere sa ?params)",
-            // "(Scale (Vec3 r r h) (Cylinder (Vec3 1 1 1) params true))", "(Cylinder (Vec3 h r r) params true)",
+            "(Scale (Vec3 r r h) (Cylinder (Vec3 1 1 1) params true))", "(Cylinder (Vec3  h r r) params true)",
             "(Scale (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (* ta sa) (* tb sb) (* tc sc)) (Scale (Vec3 sa sb sc) a))",
             "(Trans (Vec3 ta tb tc) (Scale (Vec3 sa sb sc) a))", "(Scale (Vec3 sa sb sc) (Trans (Vec3 (/ ta sa) (/ tb sb) (/ tc sc)) a))",
             "(Trans (Vec3 0 0 0) a)", "a",
