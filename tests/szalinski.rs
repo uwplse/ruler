@@ -3,6 +3,7 @@
 
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+#![allow(dead_code)]
 use egg::{AstSize, Extractor, RecExpr, Language, CostFunction, Runner};
 use itertools::enumerate;
 use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
@@ -18,7 +19,7 @@ use std::fs;
 use std::time::SystemTime;
 use std::{hash::Hash, time::Instant};
 
-pub type Constant = usize;
+pub type Constant = i64;
 
 egg::define_language! {
  pub enum CF  {
@@ -107,101 +108,6 @@ impl CostFunction<CF> for SzalinskiCostFunction {
     }
 }
 
-#[test]
-fn custom_modify() {
-    let term_expected_pairs = [
-        (
-            "(subst (/ x ?a) y z (- 1 (- (- x y) z)))",
-            "(- 1 (- (- (/ x ?a) y) z))",
-        ),
-        ("(subst (/ x a) y z x)", "(/ x a)"),
-
-        ("(subst (/ x a) y z (min x x))", "(min (/ x a) (/ x a))"),
-        (
-            "(subst (/ x a) y z (- x y))",
-            "(- (/ x a) y)",
-        ),
-        (
-            "(subst (/ x a) y z (* x x))",
-            "(* (/ x a) (/ x a))",
-        ),
-
-        (
-            "(subst (/ x ?a) (/ y ?b) (/ z ?c)
-                
-            (min (/ x 1)
-            (min (- 1 (/ x 1))
-               (min y
-                  (min (- 1 y)
-                     (min z
-                        (- 1 z))))))
-
-              )",
-
-
-            "(min (/ (/ x ?a) 1)
-            (min (- 1 (/ (/ x ?a) 1))
-               (min (/ y ?b)
-                  (min (- 1 (/ y ?b))
-                     (min (/ z ?c)
-                        (- 1 (/ z ?c)))))))",
-        ),
-        (
-            "(subst (/ x (Scalar sa)) (/ y (Scalar sb)) (/ z (Scalar sc))
-             (subst (- x (Scalar ta)) (- y (Scalar tb)) (- z (Scalar tc))
-                x
-            ))",
-            "(- (/ x (Scalar sa)) (Scalar ta))",
-        ),
-
-        (
-            "(subst (/ x (Scalar sa)) (/ y (Scalar sb)) (/ z (Scalar sc))
-             (subst (- x (Scalar ta)) (- y (Scalar tb)) (- z (Scalar tc))
-                ?b
-            ))",
-            "
-            (subst (- (/ x (Scalar sa)) (Scalar ta)) (- (/ y (Scalar sb)) (Scalar tb)) (- (/ z (Scalar sc)) (Scalar tc))
-            ?b
-            )
-            ",
-        ),
-        (
-            "(subst 1 2 3 (* ?b ?c))",
-            "(* (subst 1 2 3 ?b) (subst 1 2 3 ?c))",
-        ),
-        (
-            "(subst 1 2 3 (* x ?c))",
-            "(* 1 (subst 1 2 3 ?c))",
-        ),
-        (
-            "(subst (/ x (Scalar sa)) (/ y (Scalar sb)) (/ z (Scalar sc))
-             (subst (- x (Scalar ta)) (- y (Scalar tb)) (- z (Scalar tc))
-                (* ?b x)
-            ))",
-            "
-            (*
-                (subst (- (/ x (Scalar sa)) (Scalar ta)) (- (/ y (Scalar sb)) (Scalar tb)) (- (/ z (Scalar sc)) (Scalar tc))
-                    ?b
-                )
-                (- (/ x (Scalar sa)) (Scalar ta))
-            )
-            ",
-        ),
-
-    ];
-
-    for (term, expected) in term_expected_pairs {
-        let mut egraph: EGraph<CF, SynthAnalysis> = EGraph::default();
-        let id = egraph.add_expr(&term.parse().unwrap());
-
-        CF::custom_modify(&mut egraph, id);
-
-        let id2 = egraph.add_expr(&expected.parse().unwrap());
-
-        assert_eq!(id, id2);
-    }
-}
-
 fn get_frep_rules() -> Vec<&'static str> {
     [
         "0 ==> (Scalar 0)",
@@ -249,40 +155,6 @@ fn get_frep_rules() -> Vec<&'static str> {
         "(max (min ?a ?b) ?a) ==> ?a",
         "(max ?a ?a) ==> ?a",
         "(min ?a ?a) ==> ?a",
-
-
-        // "(- (/ ?a ?b) (/ ?c ?b)) ==> (/ (- ?a ?c) ?b)",
-        // "(/ (- ?a ?b) ?c) ==> (- (/ ?a ?c) (/ ?b ?c))",
-        // "(- (/ ?a ?b) ?c) ==> (/ (- ?a (* ?b ?c)) ?b)",
-        // "(/ (- ?a (* ?b ?c)) ?b) ==> (- (/ ?a ?b) ?c)",
-        // "(/ ?a (Scalar ?a)) ==> 1",
-        // "(/ (Scalar ?a) (Scalar ?b)) ==> (Scalar (/ (Scalar ?a) (Scalar ?b)))",
-        // "(- (Scalar ?a) (Scalar ?b)) ==> (Scalar (- (Scalar ?a) (Scalar ?b)))",
-        // "(* (Scalar ?a) (Scalar ?b)) ==> (Scalar (* (Scalar ?a) (Scalar ?b)))",
-        // "(- (* ?a ?c) (* ?b ?c)) ==> (* (- ?a ?b) ?c)",
-
-
-        // "(* ?a ?b) ==> (* ?b ?a)",
-        // "(+ ?a ?b) ==> (+ ?b ?a)",
-        // "(- (- ?a ?b) ?c) ==> (- ?a (+ ?b ?c))",
-        // "(- (- ?a ?b) ?c) ==> (- (- ?a ?c) ?b))",
-
-        // "(/ (- ?a (* ?b ?c)) ?b) ="
-
-
-        // "(Scale ?sa ?sb ?sc (Trans ?ta ?tb ?tc ?a)) ==>
-        //     // (subst (- (/ x (Scalar ?sa)) (Scalar ?ta)) (- (/ y (Scalar ?sb)) (Scalar ?tb)) (- (/ z (Scalar ?sc)) (Scalar ?tc)) ?a)",
-
-        // "(Trans (* ?ta ?sa) (* ?tb ?sb) (* ?tc ?sc) (Scale ?sa ?sb ?sc ?a)) ==>
-        // (Cheat ?ta ?sa ?tb ?sb ?tc ?sc ?a)",
-
-        // "(Cheat ?ta ?sa ?tb ?sb ?tc ?sc ?a) ==>
-        //  (Scale ?sa ?sb ?sc (Trans ?ta ?tb ?tc ?a))",
-        // (subst (- (/ x (Scalar ?sa)) (Scalar ?ta)) (- (/ y (Scalar ?sb)) (Scalar ?tb)) (- (/ z (Scalar ?sc)) (Scalar ?tc)) ?a)",
-        // "(Trans (* 
-        // (subst (- (/ x ?sa) ?ta) (- (/ y ?sb) ?tb) (- (/ z ?sc) ?tc) ?a)",?ta ?sa) (* ?tb ?sb) (* ?tc ?sc) (Scale ?sa ?sb ?sc ?a)) ==>
-        // "(Trans ta tb tc (Scale sa sb sc a))",
-        // "(Scale sa sb sc (Trans (/ ta sa) (/ tb sb) (/ tc sc) a))",
     ]
     .into()
 }
@@ -311,282 +183,6 @@ fn get_lifting_rules() -> Vec<&'static str> {
 }
 
 const DEBUG: bool = true;
-
-fn to_idx(from_var: CF) -> usize {
-    if from_var == CF::DimX {
-        return 0;
-    } else if from_var == CF::DimY {
-        return 1;
-    } else if from_var == CF::DimZ {
-        return 2;
-    } else {
-        println!("not a dim var!");
-        return 0;
-    }
-}
-
-fn canonicalize_all_substs(egraph: &mut EGraph<CF, SynthAnalysis>) {
-    println!("TOP");
-    let mut all_subst_ids: Vec<Id> = vec![];
-    for class in egraph.classes() {
-        let mut all_subst = true;
-        let mut at_least_one_subst = false;
-        for node in &egraph[class.id].nodes {
-            if is_caddy(node) {
-                continue;
-            }
-            // Check if there is any non-subst FRep node
-            if let CF::Subst(_) = node {
-                at_least_one_subst = true;
-            } else {
-                all_subst = false;
-            }
-        }
-        if at_least_one_subst && all_subst {
-            all_subst_ids.push(class.id.clone());
-        }
-    }
-
-    // println!("num is {}", all_subst_ids.len());
-    let x = egraph.add(CF::DimX);
-    let y = egraph.add(CF::DimY);
-    let z = egraph.add(CF::DimZ);
-    for id in all_subst_ids {
-        // println!("cm");
-        for node in &egraph[id].nodes.clone() {
-            if let CF::Subst([x2, y2, z2, e]) = node.clone() {
-                let mapping = [x2, y2, z2];
-                if mapping == [x, y, z] {
-                    if egraph.find(id) != egraph.find(e) {
-                        egraph.union(id, e);
-                        if DEBUG { println!("redo1"); }
-                        return canonicalize_all_substs(egraph);
-                    } else {
-                        continue;
-                    }
-                }
-                let mut cache: HashMap<(Id, [Id; 3]), Option<CF>> = HashMap::new();
-                
-                if DEBUG {
-                    let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
-                    let (_, eex) = extractor.find_best(e);
-                    let (_, x2ex) = extractor.find_best(x2);
-                    let (_, y2ex) = extractor.find_best(y2);
-                    let (_, z2ex) = extractor.find_best(z2);
-                    let (_, idex) = extractor.find_best(id);
-                    println!("custom modify start");
-                    println!("id: {} {}", id, idex); 
-                    println!("e: {} {}", e, eex);
-                    println!("x2: {}", x2ex);
-                    println!("y2: {}", y2ex);
-                    println!("z2: {}", z2ex);
-                }
-
-                if let Some(e_substed) = compute_subst(egraph, e, mapping, &mut cache, 0) {
-                    
-                    let id2 = egraph.add(e_substed.clone());
-                    
-                    if DEBUG {
-                        println!("custom modify SUCCESS");
-                        let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
-                        let (_, eex) = extractor.find_best(e);
-                        let (_, x2ex) = extractor.find_best(x2);
-                        let (_, y2ex) = extractor.find_best(y2);
-                        let (_, z2ex) = extractor.find_best(z2);
-                        let (_, id2ex) = extractor.find_best(id2);
-                        let (_, idex) = extractor.find_best(id);
-                        println!("id: {} {}", id, idex); 
-                        println!("e: {} {}", e, eex);
-                        println!("x2: {}", x2ex);
-                        println!("y2: {}", y2ex);
-                        println!("z2: {}", z2ex);
-   
-                        println!("id2: {} {}", id2, id2ex);
-                    }
-
-
-                    // This algorithm runs until fixed-point
-                    // Only restart if we introduced a non-subst term
-                    if egraph.find(id) != egraph.find(id2) {
-                        egraph.union(id, id2);
-                        if DEBUG { println!("redo2"); }
-                        return canonicalize_all_substs(egraph);
-                    }
-                } else {
-                    // println!("Custom modify fail");
-                }
-            }
-        }
-    }
-}
-
-fn compute_substs<'a, const N: usize>(
-    egraph: &mut EGraph<CF, SynthAnalysis>,
-    ids: &[Id; N],
-    mapping: [Id; 3],
-    cache: &mut HashMap<(Id, [Id; 3]), Option<CF>>,
-    depth: usize,
-) -> Option<[Id; N]> {
-    let mut v = vec![];
-    if DEBUG {
-        for ii in 0..depth { print!(" "); }
-        println!("{} children", N);
-    }
-    for id in ids {
-        if let Some(e_substed) = compute_subst(egraph, *id, mapping.clone(), cache, depth) {
-            v.push(e_substed);
-        } else {
-            return None;
-        }
-    }
-    let mut ids_substed = ids.clone();
-    for (i, n) in enumerate(v.into_iter()) {
-        ids_substed[i] = egraph.add(n);
-    }
-    Some(ids_substed)
-}
-
-fn compute_subst(
-    egraph: &mut EGraph<CF, SynthAnalysis>,
-    id: Id,
-    mapping: [Id; 3],
-    cache: &mut HashMap<(Id, [Id; 3]), Option<CF>>,
-    depth: usize,
-) -> Option<CF> {
-    if DEBUG {
-        for ii in 0..depth { print!(" "); }
-        println!("cs");
-        let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
-        let (_, idex) = extractor.find_best(id);
-        for ii in 0..depth { print!(" "); }
-        println!("id: {} {}", id, idex);
-    }
-
-    // If something is a scalar, then substitution doesn't change it
-    for n in egraph[id].nodes.clone() {
-        if matches!(n, CF::Scalar(_) | CF::Lit(_)) {
-            return Some(n);
-        }
-    }
-
-    if cache.contains_key(&(id, mapping)) {
-        if DEBUG {     
-            for ii in 0..depth { print!(" "); }
-            println!("cached {:?}", cache[&(id, mapping)]);
-        }
-        return cache[&(id, mapping)].clone();
-    }
-    // We will replace this if we can successfully subst, but this just prevents
-    // infinite cycles.
-    cache.insert((id, mapping), None);
-
-    // If it's a non-scalar var
-    for n in egraph[id].nodes.clone() {
-        if matches!(n, CF::Var(_)) {
-            cache.insert((id, mapping), Some(CF::Subst([mapping[0], mapping[1], mapping[2], id])));
-            return cache[&(id, mapping)].clone();
-        }
-    }
-
-    for n in egraph[id].nodes.clone() {
-        if DEBUG {
-            for ii in 0..depth { print!(" "); }
-            println!("anticipate node: {}", n.to_string());
-        }
-
-    }
-    for n in egraph[id].nodes.clone() {
-        if DEBUG { 
-            for ii in 0..depth { print!(" "); }
-            println!("node: {}", n.to_string());
-        }
-        match n {
-            CF::Subst([x2, y2, z2, e]) => {
-                if let Some([x3, y3, z3]) = compute_substs(egraph, &[x2, y2, z2], mapping.clone(), cache, depth + 1) {
-                    if let Some(e_double_substed) = compute_subst(egraph, e, [x3, y3, z3], cache, depth + 1) {
-                        // println!("did double!");
-                        cache.insert((id, mapping), Some(e_double_substed));
-                        return cache[&(id, mapping)].clone();
-                    } else {
-
-                        if DEBUG {
-                            
-                            for ii in 0..depth { print!(" "); }
-                            let extractor = Extractor::new(&egraph, SzalinskiCostFunction);
-                            let (_, eex) = extractor.find_best(e);
-                            let (_, mxex) = extractor.find_best(mapping[0]);
-                            let (_, myex) = extractor.find_best(mapping[1]);
-                            let (_, mzex) = extractor.find_best(mapping[2]);
-                            let (_, x2ex) = extractor.find_best(x2);
-                            let (_, y2ex) = extractor.find_best(y2);
-                            let (_, z2ex) = extractor.find_best(z2);
-                            let (_, x3ex) = extractor.find_best(x3);
-                            let (_, y3ex) = extractor.find_best(y3);
-                            let (_, z3ex) = extractor.find_best(z3);
-                            println!("mapping: {} {} {}", mxex, myex, mzex);
-                            println!("xyz2   : {} {} {}", x2ex, y2ex, z2ex);
-                            println!("xyz3   : {} {} {}", x3ex, y3ex, z3ex);
-                            println!("e: {}", eex);
-                        }
-                        
-                        panic!("should have been able to lower!");
-
-
-
-                        // // We couldn't compute through everything, at least combine the substs
-                        // cache.insert((id, mapping), Some(CF::Subst([x3, y3, z3, e])));
-                        // return cache[&(id, mapping)].clone();
-                    }
-                }
-            }
-            CF::Min(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
-                    cache.insert((id, mapping), Some(CF::Min(ids_substed)));
-                    return cache[&(id, mapping)].clone();
-                }
-            }
-            CF::Max(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
-                    cache.insert((id, mapping), Some(CF::Max(ids_substed)));
-                    return cache[&(id, mapping)].clone();
-                }
-            }
-            CF::Div(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
-                    cache.insert((id, mapping), Some(CF::Div(ids_substed)));
-                    return cache[&(id, mapping)].clone();
-                }
-            }
-            CF::Mul(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
-                    cache.insert((id, mapping), Some(CF::Mul(ids_substed)));
-                    return cache[&(id, mapping)].clone();
-                }
-            }
-            CF::Sub(ids) => {
-                if let Some(ids_substed) = compute_substs(egraph, &ids, mapping.clone(), cache, depth + 1) {
-                    cache.insert((id, mapping), Some(CF::Sub(ids_substed)));
-                    return cache[&(id, mapping)].clone();
-                }
-            }
-            CF::DimX | CF::DimY | CF::DimZ => {
-                let i = to_idx(n);
-                cache.insert((id, mapping), Some(egraph[mapping[i]].nodes[0].clone()));
-                return cache[&(id, mapping)].clone();
-            }
-            CF::Lit(i) => {
-                cache.insert((id, mapping), Some(n));
-                return cache[&(id, mapping)].clone();
-            }
-            CF::Scalar(_) => {
-                return Some(n);
-            }
-            _ => {},
-        }
-    }
-    cache.insert((id, mapping), None);
-    return cache[&(id, mapping)].clone();
-}
 
 impl SynthLanguage for CF {
     type Constant = Constant;
@@ -664,7 +260,7 @@ fn timekeep(msg: String) {
 }
 
 fn paste_print(rs: &Ruleset<CF>) {
-    println!("\n\npaste these vvv\n\n");
+    println!("\npaste these vvv\n");
     let mut i = 1;
 
     fn fix(s: String) -> String {
@@ -698,9 +294,9 @@ impl CF {
 
         timekeep("allow_forbid_actual done".into());
         
-        candidates.pretty_print();
+        // candidates.pretty_print();
 
-        paste_print(&candidates);
+        // paste_print(&candidates);
 
         timekeep("starting minimize".into());
 
@@ -733,13 +329,13 @@ fn time() -> String {
         .unwrap()
         .as_secs()
         - 1680159600;
-    let days = t / (60 * 60 * 24);
+    let days = t / (60 * 60 * 24) - 1;
     t %= 60 * 60 * 24;
     let hours = t / (60 * 60);
     t %= 60 * 60;
     let minutes = t / 60;
     t %= 60;
-    format!("{}d {}:{:02}:{:02}", days, hours, minutes, t)
+    format!("4-{} {}:{:02}:{:02}", days, hours, minutes, t)
 }
 
 #[cfg(test)]
@@ -749,20 +345,8 @@ mod tests {
 
     use super::*;
 
-    fn iter_szalinski(n: usize) -> Workload {
-        let lang = Workload::new([
-            // "var",
-            // "(bop solid solid)",
-            // "(Scale scalar scalar scalar solid)",
-            // "(Cube scalar scalar scalar)",
-            // "(Sphere scalar)",
-            // "(Cylinder scalar scalar scalar)",
-            // "(Cube scalar scalar scalar)", "(Scale scalar scalar scalar (Cube 1 1 1))",
-            
-
-            // "(Union (Inter a b) a)", "a",
-            // "(Inter (Union a b) a)", "a",
-
+    fn iter_szalinski_overfit() -> Workload {
+        let w = Workload::new([
             "(Scale (Vec3 sa sb sc) (Cube (Vec3 1 1 1) false))", "(Cube (Vec3 sa sb sc) false)",
             "(Scale (Vec3 sa sa sa) (Sphere 1 ?params))",  "(Sphere sa ?params)",
             "(Scale (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (* ta sa) (* tb sb) (* tc sc)) (Scale (Vec3 sa sb sc) a))",
@@ -772,18 +356,55 @@ mod tests {
             "(Scale (Vec3 sa sb sc) (Scale (Vec3 ta tb tc) a))", "(Scale (Vec3 (* sa ta) (* sb tb) (* sc tc)) a)",
             "(Trans (Vec3 sa sb sc) (Trans (Vec3 ta tb tc) a))", "(Trans (Vec3 (+ sa ta) (+ sb tb) (+ sc tc)) a)",
             "(Cylinder (Vec3 h r r) params true)", "(Scale (Vec3 r r h) (Cylinder (Vec3 1 1 1) params true))",
-
+            // "(Union (Inter a b) a)", "a",
+            // "(Inter (Union a b) a)", "a",
         ]);
-        let scalars: &[&str] = &["sa", "sb", "sc", "1"];
-        let vars: &[&str] = &["a", "b", "c"];
-        let bops: &[&str] = &["Union", "Inter"];
 
+        let mut data = w
+            .force()
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join("\n");
+        data = format!("{}\n{}\n", time(), data);
+        fs::write("wl.txt", data).expect("Unable to write file");
+        w
+    }
+    
+    fn iter_szalinski(n: usize) -> Workload {
+        let lang = Workload::new([
+            "(transformation v3 shape)",
+            "(Cube v3 false)",
+            "(Cylinder v3 params true)",
+            "(Sphere scalar params)",
+        ]);
+        let scalars: &[&str] = &["a", "b", "c", "1", "0"];
+        let transformations: &[&str] = &["Scale", "Trans"];
+        let v3s: &[&str] = &["(Vec3 scalar scalar scalar)"];
         let w = lang
-            .iter_metric("solid", Metric::Atoms, n)
-            // .filter(Filter::Contains("var".parse().unwrap()))
-            .plug("scalar", &scalars.into())
-            .plug("var", &vars.into())
-            .plug("bop", &bops.into());
+            .iter_metric("shape", Metric::Depth, n)
+            .plug("v3", &v3s.into())
+            .plug("transformation", &transformations.into())
+            .plug("scalar", &scalars.into());
+
+
+        let lang = Workload::new([
+            "(transformation v3 shape)",
+            // "(Cube v3 false)",
+            // "(Cylinder v3 params true)",
+            // "(Sphere scalar params)",
+            "s",
+        ]);
+        let scalars: &[&str] = &["sa", "1"];
+        let transformations: &[&str] = &["Scale", "Trans"];
+        let v3s: &[&str] = &["(Vec3 0 0 0)", "(Vec3 1 1 1)", "(Vec3 a a a)", "(Vec3 a b c)"];
+        let w = lang
+            .iter_metric("shape", Metric::Depth, n)
+            .plug("v3", &v3s.into())
+            .plug("transformation", &transformations.into())
+            .plug("scalar", &scalars.into());
+
+
 
         let mut data = w
             .force()
@@ -806,7 +427,7 @@ mod tests {
         // assert_eq!(atoms3.force().len(), 51);
 
         let limits = Limits {
-            iter: 3,
+            iter: 6,
             node: 10000000,
         };
 
@@ -839,13 +460,34 @@ mod tests {
         let mut all_rules = Ruleset::default();
         all_rules.extend(Ruleset::new(&frep_rules));
         
-        let atoms3 = iter_szalinski(20);
+        let atoms3 = iter_szalinski(3);
 
         let rules3 = CF::run_workload(
             atoms3,
             all_rules.clone(),
             Limits {
-                iter: 6,
+                iter: 3,
+                node: 10000000000,
+            },
+        );
+        all_rules.extend(rules3);
+    }
+
+
+    #[test]
+    fn rule_lifting_overfit() {
+        let frep_rules = get_frep_rules();
+
+        let mut all_rules = Ruleset::default();
+        all_rules.extend(Ruleset::new(&frep_rules));
+        
+        let atoms3 = iter_szalinski_overfit();
+
+        let rules3 = CF::run_workload(
+            atoms3,
+            all_rules.clone(),
+            Limits {
+                iter: 5,
                 node: 10000000000,
             },
         );
