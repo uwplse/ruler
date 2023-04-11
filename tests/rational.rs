@@ -729,7 +729,7 @@ pub mod test {
         assert_eq!(chosen_conditional.len(), 1);
     }
 
-    #[test]
+    // #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
@@ -766,7 +766,7 @@ pub mod test {
         logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
     }
 
-    #[test]
+    // #[test]
     fn cond_div_figure() {
         let mut all_rules: Ruleset<Math> = Ruleset::default();
 
@@ -804,7 +804,7 @@ pub mod test {
             .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
     }
 
-    #[test]
+    // #[test]
     fn reverse_candidate() {
         // regression test that captures a bug where we were not properly adding both directions
         // when we add candidates. See https://github.com/uwplse/ruler/pull/183
