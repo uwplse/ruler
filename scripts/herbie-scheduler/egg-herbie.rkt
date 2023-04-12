@@ -261,12 +261,7 @@
            (define output* (desugar-program output sugar-ctx #:full #f))
            (when (andmap (curry set-member? (*needed-reprs*))
                          (append (reprs-in-expr input*) (reprs-in-expr output*)))
-             (cond 
-               [(and (symbol? input*) (equal? otype 'real))
-                (define input** (desugar-program (list '+ input* 0) sugar-ctx #:full #f))
-                (sow (rule name* input** output* itypes* otype*))]
-               [else
-                (sow (rule name* input* output* itypes* otype*))])))))]))
+             (sow (rule name* input* output* itypes* otype*))))))]))
 
 (module+ test
   ;; Make sure all built-in rules are valid in some
@@ -308,7 +303,8 @@
    [0 "saturated"]
    [1 "iter limit"]
    [2 "node limit"]
-   [3 "unsound"]
+   [3 "time limit"]
+   [4 "unsound"]
    [sr (error 'egraph-stop-reason "unexpected stop reason ~a" sr)]))
 
 (define (make-raw-string s)
@@ -441,18 +437,6 @@
       #f
       expanded))
 
-(define (vars-in-expr expr)
-  (define vars (mutable-set))
-  (let loop ([expr expr])
-    (match expr
-      [(list op args ...)
-       (for-each loop args)]
-      [(? symbol?)
-       (set-add! vars expr)]
-      [else
-       (void)]))
-  (set->list vars))
-
 ;; result function is a function that takes the ids of the nodes
 (define (egraph-add-expr eg-data expr)
   (define egg-expr (~a (expr->egg-expr expr eg-data)))
@@ -489,6 +473,16 @@
 ;; (rules, reprs) -> (egg-rules, ffi-rules, name-map)
 (define ffi-rules-cache #f)
 
+(define (free-ffi-cache)
+  (when ffi-rules-cache
+    (match-define (list _ ffi-rules _) (cdr ffi-rules-cache))
+    (free-ffi-rules ffi-rules)))
+
+(register-reset
+  (λ ()
+    (free-ffi-cache)
+    (set! ffi-rules-cache #f)))
+
 ;; Tries to look up the canonical name of a rule using the cache.
 ;; Obviously dangerous if the cache is invalid.
 (define (get-canon-rule-name name [failure #f])
@@ -506,9 +500,7 @@
   (define key (cons rules (*needed-reprs*)))
   (unless (and ffi-rules-cache (equal? (car ffi-rules-cache) key))
     ; free any rules in the cache
-    (when ffi-rules-cache
-      (match-define (list _ ffi-rules _) (cdr ffi-rules-cache))
-      (free-ffi-rules ffi-rules))
+    (free-ffi-cache)
     ; instantiate rules
     (define-values (egg-rules canon-names)
       (for/fold ([rules* '()] [canon-names (hash)] #:result (values (reverse rules*) canon-names))

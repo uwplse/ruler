@@ -75,7 +75,7 @@ function do_branch {
     git checkout 5a1accbc5ebcb1311f85421a3c6dd73e4f8575be
   fi
 
-  # cp "$MYDIR/new-config.rkt" "$HERBIE_DIR/src/config.rkt"
+  cp "$MYDIR/new-config.rkt" "$HERBIE_DIR/src/config.rkt"
   # cp "$MYDIR/lib.rs" "$HERBIE_DIR/egg-herbie/src/lib.rs"
 
   # Patch ruler-autogen rule branches
@@ -93,7 +93,6 @@ function do_branch {
       echo "" >> "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
 
-    cp "$MYDIR/egg-herbie-expansive.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
     cat "$MYDIR/expansive.patch" >> "$HERBIE_DIR/src/syntax/rules.rkt"
     if [[ "$name" = "enumo-only-rat" ]]; then
       sed -i 's#(ruler-manifest "exponential"#; (ruler-manifest "exponential"#g' "$HERBIE_DIR/src/syntax/rules.rkt"
@@ -105,8 +104,7 @@ function do_branch {
     cp "$MYDIR/empty-rules.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
   # Patch any other branch
   else
-    # Patch bug where rules cannot be disabled
-    cp "$MYDIR/egg-herbie.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
+    cp "$MYDIR/egg-herbie.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"ppp
     if [[ "$flags" == *"-o rules:numerics"* ]]; then
       cp "$MYDIR/no-numerics.rkt" "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
@@ -114,7 +112,7 @@ function do_branch {
 
   make install
   popd
-W
+
   flags="$flags --timeout 300"
   if [ -z "$PARALLEL_SEEDS" ]; then
     HERBIE=$HERBIE_DIR \
@@ -133,11 +131,11 @@ W
 }
 
 if [ -z "$NO_RUN" ]; then
-  # do_branch main main-t -o generate:taylor
+  do_branch main main-t -o generate:taylor
   do_branch using-ruler-nightlies enumo-t -o generate:taylor
   do_branch ruler-no-fast-forwarding ruler-no-ff-t -o generate:taylor
   do_branch using-ruler-baseline enumo-only-rat -o generate:taylor
-  # do_branch using-ruler-baseline ruler-t -o generate:taylor
+  do_branch using-ruler-baseline ruler-t -o generate:taylor
 fi
 
 # Plots

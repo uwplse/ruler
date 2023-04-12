@@ -38,9 +38,8 @@ git clone https://github.com/herbie-fp/herbie.git $BUILD_DIR ||    \
 
 pushd $BUILD_DIR
 # For patches
-git checkout "$BUILD_DIR/src/syntax/rules.rkt"
-git checkout "$BUILD_DIR/src/core/egg-herbie.rkt"
-git checkout "$BUILD_DIR/src/sandbox.rkt"
+git checkout "$BUILD_DIR/src/"
+git checkout "$BUILD_DIR/egg-herbie/src"
 # Checkout the branches
 git checkout using-ruler-baseline
 git checkout using-ruler-nightlies
