@@ -275,8 +275,20 @@ function loadBvExp() {
       from_bv4: exp.from_bv4.rules.length,
       "from_bv4 time (s)": tryRound(exp.from_bv4.time),
       derive: toPercentage(exp.derive.can, exp.derive.can + exp.derive.cannot),
-      missing: exp.derive.missing_rules.join("<br/>"),
+      missing: formatRules(exp.derive.missing_rules),
     });
   });
   document.getElementById("container").innerHTML = ConvertJsonToTable(rows);
+}
+
+function formatRules(rules) {
+  let bidir = [];
+  rules.forEach((rule, i) => {
+    let [left, right] = rule.split(" ==> ");
+    if (rules.includes(`${right} ==> ${left}`)) {
+      bidir.push(`${left} <=> ${right}`);
+      rules.splice(i, 1);
+    }
+  });
+  return bidir.join("<br/>");
 }
