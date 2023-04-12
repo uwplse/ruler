@@ -11,6 +11,9 @@ ruler::impl_bv!(32);
 #[path = "./recipes/bv4.rs"]
 pub mod bv4;
 
+#[path = "./recipes/bv32.rs"]
+mod bv32;
+
 impl Bv {
     pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
         let t = Instant::now();
@@ -42,6 +45,7 @@ impl Bv {
 pub mod test {
     use std::time::{Duration, Instant};
 
+    use crate::bv32::bv32_rules;
     use crate::bv4::bv4_rules;
 
     use ruler::{
@@ -100,6 +104,21 @@ pub mod test {
         let start = Instant::now();
         let (sound, _) = ported_bv4_rules.partition(|rule| rule.is_valid());
         (sound, start.elapsed())
+    }
+
+    #[test]
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        let start = Instant::now();
+        let rules = bv32_rules();
+        let duration = start.elapsed();
+        let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
+
+        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration);
     }
 
     #[test]
