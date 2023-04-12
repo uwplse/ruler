@@ -63,10 +63,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     );
     let nested_bops_arith = Workload::new(&["(bop e e)", "v"])
         .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
-        .plug(
-            "bop",
-            &Workload::new(&["+", "-", "*", "<", "max", "min"]),
-        )
+        .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))
         .plug("uop", &Workload::new(&["-", "!"]))
         .plug("v", &Workload::new(&["a", "b", "c"]))
         .filter(Filter::Canon(vec![
