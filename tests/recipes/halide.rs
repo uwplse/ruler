@@ -28,7 +28,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
             &["-1", "0", "1"],
             &["a", "b", "c"],
             &["-"],
-            &["+", "-", "*", "/", "min", "max"],
+            &["+", "-", "*", "min", "max"],
             &[],
         ),
         all_rules.clone(),
@@ -55,19 +55,17 @@ pub fn halide_rules() -> Ruleset<Pred> {
             &["a", "b", "c"],
             &["-", "!"],
             &[
-                "&&", "||", "^", "+", "-", "*", "/", "min", "max", "<", "<=", "==", "!=",
+                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
             ],
             &["select"],
         ),
         all_rules.clone(),
     );
-    println!("full finished.");
-    all_rules.to_file("thru_full.rules");
     let nested_bops_arith = Workload::new(&["(bop e e)", "v"])
         .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
         .plug(
             "bop",
-            &Workload::new(&["+", "-", "*", "<", "/", "max", "min"]),
+            &Workload::new(&["+", "-", "*", "<", "max", "min"]),
         )
         .plug("uop", &Workload::new(&["-", "!"]))
         .plug("v", &Workload::new(&["a", "b", "c"]))
@@ -83,13 +81,11 @@ pub fn halide_rules() -> Ruleset<Pred> {
         true,
     );
     all_rules.extend(new);
-    println!("nested_bops_arith finished.");
-
     let nested_bops_full = Workload::new(&["(bop e e)", "v"])
         .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
         .plug(
             "bop",
-            &Workload::new(&["&&", "||", "!=", "<=", "==", "<", "/", "max", "min"]),
+            &Workload::new(&["&&", "||", "!=", "<=", "==", "<", "max", "min"]),
         )
         .plug("uop", &Workload::new(&["-", "!"]))
         .plug("v", &Workload::new(&["a", "b", "c"]))
@@ -105,9 +101,5 @@ pub fn halide_rules() -> Ruleset<Pred> {
         true,
     );
     all_rules.extend(new.clone());
-    println!("nested_bops_full finished.");
-    all_rules.to_file("thru_nested_bops_full.rules");
-
-    all_rules.to_file("all_rules.rules");
     all_rules
 }

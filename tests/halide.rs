@@ -327,7 +327,7 @@ mod test {
             "oopsla halide (1 iter)",
             "halide",
             oopsla_duration,
-            true,
+            false,
         )
     }
 }

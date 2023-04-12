@@ -17,12 +17,24 @@ pub fn write_output<L: SynthLanguage>(
     derive: bool,
 ) {
     // get information about the derivability of our ruleset vs. the baseline ruleset
+    let start = Instant::now();
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
         get_derivability_results(ruleset, DeriveType::Lhs, baseline, derive);
+    let duration = start.elapsed();
+    println!("LHS: {} / {}, {} / {} in {} seconds.", 
+    forwards_lhs, baseline.clone().len(), backwards_lhs, ruleset.clone().len(), duration.as_secs_f64());
+    let start = Instant::now();
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
         get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, derive);
+    let duration = start.elapsed();
+    println!("LHS/RHS: {} / {}, {} / {} in {} seconds.", 
+    forwards_lhs_rhs, baseline.clone().len(), backwards_lhs_rhs, ruleset.clone().len(), duration.as_secs_f64());
+    let start = Instant::now();
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
         get_derivability_results(ruleset, DeriveType::AllRules, baseline, derive);
+    let duration = start.elapsed();
+    println!("ALL: {} / {}, {} / {} in {} seconds.", 
+    forwards_all, baseline.clone().len(), backwards_all, ruleset.clone().len(), duration.as_secs_f64());
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
