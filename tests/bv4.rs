@@ -26,6 +26,6 @@ pub mod test {
         let duration = start.elapsed();
         let baseline = Ruleset::<_>::from_file("baseline/bv4.rules");
 
-        logger::write_output(&rules, &baseline, "bv4", "oopsla", duration);
+        logger::write_output(&rules, &baseline, "bv4", "oopsla", duration, true);
     }
 }

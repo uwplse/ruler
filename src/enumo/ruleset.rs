@@ -448,6 +448,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                 before,
                 chosen.len()
             );
+
             let selected = self.select(step_size, &mut invalid);
             print!("Selected: ");
             selected.pretty_print();
