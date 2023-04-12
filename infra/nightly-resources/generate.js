@@ -278,6 +278,10 @@ function loadBvExp() {
       missing: formatRules(exp.derive.missing_rules),
     });
   });
+
+  // sort by increasing BV width
+  rows.sort((a, b) => a.domain.substr(2) - b.domain.substr(2));
+
   document.getElementById("container").innerHTML = ConvertJsonToTable(rows);
 }
 
