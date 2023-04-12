@@ -179,13 +179,21 @@ function tryRound(v, precision) {
 }
 
 function getFormattedHeader(baseline, columnNames) {
-  if (baseline === "oopsla") {
-    return String.raw`Domain & \enumo LOC & \# \enumo & \# \ruler & Time (s) & \enumo $\rightarrow$ \ruler & \enumo $\rightarrow$ \ruler Time (s) & \ruler $\rightarrow$ \enumo & \ruler $\rightarrow$ \enumo Time (s)\\ \cline{1-9}`;
+  let header = "";
+  let baseline_names = {
+    oopsla: String.raw`\ruler`,
+    herbie: String.raw`\herbie`,
+    halide: String.raw`\halide`,
+  };
+  if (baseline === "bv") {
+    header = String.raw`Domain & \# Generated Rules & Generation Time (s) & \# Sound BV4 Rules & Validation Time (s) & Validate $\rightarrow$ Generated`;
   } else {
-    return (
-      columnNames.join(" & ") + String.raw`\\ \cline{1-${columnNames.length}}`
-    );
+    let baseline_name = baseline_names[baseline];
+    if (baseline_name) {
+      header = String.raw`Domain & \enumo LOC & \# \enumo & \# ${baseline_names[baseline]} & \enumo $\rightarrow$ ${baseline_names[baseline]} & ${baseline_names[baseline]} $\rightarrow$ \enumo`;
+    }
   }
+  return String.raw`${header} \\ \cline{1-${header.split("&").length}}`;
 }
 
 function getCaption(baseline) {
@@ -203,18 +211,30 @@ function getCaption(baseline) {
   }
 }
 
-function generateLatex(baseline) {
-  let baselineData = getBaseline(data, baseline);
-
-  let columnNames = Object.keys(baselineData[0]);
-
-  if (baseline === "oopsla") {
-    var ignoreColumns = ["Baseline", "Minimization"];
+function onGenerateClick(version) {
+  var ignoreColumns = [];
+  if (version === "bv") {
+    let tableData = loadBvExp();
+    console.log(tableData);
+    generateLatex("bv", tableData, ["missing"]);
   } else {
-    var ignoreColumns = [];
-  }
+    let tableData = getBaseline(data, version);
 
-  var lines = [
+    ignoreColumns = [
+      "Baseline",
+      "Minimization",
+      "Time (s)",
+      "Baseline derives Enumo Time (s)",
+      "Enumo derives Baseline Time (s)",
+    ];
+
+    generateLatex(version, tableData, ignoreColumns);
+  }
+}
+
+function generateLatex(version, tableData, ignoreColumns) {
+  let columnNames = Object.keys(tableData[0]);
+  let lines = [
     String.raw`\begin{table}`,
     String.raw`\resizebox{\textwidth}{!}{%`,
     String.raw`\begin{tabular}{` +
@@ -222,21 +242,21 @@ function generateLatex(baseline) {
       "}",
   ];
 
-  lines.push(getFormattedHeader(baseline, columnNames));
+  lines.push(getFormattedHeader(version, columnNames));
 
-  baselineData.forEach((row) => {
-    lines.push(
+  tableData.forEach((row) => {
+    let line =
       Object.keys(row)
         .filter((key) => !ignoreColumns.includes(key))
         .map((key) => row[key])
-        .join(" & ") + " \\\\"
-    );
+        .join(" & ") + " \\\\";
+    lines.push(line.replaceAll("%", "\\%"));
   });
 
   lines.push(String.raw`\end{tabular}%`);
   lines.push(String.raw`}`);
-  lines = lines.concat(getCaption(baseline));
-  lines.push(String.raw`\label{table:${baseline}}`);
+  lines = lines.concat(getCaption(version));
+  lines.push(String.raw`\label{table:${version}}`);
   lines.push(String.raw`\end{table}`);
 
   let s = lines.join("\n");
@@ -281,7 +301,11 @@ function loadBvExp() {
 
   // sort by increasing BV width
   rows.sort((a, b) => a.domain.substr(2) - b.domain.substr(2));
+  return rows;
+}
 
+function onLoadBv() {
+  let rows = loadBvExp();
   document.getElementById("container").innerHTML = ConvertJsonToTable(rows);
 }
 
