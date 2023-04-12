@@ -23,7 +23,6 @@ impl Scheduler {
             .with_node_limit(limits.node)
             .with_iter_limit(limits.iter)
             .with_time_limit(Duration::from_secs(600))
-            .with_hook(L::hook)
             .with_egraph(egraph)
     }
 
