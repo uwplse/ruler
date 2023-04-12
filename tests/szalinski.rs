@@ -422,31 +422,37 @@ mod tests {
         w
     }
 
-    // Simple attempt to use iter_szalinski. Status: too slow, not sure if it works
+    // Simple attempt to use iter_szalinski.
     #[test]
     fn rule_lifting() {
-        let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());
-        
         let mut learned_rules = Ruleset::default();
+        let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());
 
-        for i in 2..3 {
+        for i in 2..5 {
             println!("MAX DEPTH OF {}", i);
 
             let atoms = iter_szalinski(i);
-            let rules = CF::run_workload(
-                atoms,
-                all_rules.clone(),
-                Limits {
-                    iter: 5,
-                    node: 10000000000,
-                },
-            );
-            all_rules.extend(rules.clone());
+            let t = Instant::now();
 
-            learned_rules.extend(rules);
+            let limits = Limits {iter: 4, node: 10_000_000};
+
+            let egraph = atoms.to_egraph::<CF>();
+            
+            timekeep("starting allow_forbid_actual".into());
+            let mut candidates = Ruleset::allow_forbid_actual(egraph, all_rules.clone(), limits);
+
+            timekeep("allow_forbid_actual done".into());
+            candidates.pretty_print();
+
+            timekeep("starting minimize".into());
+            let chosen = candidates.minimize(all_rules.clone(), Scheduler::Compress(limits));
+
+            timekeep("minimize done".into());
+            println!();
+            all_rules.extend(chosen.clone());
+            learned_rules.extend(chosen);
             learned_rules.pretty_print();
             paste_print(&learned_rules);  
-
         }
     }
 
