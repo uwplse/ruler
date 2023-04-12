@@ -33,6 +33,9 @@ function getBaseline(data, baseline) {
     Object.keys(keys).forEach((key) => {
       newRow[keys[key]] = tryRound(row[key]);
     });
+
+    convertDerivabilityToPercentages(newRow);
+
     consolidateColumns(newRow, "Enumo derives Baseline (LHS, LHS/RHS, All)", [
       "E derives B (LHS)",
       "E derives B (LHSRHS)",
@@ -56,6 +59,22 @@ function getBaseline(data, baseline) {
     newData.push(newRow);
   });
   return newData;
+}
+
+function convertDerivabilityToPercentages(row) {
+  let derive_types = ["LHS", "LHSRHS", "ALL"];
+  derive_types.forEach((dt) => {
+    row[`E derives B (${dt})`] = toPercentage(
+      row[`E derives B (${dt})`],
+      row["# Baseline"],
+      1
+    );
+    row[`B derives E (${dt})`] = toPercentage(
+      row[`B derives E (${dt})`],
+      row["# Enumo"],
+      1
+    );
+  });
 }
 
 function load() {
@@ -147,12 +166,12 @@ function loadDeriveDetail() {
   });
 }
 
-function tryRound(v) {
+function tryRound(v, precision) {
   if (typeof v == "number") {
     if (v % 1 == 0) {
       return v;
     } else {
-      return v.toFixed(2);
+      return v.toFixed(precision || 2);
     }
   } else {
     return v;
@@ -235,8 +254,12 @@ function consolidateColumns(dataObj, consolidatedName, columnNames) {
   dataObj[consolidatedName] = values.join(", ");
 }
 
-function toPercentage(v, b) {
-  return (tryRound(v / b) * 100).toFixed(0).toString() + "%";
+function toPercentage(n, d, decimals) {
+  return (
+    (tryRound(n / d, decimals + 2 || 2) * 100)
+      .toFixed(decimals || 0)
+      .toString() + "%"
+  );
 }
 
 function loadBvExp() {
