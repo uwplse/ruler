@@ -1,6 +1,6 @@
 use super::*;
 use ruler::{
-    enumo::{Ruleset, Workload},
+    enumo::{Filter, Ruleset, Workload},
     recipe_utils::{iter_metric, run_workload},
 };
 
@@ -53,6 +53,37 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let layer3 = iter_metric(lang, "expr", enumo::Metric::Depth, 3);
     let layer3_rules = run_workload(layer3, rules.clone(), limits, false);
     rules.extend(layer3_rules);
+
+    // Contains var filter
+    let contains_var_filter = Filter::Or(vec![
+        Filter::Contains("a".parse().unwrap()),
+        Filter::Contains("b".parse().unwrap()),
+        Filter::Contains("c".parse().unwrap()),
+    ]);
+
+    // Safe filter
+    let safe_filter = Filter::Invert(Box::new(Filter::Contains("(/ ?x 0)".parse().unwrap())));
+
+    // Contains abs filter
+    let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
+
+    let vars = Workload::new(["a", "b", "c"]);
+    let consts = Workload::new(["-1", "0", "1", "2"]);
+
+    // Nested fabs
+    println!("nested fabs");
+    let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
+        .plug("uop", &Workload::new(&["~", "fabs"]))
+        .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
+    let layer1 = op_layer.clone().plug("expr", &vars.append(consts));
+    let layer2 = op_layer
+        .plug("expr", &layer1)
+        .filter(safe_filter.clone())
+        .filter(contains_var_filter.clone())
+        .filter(contains_abs_filter);
+    let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
+    let nested_abs_rules = Math::run_workload_conditional(nested_abs, rules.clone(), limits, true);
+    rules.extend(nested_abs_rules);
 
     // Factorization
     println!("factorization");
