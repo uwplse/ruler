@@ -116,12 +116,16 @@ pub fn get_derivability_results<L: SynthLanguage>(
     derive: bool,
 ) -> ((usize, usize), (Duration, Duration), Value) {
     if !derive {
-        ((0, 0), (Duration::default(), Duration::default()), json!({
-            "enumo_derives_baseline_derivable": vec![""],
-            "enumo_derives_baseline_underivable": vec![""],
-            "baseline_derives_enumo_derivable": vec![""],
-            "baseline_derives_enumo_underivable": vec![""],
-        }))
+        (
+            (0, 0),
+            (Duration::default(), Duration::default()),
+            json!({
+                "enumo_derives_baseline_derivable": vec![""],
+                "enumo_derives_baseline_underivable": vec![""],
+                "baseline_derives_enumo_derivable": vec![""],
+                "baseline_derives_enumo_underivable": vec![""],
+            }),
+        )
     } else {
         let limits = if let DeriveType::AllRules = derive_type {
             Limits {
@@ -131,21 +135,21 @@ pub fn get_derivability_results<L: SynthLanguage>(
         } else {
             Limits::deriving()
         };
-    
+
         let start_f = Instant::now();
         let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, limits);
         let time_f = start_f.elapsed();
         let start_b = Instant::now();
         let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
         let time_b = start_b.elapsed();
-    
+
         let derivability_results = json!({
             "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
             "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
             "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
             "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
         });
-    
+
         (
             (can_f.len(), can_b.len()),
             (time_f, time_b),
