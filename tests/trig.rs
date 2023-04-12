@@ -1,7 +1,7 @@
 use num::rational::Ratio;
 use num::BigInt;
 use num::{Signed, Zero};
-use ruler::enumo::{Ruleset, Scheduler, Workload};
+use ruler::enumo::Ruleset;
 use ruler::*;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -312,37 +312,13 @@ impl SynthLanguage for Trig {
     }
 }
 
-impl Trig {
-    pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let num_prior = prior.len();
-        let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
-
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::trig::trig_rules;
     use ruler::{
         enumo::{Ruleset, Workload},
+        recipe_utils::run_rule_lifting,
         Limits,
     };
 
@@ -384,17 +360,7 @@ mod test {
         let rules = trig_rules();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &rules,
-            &herbie,
-            "trig",
-            "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
+        logger::write_output(&rules, &herbie, "trig", "herbie", duration);
     }
 
     #[test]
@@ -421,7 +387,7 @@ mod test {
         let mut all = complex;
         all.extend(prior_rules());
 
-        let rules = Trig::run_workload(terms, all, limits);
+        let rules = run_rule_lifting(terms, all, limits);
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);

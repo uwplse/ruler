@@ -1,14 +1,8 @@
-use std::time::Instant;
-
-use num::{BigInt, ToPrimitive, Zero};
-use num_bigint::ToBigInt;
-use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
-    *,
-};
+use num::{ToPrimitive, Zero};
+use ruler::*;
 use z3::ast::Ast;
 
-type Constant = BigInt;
+type Constant = i64;
 
 egg::define_language! {
   pub enum Pred {
@@ -41,8 +35,8 @@ impl SynthLanguage for Pred {
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
-        let one = 1.to_bigint().unwrap();
-        let zero = 0.to_bigint().unwrap();
+        let one = 1.to_i64().unwrap();
+        let zero = 0.to_i64().unwrap();
         match self {
             Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
             Pred::Lt([x, y]) => {
@@ -89,14 +83,14 @@ impl SynthLanguage for Pred {
                     if xbool ^ ybool { Some(one.clone()) } else { Some(zero.clone()) }
                 })
             }
-            Pred::Add([x, y]) => map!(get_cvec, x, y => Some(x + y)),
-            Pred::Sub([x, y]) => map!(get_cvec, x, y => Some(x - y)),
-            Pred::Mul([x, y]) => map!(get_cvec, x, y => Some(x * y)),
+            Pred::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(*y)),
+            Pred::Sub([x, y]) => map!(get_cvec, x, y => x.checked_sub(*y)),
+            Pred::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(*y)),
             Pred::Div([x, y]) => map!(get_cvec, x, y => {
               if y.is_zero() {
                 Some(zero.clone())
               } else {
-                Some(x / y)
+                x.checked_div(*y)
               }
             }),
             Pred::Min([x, y]) => map!(get_cvec, x, y => Some(x.min(y).clone())),
@@ -111,13 +105,13 @@ impl SynthLanguage for Pred {
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let consts = vec![
-            Some((-10).to_bigint().unwrap()),
-            Some((-1).to_bigint().unwrap()),
-            Some(0.to_bigint().unwrap()),
-            Some(1.to_bigint().unwrap()),
-            Some(2.to_bigint().unwrap()),
-            Some(5.to_bigint().unwrap()),
-            Some(100.to_bigint().unwrap()),
+            Some((-10).to_i64().unwrap()),
+            Some((-1).to_i64().unwrap()),
+            Some(0.to_i64().unwrap()),
+            Some(1.to_i64().unwrap()),
+            Some(2.to_i64().unwrap()),
+            Some(5.to_i64().unwrap()),
+            Some(100.to_i64().unwrap()),
         ];
         let cvecs = self_product(&consts, vars.len());
 
@@ -287,33 +281,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
     buf.pop().unwrap()
 }
 
-impl Pred {
-    fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-
-        let mut candidates = Ruleset::fast_cvec_match(&compressed);
-
-        let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
-    }
-}
-
 #[cfg(test)]
 #[path = "./recipes/halide.rs"]
 mod halide;
@@ -323,7 +290,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{enumo::Ruleset, logger, Limits};
+    use ruler::{enumo::Ruleset, logger};
 
     #[test]
     fn run() {
@@ -337,24 +304,21 @@ mod test {
         let all_rules = halide_rules();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &all_rules,
-            &baseline,
-            "halide",
-            "halide",
-            Limits {
-                iter: 2,
-                node: 200000,
-            },
-            duration,
-        );
+        logger::write_output(&all_rules, &baseline, "halide", "halide", duration);
 
         // oopsla-halide-baseline branch
-        // Run on leviathan 3/31/2023
+        // Run on leviathan 4/4/2023
         // time cargo run --release --bin halide -- synth --iters 1 --use-smt
-        // real	0m3.354s
-        // user	0m3.274s
-        // sys	0m0.076s
+        // real	0m6.829s
+        // user	0m19.784s
+        // sys	0m0.595s
+
+        // With only Add, Sub, Mul, Div, Neg nodes added in make_layer
+        // time cargo run --release --bin halide -- synth --iters 2 --use-smt
+        // real	0m53.816s
+        // user	1m6.082s
+        // sys	0m1.259s
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);
 
@@ -363,10 +327,6 @@ mod test {
             &baseline,
             "oopsla halide (1 iter)",
             "halide",
-            Limits {
-                iter: 2,
-                node: 200000,
-            },
             oopsla_duration,
         )
     }

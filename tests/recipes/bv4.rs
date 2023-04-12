@@ -1,37 +1,44 @@
-use super::*;
-use ruler::enumo::{Filter, Metric, Ruleset, Workload};
+use ruler::{
+    enumo::{Filter, Ruleset, Workload},
+    recipe_utils::{iter_metric, recursive_rules, run_workload, Lang},
+};
+
+ruler::impl_bv!(4);
 
 pub fn bv4_rules() -> Ruleset<Bv> {
-    let mut all_rules = Ruleset::default();
-    let initial_vals = Workload::new(["a", "b", "c"]);
-    let uops = Workload::new(["~", "-"]);
-    let bops = Workload::new(["&", "|", "*", "--", "+", "<<", ">>"]);
-
-    let layer_1 = Workload::make_layer(initial_vals.clone(), uops.clone(), bops.clone())
-        .filter(Filter::MetricLt(Metric::Lists, 2));
-    let terms_1 = layer_1.clone().append(initial_vals.clone());
-    let rules_1 = Bv::run_workload(
-        terms_1.clone(),
-        all_rules.clone(),
-        Limits {
-            iter: 2,
-            node: 300000,
-        },
+    let mut rules: Ruleset<Bv> = Ruleset::default();
+    let lang = Lang::new(
+        &["0", "1"],
+        &["a", "b", "c"],
+        &["~", "-"],
+        &["&", "|", "*", "--", "+", "<<", ">>"],
+        &[],
     );
-    all_rules.extend(rules_1.clone());
+    rules.extend(recursive_rules(
+        enumo::Metric::Atoms,
+        5,
+        lang.clone(),
+        Ruleset::default(),
+    ));
 
-    let layer_2 = Workload::make_layer(layer_1.clone(), uops.clone(), bops.clone())
-        .filter(Filter::MetricLt(Metric::Lists, 3))
-        .filter(Filter::Invert(Box::new(Filter::MetricLt(Metric::Lists, 1))));
-    let terms_2 = layer_2.clone().append(terms_1.clone());
-    let rules_2 = Bv::run_workload(
-        terms_2.clone(),
-        all_rules.clone(),
-        Limits {
-            iter: 2,
-            node: 300000,
-        },
-    );
-    all_rules.extend(rules_2.clone());
-    all_rules
+    let base_lang = Workload::new(["VAR", "CONST", "(UOP EXPR)", "(BOP EXPR EXPR)"]);
+
+    let a6_canon = iter_metric(base_lang, "EXPR", enumo::Metric::Atoms, 6)
+        .plug("VAR", &Workload::new(lang.vars))
+        .plug("CONST", &Workload::empty())
+        .plug("UOP", &Workload::new(lang.uops))
+        .plug("BOP", &Workload::new(lang.bops))
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ]));
+
+    rules.extend(run_workload(
+        a6_canon,
+        rules.clone(),
+        Limits::rulefinding(),
+        true,
+    ));
+    rules
 }

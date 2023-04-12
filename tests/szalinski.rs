@@ -1,8 +1,8 @@
 // Learn Szalinski rules by lowering to FRep
 // Status: frozen. Develop on szalinski-dev.rs instead.
-
 use ruler::{
     enumo::{Metric, Ruleset},
+    recipe_utils::iter_metric,
     *,
 };
 use std::hash::Hash;
@@ -250,7 +250,7 @@ mod tests {
             "(Vec3 d e f)",
             "(Vec3 (bop a d) (bop b e) (bop c f))",
         ];
-        lang.iter_metric("shape", Metric::Depth, n)
+        iter_metric(lang, "shape", Metric::Depth, n)
             .plug("v3", &v3s.into())
             .plug("transformation", &transformations.into())
             .plug("scalar", &scalars.into())
@@ -270,7 +270,7 @@ mod tests {
             let atoms = iter_szalinski(i);
             let egraph = atoms.to_egraph::<CF>();
             let mut candidates = Ruleset::allow_forbid_actual(egraph, all_rules.clone(), limits);
-            let chosen = candidates.minimize(all_rules.clone(), Scheduler::Compress(limits));
+            let (chosen, _) = candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
 
             all_rules.extend(chosen.clone());
             learned_rules.extend(chosen);

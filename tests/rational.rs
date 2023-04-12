@@ -1,11 +1,13 @@
-use egg::Rewrite;
-use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
-use num_bigint::ToBigInt;
+use egg::{AstSize, CostFunction, ENodeOrVar, Language, Rewrite};
+use num::{
+    rational::{Ratio, Rational64},
+    CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
+};
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
 };
-use std::{ops::*, time::Instant};
+use std::{cmp::max, ops::*, time::Instant};
 use symbolic_expressions::parser::parse_str;
 use symbolic_expressions::Sexp;
 use z3::ast::Ast;
@@ -15,19 +17,12 @@ pub mod rational_best;
 pub mod rational_replicate;
 
 /// define `Constant` for rationals.
-pub type Constant = Ratio<BigInt>;
+pub type Constant = Ratio<i64>;
 
-fn mk_rat(n: i64, d: i64) -> Ratio<BigInt> {
+fn mk_rat(n: i64, d: i64) -> Constant {
     if d.is_zero() {
         panic!("mk_rat: denominator is zero!");
     }
-    let n = n
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", n));
-    let d = d
-        .to_bigint()
-        .unwrap_or_else(|| panic!("could not make bigint from {}", d));
-
     Ratio::new(n, d)
 }
 
@@ -40,7 +35,6 @@ egg::define_language! {
     "~" = Neg(Id),
     "fabs" = Abs(Id),
     "if" = If([Id; 3]),
-    "zero" = Z(Id),
     Lit(Constant),
     Var(egg::Symbol),
   }
@@ -54,29 +48,33 @@ impl SynthLanguage for Math {
         F: FnMut(&'a Id) -> &'a CVec<Self>,
     {
         match self {
-            Math::Add([x, y]) => map!(get_cvec, x, y => Some(x + y)),
-            Math::Sub([x, y]) => map!(get_cvec, x, y => Some(x - y)),
-            Math::Mul([x, y]) => map!(get_cvec, x, y => Some(x * y)),
+            Math::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(y)),
+            Math::Sub([x, y]) => map!(get_cvec, x, y => x.checked_sub(y)),
+            Math::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(y)),
             Math::Div([x, y]) => map!(get_cvec, x, y => {
-              if y.is_zero() {
-                None
-              } else {
-                Some(x / y)
-              }
+                x.checked_div(y)
             }),
             Math::Neg(x) => map!(get_cvec, x => Some(-x)),
             Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
             Math::Lit(c) => vec![Some(c.clone()); cvec_len],
             Math::Var(_) => vec![],
-            Math::If([x, y, z]) => {
-                map!(get_cvec, x, y, z => Some( if x.is_zero() {z.clone()} else {y.clone()}))
-            }
-
-            Math::Z(x) => {
-                let zero = mk_rat(0, 1);
-                let one = mk_rat(1, 1);
-                map!(get_cvec, x => Some(if x.eq(&zero) {one.clone()} else {zero.clone()}))
-            }
+            Math::If([x, y, z]) => get_cvec(x)
+                .iter()
+                .zip(get_cvec(y).iter())
+                .zip(get_cvec(z).iter())
+                .map(|tup| {
+                    let ((x, y), z) = tup;
+                    if let Some(cond) = x {
+                        if !cond.is_zero() {
+                            *y
+                        } else {
+                            *z
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>(),
         }
     }
 
@@ -84,18 +82,49 @@ impl SynthLanguage for Math {
     where
         F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
     {
+        let mut get_const = |x: &'a Id| {
+            let ival = get_interval(x);
+            if ival.low == ival.high {
+                ival.low.clone()
+            } else {
+                None
+            }
+        };
         match self {
-            Math::Lit(n) => Interval::new(Some(n.clone()), Some(n.clone())),
-            Math::Var(_) => Interval::default(),
-            Math::Neg(x) => neg(get_interval(x)),
-            Math::Abs(a) => abs(get_interval(a)),
-            Math::Add([x, y]) => add(get_interval(x), get_interval(y)),
-            Math::Sub([x, y]) => add(get_interval(x), &neg(get_interval(y))),
-            Math::Mul([x, y]) => mul(get_interval(x), get_interval(y)),
-            Math::Div([x, y]) => mul(get_interval(x), &recip(get_interval(y))),
-            Math::If(_) => Interval::default(), // TODO?
-            Math::Z(_) => Interval::default(),
+            Math::Lit(n) => Some(n.clone()),
+            Math::Var(_) => None,
+            Math::Neg(x) => get_const(x).map(|c| -c),
+            Math::Abs(a) => get_const(a).map(|c| c.abs()),
+            Math::Add([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => x.checked_add(&y),
+                _ => None,
+            },
+            Math::Sub([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => x.checked_sub(&y),
+                _ => None,
+            },
+            Math::Mul([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => x.checked_mul(&y),
+                _ => None,
+            },
+            Math::Div([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => x.checked_div(&y),
+                _ => None,
+            },
+            Math::If([x, y, z]) => {
+                if let Some(x) = get_const(x) {
+                    if !x.is_zero() {
+                        get_const(y)
+                    } else {
+                        get_const(z)
+                    }
+                } else {
+                    None
+                }
+            }
         }
+        .map(|c| Interval::new(Some(c.clone()), Some(c)))
+        .unwrap_or_default()
     }
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
@@ -105,7 +134,6 @@ impl SynthLanguage for Math {
             Some(mk_rat(1, 1)),
             Some(mk_rat(2, 1)),
             Some(mk_rat(-3, 1)),
-            Some(mk_rat(1238923, 2)),
         ];
         let cvecs = self_product(&consts, vars.len());
 
@@ -136,28 +164,16 @@ impl SynthLanguage for Math {
         let solver = z3::Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        let lhs_denom = Self::all_denominators(Self::pat_to_sexp(lhs));
-        let rhs_denom = Self::all_denominators(Self::pat_to_sexp(rhs));
-        let denominators = lhs_denom.union(&rhs_denom);
 
-        let mut assert_equal = lexpr._eq(&rexpr);
-        let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
+        let assert_equal = lexpr._eq(&rexpr);
 
-        for d in denominators {
-            let expr = egg_to_z3(
-                &ctx,
-                Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
-            );
-            assert_equal = expr._eq(&zero_z3).not().implies(&assert_equal);
-        }
-
-        let rhs_errors = Self::one_of_errors(&ctx, rhs_denom);
-        let lhs_errors = Self::one_of_errors(&ctx, lhs_denom);
-        let error_preserved = rhs_errors.iff(&lhs_errors);
-        let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
-
-        solver.assert(&assertion.not());
-        Self::z3_res_to_validationresult(solver.check())
+        solver.assert(&assert_equal.not());
+        let res = Self::z3_res_to_validationresult(solver.check());
+        /*if let ValidationResult::Valid = res {
+            eprintln!("verifying {} => {}", lhs, rhs);
+        eprintln!("assertion: {}", assertion);
+        }*/
+        res
     }
 
     fn is_constant(&self) -> bool {
@@ -208,21 +224,16 @@ impl Math {
                     res.extend(Self::all_denominators(s));
                 }
             }
-            Sexp::String(atom) => (),
-            Empty => (),
+            _ => (),
         }
 
         res
     }
 
-    // currently does nothing
-    fn wrap_neqzero(sexp: Sexp) -> Sexp {
-        sexp
-    }
-
     fn add_condition(rule: Rule<Math>) -> Option<Rule<Math>> {
         let lhs_sexp = parse_str(&rule.lhs.to_string()).unwrap();
         let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
+
         let lhs_denoms = Self::all_denominators(lhs_sexp.clone());
         let rhs_denoms = Self::all_denominators(rhs_sexp.clone());
         let intersection: HashSet<String> = lhs_denoms.intersection(&rhs_denoms).cloned().collect();
@@ -238,8 +249,7 @@ impl Math {
             None
         } else {
             let mut iterator = all_denoms.iter();
-            let mut condition: Sexp =
-                Self::wrap_neqzero(parse_str(iterator.next().unwrap()).unwrap());
+            let mut condition: Sexp = parse_str(iterator.next().unwrap()).unwrap();
 
             // TODO doesn't handle multiple denominators
             if let Some(_) = iterator.next() {
@@ -249,7 +259,7 @@ impl Math {
                 condition = Sexp::List(vec![
                     Sexp::String("and".to_string()),
                     condition,
-                    Self::wrap_neqzero(parse_str(denom).unwrap()),
+                    parse_str(denom).unwrap(),
                 ]);
             }
             let rhs = Sexp::List(vec![
@@ -281,31 +291,25 @@ impl Math {
     ) -> Ruleset<Self> {
         let t = Instant::now();
 
+        println!("Compressing workload with {} prior rules", prior.len());
         let egraph = workload.to_egraph::<Self>();
         let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
 
-        let candidates = if fast_match {
+        let mut candidates = if fast_match {
             Ruleset::fast_cvec_match(&compressed)
         } else {
             Ruleset::cvec_match(&compressed)
         };
 
-        println!(
-            "Partionioning {} candidates into valid/invalid",
-            candidates.len()
-        );
-        let (mut valid, invalid) = candidates.partition(|r| r.is_valid());
+        let num_prior = prior.len();
+        let (chosen, invalid) = candidates.minimize(prior.clone(), Scheduler::Compress(limits));
+
         println!(
             "Found {} valid and {} invalid rules",
-            valid.len(),
+            chosen.len(),
             invalid.len()
         );
-
-        let num_prior = prior.len();
-        let chosen = valid.minimize(prior.clone(), Scheduler::Compress(limits));
-
         // here's the conditional stuff
-        /*
         let mut with_condition = Ruleset::<Math>(
             invalid
                 .0
@@ -325,11 +329,11 @@ impl Math {
             with_condition.len()
         );
 
-        let chosen_conditional =
-            with_condition.minimize(prior.union(&chosen), Scheduler::Compress(limits));
+        let chosen_conditional = with_condition
+            .minimize(prior.union(&chosen), Scheduler::Compress(limits))
+            .0;
 
-        let result = chosen.union(&chosen_conditional);*/
-        let result = chosen;
+        let result = chosen.union(&chosen_conditional);
 
         let time = t.elapsed().as_secs_f64();
         println!(
@@ -342,40 +346,6 @@ impl Math {
 
         result.pretty_print();
         result
-    }
-
-    fn run_workload(
-        workload: Workload,
-        prior: Ruleset<Self>,
-        limits: Limits,
-        fast_match: bool,
-    ) -> Ruleset<Self> {
-        let t = Instant::now();
-
-        let egraph = workload.to_egraph::<Self>();
-        let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
-
-        let mut candidates = if fast_match {
-            Ruleset::fast_cvec_match(&compressed)
-        } else {
-            Ruleset::cvec_match(&compressed)
-        };
-
-        let num_prior = prior.len();
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
-        let time = t.elapsed().as_secs_f64();
-
-        println!(
-            "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
-            chosen.bidir_len(),
-            chosen.len(),
-            time,
-            num_prior
-        );
-
-        chosen.pretty_print();
-
-        chosen
     }
 }
 
@@ -396,10 +366,13 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
             Math::Div([x, y]) => {
-                // Do NOT assume denominator is non-zero
-                buf.push(z3::ast::Real::div(
-                    &buf[usize::from(*x)],
-                    &buf[usize::from(*y)],
+                let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                let one = z3::ast::Real::from_real(ctx, 1, 1);
+                // Division by zero set to one
+                buf.push(z3::ast::Bool::ite(
+                    &buf[usize::from(*y)]._eq(&zero),
+                    &one,
+                    &z3::ast::Real::div(&buf[usize::from(*x)], &buf[usize::from(*y)]),
                 ))
             }
             Math::Neg(x) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*x)])),
@@ -425,16 +398,6 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                     &cond,
                     &buf[usize::from(*y)],
                     &buf[usize::from(*z)],
-                ))
-            }
-            Math::Z(x) => {
-                let l = &buf[usize::from(*x)];
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                let one = z3::ast::Real::from_real(ctx, 1, 1);
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Real::_eq(l, &zero),
-                    &one,
-                    &zero,
                 ))
             }
         }
@@ -590,16 +553,19 @@ fn recip(interval: &Interval<Constant>) -> Interval<Constant> {
 
 #[cfg(test)]
 pub mod test {
-    use std::time::Duration;
 
     use super::*;
     use crate::rational_best::best_enumo_recipe;
     use crate::rational_replicate::replicate_ruler1_recipe;
-    use ruler::enumo::{Filter, Ruleset, Workload};
+    use num::rational::Ratio;
+    use ruler::{
+        enumo::{Ruleset, Workload},
+        recipe_utils::{base_lang, iter_metric, run_workload},
+    };
 
-    fn interval(low: Option<i32>, high: Option<i32>) -> Interval<Constant> {
-        let i32_to_constant = |x: i32| Ratio::new(x.to_bigint().unwrap(), 1.to_bigint().unwrap());
-        Interval::new(low.map(i32_to_constant), high.map(i32_to_constant))
+    fn interval(low: Option<i64>, high: Option<i64>) -> Interval<Constant> {
+        let i64_to_constant = |x: i64| Ratio::new(x, 1);
+        Interval::new(low.map(i64_to_constant), high.map(i64_to_constant))
     }
 
     #[test]
@@ -732,58 +698,12 @@ pub mod test {
         assert_eq!(recip(&interval(None, None)), interval(None, None));
         assert_eq!(
             recip(&interval(Some(50), Some(100))),
-            Interval::new(
-                Some(Ratio::new(1.to_bigint().unwrap(), 100.to_bigint().unwrap())),
-                Some(Ratio::new(1.to_bigint().unwrap(), 50.to_bigint().unwrap())),
-            )
+            Interval::new(Some(Ratio::new(1, 100)), Some(Ratio::new(1, 50)),)
         );
         assert_eq!(
             recip(&interval(Some(-10), Some(-5))),
-            Interval::new(
-                Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-5).to_bigint().unwrap()
-                )),
-                Some(Ratio::new(
-                    1.to_bigint().unwrap(),
-                    (-10).to_bigint().unwrap()
-                )),
-            )
+            Interval::new(Some(Ratio::new(1, -5)), Some(Ratio::new(1, -10)),)
         );
-    }
-
-    #[test]
-    fn minimize() {
-        // This test fails if there are improperly initialized cvecs during minimize.
-        let limits = Limits {
-            iter: 4,
-            node: 1_000_000,
-        };
-
-        let prior: Ruleset<Math> = Ruleset::new([
-            "(* ?b ?a) ==> (* ?a ?b)",
-            "(- ?a ?a) ==> 0",
-            "?a ==> (+ ?a 0)",
-            "?a ==> (* ?a 1)",
-            "?a ==> (- ?a 0)",
-            "?a ==> (/ ?a 1)",
-            "(* (* ?c ?b) (/ 0 ?a)) ==> (/ 0 (fabs ?a))",
-            "(/ (- ?c ?b) (/ ?a ?a)) ==> (- (/ 0 ?a) (- ?b ?c))",
-            "(* (/ ?c ?c) (* ?b ?a)) ==> (/ (* ?b ?a) (/ ?c ?c))",
-            "(- (* ?a ?c) (* ?b ?a)) ==> (* ?a (- ?c ?b))",
-            "(/ (* ?c ?b) ?a) ==> (* ?b (/ ?c ?a))",
-            "(- ?c (- ?b ?a)) ==> (- ?a (- ?b ?c))",
-        ]);
-        let mut with_condition = Ruleset::new([
-            "(- (- ?b ?c) (- ?b ?a)) ==> (if ?c (* (/ ?c ?c) (- ?a ?c)) (- (- ?b ?c) (- ?b ?a)))",
-            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?b (* (/ ?b ?b) (- ?c ?b)) (- (- ?c ?a) (- ?b ?a)))",
-            "(- (- ?c ?a) (- ?b ?a)) ==> (if ?c (* (- ?c ?b) (/ ?c ?c)) (- (- ?c ?a) (- ?b ?a)))",
-            "(- (+ ?c ?a) (+ ?b ?a)) ==> (if ?b (* (- ?c ?b) (/ ?b ?b)) (- (+ ?c ?a) (+ ?b ?a)))",
-            "(/ (/ 0 ?b) (+ ?b ?a)) ==> (if (+ ?b ?a) (/ 0 ?b) (/ (/ 0 ?b) (+ ?b ?a)))",
-        ]);
-        let chosen_conditional = with_condition.minimize(prior, Scheduler::Compress(limits));
-
-        assert_eq!(chosen_conditional.len(), 1);
     }
 
     #[test]
@@ -805,10 +725,6 @@ pub mod test {
             &ruler1,
             "rational_replicate",
             "oopsla",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
             duration,
         );
         logger::write_output(
@@ -816,10 +732,6 @@ pub mod test {
             &herbie,
             "rational_replicate",
             "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
             duration,
         );
 
@@ -827,54 +739,28 @@ pub mod test {
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &best_rules,
-            &ruler1,
-            "rational_best",
-            "oopsla",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
-        logger::write_output(
-            &best_rules,
-            &herbie,
-            "rational_best",
-            "herbie",
-            Limits {
-                iter: 2,
-                node: 150000,
-            },
-            duration,
-        );
+        logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
+        logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
     }
 
     #[test]
     fn cond_div_figure() {
-        let lang = Workload::new(&["var", "const", "(uop expr)", "(bop expr expr)"]);
-        let uops = &Workload::new(["~", "fabs"]);
-        let bops = &Workload::new(["+", "-", "*", "/"]);
+        let mut all_rules: Ruleset<Math> = Ruleset::default();
 
-        let mut all_rules = Ruleset::default();
-
-        let starting_rules = Math::run_workload(
-            lang.clone()
-                .iter_metric("expr", enumo::Metric::Atoms, 3)
-                .plug_lang(
-                    &Workload::new(["a", "b", "c"]),
-                    &Workload::new(["-1", "0", "1"]),
-                    uops,
-                    bops,
-                ),
+        let starting_rules = run_workload(
+            iter_metric(base_lang(), "EXPR", enumo::Metric::Atoms, 3)
+                .plug("CONST", &Workload::new(["-1", "0", "1"]))
+                .plug("VAR", &Workload::new(["a", "b", "c"]))
+                .plug("UOP", &Workload::new(["~", "fabs"]))
+                .plug("BOP", &Workload::new(["+", "*", "-", "/"]))
+                .plug("TOP", &Workload::empty()),
             all_rules.clone(),
             Limits::rulefinding(),
             false,
         );
         all_rules.extend(starting_rules);
 
-        let basic_if_rules = Math::run_workload(
+        let basic_if_rules = run_workload(
             Workload::new(["(if e e e)"])
                 .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
             all_rules.clone(),
@@ -883,16 +769,30 @@ pub mod test {
         );
         all_rules.extend(basic_if_rules);
 
-        let terms = Workload::new(["(/ lit var)", "(if (zero var) (/ lit var) (op lit lit))"])
+        let terms = Workload::new(["(/ lit var)", "(if var (op lit lit) (/ lit var))"])
             .plug("lit", &Workload::new(["a", "0", "1"]))
             .plug("var", &Workload::new(["a"]))
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
         terms.to_file("guard.terms");
 
-        let guarded_rules =
-            Math::run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
+        let guarded_rules = run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
+        guarded_rules.to_file("guard.rules");
+        assert!(guarded_rules.0.contains_key("(if ?a 1 (/ 1 ?a)) ==> 1"));
         assert!(guarded_rules
             .0
-            .contains_key("(/ ?a ?a) ==> (if (zero ?a) (/ ?a ?a) 1)"));
+            .contains_key("(/ 0 ?a) ==> (if ?a 0 (/ 1 ?a))"));
+    }
+
+    // TODO write test that catches if cvecs are not initialized
+
+    #[test]
+    fn reverse_candidate() {
+        // regression test that captures a bug where we were not properly adding both directions
+        // when we add candidates. See https://github.com/uwplse/ruler/pull/183
+
+        let test = Workload::new(&["(if a b b)", "b"]);
+        let test_rules: Ruleset<Math> =
+            run_workload(test, Ruleset::default(), Limits::default(), false);
+        assert_eq!(test_rules.len(), 1);
     }
 }

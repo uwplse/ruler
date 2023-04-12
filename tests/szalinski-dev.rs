@@ -16,6 +16,7 @@ use num_bigint::ToBigInt;
 use rayon::vec;
 use ruler::{
     enumo::{Filter, Metric, Rule, Ruleset, Scheduler, Workload},
+    recipe_utils::iter_metric,
     *,
 };
 use std::collections::HashSet;
@@ -325,7 +326,7 @@ impl CF {
 
         timekeep("starting minimize".into());
 
-        let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+        let (_, chosen) = candidates.minimize(prior, Scheduler::Compress(limits));
 
         timekeep("minimize done".into());
 
@@ -413,8 +414,7 @@ mod tests {
             "(Vec3 d e f)",
             "(Vec3 (bop a d) (bop b e) (bop c f))",
         ];
-        let w = lang
-            .iter_metric("shape", Metric::Depth, n)
+        let w = iter_metric(lang, "shape", Metric::Depth, n)
             .plug("v3", &v3s.into())
             .plug("transformation", &transformations.into())
             .plug("scalar", &scalars.into())
@@ -424,7 +424,7 @@ mod tests {
     }
 
     // Simple attempt to use iter_szalinski.
-    // #[test]
+    #[test]
     fn rule_lifting() {
         let mut learned_rules = Ruleset::default();
         let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());
@@ -449,7 +449,7 @@ mod tests {
             candidates.pretty_print();
 
             timekeep("starting minimize".into());
-            let chosen = candidates.minimize(all_rules.clone(), Scheduler::Compress(limits));
+            let (chosen, _) = candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
 
             timekeep("minimize done".into());
             println!();
@@ -505,7 +505,7 @@ mod tests {
             timekeep("Candidates".into());
             candidates.pretty_print();
 
-            let chosen = candidates.minimize(
+            let (_, chosen) = candidates.minimize(
                 learned_rules.clone(),
                 Scheduler::Compress(Limits {
                     iter: 5,
@@ -572,7 +572,7 @@ mod tests {
             candidates.pretty_print();
 
             timekeep("starting minimize".into());
-            let chosen = candidates.minimize(
+            let (_, chosen) = candidates.minimize(
                 learned_rules.clone(),
                 Scheduler::Compress(Limits {
                     iter: 5,
