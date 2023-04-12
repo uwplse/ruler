@@ -345,6 +345,7 @@ impl Math {
         );
 
         result.pretty_print();
+
         result
     }
 }
@@ -371,7 +372,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 // Division by zero set to one
                 buf.push(z3::ast::Bool::ite(
                     &buf[usize::from(*y)]._eq(&zero),
-                    &one,
+                    &zero,
                     &z3::ast::Real::div(&buf[usize::from(*x)], &buf[usize::from(*y)]),
                 ))
             }
