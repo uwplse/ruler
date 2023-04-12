@@ -320,11 +320,21 @@ mod test {
         let oopsla_duration = Duration::from_secs_f32(3.354);
 
         logger::write_output(
+            &all_rules,
+            &baseline,
+            "halide",
+            "halide",
+            duration,
+            false
+        )
+
+        logger::write_output(
             &oopsla_halide,
             &baseline,
             "oopsla halide (1 iter)",
             "halide",
             oopsla_duration,
+            true
         )
     }
 }

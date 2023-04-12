@@ -14,20 +14,15 @@ pub fn write_output<L: SynthLanguage>(
     recipe_name: &str,
     baseline_name: &str,
     time_rules: Duration,
+    derive: bool,
 ) {
     // get information about the derivability of our ruleset vs. the baseline ruleset
-    let start = Instant::now();
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-        get_derivability_results(ruleset, DeriveType::Lhs, baseline);
-    let duration = start.elapsed();
-    let start = Instant::now();
+        get_derivability_results(ruleset, DeriveType::Lhs, baseline, derive);
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
-        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline);
-    let duration = start.elapsed();
-    let start = Instant::now();
+        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, derive);
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline);
-    let duration = start.elapsed();
+        get_derivability_results(ruleset, DeriveType::AllRules, baseline, derive);
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
@@ -118,33 +113,43 @@ pub fn get_derivability_results<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     derive_type: DeriveType,
     baseline: &Ruleset<L>,
+    derive: bool,
 ) -> ((usize, usize), (Duration, Duration), Value) {
-    let limits = if let DeriveType::AllRules = derive_type {
-        Limits {
-            iter: 2,
-            node: 100_000,
-        }
+    if !derive {
+        ((0, 0), (Duration::default(), Duration::default()), json!({
+            "enumo_derives_baseline_derivable": vec![""],
+            "enumo_derives_baseline_underivable": vec![""],
+            "baseline_derives_enumo_derivable": vec![""],
+            "baseline_derives_enumo_underivable": vec![""],
+        }))
     } else {
-        Limits::deriving()
-    };
-
-    let start_f = Instant::now();
-    let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, limits);
-    let time_f = start_f.elapsed();
-    let start_b = Instant::now();
-    let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
-    let time_b = start_b.elapsed();
-
-    let derivability_results = json!({
-        "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
-        "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
-        "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
-        "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
-    });
-
-    (
-        (can_f.len(), can_b.len()),
-        (time_f, time_b),
-        derivability_results,
-    )
+        let limits = if let DeriveType::AllRules = derive_type {
+            Limits {
+                iter: 2,
+                node: 100_000,
+            }
+        } else {
+            Limits::deriving()
+        };
+    
+        let start_f = Instant::now();
+        let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, limits);
+        let time_f = start_f.elapsed();
+        let start_b = Instant::now();
+        let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
+        let time_b = start_b.elapsed();
+    
+        let derivability_results = json!({
+            "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
+            "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
+            "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
+            "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
+        });
+    
+        (
+            (can_f.len(), can_b.len()),
+            (time_f, time_b),
+            derivability_results,
+        )
+    }
 }

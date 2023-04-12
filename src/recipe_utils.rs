@@ -16,6 +16,15 @@ pub fn iter_metric(wkld: Workload, atom: &str, met: Metric, n: usize) -> Workloa
     pegs
 }
 
+pub fn substitute(workload: Workload, sub: Workload, atom: &str) -> Workload {
+    let mut pegs = Workload::Set(vec![]);
+    let substitutions = sub.force();
+    for sub in substitutions {
+        pegs = pegs.append(workload.clone().plug(atom, &Workload::Set(vec![sub])));
+    }
+    pegs
+}
+
 pub fn run_workload<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
@@ -34,7 +43,7 @@ pub fn run_workload<L: SynthLanguage>(
     };
 
     let num_prior = prior.len();
-    let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(limits));
     let time = t.elapsed().as_secs_f64();
 
     println!(
@@ -45,7 +54,7 @@ pub fn run_workload<L: SynthLanguage>(
         num_prior
     );
 
-    chosen.pretty_print();
+    // chosen.pretty_print();
 
     chosen
 }
@@ -61,7 +70,7 @@ pub fn run_rule_lifting<L: SynthLanguage>(
     let num_prior = prior.len();
     let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
 
-    let chosen = candidates.minimize(prior, Scheduler::Compress(limits));
+    let chosen = candidates.minimize(prior, Scheduler::Compress(limits)).0;
     let time = t.elapsed().as_secs_f64();
 
     println!(
@@ -80,10 +89,10 @@ pub fn run_rule_lifting<L: SynthLanguage>(
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Lang {
     pub consts: Vec<String>,
-    vars: Vec<String>,
-    uops: Vec<String>,
-    bops: Vec<String>,
-    tops: Vec<String>,
+    pub vars: Vec<String>,
+    pub uops: Vec<String>,
+    pub bops: Vec<String>,
+    pub tops: Vec<String>,
 }
 
 impl Lang {
