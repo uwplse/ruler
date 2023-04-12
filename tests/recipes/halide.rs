@@ -10,7 +10,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     // This is porting the halide recipe at incremental/halide.spec
     // on the branch "maybe-useful" in the old recipes repo
     let mut all_rules = Ruleset::default();
-    
+
     // Bool rules up to size 5:
     let bool_only = recursive_rules(
         Metric::Atoms,
@@ -34,7 +34,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
             &["-1", "0", "1"],
             &["a", "b", "c"],
             &["-"],
-            &["+", "-", "*", "/", "min", "max"],
+            &["+", "-", "*", "min", "max"],
             &[],
         ),
         all_rules.clone(),
@@ -65,7 +65,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
             &["a", "b", "c"],
             &["-", "!"],
             &[
-                "&&", "||", "^", "+", "-", "*", "/", "min", "max", "<", "<=", "==", "!=",
+                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
             ],
             &["select"],
         ),

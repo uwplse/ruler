@@ -17,18 +17,23 @@ pub fn write_output<L: SynthLanguage>(
 ) {
     // get information about the derivability of our ruleset vs. the baseline ruleset
     let start = Instant::now();
+    let halide = if recipe_name == "halide" {
+        true
+    } else {
+        false
+    };
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-        get_derivability_results(ruleset, DeriveType::Lhs, baseline);
+        get_derivability_results(ruleset, DeriveType::Lhs, baseline, halide);
     let duration = start.elapsed();
     println!("LHS: {} / {}, {} seconds.", forwards_lhs, baseline.len(), duration.as_secs());
     let start = Instant::now();
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
-        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline);
+        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, halide);
     let duration = start.elapsed();
     println!("LHS/RHS: {} / {}, {} seconds.", forwards_lhs_rhs, baseline.len(), duration.as_secs());
     let start = Instant::now();
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline);
+        get_derivability_results(ruleset, DeriveType::AllRules, baseline, halide);
     let duration = start.elapsed();
     println!("ALL: {} / {}, {} seconds.", forwards_all, baseline.len(), duration.as_secs());
 
@@ -121,6 +126,7 @@ pub fn get_derivability_results<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     derive_type: DeriveType,
     baseline: &Ruleset<L>,
+    halide: bool,
 ) -> ((usize, usize), (Duration, Duration), Value) {
     let limits = if let DeriveType::AllRules = derive_type {
         Limits {
@@ -135,18 +141,32 @@ pub fn get_derivability_results<L: SynthLanguage>(
     let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, limits);
     let time_f = start_f.elapsed();
     let start_b = Instant::now();
-    let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
-    let time_b = start_b.elapsed();
 
-    let derivability_results = json!({
+    let mut derivability_results = json!({
         "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
         "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
-        "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
-        "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
+        "baseline_derives_enumo_derivable": 0,
+        "baseline_derives_enumo_underivable": 0,
     });
 
+    let mut time_b = Duration::default();
+    let mut can_b_len = 0;
+
+    if !halide {
+        let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
+        can_b_len = can_b.len();
+        time_b = start_b.elapsed();
+
+        derivability_results = json!({
+            "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
+            "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
+            "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
+            "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
+        });
+    }
+
     (
-        (can_f.len(), can_b.len()),
+        (can_f.len(), can_b_len),
         (time_f, time_b),
         derivability_results,
     )
