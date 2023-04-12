@@ -98,7 +98,6 @@ pub fn halide_rules() -> Ruleset<Pred> {
             "b".to_string(),
             "c".to_string(),
         ]));
-    nested_bops_full.to_file("nested_bops_full_canon.rules");
     let new = run_workload(
         nested_bops_full,
         all_rules.clone(),
