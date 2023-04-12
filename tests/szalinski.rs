@@ -412,12 +412,21 @@ mod tests {
         ]);
         let scalars: &[&str] = &["sa", "1"];
         let transformations: &[&str] = &["Scale", "Trans"];
-        let v3s: &[&str] = &["(Vec3 0 0 0)", "(Vec3 1 1 1)", "(Vec3 a a a)", "(Vec3 a b c)", "(Vec3 d e f)", "(Vec3 (* a d) (* b e) (* c f))"];
+        let bops: &[&str] = &["+", "*", "/"];
+        let v3s: &[&str] = &[
+            "(Vec3 0 0 0)",
+            "(Vec3 1 1 1)",
+            "(Vec3 a a a)",
+            "(Vec3 a b c)",
+            "(Vec3 d e f)",
+            "(Vec3 (bop a d) (bop b e) (bop c f))"
+        ];
         let w = lang
             .iter_metric("shape", Metric::Depth, n)
             .plug("v3", &v3s.into())
             .plug("transformation", &transformations.into())
-            .plug("scalar", &scalars.into());
+            .plug("scalar", &scalars.into())
+            .plug("bop", &bops.into());
         dump_workload("wl.txt".into(), &w);
         w
     }
@@ -428,7 +437,7 @@ mod tests {
         let mut learned_rules = Ruleset::default();
         let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());
 
-        for i in 2..5 {
+        for i in 2..4 {
             println!("MAX DEPTH OF {}", i);
 
             let atoms = iter_szalinski(i);
