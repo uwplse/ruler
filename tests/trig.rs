@@ -347,7 +347,7 @@ mod test {
         ])
     }
 
-    // #[test]
+    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
@@ -363,7 +363,7 @@ mod test {
         logger::write_output(&rules, &herbie, "trig", "herbie", duration, true);
     }
 
-    // #[test]
+    #[test]
     fn simple() {
         let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         assert_eq!(complex.len(), 57);

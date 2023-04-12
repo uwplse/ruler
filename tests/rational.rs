@@ -759,7 +759,7 @@ pub mod test {
         );
     }
 
-    // #[test]
+    #[test]
     fn cond_div_figure() {
         let mut all_rules: Ruleset<Math> = Ruleset::default();
 
