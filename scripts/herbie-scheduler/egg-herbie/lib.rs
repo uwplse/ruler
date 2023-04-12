@@ -210,7 +210,7 @@ pub unsafe extern "C" fn egraph_run(
     egraph_run_with_iter_limit(
         ptr,
         output_size,
-        5,
+        3,
         node_limit,
         rules_array_ptr,
         is_constant_folding_enabled,
@@ -233,7 +233,7 @@ pub unsafe extern "C" fn egraph_get_stop_reason(ptr: *mut Context) -> u32 {
             Some(StopReason::NodeLimit(_)) => 2,
             Some(StopReason::TimeLimit(_)) => 3,
             Some(StopReason::Other(_)) => 4,
-            _ => 4,
+            _ => 5,
         }
     })
 }

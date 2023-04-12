@@ -82,7 +82,7 @@ function do_branch {
   make install
   popd
 
-  flags="$flags --timeout 300"
+  flags="$flags --timeout 600"
   if [ -z "$PARALLEL_SEEDS" ]; then
     HERBIE=$HERBIE_DIR \
       THREADS=$THREADS \
@@ -106,18 +106,19 @@ popd
 if [ -z "$NO_RUN" ]; then
   rm $HERBIE_DIR/egg-herbie/src/*
   cp $MYDIR/egg-herbie/* "$HERBIE_DIR/egg-herbie/src/"
+  cp $MYDIR/egg-herbie.rkt "$HERBIE_DIR/src/core/egg-herbie.rkt"
 
+  do_branch sat-2500 -o generate:taylor --num-enodes 2500
   do_branch sat-5000 -o generate:taylor --num-enodes 5000
   do_branch sat-10000 -o generate:taylor --num-enodes 10000
   do_branch sat-20000 -o generate:taylor --num-enodes 20000
-  do_branch sat-40000 -o generate:taylor --num-enodes 40000
 
   git checkout "$HERBIE_DIR/egg-herbie/src/"
 
+  do_branch default-2500 -o generate:taylor --num-enodes 2500
   do_branch default-5000 -o generate:taylor --num-enodes 5000
   do_branch default-10000 -o generate:taylor --num-enodes 10000
   do_branch default-20000 -o generate:taylor --num-enodes 20000
-  do_branch default-40000 -o generate:taylor --num-enodes 40000
 fi
 
 # Plots

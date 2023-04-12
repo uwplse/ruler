@@ -480,7 +480,8 @@
 
 (register-reset
   (λ ()
-    (free-ffi-cache)
+    ; WARN: will leak memory
+    ; (free-ffi-cache)
     (set! ffi-rules-cache #f)))
 
 ;; Tries to look up the canonical name of a rule using the cache.
