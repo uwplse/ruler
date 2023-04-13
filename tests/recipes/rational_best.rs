@@ -9,8 +9,8 @@ use ruler::{
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 2,
-        node: 500_000,
+        iter: 3,
+        node: 1_000_000,
     };
 
     // Domain
