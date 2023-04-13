@@ -179,14 +179,14 @@ impl SynthLanguage for Pred {
                 to_add.push(Pred::Leq([i, j]));
                 to_add.push(Pred::Eq([i, j]));
                 to_add.push(Pred::Neq([i, j]));
-                to_add.push(Pred::Implies([i, j]));
+                // to_add.push(Pred::Implies([i, j]));
                 to_add.push(Pred::And([i, j]));
                 to_add.push(Pred::Or([i, j]));
                 to_add.push(Pred::Xor([i, j]));
                 to_add.push(Pred::Add([i, j]));
                 to_add.push(Pred::Sub([i, j]));
                 to_add.push(Pred::Mul([i, j]));
-                to_add.push(Pred::Div([i, j]));
+                // to_add.push(Pred::Div([i, j]));
                 to_add.push(Pred::Min([i, j]));
                 to_add.push(Pred::Max([i, j]));
             }
