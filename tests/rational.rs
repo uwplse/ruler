@@ -734,7 +734,7 @@ pub mod test {
             "rational_replicate",
             "herbie",
             duration,
-            true,
+            false, // can't derive because herbie's not sound
         );
 
         let start = Instant::now();
@@ -755,7 +755,7 @@ pub mod test {
             "rational_best",
             "herbie",
             duration,
-            true,
+            false, // can't derive because herbie's not sound
         );
     }
 
