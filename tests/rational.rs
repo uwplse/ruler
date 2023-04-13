@@ -158,16 +158,45 @@ impl SynthLanguage for Math {
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
+        // if you drop variables, it's unsound because
+        // we may have lost an error
+        if lhs.vars().into_iter().collect::<HashSet<Var>>()
+            != rhs.vars().into_iter().collect::<HashSet<Var>>()
+        {
+            return ValidationResult::Invalid;
+        }
+
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
         let solver = z3::Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+        let lhs_denom = Self::error_conditions(
+            &ctx,
+            Self::pat_to_sexp(lhs),
+            z3::ast::Bool::from_bool(&ctx, true),
+        );
+        let rhs_denom = Self::error_conditions(
+            &ctx,
+            Self::pat_to_sexp(rhs),
+            z3::ast::Bool::from_bool(&ctx, true),
+        );
 
-        let assert_equal = lexpr._eq(&rexpr);
+        let mut assert_equal = lexpr._eq(&rexpr);
 
-        solver.assert(&assert_equal.not());
+        for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
+            assert_equal = condition.not().implies(&assert_equal);
+        }
+
+        let rhs_errors =
+            z3::ast::Bool::or(&ctx, &rhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
+        let lhs_errors =
+            z3::ast::Bool::or(&ctx, &lhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
+        let error_preserved = rhs_errors.iff(&lhs_errors);
+        let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
+
+        solver.assert(&assertion.clone().not());
         let res = Self::z3_res_to_validationresult(solver.check());
         /*if let ValidationResult::Valid = res {
             eprintln!("verifying {} => {}", lhs, rhs);
@@ -281,6 +310,53 @@ impl Math {
                 rewrite,
             })
         }
+    }
+
+    fn error_conditions<'a>(
+        ctx: &'a z3::Context,
+        sexp: Sexp,
+        path: z3::ast::Bool<'a>,
+    ) -> Vec<z3::ast::Bool<'a>> {
+        let mut res = Vec::<z3::ast::Bool<'a>>::default();
+        match sexp {
+            Sexp::List(list) => {
+                if list[0] == Sexp::String("/".to_string()) {
+                    let denom = list[2].to_string();
+                    let expr = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(&denom.to_string().parse::<Pattern<Math>>().unwrap())
+                            .as_ref(),
+                    );
+                    let is_zero = expr._eq(&z3::ast::Real::from_real(ctx, 0, 1));
+
+                    res.push(z3::ast::Bool::and(ctx, &[&is_zero, &path]));
+                }
+
+                if list[0] == Sexp::String("if".to_string()) {
+                    let cond_real = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(&list[1].to_string().parse::<Pattern<Math>>().unwrap())
+                            .as_ref(),
+                    );
+                    let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                    let new_path_pos = z3::ast::Bool::and(
+                        &ctx,
+                        &[&path, &z3::ast::Bool::not(&cond_real._eq(&zero))],
+                    );
+                    let new_path_neg = z3::ast::Bool::and(&ctx, &[&path, &cond_real._eq(&zero)]);
+                    res.extend(Self::error_conditions(ctx, list[2].clone(), new_path_pos));
+                    res.extend(Self::error_conditions(ctx, list[3].clone(), new_path_neg));
+                } else {
+                    for s in list {
+                        res.extend(Self::error_conditions(ctx, s, path.clone()));
+                    }
+                };
+            }
+            Sexp::String(_atom) => (),
+            Sexp::Empty => (),
+        }
+
+        res
     }
 
     fn run_workload_conditional(
@@ -744,10 +820,10 @@ pub mod test {
         logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
     }
 
-    /*#[test]
+    #[test]
     fn just_best() {
         let best_rules = best_enumo_recipe();
-    }*/
+    }
 
     /*#[test]
     fn cond_div_figure() {
