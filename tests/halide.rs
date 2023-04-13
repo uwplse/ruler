@@ -336,7 +336,8 @@ mod test {
         )
     }
 
-    // Uncomment to run the fancy 75% recipe.
+    // This is the fancy 75% recipe that takes too much memory for Nightly to run it, 
+    // so it's commented out here, but it runs fine on Leviathan.
     // #[test]
     fn run_fancy_halide_recipe() {
         let mut all_rules = Ruleset::<Pred>::default();
