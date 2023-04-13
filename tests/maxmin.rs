@@ -479,6 +479,7 @@ mod tests {
         let limits = Limits {
             iter: 3,
             node: 10000000,
+            match_: 200_000,
         };
 
         let eg_init = atoms3.to_egraph();
@@ -519,6 +520,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
+                match_: 200_000,
             },
         );
         // assert_eq!(rules3.len(), 6);
@@ -533,6 +535,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
+                match_: 200_000,
             },
         );
         // assert_eq!(rules4.len(), 2);
@@ -547,6 +550,7 @@ mod tests {
             Limits {
                 iter: 3,
                 node: 1000000,
+                match_: 200_000,
             },
         );
         // assert_eq!(rules4.len(), 1);

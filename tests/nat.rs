@@ -203,6 +203,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
+                match_: 200_000,
             },
             false,
         );
@@ -217,6 +218,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
+                match_: 200_000,
             },
             false,
         );
@@ -231,6 +233,7 @@ mod test {
             Limits {
                 iter: 3,
                 node: 1000000,
+                match_: 200_000,
             },
             false,
         );

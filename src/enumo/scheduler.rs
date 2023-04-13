@@ -33,11 +33,12 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
         rule: Option<&Rule<L>>,
-        match_limit: usize,
     ) -> EGraph<L, SynthAnalysis> {
         let get_runner = |egraph: EGraph<L, SynthAnalysis>, limits: Limits| {
             let base_runner = Runner::default()
-                .with_scheduler(MatchScheduler { match_limit })
+                .with_scheduler(MatchScheduler {
+                    match_limit: limits.match_,
+                })
                 .with_node_limit(limits.node)
                 .with_iter_limit(limits.iter)
                 .with_time_limit(Duration::from_secs(600))
@@ -87,9 +88,15 @@ impl Scheduler {
 
                 let mut runner = get_runner(egraph.clone(), *limits);
 
+                let max_limits = Limits {
+                    iter: usize::MAX,
+                    node: usize::MAX,
+                    match_: limits.match_,
+                };
+
                 for _ in 0..limits.iter {
                     // Sat
-                    runner = get_runner(runner.egraph, Limits::max()).run(&sat);
+                    runner = get_runner(runner.egraph, max_limits).run(&sat);
 
                     // Other
                     runner = get_runner(
@@ -97,11 +104,12 @@ impl Scheduler {
                         Limits {
                             iter: 1,
                             node: limits.node,
+                            match_: limits.match_,
                         },
                     )
                     .run(&other);
                 }
-                let mut runner = get_runner(runner.egraph, Limits::max()).run(&sat);
+                let mut runner = get_runner(runner.egraph, max_limits).run(&sat);
                 runner.egraph.rebuild();
                 runner.egraph
             }
@@ -137,16 +145,6 @@ impl Scheduler {
         egraph: &EGraph<L, SynthAnalysis>,
         ruleset: &Ruleset<L>,
     ) -> EGraph<L, SynthAnalysis> {
-        self.run_internal(egraph, ruleset, None, 200_000)
-    }
-
-    pub fn run_derive<L: SynthLanguage>(
-        &self,
-        egraph: &EGraph<L, SynthAnalysis>,
-        ruleset: &Ruleset<L>,
-        rule: &Rule<L>,
-    ) -> EGraph<L, SynthAnalysis> {
-        // Use a small match limit for deriving
-        self.run_internal(egraph, ruleset, Some(rule), 1000)
+        self.run_internal(egraph, ruleset, None)
     }
 }

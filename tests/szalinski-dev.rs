@@ -389,6 +389,7 @@ mod tests {
             Limits {
                 iter: 5,
                 node: 10000000000,
+                match_: 1_000_000,
             },
         );
         all_rules.extend(rules3);
@@ -438,6 +439,7 @@ mod tests {
             let limits = Limits {
                 iter: 4,
                 node: 10_000_000,
+                match_: 1_000_000,
             };
 
             let egraph = atoms.to_egraph::<CF>();
@@ -449,7 +451,8 @@ mod tests {
             candidates.pretty_print();
 
             timekeep("starting minimize".into());
-            let (chosen, _) = candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
+            let (chosen, _) =
+                candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
 
             timekeep("minimize done".into());
             println!();
@@ -483,6 +486,7 @@ mod tests {
             let eg_translated = Scheduler::Simple(Limits {
                 iter: 2,
                 node: 10_000_000,
+                match_: 1_000_000,
             })
             .run(&eg_init, &translational_ruleset);
 
@@ -490,6 +494,7 @@ mod tests {
             let eg_substed = Scheduler::Simple(Limits {
                 iter: 10,
                 node: 10_000_000,
+                match_: 1_000_000,
             })
             .run(&eg_translated, &subst_ruleset);
 
@@ -497,6 +502,7 @@ mod tests {
             let eg_final = Scheduler::Simple(Limits {
                 iter: 3,
                 node: 10_000_000,
+                match_: 1_000_000,
             })
             .run(&eg_substed, &frep_ruleset);
 
@@ -510,6 +516,7 @@ mod tests {
                 Scheduler::Compress(Limits {
                     iter: 5,
                     node: 10_000_000,
+                    match_: 1_000_000,
                 }),
             );
 
@@ -547,6 +554,7 @@ mod tests {
             let eg_allowed = Scheduler::Compress(Limits {
                 iter: 5,
                 node: 10000000000,
+                match_: 1_000_000,
             })
             .run(&eg_init, &allowed);
 
@@ -555,6 +563,7 @@ mod tests {
             let eg_denote = Scheduler::Simple(Limits {
                 iter: 5,
                 node: 10000000000,
+                match_: 1_000_000,
             })
             .run(&eg_allowed, &lifting_rules);
             let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
@@ -564,6 +573,7 @@ mod tests {
             let eg_final = Scheduler::Compress(Limits {
                 iter: 5,
                 node: 10000000000,
+                match_: 1_000_000,
             })
             .run(&eg_denote, &all_rules);
             candidates.extend(Ruleset::extract_candidates(&eg_denote, &eg_final));
@@ -577,6 +587,7 @@ mod tests {
                 Scheduler::Compress(Limits {
                     iter: 5,
                     node: 10000000000,
+                    match_: 1_000_000,
                 }),
             );
 

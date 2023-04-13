@@ -9,6 +9,7 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     let limits = Limits {
         iter: 4,
         node: 1_000_000,
+        match_: 200_000,
     };
 
     // Domain

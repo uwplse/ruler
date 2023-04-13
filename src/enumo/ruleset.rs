@@ -491,7 +491,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
 
-        let out_egraph = scheduler.run_derive(&egraph, self, rule);
+        let out_egraph = scheduler.run_internal(&egraph, self, Some(rule));
 
         let l_id = out_egraph
             .lookup_expr(lexpr)

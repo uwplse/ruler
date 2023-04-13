@@ -371,6 +371,7 @@ mod test {
         let limits = Limits {
             iter: 3,
             node: 2000000,
+            match_: 200_000,
         };
 
         let terms = Workload::new([

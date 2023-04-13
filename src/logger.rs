@@ -161,6 +161,7 @@ pub fn get_derivability_results<L: SynthLanguage>(
             Limits {
                 iter: 2,
                 node: 100_000,
+                match_: 1000,
             }
         } else {
             Limits::deriving()

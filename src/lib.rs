@@ -54,6 +54,7 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
 pub struct Limits {
     pub iter: usize,
     pub node: usize,
+    pub match_: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -63,28 +64,13 @@ pub enum DeriveType {
     AllRules,
 }
 
-impl Default for Limits {
-    fn default() -> Self {
-        Self {
-            iter: 3,
-            node: 300000,
-        }
-    }
-}
-
 impl Limits {
-    fn max() -> Self {
-        Self {
-            iter: usize::MAX,
-            node: usize::MAX,
-        }
-    }
-
     // match oopsla limits
     pub fn rulefinding() -> Self {
         Self {
             iter: 2,
             node: 300_000,
+            match_: 200_000,
         }
     }
 
@@ -93,6 +79,7 @@ impl Limits {
         Self {
             iter: 5,
             node: 100_000,
+            match_: 1000,
         }
     }
 }

@@ -264,13 +264,15 @@ mod tests {
         let limits = Limits {
             iter: 4,
             node: 10_000_000,
+            match_: 1_000_000,
         };
 
         for i in 2..4 {
             let atoms = iter_szalinski(i);
             let egraph = atoms.to_egraph::<CF>();
             let mut candidates = Ruleset::allow_forbid_actual(egraph, all_rules.clone(), limits);
-            let (chosen, _) = candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
+            let (chosen, _) =
+                candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
 
             all_rules.extend(chosen.clone());
             learned_rules.extend(chosen);

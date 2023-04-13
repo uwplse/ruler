@@ -807,8 +807,16 @@ pub mod test {
         // when we add candidates. See https://github.com/uwplse/ruler/pull/183
 
         let test = Workload::new(&["(if a b b)", "b"]);
-        let test_rules: Ruleset<Math> =
-            run_workload(test, Ruleset::default(), Limits::default(), false);
+        let test_rules: Ruleset<Math> = run_workload(
+            test,
+            Ruleset::default(),
+            Limits {
+                iter: 3,
+                node: 300000,
+                match_: 200_000,
+            },
+            false,
+        );
         assert_eq!(test_rules.len(), 1);
     }
 }
