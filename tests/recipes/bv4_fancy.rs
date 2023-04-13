@@ -5,7 +5,7 @@ use ruler::{
 
 ruler::impl_bv!(4);
 
-pub fn bv4_rules() -> Ruleset<Bv> {
+pub fn bv4_fancy_rules() -> Ruleset<Bv> {
     let mut rules: Ruleset<Bv> = Ruleset::default();
     let lang = Lang::new(
         &["0", "1"],
