@@ -726,6 +726,7 @@ pub mod test {
             "rational_replicate",
             "oopsla",
             duration,
+            true,
         );
         logger::write_output(
             &replicate_rules,
@@ -733,14 +734,29 @@ pub mod test {
             "rational_replicate",
             "herbie",
             duration,
+            true,
         );
 
         let start = Instant::now();
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
 
-        logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
-        logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
+        logger::write_output(
+            &best_rules,
+            &ruler1,
+            "rational_best",
+            "oopsla",
+            duration,
+            true,
+        );
+        logger::write_output(
+            &best_rules,
+            &herbie,
+            "rational_best",
+            "herbie",
+            duration,
+            true,
+        );
     }
 
     #[test]
