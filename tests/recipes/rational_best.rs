@@ -1,19 +1,21 @@
 use super::*;
+use egg::{Extractor, RecExpr};
 use ruler::{
     enumo::{Filter, Ruleset, Workload},
+    logger::get_derivability_results,
     recipe_utils::{iter_metric, run_workload},
 };
 
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 4,
-        node: 1_000_000,
+        iter: 2,
+        node: 500_000,
     };
 
     // Domain
     let vars = &Workload::new(["a", "b", "c"]);
-    let consts = &Workload::new(["0", "-1", "1"]);
+    let consts = &Workload::new(["0", "-1", "1", "2"]);
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
 
@@ -38,8 +40,24 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Layer 3
     println!("layer3");
     let layer3 = iter_metric(lang, "expr", enumo::Metric::Depth, 3);
+
     let layer3_rules = run_workload(layer3, rules.clone(), limits, false);
     rules.extend(layer3_rules);
+
+    let target_rules = Ruleset::new(vec!["2 => (+ 1 1)"]);
+
+    let (_can_f, cannot_f) = rules.derive(
+        DeriveType::Lhs,
+        &target_rules,
+        Limits {
+            iter: 4,
+            node: 1_000_000,
+        },
+    );
+
+    println!("cant_target:");
+    cannot_f.pretty_print();
+    assert!(cannot_f.len() == 0);
 
     // Contains var filter
     let contains_var_filter = Filter::Or(vec![
@@ -48,24 +66,18 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
         Filter::Contains("c".parse().unwrap()),
     ]);
 
-    // Safe filter
-    let safe_filter = Filter::Invert(Box::new(Filter::Contains("(/ ?x 0)".parse().unwrap())));
-
     // Contains abs filter
     let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
-
-    let vars = Workload::new(["a", "b", "c"]);
-    let consts = Workload::new(["-1", "0", "1", "2"]);
 
     // Nested fabs
     println!("nested fabs");
     let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
         .plug("uop", &Workload::new(&["~", "fabs"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
-    let layer1 = op_layer.clone().plug("expr", &vars.append(consts));
+    let vars_and_consts = vars.clone().append(consts.clone());
+    let layer1 = op_layer.clone().plug("expr", &vars_and_consts);
     let layer2 = op_layer
         .plug("expr", &layer1)
-        .filter(safe_filter.clone())
         .filter(contains_var_filter.clone())
         .filter(contains_abs_filter);
     let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
