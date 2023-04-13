@@ -336,7 +336,7 @@ mod test {
         )
     }
 
-    // This is the fancy 75% recipe that takes too much memory for Nightly to run it, 
+    // This is the fancy 75% recipe that takes too much memory for Nightly to run it,
     // so it's commented out here, but it runs fine on Leviathan.
     // #[test]
     fn run_fancy_halide_recipe() {
