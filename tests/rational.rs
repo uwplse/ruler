@@ -815,9 +815,31 @@ pub mod test {
         let start = Instant::now();
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
+        // herbie and ruler can't learn any if rules
+        // but crash if you include them
+        let without_if: Ruleset<Math> = Ruleset::new(
+            best_rules
+                .0
+                .iter()
+                .filter_map(|r| {
+                    if r.1.rhs.to_string().starts_with("(if") {
+                        None
+                    } else {
+                        Some(r.0.to_string().clone())
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
 
-        logger::write_output(&best_rules, &ruler1, "rational_best", "oopsla", duration);
-        logger::write_output(&best_rules, &herbie, "rational_best", "herbie", duration);
+        logger::write_output(&without_if, &ruler1, "rational_best", "oopsla", duration);
+        logger::write_output(&without_if, &herbie, "rational_best", "herbie", duration);
+        logger::write_output(
+            &best_rules,
+            &best_rules,
+            "rational_best",
+            "rational_best",
+            duration,
+        );
     }
 
     /*#[test]
