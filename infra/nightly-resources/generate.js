@@ -294,8 +294,18 @@ function loadBvExp() {
       "gen time (s)": tryRound(exp.direct_gen.time),
       from_bv4: exp.from_bv4.rules.length,
       "from_bv4 time (s)": tryRound(exp.from_bv4.time),
-      derive: toPercentage(exp.derive.can, exp.derive.can + exp.derive.cannot),
-      missing: formatRules(exp.derive.missing_rules),
+      LHS: toPercentage(
+        exp.lhs_derive.can,
+        exp.lhs_derive.can + exp.lhs_derive.cannot
+      ),
+      "LHS Time": tryRound(exp.lhs_derive.time),
+      "LHS missing": formatRules(exp.lhs_derive.missing_rules),
+      "LHS-RHS": toPercentage(
+        exp.lhsrhs_derive.can,
+        exp.lhsrhs_derive.can + exp.lhsrhs_derive.cannot
+      ),
+      "LHS-RHS Time": tryRound(exp.lhsrhs_derive.time),
+      "LHS-RHS missing": formatRules(exp.lhsrhs_derive.missing_rules),
     });
   });
 
