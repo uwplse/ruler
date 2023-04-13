@@ -29,9 +29,9 @@ pub mod test {
             lang.clone(),
             Ruleset::default(),
         ));
-    
+
         let base_lang = Workload::new(["VAR", "CONST", "(UOP EXPR)", "(BOP EXPR EXPR)"]);
-    
+
         let a6_canon = iter_metric(base_lang, "EXPR", enumo::Metric::Atoms, 6)
             .plug("VAR", &Workload::new(lang.vars))
             .plug("CONST", &Workload::empty())
@@ -42,7 +42,7 @@ pub mod test {
                 "b".to_string(),
                 "c".to_string(),
             ]));
-    
+
         rules.extend(run_workload(
             a6_canon,
             rules.clone(),
@@ -50,7 +50,7 @@ pub mod test {
             true,
         ));
         rules
-    }    
+    }
 
     #[test]
     fn run() {
@@ -68,7 +68,7 @@ pub mod test {
 
         let start = Instant::now();
         let rules = bv4_rules();
-        let duration = start.elapsed(); 
+        let duration = start.elapsed();
 
         logger::write_output(&rules, &baseline, "bv4_baseline", "oopsla", duration, true);
     }
