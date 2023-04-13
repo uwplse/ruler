@@ -8,8 +8,8 @@ use ruler::enumo::{Ruleset, Scheduler, Workload};
 
 ruler::impl_bv!(32);
 
-#[path = "./recipes/bv4.rs"]
-pub mod bv4;
+#[path = "./recipes/bv4_fancy.rs"]
+pub mod bv4_fancy;
 
 #[path = "./recipes/bv32.rs"]
 mod bv32;
@@ -46,7 +46,7 @@ pub mod test {
     use std::time::{Duration, Instant};
 
     use crate::bv32::bv32_rules;
-    use crate::bv4::bv4_rules;
+    use crate::bv4_fancy::bv4_fancy_rules;
 
     use ruler::{
         enumo::{self, Filter, Ruleset, Workload},
@@ -99,7 +99,7 @@ pub mod test {
     }
 
     fn from_bv4() -> (Ruleset<Bv>, Duration) {
-        let actual_bv4_rules: Ruleset<_> = bv4_rules();
+        let actual_bv4_rules: Ruleset<_> = bv4_fancy_rules();
         let ported_bv4_rules: Ruleset<Bv> = Ruleset::new(actual_bv4_rules.to_str_vec());
         let start = Instant::now();
         let (sound, _) = ported_bv4_rules.partition(|rule| rule.is_valid());

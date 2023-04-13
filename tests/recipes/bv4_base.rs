@@ -1,6 +1,6 @@
 use ruler::{
-    enumo::{Filter, Ruleset, Workload},
-    recipe_utils::{iter_metric, recursive_rules, run_workload, Lang},
+    enumo::{Metric, Ruleset},
+    recipe_utils::{recursive_rules, Lang},
 };
 
 ruler::impl_bv!(4);
