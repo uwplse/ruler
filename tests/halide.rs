@@ -313,7 +313,14 @@ mod test {
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);
 
-        logger::write_output(&all_rules, &baseline, "halide", "halide", duration, false);
+        logger::write_output(
+            &all_rules,
+            &baseline,
+            "halide",
+            "halide",
+            duration,
+            (false, false),
+        );
 
         logger::write_output(
             &oopsla_halide,
@@ -321,7 +328,7 @@ mod test {
             "oopsla halide (1 iter)",
             "halide",
             oopsla_duration,
-            false,
+            (false, false),
         )
     }
 }

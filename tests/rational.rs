@@ -726,7 +726,7 @@ pub mod test {
             "rational_replicate",
             "oopsla",
             duration,
-            true,
+            (true, true),
         );
         logger::write_output(
             &replicate_rules,
@@ -734,7 +734,7 @@ pub mod test {
             "rational_replicate",
             "herbie",
             duration,
-            true,
+            (true, false),
         );
 
         let start = Instant::now();
@@ -747,7 +747,7 @@ pub mod test {
             "rational_best",
             "oopsla",
             duration,
-            true,
+            (true, true),
         );
         logger::write_output(
             &best_rules,
@@ -755,7 +755,7 @@ pub mod test {
             "rational_best",
             "herbie",
             duration,
-            true,
+            (true, false),
         );
     }
 

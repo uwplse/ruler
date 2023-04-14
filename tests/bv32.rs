@@ -118,7 +118,7 @@ pub mod test {
         let duration = start.elapsed();
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
 
-        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, true);
+        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, (true, true));
     }
 
     #[test]
@@ -148,6 +148,23 @@ pub mod test {
         let (can, cannot) =
             sound_bv4.derive(ruler::DeriveType::LhsAndRhs, &gen, Limits::deriving());
         let derive_time = start.elapsed();
+        let lhsrhs = json!({
+            "can": can.len(),
+            "cannot": cannot.len(),
+            "missing_rules": cannot.to_str_vec(),
+            "time": derive_time.as_secs_f32()
+        });
+
+        let start = Instant::now();
+        let (can, cannot) = sound_bv4.derive(ruler::DeriveType::Lhs, &gen, Limits::deriving());
+        let derive_time = start.elapsed();
+
+        let lhs = json!({
+            "can": can.len(),
+            "cannot": cannot.len(),
+            "missing_rules": cannot.to_str_vec(),
+            "time": derive_time.as_secs_f32()
+        });
 
         std::fs::create_dir_all("nightly/data")
             .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
@@ -161,12 +178,8 @@ pub mod test {
                 "rules": sound_bv4.to_str_vec(),
                 "time": sound_bv4_time.as_secs_f32()
             }),
-            "derive": json!({
-                "can": can.len(),
-                "cannot": cannot.len(),
-                "missing_rules": cannot.to_str_vec(),
-                "time": derive_time.as_secs_f32()
-            })
+            "lhs_derive": lhs,
+            "lhsrhs_derive": lhsrhs
 
         });
         logger::add_to_data_file("nightly/data/output.json".to_string(), stat);

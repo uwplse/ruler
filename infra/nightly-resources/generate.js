@@ -233,36 +233,38 @@ function onGenerateClick(version) {
 }
 
 function generateLatex(version, tableData, ignoreColumns) {
-  let columnNames = Object.keys(tableData[0]);
-  let lines = [
-    String.raw`\begin{table}`,
-    String.raw`\resizebox{\textwidth}{!}{%`,
-    String.raw`\begin{tabular}{` +
-      "l".repeat(columnNames.length - ignoreColumns.length) +
-      "}",
-  ];
+  document.getElementById("latex").innerHTML =
+    "This feature is not currently supported.";
+  // let columnNames = Object.keys(tableData[0]);
+  // let lines = [
+  //   String.raw`\begin{table}`,
+  //   String.raw`\resizebox{\textwidth}{!}{%`,
+  //   String.raw`\begin{tabular}{` +
+  //     "l".repeat(columnNames.length - ignoreColumns.length) +
+  //     "}",
+  // ];
 
-  lines.push(getFormattedHeader(version, columnNames));
+  // lines.push(getFormattedHeader(version, columnNames));
 
-  tableData.forEach((row) => {
-    let line =
-      Object.keys(row)
-        .filter((key) => !ignoreColumns.includes(key))
-        .map((key) => row[key])
-        .join(" & ") + " \\\\";
-    lines.push(line.replaceAll("%", "\\%"));
-  });
+  // tableData.forEach((row) => {
+  //   let line =
+  //     Object.keys(row)
+  //       .filter((key) => !ignoreColumns.includes(key))
+  //       .map((key) => row[key])
+  //       .join(" & ") + " \\\\";
+  //   lines.push(line.replaceAll("%", "\\%"));
+  // });
 
-  lines.push(String.raw`\end{tabular}%`);
-  lines.push(String.raw`}`);
-  lines = lines.concat(getCaption(version));
-  lines.push(String.raw`\label{table:${version}}`);
-  lines.push(String.raw`\end{table}`);
+  // lines.push(String.raw`\end{tabular}%`);
+  // lines.push(String.raw`}`);
+  // lines = lines.concat(getCaption(version));
+  // lines.push(String.raw`\label{table:${version}}`);
+  // lines.push(String.raw`\end{table}`);
 
-  let s = lines.join("\n");
-  let elem = document.getElementById("latex");
-  elem.innerHTML = s;
-  elem.style.height = "200px";
+  // let s = lines.join("\n");
+  // let elem = document.getElementById("latex");
+  // elem.innerHTML = s;
+  // elem.style.height = "200px";
 }
 
 function consolidateColumns(dataObj, consolidatedName, columnNames) {
@@ -294,8 +296,18 @@ function loadBvExp() {
       "gen time (s)": tryRound(exp.direct_gen.time),
       from_bv4: exp.from_bv4.rules.length,
       "from_bv4 time (s)": tryRound(exp.from_bv4.time),
-      derive: toPercentage(exp.derive.can, exp.derive.can + exp.derive.cannot),
-      missing: formatRules(exp.derive.missing_rules),
+      LHS: toPercentage(
+        exp.lhs_derive.can,
+        exp.lhs_derive.can + exp.lhs_derive.cannot
+      ),
+      "LHS Time": tryRound(exp.lhs_derive.time),
+      "LHS missing": formatRules(exp.lhs_derive.missing_rules),
+      "LHS-RHS": toPercentage(
+        exp.lhsrhs_derive.can,
+        exp.lhsrhs_derive.can + exp.lhsrhs_derive.cannot
+      ),
+      "LHS-RHS Time": tryRound(exp.lhsrhs_derive.time),
+      "LHS-RHS missing": formatRules(exp.lhsrhs_derive.missing_rules),
     });
   });
 
