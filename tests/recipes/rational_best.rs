@@ -28,14 +28,8 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Layer 1 (one op)
     println!("layer1");
     let layer1 = iter_metric(lang.clone(), "expr", enumo::Metric::Depth, 2);
-    let layer1_rules = Math::run_workload_conditional(layer1.clone(), rules.clone(), limits, false);
+    let layer1_rules = run_workload(layer1.clone(), rules.clone(), limits, false);
     rules.extend(layer1_rules);
-
-    // Layer 2
-    println!("layer2");
-    let layer2 = iter_metric(lang.clone(), "expr", enumo::Metric::Atoms, 4);
-    let layer2_rules = Math::run_workload_conditional(layer2.clone(), rules.clone(), limits, false);
-    rules.extend(layer2_rules);
 
     // Layer 3
     println!("layer3");
