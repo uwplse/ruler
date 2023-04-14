@@ -13,20 +13,22 @@ pub type Constant = i64;
 egg::define_language! {
  pub enum CF  {
     // FRep
-    "max" = Max([Id; 2]),
-    "min" = Min([Id; 2]),
-    "+" = Add([Id; 2]),
-    "-" = Sub([Id; 2]),
-    "*" = Mul([Id; 2]),
-    "/" = Div([Id; 2]),
+    "max" = Max,
+    "min" = Min,
+    "+" = Add,
+    "-" = Sub,
+    "*" = Mul,
+    "/" = Div,
     "x" = DimX,
     "y" = DimY,
     "z" = DimZ,
     "subst" = Subst([Id; 4]),
+    "op" = Op([Id; 3]),
 
     // Indicate that the containing expr cannot have x, y, or z
     "Scalar" = Scalar(Id),
-    Lit(Constant),
+    "Lit" = Lit(Id),
+    Literal(Constant),
 
     // Caddy
     "Cube" = Cube([Id; 2]),
@@ -47,47 +49,35 @@ egg::define_language! {
 
 fn get_subst_rules() -> Vec<&'static str> {
     [
-        "0 ==> (Scalar 0)",
-        "1 ==> (Scalar 1)",
-        "2 ==> (Scalar 2)",
-        "(Scalar 0) ==> 0",
-        "(Scalar 1) ==> 1",
-        "(Scalar 2) ==> 2",
+        "(Lit ?x) ==> (Scalar (Lit ?x))",
         "(subst ?x ?y ?z (Scalar ?a)) ==> (Scalar ?a)",
         "(subst ?x ?y ?z x) ==> ?x",
         "(subst ?x ?y ?z y) ==> ?y",
         "(subst ?x ?y ?z z) ==> ?z",
-        "(subst ?x ?y ?z (min ?a ?b)) ==> (min (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
-        "(subst ?x ?y ?z (max ?a ?b)) ==> (max (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
-        "(subst ?x ?y ?z (- ?a ?b)) ==> (- (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
-        "(subst ?x ?y ?z (+ ?a ?b)) ==> (+ (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
-        "(subst ?x ?y ?z (* ?a ?b)) ==> (* (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
-        "(subst ?x ?y ?z (/ ?a ?b)) ==> (/ (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (op ?op ?a ?b)) ==> (op ?op (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
         "(subst ?x ?y ?z (subst ?x2 ?y2 ?z2 ?a)) ==>
             (subst (subst ?x ?y ?z ?x2)
                    (subst ?x ?y ?z ?y2)
                    (subst ?x ?y ?z ?z2)
                    ?a)",
         "(subst x y z ?a) ==> ?a",
-        "(Scalar (/ ?a ?b)) ==> (/ (Scalar ?a) (Scalar ?b))",
-        "(Scalar (* ?a ?b)) ==> (* (Scalar ?a) (Scalar ?b))",
-        "(Scalar (+ ?a ?b)) ==> (+ (Scalar ?a) (Scalar ?b))",
+        "(Scalar (op ?op ?a ?b)) ==> (op ?op (Scalar ?a) (Scalar ?b))",
     ]
     .into()
 }
 
 fn get_frep_rules() -> Vec<&'static str> {
     [
-        "(/ ?a 1) ==> ?a",
-        "(- ?a 0) ==> ?a",
-        "(- (/ ?a ?c) (/ ?b ?c)) ==> (/ (- ?a ?b) ?c)",
-        "(- (/ ?a ?c) ?b) ==> (/ (- ?a (* ?b ?c)) ?c)",
-        "(/ (/ ?a ?b) ?c) ==> (/ ?a (* ?b ?c))",
-        "(- ?a (+ ?b ?c)) ==> (- (- ?a ?b) ?c)",
-        "(min (max ?a ?b) ?a) ==> ?a",
-        "(max (min ?a ?b) ?a) ==> ?a",
-        "(max ?a ?a) ==> ?a",
-        "(min ?a ?a) ==> ?a",
+        "(op / ?a (Lit 1)) ==> ?a",
+        "(op - ?a (Lit 0)) ==> ?a",
+        "(op - (op / ?a ?c) (op / ?b ?c)) ==> (op / (op - ?a ?b) ?c)",
+        "(op - (op / ?a ?c) ?b) ==> (op / (op - ?a (op * ?b ?c)) ?c)",
+        "(op / (op / ?a ?b) ?c) ==> (op / ?a (op * ?b ?c))",
+        "(op - ?a (op + ?b ?c)) ==> (op - (op - ?a ?b) ?c)",
+        // "(op min (op max ?a ?b) ?a) ==> ?a",
+        // "(op max (op min ?a ?b) ?a) ==> ?a",
+        // "(op max ?a ?a) ==> ?a",
+        // "(op min ?a ?a) ==> ?a",
     ]
     .into()
 }
@@ -100,39 +90,41 @@ fn get_subst_and_frep_rules() -> Vec<&'static str> {
 
 fn get_lifting_rules() -> Vec<&'static str> {
     [
-        "(Scale (Vec3 ?w ?h ?l) ?e) ==> (subst (/ x (Scalar ?w)) (/ y (Scalar ?h)) (/ z (Scalar ?l)) ?e)",
+        "(Scale (Vec3 ?w ?h ?l) ?e) ==> (subst (op / x (Scalar ?w)) (op / y (Scalar ?h)) (op / z (Scalar ?l)) ?e)",
         "(Cube (Vec3 ?a ?b ?c) false) ==>
-         (min (min (min (/ x (Scalar ?a))
-                        (/ y (Scalar ?b)))
-                   (/ z (Scalar ?c)))
-              (min (min (- 1 (/ x (Scalar ?a)))
-                        (- 1 (/ y (Scalar ?b))))
-                   (- 1 (/ z (Scalar ?c)))))",
+         (op min (op min (op min (op / x (Scalar ?a))
+                        (op / y (Scalar ?b)))
+                   (op / z (Scalar ?c)))
+              (op min (op min (op - (Lit 1) (op / x (Scalar ?a)))
+                        (op - (Lit 1) (op / y (Scalar ?b))))
+                   (op - (Lit 1) (op / z (Scalar ?c)))))",
         "(Cylinder (Vec3 ?h ?r ?r) ?params true) ==>
-         (min (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
-                 (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
-              (min (- (/ 1 2) (/ z (Scalar ?h)))
-                   (+ (/ 1 2) (/ z (Scalar ?h)))))",
-        "(Sphere ?r ?params) ==> (- (- (- 1 (* (/ x (Scalar ?r)) (/ x (Scalar ?r))))
-                               (* (/ y (Scalar ?r)) (/ y (Scalar ?r))))
-                            (* (/ z (Scalar ?r)) (/ z (Scalar ?r))))",
-        "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (- x (Scalar ?a)) (- y (Scalar ?b)) (- z (Scalar ?c)) ?e)"
+         (op min (op - (op - (Lit 1) (op * (op / x (Scalar ?r)) (op / x (Scalar ?r))))
+                 (op * (op / y (Scalar ?r)) (op / y (Scalar ?r))))
+              (op min (op - (op / (Lit 1) (Lit 2)) (op / z (Scalar ?h)))
+                   (op + (op / (Lit 1) (Lit 2)) (op / z (Scalar ?h)))))",
+        "(Sphere ?r ?params) ==> (op - (op - (op - (Lit 1) (op * (op / x (Scalar ?r)) (op / x (Scalar ?r))))
+                               (op * (op / y (Scalar ?r)) (op / y (Scalar ?r))))
+                            (op * (op / z (Scalar ?r)) (op / z (Scalar ?r))))",
+        "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (op - x (Scalar ?a)) (op - y (Scalar ?b)) (op - z (Scalar ?c)) ?e)"
     ].into()
 }
 
 fn is_caddy(node: &CF) -> bool {
     match node {
-        CF::Max(_) => false,
-        CF::Add(_) => false,
-        CF::Min(_) => false,
-        CF::Sub(_) => false,
-        CF::Mul(_) => false,
-        CF::Div(_) => false,
+        CF::Max => false,
+        CF::Add => false,
+        CF::Min => false,
+        CF::Sub => false,
+        CF::Mul => false,
+        CF::Div => false,
+        CF::Op(_) => false,
         CF::DimX => false,
         CF::DimY => false,
         CF::DimZ => false,
         CF::Subst(_) => false,
         CF::Scalar(_) => false,
+        CF::Literal(_) => false,
         CF::Lit(_) => false,
         CF::Cube(_) => true,
         CF::Cylinder(_) => true,
@@ -164,7 +156,14 @@ impl SynthLanguage for CF {
         is_caddy(self)
             || matches!(
                 self,
-                CF::Var(_) | CF::Lit(_) | CF::Div(_) | CF::Mul(_) | CF::Sub(_) | CF::Add(_)
+                CF::Var(_)
+                    | CF::Literal(_)
+                    | CF::Lit(_)
+                    | CF::Op(_)
+                    | CF::Div
+                    | CF::Mul
+                    | CF::Sub
+                    | CF::Add
             )
     }
 
@@ -192,11 +191,11 @@ impl SynthLanguage for CF {
     }
 
     fn is_constant(&self) -> bool {
-        matches!(self, CF::Lit(_))
+        matches!(self, CF::Literal(_))
     }
 
     fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
-        CF::Lit(c)
+        CF::Literal(c)
     }
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
@@ -211,6 +210,9 @@ fn paste_print(rs: &Ruleset<CF>) {
     fn fix(s: String) -> String {
         s.replace("Scale", "Affine Scale")
             .replace("Trans", "Affine Trans")
+            .replace("op ", "")
+            .replace("(Lit 0)", "0") // TODO: regex or smth
+            .replace("(Lit 1)", "1")
     }
 
     for (_, rule) in rs {
@@ -239,16 +241,16 @@ mod tests {
             "(Sphere scalar params)",
             "s",
         ]);
-        let scalars: &[&str] = &["sa", "1"];
+        let scalars: &[&str] = &["sa", "(Lit 1)"];
         let transformations: &[&str] = &["Scale", "Trans"];
         let bops: &[&str] = &["+", "*", "/"];
         let v3s: &[&str] = &[
-            "(Vec3 0 0 0)",
-            "(Vec3 1 1 1)",
+            "(Vec3 (Lit 0) (Lit 0) (Lit 0))",
+            "(Vec3 (Lit 1) (Lit 1) (Lit 1))",
             "(Vec3 a a a)",
             "(Vec3 a b c)",
             "(Vec3 d e f)",
-            "(Vec3 (bop a d) (bop b e) (bop c f))",
+            "(Vec3 (op bop a d) (op bop b e) (op bop c f))",
         ];
         iter_metric(lang, "shape", Metric::Depth, n)
             .plug("v3", &v3s.into())
@@ -282,15 +284,15 @@ mod tests {
         paste_print(&learned_rules);
 
         let expected: Ruleset<CF> = Ruleset::new(&[
-            "(Trans (Vec3 0 0 0) ?a) <=> ?a",
-            "?a <=> (Scale (Vec3 1 1 1) ?a)",
-            "(Scale (Vec3 ?b ?b ?b) (Cylinder (Vec3 1 1 1) ?a true)) <=> (Cylinder (Vec3 ?b ?b ?b) ?a true)",
-            "(Scale (Vec3 ?f ?e ?d) (Cube (Vec3 ?c ?b ?a) false)) ==> (Scale (Vec3 (* ?f ?c) (* ?e ?b) (* ?d ?a)) (Cube (Vec3 1 1 1) false))",
-            "(Scale (Vec3 ?f ?e ?d) (Cube (Vec3 ?c ?b ?a) false)) ==> (Cube (Vec3 (* ?f ?c) (* ?e ?b) (* ?d ?a)) false)",
-            "(Scale (Vec3 ?f ?d ?b) (Trans (Vec3 (/ ?g ?f) (/ ?e ?d) (/ ?c ?b)) ?a)) ==> (Trans (Vec3 ?g ?e ?c) (Scale (Vec3 ?f ?d ?b) ?a))",
-            "(Scale (Vec3 ?g ?f ?e) (Trans (Vec3 ?d ?c ?b) ?a)) ==> (Trans (Vec3 (* ?d ?g) (* ?c ?f) (* ?b ?e)) (Scale (Vec3 ?g ?f ?e) ?a))",
-            "(Trans (Vec3 ?g ?f ?e) (Trans (Vec3 ?d ?c ?b) ?a)) ==> (Trans (Vec3 (+ ?g ?d) (+ ?f ?c) (+ ?e ?b)) ?a)",
-            "(Scale (Vec3 ?g ?f ?e) (Scale (Vec3 ?d ?c ?b) ?a)) ==> (Scale (Vec3 (* ?g ?d) (* ?f ?c) (* ?e ?b)) ?a)",
+            "?a <=> (Trans (Vec3 (Lit 0) (Lit 0) (Lit 0)) ?a)",
+            "?a <=> (Scale (Vec3 (Lit 1) (Lit 1) (Lit 1)) ?a)",
+            "(Scale (Vec3 ?b ?b ?b) (Cylinder (Vec3 (Lit 1) (Lit 1) (Lit 1)) ?a true)) <=> (Cylinder (Vec3 ?b ?b ?b) ?a true)",
+            "(Scale (Vec3 (op * ?f ?e) (op * ?d ?c) (op * ?b ?a)) (Cube (Vec3 (Lit 1) (Lit 1) (Lit 1)) false)) <=> (Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false))",
+            "(Scale (Vec3 ?g ?e ?c) (Scale (Vec3 ?f ?d ?b) ?a)) <=> (Scale (Vec3 (op * ?g ?f) (op * ?e ?d) (op * ?c ?b)) ?a)",
+            "(Trans (Vec3 (op + ?g ?d) (op + ?f ?c) (op + ?e ?b)) ?a) <=> (Trans (Vec3 ?g ?f ?e) (Trans (Vec3 ?d ?c ?b) ?a))",
+            "(Scale (Vec3 ?d ?c ?b) (Trans (Vec3 ?g ?f ?e) ?a)) <=> (Trans (Vec3 (op * ?g ?d) (op * ?f ?c) (op * ?e ?b)) (Scale (Vec3 ?d ?c ?b) ?a))",
+            "(Trans (Vec3 ?g ?e ?c) (Scale (Vec3 ?f ?d ?b) ?a)) <=> (Scale (Vec3 ?f ?d ?b) (Trans (Vec3 (op / ?g ?f) (op / ?e ?d) (op / ?c ?b)) ?a))",
+            "(Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false)) <=> (Cube (Vec3 (op * ?f ?e) (op * ?d ?c) (op * ?b ?a)) false)",
         ]);
         let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
