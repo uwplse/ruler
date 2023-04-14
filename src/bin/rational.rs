@@ -16,6 +16,8 @@ use num::bigint::{BigInt, RandBigInt, ToBigInt};
 use num::{rational::Ratio, Signed, ToPrimitive, Zero};
 use rand::Rng;
 use rand_pcg::Pcg64;
+use symbolic_expressions::parser::parse_str;
+use symbolic_expressions::Sexp;
 use z3::ast::Ast;
 use z3::*;
 
@@ -44,6 +46,61 @@ fn mk_constant(n: &BigInt, d: &BigInt) -> Option<Constant> {
         None
     } else {
         Some(Ratio::new(n.clone(), d.clone()))
+    }
+}
+
+impl Math {
+    fn error_conditions<'a>(
+        ctx: &'a z3::Context,
+        sexp: Sexp,
+        path: z3::ast::Bool<'a>,
+    ) -> Vec<z3::ast::Bool<'a>> {
+        let mut res = Vec::<z3::ast::Bool<'a>>::default();
+        match sexp {
+            Sexp::List(list) => {
+                if list[0] == Sexp::String("/".to_string()) {
+                    let denom = list[2].to_string();
+                    let expr = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(
+                            &denom.to_string().parse::<egg::Pattern<Math>>().unwrap(),
+                        )
+                        .as_ref(),
+                    )
+                    .0;
+                    let is_zero = expr._eq(&z3::ast::Real::from_real(ctx, 0, 1));
+
+                    res.push(z3::ast::Bool::and(ctx, &[&is_zero, &path]));
+                }
+
+                if list[0] == Sexp::String("if".to_string()) {
+                    let cond_real = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(
+                            &list[1].to_string().parse::<egg::Pattern<Math>>().unwrap(),
+                        )
+                        .as_ref(),
+                    )
+                    .0;
+                    let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                    let new_path_pos = z3::ast::Bool::and(
+                        &ctx,
+                        &[&path, &z3::ast::Bool::not(&cond_real._eq(&zero))],
+                    );
+                    let new_path_neg = z3::ast::Bool::and(&ctx, &[&path, &cond_real._eq(&zero)]);
+                    res.extend(Self::error_conditions(ctx, list[2].clone(), new_path_pos));
+                    res.extend(Self::error_conditions(ctx, list[3].clone(), new_path_neg));
+                } else {
+                    for s in list {
+                        res.extend(Self::error_conditions(ctx, s, path.clone()));
+                    }
+                };
+            }
+            Sexp::String(_atom) => (),
+            Sexp::Empty => (),
+        }
+
+        res
     }
 }
 
@@ -205,16 +262,46 @@ impl SynthLanguage for Math {
         rhs: &egg::Pattern<Self>,
     ) -> bool {
         if synth.params.use_smt {
+            //if you drop variables, it's unsound because
+            // we may have lost an error
+            if lhs.vars().into_iter().collect::<HashSet<Var>>()
+                != rhs.vars().into_iter().collect::<HashSet<Var>>()
+            {
+                return false;
+            }
+
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);
             let ctx = z3::Context::new(&cfg);
             let solver = z3::Solver::new(&ctx);
-            let (lexpr, mut lasses) = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-            let (rexpr, mut rasses) = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-            lasses.append(&mut rasses);
-            let all = &lasses[..];
-            solver.assert(&lexpr._eq(&rexpr).not());
-            match solver.check_assumptions(all) {
+            let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref()).0;
+            let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref()).0;
+            let lhs_denom = Self::error_conditions(
+                &ctx,
+                parse_str(&lhs.to_string()).unwrap(),
+                z3::ast::Bool::from_bool(&ctx, true),
+            );
+            let rhs_denom = Self::error_conditions(
+                &ctx,
+                parse_str(&rhs.to_string()).unwrap(),
+                z3::ast::Bool::from_bool(&ctx, true),
+            );
+
+            let mut assert_equal = lexpr._eq(&rexpr);
+
+            for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
+                assert_equal = condition.not().implies(&assert_equal);
+            }
+
+            let rhs_errors =
+                z3::ast::Bool::or(&ctx, &rhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
+            let lhs_errors =
+                z3::ast::Bool::or(&ctx, &lhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
+            let error_preserved = rhs_errors.iff(&lhs_errors);
+            let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
+
+            solver.assert(&assertion.clone().not());
+            match solver.check() {
                 // match solver.check() {
                 SatResult::Unsat => true,
                 SatResult::Sat => {
@@ -322,8 +409,8 @@ fn egg_to_z3<'a>(
                 let denom = &buf[usize::from(*b)];
                 let lez = z3::ast::Real::le(denom, &zero);
                 let gez = z3::ast::Real::ge(denom, &zero);
-                let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
-                assumes.push(assume);
+                //let assume = z3::ast::Bool::not(&z3::ast::Bool::and(&ctx, &[&lez, &gez]));
+                //assumes.push(assume);
                 buf.push(z3::ast::Real::div(
                     &buf[usize::from(*a)],
                     &buf[usize::from(*b)],
@@ -344,7 +431,7 @@ fn egg_to_z3<'a>(
     (buf.pop().unwrap(), assumes)
 }
 
-/// Entry point 
+/// Entry point
 fn main() {
     Math::main()
 }
