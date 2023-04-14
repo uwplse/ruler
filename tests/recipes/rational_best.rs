@@ -63,21 +63,6 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
     // Contains abs filter
     let contains_abs_filter = Filter::Contains("fabs".parse().unwrap());
 
-    // Nested fabs
-    println!("nested fabs");
-    let op_layer = Workload::new(["(uop expr)", "(bop expr expr)"])
-        .plug("uop", &Workload::new(&["~", "fabs"]))
-        .plug("bop", &Workload::new(&["+", "-", "*", "/"]));
-    let vars_and_consts = vars.clone().append(consts.clone());
-    let layer1 = op_layer.clone().plug("expr", &vars_and_consts);
-    let layer2 = op_layer
-        .plug("expr", &layer1)
-        .filter(contains_var_filter.clone())
-        .filter(contains_abs_filter);
-    let nested_abs = Workload::new(["(fabs e)"]).plug("e", &layer2);
-    let nested_abs_rules = Math::run_workload_conditional(nested_abs, rules.clone(), limits, true);
-    rules.extend(nested_abs_rules);
-
     // Factorization
     println!("factorization");
     let variables_multiplied = iter_metric(
