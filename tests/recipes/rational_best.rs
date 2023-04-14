@@ -9,13 +9,13 @@ use ruler::{
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = Ruleset::default();
     let limits = Limits {
-        iter: 3,
-        node: 1_000_000,
+        iter: 2,
+        node: 300_000,
     };
 
     // Domain
     let vars = &Workload::new(["a", "b", "c"]);
-    let consts = &Workload::new(["0", "-1", "1", "2"]);
+    let consts = &Workload::new(["0", "-1", "1"]);
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
 
