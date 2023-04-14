@@ -360,7 +360,7 @@ mod test {
         let rules = trig_rules();
         let duration = start.elapsed();
 
-        logger::write_output(&rules, &herbie, "trig", "herbie", duration, true);
+        logger::write_output(&rules, &herbie, "trig", "herbie", duration, (true, true));
     }
 
     #[test]
@@ -394,5 +394,13 @@ mod test {
         let (can, cannot) = rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
+    }
+
+    #[test]
+    fn derive() {
+        let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
+        let rules = Ruleset::from_file("trig.rules");
+        let (can, cannot) = herbie.derive(DeriveType::LhsAndRhs, &rules, Limits::deriving());
+        println!("{} {}", can.len(), cannot.len());
     }
 }
