@@ -264,11 +264,11 @@ impl SynthLanguage for Math {
         if synth.params.use_smt {
             //if you drop variables, it's unsound because
             // we may have lost an error
-            if lhs.vars().into_iter().collect::<HashSet<Var>>()
+            /*if lhs.vars().into_iter().collect::<HashSet<Var>>()
                 != rhs.vars().into_iter().collect::<HashSet<Var>>()
             {
                 return false;
-            }
+            }*/
 
             let mut cfg = z3::Config::new();
             cfg.set_timeout_msec(1000);
