@@ -717,7 +717,8 @@ pub mod test {
         let herbie: Ruleset<Math> = Ruleset::from_file("baseline/herbie-rational.rules");
 
         let start = Instant::now();
-        let replicate_rules = replicate_ruler1_recipe();
+        // let replicate_rules = replicate_ruler1_recipe();
+        let replicate_rules = Ruleset::from_file("rat-rep.rules");
         let duration = start.elapsed();
 
         logger::write_output(
@@ -726,7 +727,7 @@ pub mod test {
             "rational_replicate",
             "oopsla",
             duration,
-            true,
+            (true, true),
         );
         logger::write_output(
             &replicate_rules,
@@ -734,11 +735,12 @@ pub mod test {
             "rational_replicate",
             "herbie",
             duration,
-            false, // can't derive because herbie's not sound
+            (true, false),
         );
 
         let start = Instant::now();
-        let best_rules = best_enumo_recipe();
+        // let best_rules = best_enumo_recipe();
+        let best_rules = Ruleset::from_file("rational.rules");
         let duration = start.elapsed();
 
         logger::write_output(
@@ -747,7 +749,7 @@ pub mod test {
             "rational_best",
             "oopsla",
             duration,
-            true,
+            (true, true),
         );
         logger::write_output(
             &best_rules,
@@ -755,7 +757,7 @@ pub mod test {
             "rational_best",
             "herbie",
             duration,
-            false, // can't derive because herbie's not sound
+            (true, false),
         );
     }
 

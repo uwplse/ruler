@@ -294,6 +294,21 @@ mod test {
         let rules = make_rules();
         let duration = start.elapsed();
 
-        logger::write_output(&rules, &herbie, "exponential", "herbie", duration, true);
+        logger::write_output(
+            &rules,
+            &herbie,
+            "exponential",
+            "herbie",
+            duration,
+            (true, true),
+        );
+    }
+
+    #[test]
+    fn derive() {
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
+        let rules = Ruleset::from_file("exponential.rules");
+        let (can, cannot) = herbie.derive(DeriveType::LhsAndRhs, &rules, Limits::deriving());
+        println!("{} {}", can.len(), cannot.len());
     }
 }

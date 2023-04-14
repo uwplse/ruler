@@ -118,7 +118,7 @@ pub mod test {
         let duration = start.elapsed();
         let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
 
-        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, true);
+        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, (true, true));
     }
 
     #[test]
