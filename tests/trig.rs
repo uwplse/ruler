@@ -395,12 +395,4 @@ mod test {
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
-
-    #[test]
-    fn derive() {
-        let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
-        let rules = Ruleset::from_file("trig.rules");
-        let (can, cannot) = herbie.derive(DeriveType::LhsAndRhs, &rules, Limits::deriving());
-        println!("{} {}", can.len(), cannot.len());
-    }
 }
