@@ -113,12 +113,17 @@ if [ -z "$NO_RUN" ]; then
   do_branch sat-10000 -o generate:taylor --num-enodes 10000
   do_branch sat-20000 -o generate:taylor --num-enodes 20000
 
-  git checkout "$HERBIE_DIR/egg-herbie/src/"
+  # rm $HERBIE_DIR/egg-herbie/src/*
+  # pushd $HERBIE_DIR
+  # git checkout $HERBIE_DIR/egg-herbie/src/
+  # popd
 
-  do_branch default-2500 -o generate:taylor --num-enodes 2500
-  do_branch default-5000 -o generate:taylor --num-enodes 5000
-  do_branch default-10000 -o generate:taylor --num-enodes 10000
-  do_branch default-20000 -o generate:taylor --num-enodes 20000
+  # cp "$MYDIR/lib.rs" "$HERBIE_DIR/egg-herbie/src/lib.rs"
+
+  # do_branch default-2500 -o generate:taylor --num-enodes 2500
+  # do_branch default-5000 -o generate:taylor --num-enodes 5000
+  # do_branch default-10000 -o generate:taylor --num-enodes 10000
+  # do_branch default-20000 -o generate:taylor --num-enodes 20000
 fi
 
 # Plots

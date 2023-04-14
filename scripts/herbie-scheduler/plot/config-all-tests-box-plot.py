@@ -22,21 +22,17 @@ if field == "time":
             new_times.append(float(t) / 1000.0)
         pairs[k] = new_times
 
-# h = ('H[-T]', pairs['main-t'])
-# e = ('E[-T]', pairs['enumo-t'])
-# en = ('E[-NT]', pairs['enumo-n-t'])
-# f = ('F[-T]', pairs['ruler-no-ff-t'])
-# fn = ('F[-NT]', pairs['ruler-no-ff-n-t'])
-# r = ('R[-T]', pairs['ruler-t'])
-# rn = ('R[-NT]', pairs['ruler-n-t'])
-# listify = [h, e, en, f, fn, r, rn]
+s025 = ('S[2.5]', pairs['sat-2500'])
+s050 = ('S[5]', pairs['sat-5000'])
+s100 = ('S[10]', pairs['sat-10000'])
+s200 = ('S[20]', pairs['sat-20000'])
 
-h = ('Herbie', pairs['main-t'])
-e = ('Enumo', pairs['enumo-t'])
-f = ('Enumo[-FF]', pairs['ruler-no-ff-t'])
-o = ('Enumo[Rational]', pairs['enumo-only-rat'])
-r = ('Ruler', pairs['ruler-t'])
-listify = [h, e, f, o, r]
+d025 = ('H[2.5]', pairs['default-2500'])
+d050 = ('H[5]', pairs['default-5000'])
+d100 = ('H[10]', pairs['default-10000'])
+d200 = ('H[20]', pairs['default-20000'])
+
+listify = [s025, s050, s100, s200, d025, d050, d100, d200]
 
 labs = []
 vals = []
@@ -50,13 +46,13 @@ ax.boxplot(vals)
 # manually set before deadline
 if str(field) == "output_parens":
     yname = "AST Size"
-    ax.set_ylim([0, 4000])
+    ax.set_ylim([0, 500])
 elif str(field) == "time":
     yname = "Time (s)"
-    ax.set_ylim([0, 6000])
+    ax.set_ylim([0, 5000])
 elif str(field) == "avg_bits_err_improve":
     yname = "Average bits of error improved"
-    ax.set_ylim([0, 3000])
+    ax.set_ylim([0, 750])
 else:
     yname = str(field)
     ax.set_ylim(bottom=0)

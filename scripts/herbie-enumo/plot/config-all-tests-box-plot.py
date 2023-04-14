@@ -22,20 +22,16 @@ if field == "time":
             new_times.append(float(t) / 1000.0)
         pairs[k] = new_times
 
-# h = ('H[-T]', pairs['main-t'])
-# e = ('E[-T]', pairs['enumo-t'])
-# en = ('E[-NT]', pairs['enumo-n-t'])
-# f = ('F[-T]', pairs['ruler-no-ff-t'])
-# fn = ('F[-NT]', pairs['ruler-no-ff-n-t'])
-# r = ('R[-T]', pairs['ruler-t'])
-# rn = ('R[-NT]', pairs['ruler-n-t'])
-# listify = [h, e, en, f, fn, r, rn]
+h = ('Herbie', pairs['main'])
+e = ('Enumo', pairs['enumo'])
+f = ('Enumo[-FF]', pairs['enumo-no-ff'])
+o = ('Enumo[Rat]', pairs['enumo-rat'])
+r = ('Ruler', pairs['ruler'])
+# hl = ('Herbie[L]', pairs['main-lim'])
+# el = ('Enumo[L]', pairs['enumo-lim'])
+# ol = ('Enumo[L, Rat]', pairs['enumo-rat-lim'])
 
-h = ('Herbie', pairs['main-t'])
-e = ('Enumo', pairs['enumo-t'])
-f = ('Enumo[-FF]', pairs['ruler-no-ff-t'])
-o = ('Enumo[Rational]', pairs['enumo-only-rat'])
-r = ('Ruler', pairs['ruler-t'])
+# listify = [h, e, f, o, r, hl, el]
 listify = [h, e, f, o, r]
 
 labs = []

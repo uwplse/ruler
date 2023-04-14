@@ -210,7 +210,7 @@ pub unsafe extern "C" fn egraph_run(
     egraph_run_with_iter_limit(
         ptr,
         output_size,
-        3,
+        4,
         node_limit,
         rules_array_ptr,
         is_constant_folding_enabled,
