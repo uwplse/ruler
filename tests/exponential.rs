@@ -303,12 +303,4 @@ mod test {
             (true, true),
         );
     }
-
-    #[test]
-    fn derive() {
-        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
-        let rules = Ruleset::from_file("exponential.rules");
-        let (can, cannot) = herbie.derive(DeriveType::LhsAndRhs, &rules, Limits::deriving());
-        println!("{} {}", can.len(), cannot.len());
-    }
 }
