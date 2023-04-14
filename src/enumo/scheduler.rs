@@ -147,4 +147,13 @@ impl Scheduler {
     ) -> EGraph<L, SynthAnalysis> {
         self.run_internal(egraph, ruleset, None)
     }
+
+    pub fn run_derive<L: SynthLanguage>(
+        &self,
+        egraph: &EGraph<L, SynthAnalysis>,
+        ruleset: &Ruleset<L>,
+        rule: &Rule<L>,
+    ) -> EGraph<L, SynthAnalysis> {
+        self.run_internal(egraph, ruleset, Some(rule))
+    }
 }

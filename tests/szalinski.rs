@@ -229,6 +229,7 @@ fn paste_print(rs: &Ruleset<CF>) {
 
 #[cfg(test)]
 mod tests {
+    use itertools::max;
     use ruler::enumo::{Ruleset, Scheduler, Workload};
 
     use super::*;
@@ -241,7 +242,7 @@ mod tests {
             "(Sphere scalar params)",
             "s",
         ]);
-        let scalars: &[&str] = &["sa", "(Lit 1)"];
+        let scalars: &[&str] = &["a", "(Lit 1)"];
         let transformations: &[&str] = &["Scale", "Trans"];
         let bops: &[&str] = &["+", "*", "/"];
         let v3s: &[&str] = &[
@@ -282,6 +283,25 @@ mod tests {
 
         learned_rules.pretty_print();
         paste_print(&learned_rules);
+
+        let mut most_atoms = 0;
+        for (_, rule) in learned_rules {
+            let mut i = 0;
+            for s in rule.lhs.ast.as_ref() {
+                if s.to_string() != "op" && s.to_string() != "Lit" {
+                    i += 1;
+                }
+            }
+
+            let mut j = 0;
+            for s in rule.rhs.ast.as_ref() {
+                if s.to_string() != "op" && s.to_string() != "Lit" {
+                    j += 1;
+                }
+            }
+            most_atoms = max(vec![most_atoms, i, j]).unwrap();
+        }
+        println!("most atoms {}", most_atoms);
 
         let expected: Ruleset<CF> = Ruleset::new(&[
             "?a <=> (Trans (Vec3 (Lit 0) (Lit 0) (Lit 0)) ?a)",
