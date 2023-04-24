@@ -834,7 +834,7 @@ pub mod test {
         );
 
         logger::write_output(
-            &best_rules,
+            &without_if,
             &ruler1,
             "rational_best",
             "oopsla",
@@ -842,7 +842,7 @@ pub mod test {
             (true, true),
         );
         logger::write_output(
-            &best_rules,
+            &without_if,
             &herbie,
             "rational_best",
             "herbie",
@@ -857,11 +857,6 @@ pub mod test {
             duration,
             (false, false),
         );
-    }
-
-    #[test]
-    fn just_best() {
-        let best_rules = best_enumo_recipe();
     }
 
     /*#[test]
