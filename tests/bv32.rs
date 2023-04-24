@@ -8,8 +8,11 @@ use ruler::enumo::{Ruleset, Scheduler, Workload};
 
 ruler::impl_bv!(32);
 
-#[path = "./recipes/bv4.rs"]
-pub mod bv4;
+#[path = "./recipes/bv4_fancy.rs"]
+pub mod bv4_fancy;
+
+#[path = "./recipes/bv32.rs"]
+mod bv32;
 
 impl Bv {
     pub fn run_workload(workload: Workload, prior: Ruleset<Self>, limits: Limits) -> Ruleset<Self> {
@@ -42,7 +45,8 @@ impl Bv {
 pub mod test {
     use std::time::{Duration, Instant};
 
-    use crate::bv4::bv4_rules;
+    use crate::bv32::bv32_rules;
+    use crate::bv4_fancy::bv4_fancy_rules;
 
     use ruler::{
         enumo::{self, Filter, Ruleset, Workload},
@@ -95,11 +99,26 @@ pub mod test {
     }
 
     fn from_bv4() -> (Ruleset<Bv>, Duration) {
-        let actual_bv4_rules: Ruleset<_> = bv4_rules();
+        let actual_bv4_rules: Ruleset<_> = bv4_fancy_rules();
         let ported_bv4_rules: Ruleset<Bv> = Ruleset::new(actual_bv4_rules.to_str_vec());
         let start = Instant::now();
         let (sound, _) = ported_bv4_rules.partition(|rule| rule.is_valid());
         (sound, start.elapsed())
+    }
+
+    #[test]
+    fn run() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        let start = Instant::now();
+        let rules = bv32_rules();
+        let duration = start.elapsed();
+        let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
+
+        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, (true, true));
     }
 
     #[test]
@@ -130,6 +149,23 @@ pub mod test {
         let (can, cannot) =
             sound_bv4.derive(ruler::DeriveType::LhsAndRhs, &gen, Limits::deriving());
         let derive_time = start.elapsed();
+        let lhsrhs = json!({
+            "can": can.len(),
+            "cannot": cannot.len(),
+            "missing_rules": cannot.to_str_vec(),
+            "time": derive_time.as_secs_f32()
+        });
+
+        let start = Instant::now();
+        let (can, cannot) = sound_bv4.derive(ruler::DeriveType::Lhs, &gen, Limits::deriving());
+        let derive_time = start.elapsed();
+
+        let lhs = json!({
+            "can": can.len(),
+            "cannot": cannot.len(),
+            "missing_rules": cannot.to_str_vec(),
+            "time": derive_time.as_secs_f32()
+        });
 
         std::fs::create_dir_all("nightly/data")
             .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
@@ -143,12 +179,8 @@ pub mod test {
                 "rules": sound_bv4.to_str_vec(),
                 "time": sound_bv4_time.as_secs_f32()
             }),
-            "derive": json!({
-                "can": can.len(),
-                "cannot": cannot.len(),
-                "missing_rules": cannot.to_str_vec(),
-                "time": derive_time.as_secs_f32()
-            })
+            "lhs_derive": lhs,
+            "lhsrhs_derive": lhsrhs
 
         });
         logger::add_to_data_file("nightly/data/output.json".to_string(), stat);

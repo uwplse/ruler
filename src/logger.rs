@@ -14,14 +14,45 @@ pub fn write_output<L: SynthLanguage>(
     recipe_name: &str,
     baseline_name: &str,
     time_rules: Duration,
+    derive: (bool, bool),
 ) {
     // get information about the derivability of our ruleset vs. the baseline ruleset
+    let start = Instant::now();
     let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-        get_derivability_results(ruleset, DeriveType::Lhs, baseline);
+        get_derivability_results(ruleset, DeriveType::Lhs, baseline, derive);
+    let duration = start.elapsed();
+    println!(
+        "LHS: {} / {}, {} / {} in {} seconds.",
+        forwards_lhs,
+        baseline.clone().len(),
+        backwards_lhs,
+        ruleset.clone().len(),
+        duration.as_secs_f64()
+    );
+    let start = Instant::now();
     let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
-        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline);
+        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, derive);
+    let duration = start.elapsed();
+    println!(
+        "LHS/RHS: {} / {}, {} / {} in {} seconds.",
+        forwards_lhs_rhs,
+        baseline.clone().len(),
+        backwards_lhs_rhs,
+        ruleset.clone().len(),
+        duration.as_secs_f64()
+    );
+    let start = Instant::now();
     let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline);
+        get_derivability_results(ruleset, DeriveType::AllRules, baseline, derive);
+    let duration = start.elapsed();
+    println!(
+        "ALL: {} / {}, {} / {} in {} seconds.",
+        forwards_all,
+        baseline.clone().len(),
+        backwards_all,
+        ruleset.clone().len(),
+        duration.as_secs_f64()
+    );
 
     // get linecount of recipe
     let cnt = count_lines(recipe_name);
@@ -112,6 +143,7 @@ pub fn get_derivability_results<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     derive_type: DeriveType,
     baseline: &Ruleset<L>,
+    derive: (bool, bool),
 ) -> ((usize, usize), (Duration, Duration), Value) {
     let limits = if let DeriveType::AllRules = derive_type {
         Limits {
@@ -123,10 +155,18 @@ pub fn get_derivability_results<L: SynthLanguage>(
     };
 
     let start_f = Instant::now();
-    let (can_f, cannot_f) = ruleset.derive(derive_type, baseline, limits);
+    let (can_f, cannot_f) = if derive.0 {
+        ruleset.derive(derive_type, baseline, limits)
+    } else {
+        (Ruleset::default(), Ruleset::default())
+    };
     let time_f = start_f.elapsed();
     let start_b = Instant::now();
-    let (can_b, cannot_b) = baseline.derive(derive_type, ruleset, limits);
+    let (can_b, cannot_b) = if derive.1 {
+        baseline.derive(derive_type, ruleset, limits)
+    } else {
+        (Ruleset::default(), Ruleset::default())
+    };
     let time_b = start_b.elapsed();
 
     let derivability_results = json!({

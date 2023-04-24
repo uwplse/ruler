@@ -33,6 +33,9 @@ function getBaseline(data, baseline) {
     Object.keys(keys).forEach((key) => {
       newRow[keys[key]] = tryRound(row[key]);
     });
+
+    convertDerivabilityToPercentages(newRow);
+
     consolidateColumns(newRow, "Enumo derives Baseline (LHS, LHS/RHS, All)", [
       "E derives B (LHS)",
       "E derives B (LHSRHS)",
@@ -56,6 +59,22 @@ function getBaseline(data, baseline) {
     newData.push(newRow);
   });
   return newData;
+}
+
+function convertDerivabilityToPercentages(row) {
+  let derive_types = ["LHS", "LHSRHS", "ALL"];
+  derive_types.forEach((dt) => {
+    row[`E derives B (${dt})`] = toPercentage(
+      row[`E derives B (${dt})`],
+      row["# Baseline"],
+      1
+    );
+    row[`B derives E (${dt})`] = toPercentage(
+      row[`B derives E (${dt})`],
+      row["# Enumo"],
+      1
+    );
+  });
 }
 
 function load() {
@@ -147,12 +166,12 @@ function loadDeriveDetail() {
   });
 }
 
-function tryRound(v) {
+function tryRound(v, precision) {
   if (typeof v == "number") {
     if (v % 1 == 0) {
       return v;
     } else {
-      return v.toFixed(2);
+      return v.toFixed(precision || 2);
     }
   } else {
     return v;
@@ -160,13 +179,21 @@ function tryRound(v) {
 }
 
 function getFormattedHeader(baseline, columnNames) {
-  if (baseline === "oopsla") {
-    return String.raw`Domain & \enumo LOC & \# \enumo & \# \ruler & Time (s) & \enumo $\rightarrow$ \ruler & \enumo $\rightarrow$ \ruler Time (s) & \ruler $\rightarrow$ \enumo & \ruler $\rightarrow$ \enumo Time (s)\\ \cline{1-9}`;
+  let header = "";
+  let baseline_names = {
+    oopsla: String.raw`\ruler`,
+    herbie: String.raw`\herbie`,
+    halide: String.raw`\halide`,
+  };
+  if (baseline === "bv") {
+    header = String.raw`Domain & \# Generated Rules & Generation Time (s) & \# Sound BV4 Rules & Validation Time (s) & Validate $\rightarrow$ Generated`;
   } else {
-    return (
-      columnNames.join(" & ") + String.raw`\\ \cline{1-${columnNames.length}}`
-    );
+    let baseline_name = baseline_names[baseline];
+    if (baseline_name) {
+      header = String.raw`Domain & \enumo LOC & \# \enumo & \# ${baseline_names[baseline]} & \enumo $\rightarrow$ ${baseline_names[baseline]} & ${baseline_names[baseline]} $\rightarrow$ \enumo`;
+    }
   }
+  return String.raw`${header} \\ \cline{1-${header.split("&").length}}`;
 }
 
 function getCaption(baseline) {
@@ -184,46 +211,60 @@ function getCaption(baseline) {
   }
 }
 
-function generateLatex(baseline) {
-  let baselineData = getBaseline(data, baseline);
-
-  let columnNames = Object.keys(baselineData[0]);
-
-  if (baseline === "oopsla") {
-    var ignoreColumns = ["Baseline", "Minimization"];
+function onGenerateClick(version) {
+  var ignoreColumns = [];
+  if (version === "bv") {
+    let tableData = loadBvExp();
+    console.log(tableData);
+    generateLatex("bv", tableData, ["missing"]);
   } else {
-    var ignoreColumns = [];
+    let tableData = getBaseline(data, version);
+
+    ignoreColumns = [
+      "Baseline",
+      "Minimization",
+      "Time (s)",
+      "Baseline derives Enumo Time (s)",
+      "Enumo derives Baseline Time (s)",
+    ];
+
+    generateLatex(version, tableData, ignoreColumns);
   }
+}
 
-  var lines = [
-    String.raw`\begin{table}`,
-    String.raw`\resizebox{\textwidth}{!}{%`,
-    String.raw`\begin{tabular}{` +
-      "l".repeat(columnNames.length - ignoreColumns.length) +
-      "}",
-  ];
+function generateLatex(version, tableData, ignoreColumns) {
+  document.getElementById("latex").innerHTML =
+    "This feature is not currently supported.";
+  // let columnNames = Object.keys(tableData[0]);
+  // let lines = [
+  //   String.raw`\begin{table}`,
+  //   String.raw`\resizebox{\textwidth}{!}{%`,
+  //   String.raw`\begin{tabular}{` +
+  //     "l".repeat(columnNames.length - ignoreColumns.length) +
+  //     "}",
+  // ];
 
-  lines.push(getFormattedHeader(baseline, columnNames));
+  // lines.push(getFormattedHeader(version, columnNames));
 
-  baselineData.forEach((row) => {
-    lines.push(
-      Object.keys(row)
-        .filter((key) => !ignoreColumns.includes(key))
-        .map((key) => row[key])
-        .join(" & ") + " \\\\"
-    );
-  });
+  // tableData.forEach((row) => {
+  //   let line =
+  //     Object.keys(row)
+  //       .filter((key) => !ignoreColumns.includes(key))
+  //       .map((key) => row[key])
+  //       .join(" & ") + " \\\\";
+  //   lines.push(line.replaceAll("%", "\\%"));
+  // });
 
-  lines.push(String.raw`\end{tabular}%`);
-  lines.push(String.raw`}`);
-  lines = lines.concat(getCaption(baseline));
-  lines.push(String.raw`\label{table:${baseline}}`);
-  lines.push(String.raw`\end{table}`);
+  // lines.push(String.raw`\end{tabular}%`);
+  // lines.push(String.raw`}`);
+  // lines = lines.concat(getCaption(version));
+  // lines.push(String.raw`\label{table:${version}}`);
+  // lines.push(String.raw`\end{table}`);
 
-  let s = lines.join("\n");
-  let elem = document.getElementById("latex");
-  elem.innerHTML = s;
-  elem.style.height = "200px";
+  // let s = lines.join("\n");
+  // let elem = document.getElementById("latex");
+  // elem.innerHTML = s;
+  // elem.style.height = "200px";
 }
 
 function consolidateColumns(dataObj, consolidatedName, columnNames) {
@@ -235,8 +276,12 @@ function consolidateColumns(dataObj, consolidatedName, columnNames) {
   dataObj[consolidatedName] = values.join(", ");
 }
 
-function toPercentage(v, b) {
-  return (tryRound(v / b) * 100).toFixed(0).toString() + "%";
+function toPercentage(n, d, decimals) {
+  return (
+    (tryRound(n / d, decimals + 2 || 2) * 100)
+      .toFixed(decimals || 0)
+      .toString() + "%"
+  );
 }
 
 function loadBvExp() {
@@ -251,9 +296,39 @@ function loadBvExp() {
       "gen time (s)": tryRound(exp.direct_gen.time),
       from_bv4: exp.from_bv4.rules.length,
       "from_bv4 time (s)": tryRound(exp.from_bv4.time),
-      derive: toPercentage(exp.derive.can, exp.derive.can + exp.derive.cannot),
-      missing: exp.derive.missing_rules.join("<br/>"),
+      LHS: toPercentage(
+        exp.lhs_derive.can,
+        exp.lhs_derive.can + exp.lhs_derive.cannot
+      ),
+      "LHS Time": tryRound(exp.lhs_derive.time),
+      "LHS missing": formatRules(exp.lhs_derive.missing_rules),
+      "LHS-RHS": toPercentage(
+        exp.lhsrhs_derive.can,
+        exp.lhsrhs_derive.can + exp.lhsrhs_derive.cannot
+      ),
+      "LHS-RHS Time": tryRound(exp.lhsrhs_derive.time),
+      "LHS-RHS missing": formatRules(exp.lhsrhs_derive.missing_rules),
     });
   });
+
+  // sort by increasing BV width
+  rows.sort((a, b) => a.domain.substr(2) - b.domain.substr(2));
+  return rows;
+}
+
+function onLoadBv() {
+  let rows = loadBvExp();
   document.getElementById("container").innerHTML = ConvertJsonToTable(rows);
+}
+
+function formatRules(rules) {
+  let bidir = [];
+  rules.forEach((rule, i) => {
+    let [left, right] = rule.split(" ==> ");
+    if (rules.includes(`${right} ==> ${left}`)) {
+      bidir.push(`${left} <=> ${right}`);
+      rules.splice(i, 1);
+    }
+  });
+  return bidir.join("<br/>");
 }
