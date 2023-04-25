@@ -123,7 +123,6 @@ pub mod test {
 
     #[test]
     fn compare() {
-        return;
         let domain = "BV32";
         // Generate the rules directly
         let (gen, gen_time): (Ruleset<Bv>, Duration) = gen();
