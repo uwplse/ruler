@@ -442,16 +442,10 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 ctx,
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
-            Math::Div([x, y]) => {
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                let one = z3::ast::Real::from_real(ctx, 1, 1);
-                // Division by zero set to one
-                buf.push(z3::ast::Bool::ite(
-                    &buf[usize::from(*y)]._eq(&zero),
-                    &zero,
-                    &z3::ast::Real::div(&buf[usize::from(*x)], &buf[usize::from(*y)]),
-                ))
-            }
+            Math::Div([x, y]) => buf.push(&z3::ast::Real::div(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)],
+            )),
             Math::Neg(x) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*x)])),
             Math::Abs(a) => {
                 let inner = &buf[usize::from(*a)].clone();
