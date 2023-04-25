@@ -1,3 +1,8 @@
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
+
 /// Return the `i`th letter from the English alphabet.
 pub fn letter(i: usize) -> &'static str {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
@@ -56,4 +61,13 @@ macro_rules! map {
             })
             .collect::<Vec<_>>()
     };
+}
+
+pub fn count_lines(name: &str) -> Option<usize> {
+    let filepath = format!("tests/recipes/{}.rs", name);
+    if let Ok(file) = File::open(filepath) {
+        Some(BufReader::new(file).lines().count())
+    } else {
+        None
+    }
 }

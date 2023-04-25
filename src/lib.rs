@@ -3,6 +3,7 @@ use std::{fmt::Display, hash::BuildHasherDefault};
 pub use bv::*;
 use enumo::Ruleset;
 pub use language::*;
+use serde::Serialize;
 pub use util::*;
 
 mod bv;
@@ -56,7 +57,7 @@ pub struct Limits {
     pub node: usize,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub enum DeriveType {
     Lhs,
     LhsAndRhs,

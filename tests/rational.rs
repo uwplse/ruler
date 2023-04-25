@@ -720,43 +720,43 @@ pub mod test {
         let replicate_rules = replicate_ruler1_recipe();
         let duration = start.elapsed();
 
-        logger::write_output(
-            &replicate_rules,
-            &ruler1,
-            "rational_replicate",
-            "oopsla",
-            duration,
-            (true, true),
-        );
-        logger::write_output(
-            &replicate_rules,
-            &herbie,
-            "rational_replicate",
-            "herbie",
-            duration,
-            (true, false),
-        );
+        // logger::write_output(
+        //     &replicate_rules,
+        //     &ruler1,
+        //     "rational_replicate",
+        //     "oopsla",
+        //     duration,
+        //     (true, true),
+        // );
+        // logger::write_output(
+        //     &replicate_rules,
+        //     &herbie,
+        //     "rational_replicate",
+        //     "herbie",
+        //     duration,
+        //     (true, false),
+        // );
 
-        let start = Instant::now();
-        let best_rules = best_enumo_recipe();
-        let duration = start.elapsed();
+        // let start = Instant::now();
+        // let best_rules = best_enumo_recipe();
+        // let duration = start.elapsed();
 
-        logger::write_output(
-            &best_rules,
-            &ruler1,
-            "rational_best",
-            "oopsla",
-            duration,
-            (true, true),
-        );
-        logger::write_output(
-            &best_rules,
-            &herbie,
-            "rational_best",
-            "herbie",
-            duration,
-            (true, false),
-        );
+        // logger::write_output(
+        //     &best_rules,
+        //     &ruler1,
+        //     "rational_best",
+        //     "oopsla",
+        //     duration,
+        //     (true, true),
+        // );
+        // logger::write_output(
+        //     &best_rules,
+        //     &herbie,
+        //     "rational_best",
+        //     "herbie",
+        //     duration,
+        //     (true, false),
+        // );
     }
 
     #[test]

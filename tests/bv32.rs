@@ -116,9 +116,9 @@ pub mod test {
         let start = Instant::now();
         let rules = bv32_rules();
         let duration = start.elapsed();
-        let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
+        // let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
 
-        logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, (true, true));
+        // logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, (true, true));
     }
 
     #[test]
@@ -182,6 +182,6 @@ pub mod test {
             "lhsrhs_derive": lhsrhs
 
         });
-        logger::add_to_data_file("nightly/data/output.json".to_string(), stat);
+        // logger::add_to_data_file("nightly/data/output.json".to_string(), stat);
     }
 }

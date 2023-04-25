@@ -133,6 +133,6 @@ pub mod test {
             "lhsrhs_derive": lhsrhs
 
         });
-        logger::add_to_data_file("nightly/data/output.json".to_string(), stat);
+        // logger::add_to_data_file("nightly/data/output.json".to_string(), stat);
     }
 }
