@@ -65,7 +65,7 @@ pub fn write_baseline<L: SynthLanguage>(
         })
     };
 
-    let baseline_derives_enumo = if skip_derive.contains(&(spec_name, baseline_name)) {
+    let baseline_derives_enumo = if skip_derive.contains(&(baseline_name, spec_name)) {
         json!({})
     } else {
         json!({
