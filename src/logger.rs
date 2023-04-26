@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use crate::{count_lines, enumo::Ruleset, DeriveType, Limits, SynthLanguage};
 
-pub fn add_json_to_file(json: Value) {
+fn add_json_to_file(json: Value) {
     let path = "nightly/data/output.json";
     std::fs::create_dir_all("nightly/data").unwrap_or_else(|e| panic!("Error creating dir: {}", e));
 
@@ -83,7 +83,54 @@ pub fn write_baseline<L: SynthLanguage>(
     add_json_to_file(row)
 }
 
-pub fn get_derivability<L: SynthLanguage>(
+pub fn write_bv_derivability<L: SynthLanguage>(
+    domain: &str,
+    gen_rules: Ruleset<L>,
+    gen_time: Duration,
+    ported_bv4_rules: Ruleset<L>,
+) {
+    // Validate bv4 rules for this domain
+    let start = Instant::now();
+    let (sound_bv4, _) = ported_bv4_rules.partition(|rule| rule.is_valid());
+    let validate_time = start.elapsed();
+
+    // Compute derivability
+    let start = Instant::now();
+    let (can, cannot) = sound_bv4.derive(DeriveType::LhsAndRhs, &gen_rules, Limits::deriving());
+    let derive_time = start.elapsed();
+    let lhsrhs = json!({
+        "can": can.to_str_vec(),
+        "cannot": cannot.to_str_vec(),
+        "time": derive_time.as_secs_f64()
+    });
+
+    let start = Instant::now();
+    let (can, cannot) = sound_bv4.derive(DeriveType::Lhs, &gen_rules, Limits::deriving());
+    let derive_time = start.elapsed();
+    let lhs = json!({
+        "can": can.to_str_vec(),
+        "cannot": cannot.to_str_vec(),
+        "time": derive_time.as_secs_f64()
+    });
+
+    add_json_to_file(json!({
+        "domain": domain,
+        "direct_gen": json!({
+            "rules": gen_rules.to_str_vec(),
+            "time": gen_time.as_secs_f64()
+        }),
+        "from_bv4": json!({
+            "rules": sound_bv4.to_str_vec(),
+            "time": validate_time.as_secs_f64()
+        }),
+        "derivability": json!({
+            "lhs": lhs,
+            "lhs_rhs": lhsrhs
+        })
+    }))
+}
+
+fn get_derivability<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     against: &Ruleset<L>,
     derive_type: DeriveType,
@@ -98,19 +145,4 @@ pub fn get_derivability<L: SynthLanguage>(
         "cannot": cannot.to_str_vec(),
         "time": elapsed.as_secs_f64()
     })
-}
-
-#[cfg(test)]
-mod test {
-    use serde_json::json;
-
-    use super::*;
-
-    #[test]
-    fn test_add() {
-        add_json_to_file(json!({
-          "foo": [1,2,3],
-          "bar": "baz"
-        }));
-    }
 }

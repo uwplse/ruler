@@ -19,7 +19,6 @@ pub mod test {
         recipe_utils::{iter_metric, recursive_rules, run_workload, Lang},
         Limits,
     };
-    use serde_json::json;
 
     use crate::Bv;
 
@@ -63,75 +62,16 @@ pub mod test {
         (rules, duration)
     }
 
-    fn from_bv4() -> (Ruleset<Bv>, Duration) {
-        let actual_bv4_rules: Ruleset<_> = bv4_fancy_rules();
-        let ported_bv4_rules: Ruleset<Bv> = Ruleset::new(actual_bv4_rules.to_str_vec());
-        let start = Instant::now();
-        let (sound, _) = ported_bv4_rules.partition(|rule| rule.is_valid());
-        (sound, start.elapsed())
-    }
-
     #[test]
     fn compare() {
         let domain = "BV64";
+        // Port the bv4 rules into domain
+        let actual_bv4_rules: Ruleset<_> = bv4_fancy_rules();
+        let ported_bv4_rules: Ruleset<Bv> = Ruleset::new(actual_bv4_rules.to_str_vec());
+
         // Generate the rules directly
         let (gen, gen_time): (Ruleset<Bv>, Duration) = gen();
 
-        // Validate bv4 rules
-        let (sound_bv4, sound_bv4_time) = from_bv4();
-
-        println!("Summary for {}", domain);
-        println!(
-            "Generated {} rules for {} in {}s",
-            gen.len(),
-            domain,
-            gen_time.as_secs_f32()
-        );
-        println!(
-            "Validating bv4 rules as {} rules resulted in {} sound rules in {}s",
-            domain,
-            sound_bv4.len(),
-            sound_bv4_time.as_secs_f32()
-        );
-
-        let start = Instant::now();
-        let (can, cannot) =
-            sound_bv4.derive(ruler::DeriveType::LhsAndRhs, &gen, Limits::deriving());
-        let derive_time = start.elapsed();
-        let lhsrhs = json!({
-            "can": can.len(),
-            "cannot": cannot.len(),
-            "missing_rules": cannot.to_str_vec(),
-            "time": derive_time.as_secs_f32()
-        });
-
-        let start = Instant::now();
-        let (can, cannot) = sound_bv4.derive(ruler::DeriveType::Lhs, &gen, Limits::deriving());
-        let derive_time = start.elapsed();
-
-        let lhs = json!({
-            "can": can.len(),
-            "cannot": cannot.len(),
-            "missing_rules": cannot.to_str_vec(),
-            "time": derive_time.as_secs_f32()
-        });
-
-        std::fs::create_dir_all("nightly/data")
-            .unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-        let stat = json!({
-            "domain": domain,
-            "direct_gen": json!({
-                "rules": gen.to_str_vec(),
-                "time": gen_time.as_secs_f32()
-            }),
-            "from_bv4": json!({
-                "rules": sound_bv4.to_str_vec(),
-                "time": sound_bv4_time.as_secs_f32()
-            }),
-            "lhs_derive": lhs,
-            "lhsrhs_derive": lhsrhs
-
-        });
-        // logger::add_to_data_file("nightly/data/output.json".to_string(), stat);
+        logger::write_bv_derivability(domain, gen, gen_time, ported_bv4_rules)
     }
 }
