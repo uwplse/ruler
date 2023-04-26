@@ -39,6 +39,11 @@ pub fn write_baseline<L: SynthLanguage>(
     baseline_name: &str,
     time: Duration,
 ) {
+    // Items in this list will *not* run derivability
+    // Format is (a, b) where a and b are spec/baseline names
+    // and a.derive(b) will *not* run.
+    // Note: b.derive(a) will still be computed unless (b, a)
+    // is also in this list.
     let skip_derive = vec![
         ("herbie", "rational_replicate"),
         ("herbie", "rational_best"),
@@ -46,6 +51,7 @@ pub fn write_baseline<L: SynthLanguage>(
         ("halide", "oopsla halide (1 iter)"),
         ("oopsla halide (1 iter)", "halide"),
     ];
+
     let loc = count_lines(spec_name)
         .map(|x| x.to_string())
         .unwrap_or_else(|| "-".to_string());
