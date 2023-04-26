@@ -2,12 +2,56 @@ function load() {
   document.getElementById("baseline_table").innerHTML = ConvertJsonToTable(
     getBaseline("oopsla")
   );
+
+  document.getElementById("detail").innerHTML = populateDomainDetail();
 }
 
 function onLoadBv() {
   document.getElementById("container").innerHTML = ConvertJsonToTable(
     getBvData()
   );
+}
+
+function loadRules() {
+  let domainData = getDomainData();
+  document.getElementById("domain_name").innerHTML = domainData.spec_name;
+  let rules = domainData.rules;
+  document.getElementById("all_rules").innerHTML = formatRules(rules);
+}
+
+function loadDeriveDetail() {
+  let domainData = getDomainData();
+  document.getElementById("domain_name").innerHTML = domainData.spec_name;
+  let deriveTypes = ["lhs", "lhs_rhs"];
+  deriveTypes.forEach((deriveType) => {
+    let derivability = domainData.derivability;
+
+    let tableData = [
+      {
+        "Enumo->Baseline (derivable)": formatRules(
+          derivability.enumo_derives_baseline[deriveType]?.can
+        ),
+        "Enumo->Baseline (not derivable)": formatRules(
+          derivability.enumo_derives_baseline[deriveType]?.cannot
+        ),
+        "Baseline->Enumo (derivable)": formatRules(
+          derivability.baseline_derives_enumo[deriveType]?.can
+        ),
+        "Baseline->Enumo (not derivable)": formatRules(
+          derivability.baseline_derives_enumo[deriveType]?.cannot
+        ),
+      },
+    ];
+    document.getElementById(`${deriveType}_table`).innerHTML =
+      ConvertJsonToTable(tableData);
+  });
+}
+
+function getDomainData() {
+  let params = new URLSearchParams(window.location.search);
+  let domain = Object.fromEntries(params).domain;
+
+  return data.find((x) => x.spec_name == domain);
 }
 
 function getBvData() {
@@ -82,6 +126,21 @@ function getBaseline(name) {
   return tableData;
 }
 
+function populateDomainDetail() {
+  let domains = data.map((row) => row.spec_name).filter((x) => !!x);
+  let str = "";
+  domains.forEach((domain) => {
+    str += `
+      <p>
+      ${domain}: 
+      <a href="rules.html?domain=${domain}">All Rules</a>
+      <a href="derive_detail.html?domain=${domain}">Derivability</a>
+      </p>
+    `;
+  });
+  return str;
+}
+
 function getDerivability(o) {
   let total = o.can.length + o.cannot.length;
   return toPercentage(o.can.length, total, 1);
@@ -109,6 +168,9 @@ function toPercentage(n, d, decimals) {
 
 function formatRules(rules) {
   let bidir = [];
+  if (!rules || rules.length == 0) {
+    return "-";
+  }
   rules.forEach((rule, i) => {
     let [left, right] = rule.split(" ==> ");
     if (rules.includes(`${right} ==> ${left}`)) {
