@@ -313,22 +313,14 @@ mod test {
         let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
         let oopsla_duration = Duration::from_secs_f32(3.354);
 
-        // logger::write_output(
-        //     &all_rules,
-        //     &baseline,
-        //     "halide",
-        //     "halide",
-        //     duration,
-        //     (false, false),
-        // );
+        logger::write_baseline(&all_rules, "halide", &baseline, "halide", duration);
 
-        // logger::write_output(
-        //     &oopsla_halide,
-        //     &baseline,
-        //     "oopsla halide (1 iter)",
-        //     "halide",
-        //     oopsla_duration,
-        //     (false, false),
-        // )
+        logger::write_baseline(
+            &oopsla_halide,
+            "oopsla halide (1 iter)",
+            &baseline,
+            "halide",
+            oopsla_duration,
+        );
     }
 }

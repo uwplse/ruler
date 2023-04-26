@@ -360,7 +360,7 @@ mod test {
         let rules = trig_rules();
         let duration = start.elapsed();
 
-        // logger::write_output(&rules, &herbie, "trig", "herbie", duration, (true, true));
+        logger::write_baseline(&rules, "trig", &herbie, "herbie", duration);
     }
 
     #[test]

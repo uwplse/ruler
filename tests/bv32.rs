@@ -116,9 +116,9 @@ pub mod test {
         let start = Instant::now();
         let rules = bv32_rules();
         let duration = start.elapsed();
-        // let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
+        let baseline = Ruleset::<_>::from_file("baseline/bv32.rules");
 
-        // logger::write_output(&rules, &baseline, "bv32", "oopsla", duration, (true, true));
+        logger::write_baseline(&rules, "bv32", &baseline, "oopsla", duration);
     }
 
     #[test]

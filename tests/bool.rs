@@ -276,11 +276,7 @@ mod test {
         let duration = start.elapsed();
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 
-        logger::write_rules(&rules, "bool", duration);
-        logger::write_derivability(&rules, "bool", &baseline, "oopsla", DeriveType::Lhs);
-        logger::write_derivability(&baseline, "oopsla", &rules, "bool", DeriveType::Lhs);
-        logger::write_derivability(&rules, "bool", &baseline, "oopsla", DeriveType::LhsAndRhs);
-        logger::write_derivability(&baseline, "oopsla", &rules, "bool", DeriveType::LhsAndRhs);
+        logger::write_baseline(&rules, "bool", &baseline, "oopsla", duration);
     }
 
     #[test]
