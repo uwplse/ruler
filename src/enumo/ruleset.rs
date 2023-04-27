@@ -461,13 +461,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         (chosen, invalid)
     }
 
-    pub fn can_derive(
-        &self,
-        derive_type: DeriveType,
-        rule: &Rule<L>,
-        allrules: &Self,
-        limits: Limits,
-    ) -> bool {
+    pub fn can_derive(&self, derive_type: DeriveType, rule: &Rule<L>, limits: Limits) -> bool {
         let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
@@ -480,14 +474,6 @@ impl<L: SynthLanguage> Ruleset<L> {
             DeriveType::LhsAndRhs => {
                 egraph.add_expr(lexpr);
                 egraph.add_expr(rexpr);
-            }
-            DeriveType::AllRules => {
-                for rule in allrules.0.values() {
-                    let lhs = &L::instantiate(&rule.lhs);
-                    let rhs = &L::instantiate(&rule.rhs);
-                    egraph.add_expr(lhs);
-                    egraph.add_expr(rhs);
-                }
             }
         }
 
@@ -507,7 +493,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|rule| self.can_derive(derive_type, rule, against, limits))
+        against.partition(|rule| self.can_derive(derive_type, rule, limits))
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {

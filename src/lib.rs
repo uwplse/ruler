@@ -61,7 +61,6 @@ pub struct Limits {
 pub enum DeriveType {
     Lhs,
     LhsAndRhs,
-    AllRules,
 }
 
 impl Default for Limits {
