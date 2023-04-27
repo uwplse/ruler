@@ -3,6 +3,14 @@ function load() {
     getBaseline("oopsla")
   );
 
+  document.getElementById("herbie_table").innerHTML = ConvertJsonToTable(
+    getBaseline("herbie")
+  );
+
+  document.getElementById("halide_table").innerHTML = ConvertJsonToTable(
+    getBaseline("halide")
+  );
+
   document.getElementById("detail").innerHTML = populateDomainDetail();
 }
 
@@ -91,26 +99,36 @@ function getBaseline(name) {
       `${getDerivability(
         row.derivability.enumo_derives_baseline.lhs
       )} / ${getDerivability(row.derivability.enumo_derives_baseline.lhs_rhs)}`,
-    "Enumo derives Baseline Time (s)": (row) =>
-      `${tryRound(
-        row.derivability.enumo_derives_baseline.lhs.time,
-        3
-      )} / ${tryRound(
-        row.derivability.enumo_derives_baseline.lhs_rhs.time,
-        3
-      )}`,
+    "Enumo derives Baseline Time (s)": (row) => {
+      if (missingDerivability(row.derivability.enumo_derives_baseline)) {
+        return "-";
+      } else {
+        return `${tryRound(
+          row.derivability.enumo_derives_baseline.lhs.time,
+          3
+        )} / ${tryRound(
+          row.derivability.enumo_derives_baseline.lhs_rhs.time,
+          3
+        )}`;
+      }
+    },
     "Baseline Derives Enumo (LHS / LHSRHS)": (row) =>
       `${getDerivability(
         row.derivability.baseline_derives_enumo.lhs
       )} / ${getDerivability(row.derivability.baseline_derives_enumo.lhs_rhs)}`,
-    "Baseline derives Enumo Time (s)": (row) =>
-      `${tryRound(
-        row.derivability.baseline_derives_enumo.lhs.time,
-        3
-      )} / ${tryRound(
-        row.derivability.baseline_derives_enumo.lhs_rhs.time,
-        3
-      )}`,
+    "Baseline derives Enumo Time (s)": (row) => {
+      if (missingDerivability(row.derivability.baseline_derives_enumo)) {
+        return "-";
+      } else {
+        return `${tryRound(
+          row.derivability.baseline_derives_enumo.lhs.time,
+          3
+        )} / ${tryRound(
+          row.derivability.baseline_derives_enumo.lhs_rhs.time,
+          3
+        )}`;
+      }
+    },
   };
   let tableData = [];
   data.forEach((row) => {
@@ -142,6 +160,9 @@ function populateDomainDetail() {
 }
 
 function getDerivability(o) {
+  if (!o) {
+    return "-";
+  }
   let total = o.can.length + o.cannot.length;
   return toPercentage(o.can.length, total, 1);
 }
@@ -181,4 +202,8 @@ function formatRules(rules) {
     }
   });
   return bidir.join("<br />");
+}
+
+function missingDerivability(o) {
+  return Object.keys(o).length === 0;
 }
