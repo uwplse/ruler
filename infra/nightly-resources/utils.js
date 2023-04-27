@@ -1,3 +1,5 @@
+// Given an object of the form {can: [list of rules], cannot: [list of rules]},
+// Returns the percentage of total rules that can be derived
 function getDerivability(o) {
   if (!o) {
     return "-";
@@ -6,6 +8,8 @@ function getDerivability(o) {
   return toPercentage(o.can.length, total, 1);
 }
 
+// If v is a number, rounds it to the specified precision.
+// If v is not a number, returns it unchanged
 function tryRound(v, precision) {
   if (typeof v == "number") {
     if (v % 1 == 0) {
@@ -18,6 +22,7 @@ function tryRound(v, precision) {
   }
 }
 
+// Returns n / d formatted as a percentage with the specified number
 function toPercentage(n, d, decimals) {
   if (n === d) {
     return "100%";
@@ -29,6 +34,7 @@ function toPercentage(n, d, decimals) {
   );
 }
 
+// Pretty prints a list of rules using bidirectional arrows when possible
 function formatRules(rules) {
   let bidir = [];
   if (!rules || rules.length == 0) {
@@ -46,6 +52,8 @@ function formatRules(rules) {
   return bidir.join("<br />");
 }
 
+// Some of the domains do not have derivability results
+// This predicate function returns true when the derivability object is empty
 function missingDerivability(o) {
   return Object.keys(o).length === 0;
 }

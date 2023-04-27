@@ -1,3 +1,5 @@
+// Parses the intended domain out of the URL query param (?domain=<some domain>)
+// Finds the corresponding JSON object in the global data array
 function getDomainData() {
   let params = new URLSearchParams(window.location.search);
   let domain = Object.fromEntries(params).domain;
@@ -5,8 +7,15 @@ function getDomainData() {
   return data.find((x) => x.spec_name == domain);
 }
 
+// Filters the global data array to just the rows corresponding to the bv4 experiment
+// Maps each raw data object into an object corresponding to one row in the table
+// Transformations include renaming columns, rounding numbers, and converting derivability
+// to percentages
 function getBvData() {
   let exps = data.filter((row) => !!row.from_bv4);
+
+  // Each key in this map corresponds to a column of the table
+  // The value is a function from the row data object to the correct value for that cell
   let keys = {
     Domain: (row) => row.domain,
     Generated: (row) => row.direct_gen.rules.length,
@@ -31,6 +40,11 @@ function getBvData() {
   return tableData;
 }
 
+// Filters the global data array to just the rows corresponding to the
+// baseline experiments (oopsla, herbie, and halide)
+// Maps each raw data object into an object corresponding to one row in the table
+// Transformations include renaming columns, rounding numbers, and converting derivability
+// to percentages
 function getBaseline(name) {
   let keys = {
     Baseline: (row) => row.baseline_name,

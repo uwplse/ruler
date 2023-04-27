@@ -7,6 +7,12 @@ use serde_json::{json, Value};
 
 use crate::{count_lines, enumo::Ruleset, DeriveType, Limits, SynthLanguage};
 
+/**
+ * Adds a JSON object to the nightly data
+ * The file is an array of JSON objects, so this function
+ * parses the file into an array, adds the new JSON objec to
+ * the array, and writes it back to the file
+ */
 fn add_json_to_file(json: Value) {
     let path = "nightly/data/output.json";
     std::fs::create_dir_all("nightly/data").unwrap_or_else(|e| panic!("Error creating dir: {}", e));
@@ -32,6 +38,16 @@ fn add_json_to_file(json: Value) {
         .expect("Unable to write to json file");
 }
 
+/**
+ * Constructs a JSON object that corresponds to a single row of the baseline
+ * derivability table (Tables 2 and 3)
+ * spec_name: Name of enumo recipe file
+ * baseline_name: Baseline to compare against
+ * loc: # of lines in enumo recipe
+ * rules: array of rules
+ * time: time in second
+ * derivability: JSON object containing dervability in both directions for both derive types
+ */
 pub fn write_baseline<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     spec_name: &str,
@@ -136,6 +152,11 @@ pub fn write_bv_derivability<L: SynthLanguage>(
     }))
 }
 
+/**
+ * Uses `ruleset` to derive `against` rules
+ * with the specified derive type
+ * Returns a JSON object containing the derivability results and time
+ */
 fn get_derivability<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
     against: &Ruleset<L>,

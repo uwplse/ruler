@@ -30,13 +30,13 @@ pub mod test {
         let duration = start.elapsed();
         let baseline = Ruleset::<bv4_fancy::Bv>::from_file("baseline/bv4.rules");
 
-        logger::write_baseline(&rules, "bv4", &baseline, "oopsla", duration);
+        logger::write_baseline(&rules, "bv4_fancy", &baseline, "oopsla", duration);
 
         let start = Instant::now();
         let rules = bv4_rules();
         let duration = start.elapsed();
         let baseline = Ruleset::<bv4_base::Bv>::from_file("baseline/bv4.rules");
 
-        logger::write_baseline(&rules, "bv4_simple", &baseline, "oopsla", duration);
+        logger::write_baseline(&rules, "bv4_base", &baseline, "oopsla", duration);
     }
 }

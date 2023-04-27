@@ -50,7 +50,7 @@ function generateBaselineLatex(tableName) {
   };
 
   let specNames = {
-    bv4_simple: "bv4",
+    bv4_base: "bv4",
     rational_replicate: "rational",
     exponential: "Exponential",
     rational_best: "Rational",
@@ -68,7 +68,7 @@ function generateBaselineLatex(tableName) {
   if (tableName === "oopsla") {
     rows = [
       allRows.find((r) => r.spec_name === "bool"),
-      allRows.find((r) => r.spec_name === "bv4_simple"),
+      allRows.find((r) => r.spec_name === "bv4_base"),
       allRows.find((r) => r.spec_name === "bv32"),
       allRows.find((r) => r.spec_name === "rational_replicate"),
     ];
