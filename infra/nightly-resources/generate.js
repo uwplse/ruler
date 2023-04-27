@@ -180,6 +180,9 @@ function tryRound(v, precision) {
 }
 
 function toPercentage(n, d, decimals) {
+  if (n === d) {
+    return "100%";
+  }
   return (
     (tryRound(n / d, decimals + 2 || 2) * 100)
       .toFixed(decimals || 0)
