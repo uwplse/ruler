@@ -7,7 +7,6 @@ function onGenerateClick(tableName) {
 }
 
 function generateBvLatex() {
-  // Domain & Generated Rules (Time) & Valid BV Rules (Time) & Validated -> Generated
   let rows = getBvData();
   rows.sort((a, b) => a.Domain.substr(2) - b.Domain.substr(2));
 
