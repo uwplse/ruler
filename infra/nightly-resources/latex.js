@@ -1,11 +1,15 @@
 function onGenerateClick(tableName) {
+  let lines = [];
   if (tableName === "bv") {
-    generateBvLatex();
+    lines = generateBvLatex();
   } else if (tableName === "ff") {
-    generateFFLatex();
+    lines = generateFFLatex();
   } else {
-    generateBaselineLatex(tableName);
+    lines = generateBaselineLatex(tableName);
   }
+  let elem = document.getElementById("latex");
+  elem.innerHTML = lines.join("\n");
+  elem.style.height = "200px";
 }
 
 function generateFFLatex() {
@@ -28,10 +32,7 @@ function generateFFLatex() {
   lines = lines.concat(getCaption("ff"));
   lines.push(String.raw`\label{table:ff-cmp}`);
   lines.push(String.raw`\end{table}`);
-
-  let elem = document.getElementById("latex");
-  elem.innerHTML = lines.join("\n");
-  elem.style.height = "200px";
+  return lines;
 }
 
 function generateBvLatex() {
@@ -66,9 +67,7 @@ function generateBvLatex() {
   lines.push(String.raw`\label{table:bv}`);
   lines.push(String.raw`\end{table}`);
 
-  let elem = document.getElementById("latex");
-  elem.innerHTML = lines.join("\n");
-  elem.style.height = "200px";
+  return lines;
 }
 
 function generateBaselineLatex(tableName) {
@@ -169,9 +168,7 @@ function generateBaselineLatex(tableName) {
   lines.push(String.raw`\label{table:${tableName}}`);
   lines.push(String.raw`\end{table}`);
 
-  let elem = document.getElementById("latex");
-  elem.innerHTML = lines.join("\n");
-  elem.style.height = "200px";
+  return lines;
 }
 
 function getCaption(version) {
