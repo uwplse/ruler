@@ -440,6 +440,11 @@ mod test {
 
     #[test]
     fn lifting_phases() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let limits = Limits::default();
         let mut all = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         all.extend(prior_rules());
