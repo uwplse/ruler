@@ -1,7 +1,10 @@
-use std::{fmt::Display, hash::BuildHasherDefault};
+use std::{
+    fmt::{self, Display},
+    hash::BuildHasherDefault,
+};
 
 pub use bv::*;
-use enumo::Ruleset;
+use enumo::{Ruleset, Scheduler};
 pub use language::*;
 use serde::Serialize;
 pub use util::*;
@@ -123,6 +126,23 @@ impl<T> Default for Interval<T> {
             low: None,
             high: None,
         }
+    }
+}
+
+pub struct Phase<L: SynthLanguage> {
+    pub rules: Ruleset<L>,
+    pub rules_name: String,
+    pub scheduler: Scheduler,
+}
+
+impl<L: SynthLanguage> fmt::Display for Phase<L> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let scheduler_name = match self.scheduler {
+            Scheduler::Simple(_) => "eqsat",
+            Scheduler::Saturating(_) => "sat",
+            Scheduler::Compress(_) => "compress",
+        };
+        write!(f, "{} ({})", scheduler_name, self.rules_name)
     }
 }
 

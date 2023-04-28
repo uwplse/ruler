@@ -36,6 +36,14 @@ function onLoadBv() {
   );
 }
 
+// This function is called when you load ff.html.
+// Populates the ff table with data from the global data object.
+function onLoadFF() {
+  document.getElementById("container").innerHTML = ConvertJsonToTable(
+    getFFData()
+  );
+}
+
 // This function is called when you load rules.html.
 // Shows all rules for the domain specified in the query param
 // If there is no domain specified, it will just be a blank page.

@@ -1,9 +1,37 @@
 function onGenerateClick(tableName) {
   if (tableName === "bv") {
     generateBvLatex();
+  } else if (tableName === "ff") {
+    generateFFLatex();
   } else {
     generateBaselineLatex(tableName);
   }
+}
+
+function generateFFLatex() {
+  let rows = getFFData();
+  let lines = [
+    String.raw`\begin{table}[h]`,
+    String.raw`  \footnotesize`,
+    String.raw`\begin{tabular}{lllcc}`,
+    String.raw`  Phase 1 & Phase 2 & Phase 3 & Time (s) & \# Rules with Trig Operators \\ \cline{1-5}`,
+  ];
+  rows.forEach((row) => {
+    let line = Object.values(row).join(" & ");
+    line = line
+      .replaceAll("R", String.raw`$\mathcal{R}$`)
+      .replaceAll("E", String.raw`$\mathcal{E}$`)
+      .replaceAll("A", String.raw`$\mathcal{A}$`);
+    lines.push(String.raw`${line} \\`);
+  });
+  lines.push(String.raw`\end{tabular}%`);
+  lines = lines.concat(getCaption("ff"));
+  lines.push(String.raw`\label{table:ff-cmp}`);
+  lines.push(String.raw`\end{table}`);
+
+  let elem = document.getElementById("latex");
+  elem.innerHTML = lines.join("\n");
+  elem.style.height = "200px";
 }
 
 function generateBvLatex() {
@@ -190,6 +218,15 @@ function getCaption(version) {
       String.raw`    (iii) the percentage of the generated rules`,
       String.raw`    that are derivable from the validated BV4 rules`,
       String.raw`    (both \lhs and \lhsandrhs derivability).`,
+    ];
+  } else if (version === "ff") {
+    return [
+      String.raw`  \caption{Comparing \C{compress} and \C{eqsat} with different`,
+      String.raw`    subsets of $\mathcal{R}$ for the three phases of \autoref{fig:ff-actual}.`,
+      String.raw`    $\mathcal{A}$ is the allowed rules of $\mathcal{R}$ and`,
+      String.raw`    $\mathcal{E}$ is the exploratory rules of $\mathcal{R}$.`,
+      String.raw`    The last row corresponds to \autoref{fig:ff-actual}, showing that`,
+      String.raw`    it produces a good ruleset fastest.}`,
     ];
   }
 }

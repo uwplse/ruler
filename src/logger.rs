@@ -5,7 +5,7 @@ use std::{
 
 use serde_json::{json, Value};
 
-use crate::{count_lines, enumo::Ruleset, DeriveType, Limits, SynthLanguage};
+use crate::{count_lines, enumo::Ruleset, DeriveType, Limits, Phase, SynthLanguage};
 
 /**
  * Adds a JSON object to the nightly data
@@ -45,7 +45,7 @@ fn add_json_to_file(json: Value) {
  * baseline_name: Baseline to compare against
  * loc: # of lines in enumo recipe
  * rules: array of rules
- * time: time in second
+ * time: time in seconds
  * derivability: JSON object containing dervability in both directions for both derive types
  */
 pub fn write_baseline<L: SynthLanguage>(
@@ -91,6 +91,7 @@ pub fn write_baseline<L: SynthLanguage>(
     };
 
     let row = json!({
+      "TYPE": "baseline",
       "spec_name": spec_name,
       "baseline_name": baseline_name,
       "loc": loc,
@@ -105,6 +106,14 @@ pub fn write_baseline<L: SynthLanguage>(
     add_json_to_file(row)
 }
 
+/**
+ * Constructs a JSON object that corresponds to a single row of the bv table (Table 5)
+ * domain: one of BV8, BV16, BV32, BV128
+ * direct_gen: array of rules + time to generate (directly generated rules for the domain)
+ * from_bv4: array of rules + tme to validate (bv4 rules ported to the domain and validated)
+ * derivability: JSON object containing dervability for both derive types
+ * (using from_bv4 rules to derive direct_gen rules)
+ */
 pub fn write_bv_derivability<L: SynthLanguage>(
     domain: &str,
     gen_rules: Ruleset<L>,
@@ -136,6 +145,7 @@ pub fn write_bv_derivability<L: SynthLanguage>(
     });
 
     add_json_to_file(json!({
+        "TYPE": "bv",
         "domain": domain,
         "direct_gen": json!({
             "rules": gen_rules.to_str_vec(),
@@ -149,6 +159,29 @@ pub fn write_bv_derivability<L: SynthLanguage>(
             "lhs": lhs,
             "lhs_rhs": lhsrhs
         })
+    }))
+}
+
+/**
+ * Constructs a JSON object that corresponds to a single row of the ff table (Table 1)
+ * phase1, phase2, phase3 : string indicating what scheduler + rules are used
+ * time: time in seconds
+ * rules: array of rules
+ */
+pub fn write_lifting_phase<L: SynthLanguage>(
+    phase1: Phase<L>,
+    phase2: Phase<L>,
+    phase3: Phase<L>,
+    time: Duration,
+    rules: &Ruleset<L>,
+) {
+    add_json_to_file(json!({
+        "TYPE": "ff_phases",
+        "phase1": format!("{}", phase1),
+        "phase2": format!("{}", phase2),
+        "phase3": format!("{}", phase3),
+        "time": time.as_secs_f64(),
+        "rules": rules.to_str_vec()
     }))
 }
 
