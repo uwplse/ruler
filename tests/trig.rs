@@ -585,10 +585,4 @@ mod test {
             },
         );
     }
-
-    #[test]
-    fn main_rules() {
-        let rules = Ruleset::<Trig>::from_file("trig.rules");
-        rules.pretty_print();
-    }
 }
