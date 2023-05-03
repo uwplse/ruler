@@ -1,184 +1,175 @@
 use std::{
-    fs::{File, OpenOptions},
-    io::{BufRead, BufReader, Read, Write},
+    fs::{self, OpenOptions},
     time::{Duration, Instant},
 };
 
 use serde_json::{json, Value};
 
-use crate::{enumo::Ruleset, DeriveType, Limits, SynthLanguage};
+use crate::{count_lines, enumo::Ruleset, DeriveType, Limits, SynthLanguage};
 
-pub fn write_output<L: SynthLanguage>(
-    ruleset: &Ruleset<L>,
-    baseline: &Ruleset<L>,
-    recipe_name: &str,
-    baseline_name: &str,
-    time_rules: Duration,
-    derive: (bool, bool),
-) {
-    // get information about the derivability of our ruleset vs. the baseline ruleset
-    let start = Instant::now();
-    let ((forwards_lhs, backwards_lhs), (lhs_f, lhs_b), results_lhs) =
-        get_derivability_results(ruleset, DeriveType::Lhs, baseline, derive);
-    let duration = start.elapsed();
-    println!(
-        "LHS: {} / {}, {} / {} in {} seconds.",
-        forwards_lhs,
-        baseline.clone().len(),
-        backwards_lhs,
-        ruleset.clone().len(),
-        duration.as_secs_f64()
-    );
-    let start = Instant::now();
-    let ((forwards_lhs_rhs, backwards_lhs_rhs), (lhs_rhs_f, lhs_rhs_b), results_lhs_rhs) =
-        get_derivability_results(ruleset, DeriveType::LhsAndRhs, baseline, derive);
-    let duration = start.elapsed();
-    println!(
-        "LHS/RHS: {} / {}, {} / {} in {} seconds.",
-        forwards_lhs_rhs,
-        baseline.clone().len(),
-        backwards_lhs_rhs,
-        ruleset.clone().len(),
-        duration.as_secs_f64()
-    );
-    let start = Instant::now();
-    let ((forwards_all, backwards_all), (all_f, all_b), results_all) =
-        get_derivability_results(ruleset, DeriveType::AllRules, baseline, derive);
-    let duration = start.elapsed();
-    println!(
-        "ALL: {} / {}, {} / {} in {} seconds.",
-        forwards_all,
-        baseline.clone().len(),
-        backwards_all,
-        ruleset.clone().len(),
-        duration.as_secs_f64()
-    );
-
-    // get linecount of recipe
-    let cnt = count_lines(recipe_name);
-
-    let stats = json!({
-        "baseline_name": baseline_name,
-        "enumo_spec_name": recipe_name,
-        "loc": cnt,
-        "num_rules": ruleset.len(),
-        "rules": json!({"rules": ruleset.to_str_vec()}),
-        "num_baseline": baseline.len(),
-        "time": time_rules.as_secs_f64(),
-        "enumo_to_baseline_lhs": results_lhs,
-        "enumo_to_baseline_lhs_num": forwards_lhs,
-        "enumo_to_baseline_lhs_time": lhs_f.as_secs_f64(),
-        "enumo_to_baseline_lhs_rhs": results_lhs_rhs,
-        "enumo_to_baseline_lhsrhs_num": forwards_lhs_rhs,
-        "enumo_to_baseline_lhsrhs_time": lhs_rhs_f.as_secs_f64(),
-        "enumo_to_baseline_all": results_all,
-        "enumo_to_baseline_all_num": forwards_all,
-        "enumo_to_baseline_all_time": all_f.as_secs_f64(),
-        "baseline_to_enumo_lhs_num": backwards_lhs,
-        "baseline_to_enumo_lhs_time": lhs_b.as_secs_f64(),
-        "baseline_to_enumo_lhsrhs_num": backwards_lhs_rhs,
-        "baseline_to_enumo_lhsrhs_time": lhs_rhs_b.as_secs_f64(),
-        "baseline_to_enumo_all_num": backwards_all,
-        "baseline_to_enumo_all_time": all_b.as_secs_f64(),
-        "minimization strategy": "compress",
-    });
-
+/**
+ * Adds a JSON object to the nightly data
+ * The file is an array of JSON objects, so this function
+ * parses the file into an array, adds the new JSON objec to
+ * the array, and writes it back to the file
+ */
+fn add_json_to_file(json: Value) {
+    let path = "nightly/data/output.json";
     std::fs::create_dir_all("nightly/data").unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-    add_to_data_file("nightly/data/output.json".to_string(), stats);
-}
 
-pub fn add_to_data_file(outfile: String, json: Value) {
-    let mut file = OpenOptions::new()
+    OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
-        .open(outfile.clone())
-        .expect("Unable to open file");
+        .open(path)
+        .expect("Unable to open or create file");
 
-    let mut file_string = String::new();
-    file.read_to_string(&mut file_string)
-        .expect("Unable to read file");
+    let s = fs::read_to_string(path).expect("Unable to read file");
 
-    let mut json_arr = vec![];
-    if !(file_string.is_empty()) {
-        json_arr = serde_json::from_str::<Vec<serde_json::Value>>(&file_string).unwrap();
-    }
-    json_arr.push(json);
+    let mut contents: Vec<Value> = if s.is_empty() {
+        vec![]
+    } else {
+        serde_json::from_str(&s).expect("Unable to parse json")
+    };
 
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(outfile)
-        .expect("Unable to open file");
+    contents.push(json);
 
-    file.write_all("[".as_bytes()).expect("write failed");
-
-    for (object, is_last_element) in json_arr
-        .iter()
-        .enumerate()
-        .map(|(i, w)| (w, i == json_arr.len() - 1))
-    {
-        file.write_all(object.to_string().as_bytes())
-            .expect("write failed");
-        if !(is_last_element) {
-            file.write_all(", ".as_bytes()).expect("write failed");
-        }
-    }
-    file.write_all("]".as_bytes()).expect("write failed");
+    std::fs::write(path, serde_json::to_string_pretty(&contents).unwrap())
+        .expect("Unable to write to json file");
 }
 
-pub fn count_lines(recipe_name: &str) -> usize {
-    let mut filepath = "tests/recipes/".to_owned();
-    filepath.push_str(recipe_name);
-    filepath.push_str(".rs");
-
-    match File::open(filepath) {
-        Ok(file) => BufReader::new(file).lines().count(),
-        Err(_) => 0,
-    }
-}
-
-pub fn get_derivability_results<L: SynthLanguage>(
+/**
+ * Constructs a JSON object that corresponds to a single row of the baseline
+ * derivability table (Tables 2 and 3)
+ * spec_name: Name of enumo recipe file
+ * baseline_name: Baseline to compare against
+ * loc: # of lines in enumo recipe
+ * rules: array of rules
+ * time: time in second
+ * derivability: JSON object containing dervability in both directions for both derive types
+ */
+pub fn write_baseline<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
-    derive_type: DeriveType,
+    spec_name: &str,
     baseline: &Ruleset<L>,
-    derive: (bool, bool),
-) -> ((usize, usize), (Duration, Duration), Value) {
-    let limits = if let DeriveType::AllRules = derive_type {
-        Limits {
-            iter: 2,
-            node: 100_000,
-        }
+    baseline_name: &str,
+    time: Duration,
+) {
+    // Items in this list will *not* run derivability
+    // Format is (a, b) where a and b are spec/baseline names
+    // and a.derive(b) will *not* run.
+    // Note: b.derive(a) will still be computed unless (b, a)
+    // is also in this list.
+    let skip_derive = vec![
+        ("herbie", "rational_replicate"),
+        ("herbie", "rational_best"),
+        ("halide", "halide"),
+        ("halide", "oopsla halide (1 iter)"),
+        ("oopsla halide (1 iter)", "halide"),
+    ];
+
+    let loc = count_lines(spec_name)
+        .map(|x| x.to_string())
+        .unwrap_or_else(|| "-".to_string());
+
+    let enumo_derives_baseline = if skip_derive.contains(&(spec_name, baseline_name)) {
+        json!({})
     } else {
-        Limits::deriving()
+        json!({
+            "lhs": get_derivability(ruleset, baseline, DeriveType::Lhs),
+            "lhs_rhs": get_derivability(ruleset, baseline, DeriveType::LhsAndRhs)
+        })
     };
 
-    let start_f = Instant::now();
-    let (can_f, cannot_f) = if derive.0 {
-        ruleset.derive(derive_type, baseline, limits)
+    let baseline_derives_enumo = if skip_derive.contains(&(baseline_name, spec_name)) {
+        json!({})
     } else {
-        (Ruleset::default(), Ruleset::default())
+        json!({
+            "lhs": get_derivability(baseline, ruleset, DeriveType::Lhs),
+            "lhs_rhs": get_derivability(baseline, ruleset, DeriveType::LhsAndRhs)
+        })
     };
-    let time_f = start_f.elapsed();
-    let start_b = Instant::now();
-    let (can_b, cannot_b) = if derive.1 {
-        baseline.derive(derive_type, ruleset, limits)
-    } else {
-        (Ruleset::default(), Ruleset::default())
-    };
-    let time_b = start_b.elapsed();
 
-    let derivability_results = json!({
-        "enumo_derives_baseline_derivable": &can_f.to_str_vec(),
-        "enumo_derives_baseline_underivable": &cannot_f.to_str_vec(),
-        "baseline_derives_enumo_derivable": &can_b.to_str_vec(),
-        "baseline_derives_enumo_underivable": &cannot_b.to_str_vec(),
+    let row = json!({
+      "spec_name": spec_name,
+      "baseline_name": baseline_name,
+      "loc": loc,
+      "rules": ruleset.to_str_vec(),
+      "time": time.as_secs_f64(),
+      "derivability": json!({
+        "enumo_derives_baseline": enumo_derives_baseline,
+        "baseline_derives_enumo": baseline_derives_enumo
+      })
     });
 
-    (
-        (can_f.len(), can_b.len()),
-        (time_f, time_b),
-        derivability_results,
-    )
+    add_json_to_file(row)
+}
+
+pub fn write_bv_derivability<L: SynthLanguage>(
+    domain: &str,
+    gen_rules: Ruleset<L>,
+    gen_time: Duration,
+    ported_bv4_rules: Ruleset<L>,
+) {
+    // Validate bv4 rules for this domain
+    let start = Instant::now();
+    let (sound_bv4, _) = ported_bv4_rules.partition(|rule| rule.is_valid());
+    let validate_time = start.elapsed();
+
+    // Compute derivability
+    let start = Instant::now();
+    let (can, cannot) = sound_bv4.derive(DeriveType::LhsAndRhs, &gen_rules, Limits::deriving());
+    let derive_time = start.elapsed();
+    let lhsrhs = json!({
+        "can": can.to_str_vec(),
+        "cannot": cannot.to_str_vec(),
+        "time": derive_time.as_secs_f64()
+    });
+
+    let start = Instant::now();
+    let (can, cannot) = sound_bv4.derive(DeriveType::Lhs, &gen_rules, Limits::deriving());
+    let derive_time = start.elapsed();
+    let lhs = json!({
+        "can": can.to_str_vec(),
+        "cannot": cannot.to_str_vec(),
+        "time": derive_time.as_secs_f64()
+    });
+
+    add_json_to_file(json!({
+        "domain": domain,
+        "direct_gen": json!({
+            "rules": gen_rules.to_str_vec(),
+            "time": gen_time.as_secs_f64()
+        }),
+        "from_bv4": json!({
+            "rules": sound_bv4.to_str_vec(),
+            "time": validate_time.as_secs_f64()
+        }),
+        "derivability": json!({
+            "lhs": lhs,
+            "lhs_rhs": lhsrhs
+        })
+    }))
+}
+
+/**
+ * Uses `ruleset` to derive `against` rules
+ * with the specified derive type
+ * Returns a JSON object containing the derivability results and time
+ */
+fn get_derivability<L: SynthLanguage>(
+    ruleset: &Ruleset<L>,
+    against: &Ruleset<L>,
+    derive_type: DeriveType,
+) -> Value {
+    let start = Instant::now();
+    let (can, cannot) = ruleset.derive(derive_type, against, Limits::deriving());
+    let elapsed = start.elapsed();
+
+    json!({
+        "derive_type": derive_type,
+        "can": can.to_str_vec(),
+        "cannot": cannot.to_str_vec(),
+        "time": elapsed.as_secs_f64()
+    })
 }
