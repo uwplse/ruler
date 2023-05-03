@@ -12,7 +12,7 @@ function getDomainData() {
 // Transformations include renaming columns, rounding numbers, and converting derivability
 // to percentages
 function getBvData() {
-  let exps = data.filter((row) => !!row.from_bv4);
+  let exps = data.filter((row) => row.TYPE === "bv");
 
   // Each key in this map corresponds to a column of the table
   // The value is a function from the row data object to the correct value for that cell
@@ -29,15 +29,19 @@ function getBvData() {
     "LHS-RHS Time": (row) => tryRound(row.derivability.lhs_rhs.time, 3),
     "LHS-RHS Missing": (row) => formatRules(row.derivability.lhs_rhs.cannot),
   };
-  let tableData = [];
-  exps.forEach((row) => {
-    let newRow = {};
-    Object.entries(keys).forEach(([key, f]) => {
-      newRow[key] = tryRound(f(row));
-    });
-    tableData.push(newRow);
-  });
-  return tableData;
+  return reformat(keys, exps);
+}
+
+function getFFData() {
+  let exps = data.filter((row) => row.TYPE === "ff_phases");
+  let keys = {
+    "Phase 1": (row) => row.phase1,
+    "Phase 2": (row) => row.phase2,
+    "Phase 3": (row) => row.phase3,
+    Time: (row) => tryRound(row.time),
+    "Trig Rules": (row) => row.rules.filter((r) => containsTrigOp(r)).length,
+  };
+  return reformat(keys, exps);
 }
 
 // Filters the global data array to just the rows corresponding to the
@@ -87,13 +91,16 @@ function getBaseline(name) {
       }
     },
   };
+  let exps = data.filter((row) => row.TYPE === "baseline");
+  let baseline_rows = exps.filter((row) => row.baseline_name === name);
+  return reformat(keys, baseline_rows);
+}
+
+function reformat(keyMap, rows) {
   let tableData = [];
-  data.forEach((row) => {
-    if (!row["baseline_name"]?.includes(name)) {
-      return;
-    }
+  rows.forEach((row) => {
     let newRow = {};
-    Object.entries(keys).forEach(([key, f]) => {
+    Object.entries(keyMap).forEach(([key, f]) => {
       newRow[key] = tryRound(f(row));
     });
     tableData.push(newRow);

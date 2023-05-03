@@ -314,10 +314,12 @@ impl SynthLanguage for Trig {
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use super::*;
     use crate::trig::trig_rules;
     use ruler::{
-        enumo::{Ruleset, Workload},
+        enumo::{Filter, Ruleset, Scheduler, Workload},
         recipe_utils::run_rule_lifting,
         Limits,
     };
@@ -394,5 +396,193 @@ mod test {
         let (can, cannot) = rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
+    }
+
+    fn lifting_variation(
+        w: &Workload,
+        phase1: Phase<Trig>,
+        phase2: Phase<Trig>,
+        phase3: Phase<Trig>,
+        minimize: Phase<Trig>,
+    ) -> (Ruleset<Trig>, Duration) {
+        let start = Instant::now();
+        let g = w.to_egraph();
+        let g1 = phase1.scheduler.run(&g, &phase1.rules);
+        println!(
+            "Done with phase 1 after {} secs, {} eclasses",
+            start.elapsed().as_secs(),
+            g1.number_of_classes()
+        );
+
+        let g2 = phase2.scheduler.run(&g1, &phase2.rules);
+        println!(
+            "Done with phase 2 after {} secs, {} eclasses",
+            start.elapsed().as_secs(),
+            g2.number_of_classes()
+        );
+        let mut candidates = Ruleset::extract_candidates(&g1, &g2);
+
+        let g3 = phase3.scheduler.run(&g2, &phase3.rules);
+        println!(
+            "Done with phase 3 after {} secs, {} eclasses",
+            start.elapsed().as_secs(),
+            g3.number_of_classes()
+        );
+        candidates.extend(Ruleset::extract_candidates(&g2, &g3));
+
+        // let (sound, _) = candidates.partition(|r| r.is_valid());
+        let (sound, _) = candidates.minimize(minimize.rules, minimize.scheduler);
+
+        logger::write_lifting_phase(phase1, phase2, phase3, start.elapsed(), &sound);
+
+        (sound, start.elapsed())
+    }
+
+    #[test]
+    fn lifting_phases() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        let limits = Limits::default();
+        let mut all = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+        all.extend(prior_rules());
+        all.extend(Trig::get_lifting_rules());
+        let mut all_but_exploratory = all.clone();
+        all_but_exploratory.remove_all(Trig::get_lifting_rules());
+        let (allowed, _) = all.partition(|r| Trig::is_allowed_rewrite(&r.lhs, &r.rhs));
+        let exploratory = Trig::get_lifting_rules();
+
+        let lits = Workload::new([
+            "a", "b", "c", "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
+        ]);
+        let ops = Workload::new(["sin", "cos", "tan"]);
+        let terms = Workload::new(["(OP V)"])
+            .plug("OP", &ops)
+            .plug("V", &lits)
+            .filter(Filter::Invert(Box::new(Filter::Contains(
+                "(tan (/ PI 2))".parse().unwrap(),
+            ))));
+
+        lifting_variation(
+            &terms,
+            Phase {
+                rules: all.clone(),
+                rules_name: "R".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: all.clone(),
+                rules_name: "R".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: all.clone(),
+                rules_name: "R".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+        );
+
+        lifting_variation(
+            &terms,
+            Phase {
+                rules: all.clone(),
+                rules_name: "R".into(),
+                scheduler: Scheduler::Simple(limits),
+            },
+            Phase {
+                rules: all.clone(),
+                rules_name: "R".into(),
+                scheduler: Scheduler::Simple(limits),
+            },
+            Phase {
+                rules: all.clone(),
+                rules_name: "R".into(),
+                scheduler: Scheduler::Simple(limits),
+            },
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+        );
+
+        lifting_variation(
+            &terms,
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: exploratory.clone(),
+                rules_name: "E".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: all_but_exploratory.clone(),
+                rules_name: "R-E".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+        );
+
+        lifting_variation(
+            &terms,
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Simple(limits),
+            },
+            Phase {
+                rules: exploratory.clone(),
+                rules_name: "E".into(),
+                scheduler: Scheduler::Simple(limits),
+            },
+            Phase {
+                rules: all_but_exploratory.clone(),
+                rules_name: "R-E".into(),
+                scheduler: Scheduler::Simple(limits),
+            },
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+        );
+
+        lifting_variation(
+            &terms,
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: exploratory.clone(),
+                rules_name: "E".into(),
+                scheduler: Scheduler::Simple(limits),
+            },
+            Phase {
+                rules: all_but_exploratory.clone(),
+                rules_name: "R-E".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+            Phase {
+                rules: allowed.clone(),
+                rules_name: "A".into(),
+                scheduler: Scheduler::Compress(limits),
+            },
+        );
     }
 }

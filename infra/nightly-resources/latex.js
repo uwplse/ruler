@@ -1,9 +1,38 @@
 function onGenerateClick(tableName) {
+  let lines = [];
   if (tableName === "bv") {
-    generateBvLatex();
+    lines = generateBvLatex();
+  } else if (tableName === "ff") {
+    lines = generateFFLatex();
   } else {
-    generateBaselineLatex(tableName);
+    lines = generateBaselineLatex(tableName);
   }
+  let elem = document.getElementById("latex");
+  elem.innerHTML = lines.join("\n");
+  elem.style.height = "200px";
+}
+
+function generateFFLatex() {
+  let rows = getFFData();
+  let lines = [
+    String.raw`\begin{table}[h]`,
+    String.raw`  \footnotesize`,
+    String.raw`\begin{tabular}{lllcc}`,
+    String.raw`  Phase 1 & Phase 2 & Phase 3 & Time (s) & \# Rules with Trig Operators \\ \cline{1-5}`,
+  ];
+  rows.forEach((row) => {
+    let line = Object.values(row).join(" & ");
+    line = line
+      .replaceAll("R", String.raw`$\mathcal{R}$`)
+      .replaceAll("E", String.raw`$\mathcal{E}$`)
+      .replaceAll("A", String.raw`$\mathcal{A}$`);
+    lines.push(String.raw`${line} \\`);
+  });
+  lines.push(String.raw`\end{tabular}%`);
+  lines = lines.concat(getCaption("ff"));
+  lines.push(String.raw`\label{table:ff-cmp}`);
+  lines.push(String.raw`\end{table}`);
+  return lines;
 }
 
 function generateBvLatex() {
@@ -38,9 +67,7 @@ function generateBvLatex() {
   lines.push(String.raw`\label{table:bv}`);
   lines.push(String.raw`\end{table}`);
 
-  let elem = document.getElementById("latex");
-  elem.innerHTML = lines.join("\n");
-  elem.style.height = "200px";
+  return lines;
 }
 
 function generateBaselineLatex(tableName) {
@@ -141,55 +168,54 @@ function generateBaselineLatex(tableName) {
   lines.push(String.raw`\label{table:${tableName}}`);
   lines.push(String.raw`\end{table}`);
 
-  let elem = document.getElementById("latex");
-  elem.innerHTML = lines.join("\n");
-  elem.style.height = "200px";
+  return lines;
 }
 
 function getCaption(version) {
   if (version === "oopsla") {
-    return [
-      String.raw`\caption{Results comparing \slide to \ruler.`,
-      String.raw`  $ R_1 ~ \rightarrow ~ R_2$ indicates using $R_1$ to derive`,
-      String.raw`  $R_2$ rules.`,
-      String.raw`  We report on both \lhs and \lhsandrhs derivability, separated by commas.`,
-      String.raw`  The numbers in parentheses are times in seconds.`,
-      String.raw`%  The three numbers correspond to using the three`,
-      String.raw`%  derivability metrics (\T{lhs-only}, \T{lhs-rhs}, \T{all})`,
-      String.raw`%  defined in \autoref{subsec:derivability}.`,
-      String.raw`%  \todo{update with final results. also add ruler times, if not, take`,
-      String.raw`%  out enumo times. Add back both lhs and lhsrhs.}`,
-      String.raw`}`,
-    ];
+    return String.raw`\caption{Results comparing \slide to \ruler.
+  $ R_1 ~ \rightarrow ~ R_2$ indicates using $R_1$ to derive
+  $R_2$ rules.
+  We report on both \lhs and \lhsandrhs derivability, separated by commas.
+  The numbers in parentheses are times in seconds.
+%  The three numbers correspond to using the three
+%  derivability metrics (\T{lhs-only}, \T{lhs-rhs}, \T{all})
+%  defined in \autoref{subsec:derivability}.
+%  \todo{update with final results. also add ruler times, if not, take
+%  out enumo times. Add back both lhs and lhsrhs.}
+}`;
   } else if (version === "herbie") {
-    return [
-      String.raw`  \caption{`,
-      String.raw`  Derivability comparison between rules from \enumo and \herbie.`,
-      String.raw`  As in \autoref{table:oopsla},`,
-      String.raw`    $R_1 ~ \rightarrow ~ R_2$ indicates using`,
-      String.raw`    $R_1$ to derive $R_2$ rules.`,
-      String.raw`  We report both \lhs and \lhsandrhs derivability,`,
-      String.raw`    separated by commas. The numbers in parentheses`,
-      String.raw`    are times in second.`,
-      " ``-'' indicates that the derivability test",
-      String.raw`    could not be completed due to \herbie's`,
-      String.raw`    unsound rules (\autoref{para:herbie}).`,
-      String.raw`  We integrate these rules for`,
-      String.raw`    end-to-end runs of \herbie~\cite{herbie} and`,
-      String.raw`    Megalibm~\cite{megalibm} (\autoref{subsubsec:numbers}).}`,
-    ];
+    return String.raw`  \caption{
+  Derivability comparison between rules from \enumo and \herbie.
+  As in \autoref{table:oopsla},
+    $R_1 ~ \rightarrow ~ R_2$ indicates using
+    $R_1$ to derive $R_2$ rules.
+  We report both \lhs and \lhsandrhs derivability,
+    separated by commas. The numbers in parentheses
+    are times in second.
+  ${"``"}-'' indicates that the derivability test
+    could not be completed due to \herbie's
+    unsound rules (\autoref{para:herbie}).
+  We integrate these rules for
+    end-to-end runs of \herbie~\cite{herbie} and
+    Megalibm~\cite{megalibm} (\autoref{subsubsec:numbers}).}`;
   } else if (version === "bv") {
-    return [
-      String.raw`\caption{`,
-      String.raw`  Comparison of rule synthesis for different widths of bitvectors.`,
-      String.raw`  Shown for each bitvector width are`,
-      String.raw`    (i) the number of rules generated from an`,
-      String.raw`    \enumo program (time in seconds) for that domain,`,
-      String.raw`    (ii) the number of \enumo-synthesized BV4 rules`,
-      String.raw`    that are valid in that domain (time in seconds), and`,
-      String.raw`    (iii) the percentage of the generated rules`,
-      String.raw`    that are derivable from the validated BV4 rules`,
-      String.raw`    (both \lhs and \lhsandrhs derivability).`,
-    ];
+    return String.raw`\caption{
+  Comparison of rule synthesis for different widths of bitvectors.
+  Shown for each bitvector width are
+    (i) the number of rules generated from an
+    \enumo program (time in seconds) for that domain,
+    (ii) the number of \enumo-synthesized BV4 rules
+    that are valid in that domain (time in seconds), and
+    (iii) the percentage of the generated rules
+    that are derivable from the validated BV4 rules
+    (both \lhs and \lhsandrhs derivability).`;
+  } else if (version === "ff") {
+    return String.raw`\caption{Comparing \C{compress} and \C{eqsat} with different
+    subsets of $\mathcal{R}$ for the three phases of \autoref{fig:ff-actual}.
+    $\mathcal{A}$ is the allowed rules of $\mathcal{R}$ and
+    $\mathcal{E}$ is the exploratory rules of $\mathcal{R}$.
+    The last row corresponds to \autoref{fig:ff-actual}, showing that
+    it produces a good ruleset fastest.}`;
   }
 }

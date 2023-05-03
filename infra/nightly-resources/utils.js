@@ -57,3 +57,15 @@ function formatRules(rules) {
 function missingDerivability(o) {
   return Object.keys(o).length === 0;
 }
+
+// Given a rule, returns true if the rule contains a trig operator
+function containsTrigOp(r) {
+  let ops = ["sin", "cos", "tan"];
+  let containsOp = false;
+  ops.forEach((op) => {
+    if (r.includes(op)) {
+      containsOp = true;
+    }
+  });
+  return containsOp;
+}
