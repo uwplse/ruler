@@ -11,10 +11,13 @@
   <script src="utils.js"></script>
 </head>
 
-<title>Rules</title>
+<title>FF Phases Experiment</title>
 
-<body onload="loadRules()">
-  <h2 id="domain_name">Bool</h2>
-  <div id="all_rules"></div>
-  
+<body onload="onLoadFF()">
+  <h2 id="domain_name">Fast Forwarding Phases</h2>
+  <div id="container"></div>
+
+  <button onclick="onGenerateClick('ff')">Generate Latex</button>
+  <div><textarea id="latex"></textarea></div>
+
 </body>
