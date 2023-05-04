@@ -778,6 +778,11 @@ pub mod test {
     }
 
     #[test]
+    fn just_best() {
+        best_enumo_recipe();
+    }
+
+    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
@@ -825,12 +830,12 @@ pub mod test {
                 .collect::<Vec<_>>(),
         );
 
-        logger::write_output(&without_if, &ruler1, "rational_best", "oopsla", duration);
-        logger::write_output(&without_if, &herbie, "rational_best", "herbie", duration);
-        logger::write_output(
-            &best_rules,
+        logger::write_baseline(&without_if, "rational_best", &ruler1, "oopsla", duration);
+        logger::write_baseline(&without_if, "rational_best", &herbie, "herbie", duration);
+        logger::write_baseline(
             &best_rules,
             "rational_best",
+            &best_rules,
             "rational_best",
             duration,
         );
