@@ -50,12 +50,14 @@ BUILD_DIR=$HERBIE_DIR bash install.sh
 rm -rf $BENCH_DIR
 mkdir -p $BENCH_DIR
 
-cp -r "$HERBIE_DIR/bench/hamming" \
-      "$HERBIE_DIR/bench/mathematics" \
-      "$HERBIE_DIR/bench/numerics" \
-      "$HERBIE_DIR/bench/physics" \
-      "$HERBIE_DIR/bench/pbrt.fpcore" \
-      "$BENCH_DIR/"
+cp -r "$HERBIE_DIR/bench/hamming" "$BENCH_DIR/"
+
+# cp -r "$HERBIE_DIR/bench/hamming" \
+#       "$HERBIE_DIR/bench/mathematics" \
+#       "$HERBIE_DIR/bench/numerics" \
+#       "$HERBIE_DIR/bench/physics" \
+#       "$HERBIE_DIR/bench/pbrt.fpcore" \
+#       "$BENCH_DIR/"
 
 # FPCORES=$(find $BENCH_DIR -name "*.fpcore")
 # for fpcore in $FPCORES; do
@@ -86,10 +88,11 @@ function do_branch {
   git checkout $HERBIE_DIR/src/syntax/rules.rkt
   if [[ "$name" != "main" ]]; then
     racket $MYDIR/gen-rules.rkt $name $RULES $MYDIR/rules.rkt
+    mv $MYDIR/rules.rkt $HERBIE_DIR/src/syntax/rules.rkt
   fi
 
   # Install
-  # make install
+  make install
   popd
 
   # Run the seed survey

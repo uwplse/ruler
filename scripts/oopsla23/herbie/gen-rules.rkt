@@ -276,9 +276,9 @@
   (log! "   Groups: ~a\n" groups)
   (log! "   Vars:   ~a\n" var-ctx)
   (log! "   Rules:  ~a\n" (length rules))
-  `(register-ruleset*!
-    ,name ,groups ,var-ctx
-    ,(for/list ([rule (in-list rules)] [i (in-naturals 1)])
+  `(define-ruleset*
+    ,name ,groups #:type ,(map (λ (c) (list (car c) (cdr c))) var-ctx)
+    ,@(for/list ([rule (in-list rules)] [i (in-naturals 1)])
       (match-define (list lhs rhs _) rule)
       (define rule-name (string->symbol (format "~a-~a" name i)))
       (log! "    ~a: ~a => ~a\n" rule-name lhs rhs)
@@ -287,6 +287,90 @@
 ;;
 ;;  Core
 ;;
+
+(define fast-fowarding-entries `(
+  (
+    "exponential-lifting"
+    (
+      "(pow ?a ?b) ==> (exp (* ?b (log ?a)))"
+      "(sqrt ?a) ==> (pow ?a 1/2)"
+      "(cbrt ?a) ==> (pow ?a 1/3)"
+      "(exp (* ?b (log ?a))) ==> (pow ?a ?b)"
+      "(pow ?a 1/2) ==> (sqrt ?a)"
+      "(pow ?a 1/3) ==> (cbrt ?a)"
+    )
+    (exponential)
+    real
+    ,rational-op-table
+  )
+
+  (
+    "exponential-prior"
+    (
+      "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))"
+      "(exp (~ ?a)) ==> (/ 1 (exp ?a))"
+      "(* (exp ?a) (exp ?b)) ==> (exp (+ ?a ?b))"
+      "(/ 1 (exp ?a)) ==> (exp (~ ?a))"
+      "(exp 0) ==> 1"
+      "(log (exp ?a)) ==> ?a"
+      "(exp (log ?a)) ==> ?a"
+    )
+    (exponential)
+    real
+    ,rational-op-table
+  )
+
+  (
+    "trigometric-lifting"
+    (
+      "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))"
+      "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)"
+      "(cos ?a) ==> (/ (+ (cis ?a) (cis (~ ?a))) 2)"
+      "(/ (+ (cis ?a) (cis (~ ?a))) 2) ==> (cos ?a)"
+      "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))"
+      "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)"
+      "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)"
+      "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) ==> (sin ?a)"
+      "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))"
+      "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)"
+      "(tan ?a) ==> (/ (sin ?a) (cos ?a))"
+      "(/ (sin ?a) (cos ?a)) ==> (tan ?a)"
+      "(* (cos ?a) (cos ?b)) ==> (/ (+ (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)"
+      "(* (sin ?a) (sin ?b)) ==> (/ (- (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)"
+      "(* (cos ?a) (sin ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?b ?a)) (cis (~ (- ?b ?a))))) (* 4 I))"
+      "(* (sin ?a) (cos ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?a ?b)) (cis (~ (- ?a ?b))))) (* 4 I))"
+      "(sqr ?a) ==> (* ?a ?a)"
+      "(* ?a ?a) ==> (sqr ?a)"
+    )
+    (trigonometry)
+    real
+    ,rational-op-table
+  )
+
+  (
+    "trigometric-prior"
+    (
+      "(+ PI PI) ==> (* 2 PI)"
+      "(* 2 PI) ==> (+ PI PI)"
+      "(cis 0) ==> 1"
+      "(cis (/ PI 2)) ==> I"
+      "(cis (~ (/ PI 2))) ==> (~ I)"
+      "(cis PI) ==> -1"
+      "(cis (+ ?a ?b)) ==> (* (cis ?a) (cis ?b))"
+      "(* (cis ?a) (cis ?b)) ==> (cis (+ ?a ?b))"
+      "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (~ ?b)))"
+      "(* (cis ?a) (cis (~ ?b))) ==> (cis (- ?a ?b))"
+      "(cis (~ ?a)) ==> (/ 1 (cis ?a))"
+      "(/ 1 (cis ?a)) ==> (cis (~ ?a))"
+      "(* (cis ?a) (cis (~ ?a))) ==> 1"
+      "(/ 1 I) ==> (~ I)"
+      "(* I I) ==> -1"
+    )
+    (trigonometry)
+    real
+    ,rational-op-table
+  )
+))
 
 (define (get-rules json keys baseline?)
   (for/list ([key (in-list keys)])
@@ -328,7 +412,7 @@
     ['enumo-no-ff
      (define keys `(("rational_best" "rational_best" (rational) real ,rational-op-table)))
      (define baseline? #f)
-     (get-rules json keys baseline?)]
+     (append (get-rules json keys baseline?) fast-fowarding-entries)]
     ['ruler
      (define keys `(("rational_best" "oopsla" (rational) real ,rational-op-table)))
      (define baseline? #t)
@@ -368,10 +452,16 @@
            (values simplify non-simplify)])))
 
     (define var-ctx (for/list ([v (in-set vars)]) (cons (string->symbol v) type)))
-    (pretty-write (make-ruleset name groups var-ctx non-simplify) outfile)
-    (newline outfile)
-    (pretty-write (make-ruleset (format "~a-simplify" name) (cons 'simplify groups) var-ctx simplify) outfile)
-    (newline outfile)
+    (define name* (string->symbol name))
+    (define simplify-name* (string->symbol (format "~a-simplify" name)))
+
+    (unless (null? non-simplify)
+      (pretty-write (make-ruleset name* groups var-ctx non-simplify) outfile)
+      (newline outfile))
+    (unless (null? simplify)
+      (pretty-write (make-ruleset simplify-name* (cons 'simplify groups) var-ctx simplify) outfile)
+      (newline outfile))
+
     (log! "  Done\n")))
 
 (define (emit-prelude! outfile)
