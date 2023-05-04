@@ -1,5 +1,13 @@
 #lang racket
 
+(require json)
+
+(define features '(no-expansive-bool no-xor))
+(define quiet-mode? #f)
+
+(define (log! msg . args)
+  (unless quiet-mode? (apply printf msg args)))
+
 (define rules-prelude '(
 ;; Arithmetic identities for rewriting programs.
 
@@ -199,25 +207,172 @@
 ;;  Rule generation
 ;;
 
-(define (get-config config)
+(define bool-op-table '(("&" . "and")
+                        ("|" . "or")
+                        ("~" . "not")
+                        ("true" . "(TRUE)")
+                        ("false" . "(FALSE)")))
+
+(define rational-op-table '(("~" . "neg")))
+
+(define/contract (string-replace* str changes)
+  (-> string? (listof (cons/c string? string?)) string?)
+  (let loop ([str str] [changes changes])
+    (match changes
+      [(? null?) str]
+      [_ (let ([change (car changes)])
+           (loop (string-replace str (car change) (cdr change)) (cdr changes)))])))
+
+(define (parse-ruler-rule lhs rhs table)
+  (define (ruler-string-expr->expr str)
+    (call-with-input-string (string-replace* str table) read))
+
+  (define (parse-expr expr)
+    (define vars (mutable-set))
+    (values
+      (let loop ([expr (ruler-string-expr->expr expr)])
+        (match expr
+          [(list 'if c ift iff)
+           (list 'if (list '!= (loop c) 0) (loop ift) (loop iff))]
+          [(list 'sqr arg)
+           (define arg* (loop arg))
+           (list '* arg* arg*)]
+          [(list op args ...)
+           (cons op (map loop args))]
+          [(? number?) expr]
+          [(? symbol?)
+           (define str-repr (symbol->string expr))
+           (cond
+             [(eq? (string-ref str-repr 0) #\?)
+              (set-add! vars (substring str-repr 1))
+              (string->symbol (substring str-repr 1))]
+             [else
+              (list expr)])]))
+      (for/set ([s (in-mutable-set vars)]) s)))
+
+  (define (expr-has-op? expr)
+    (match expr
+      [(list op head rest ...) #t]
+      [_ #f]))
+
+  (define-values (lhs* lhs-vars) (parse-expr lhs))
+  (define-values (rhs* rhs-vars) (parse-expr rhs))
+  (define rule (list lhs* rhs* (and (expr-has-op? lhs*) 'simplify)))
+  (values rule (set-union lhs-vars rhs-vars)))
+
+(define (ops-in-expr expr)
+  (define ops (mutable-set))
+  (let loop ([expr expr])
+    (match expr
+      [(list op args ...)
+       (set-add! ops op)
+       (for-each loop args)]
+      [_
+       (void)]))
+  ops)
+
+(define (make-ruleset name groups var-ctx rules)
+  (log! "  Registering ruleset `~a` ...\n" name)
+  (log! "   Groups: ~a\n" groups)
+  (log! "   Vars:   ~a\n" var-ctx)
+  (log! "   Rules:  ~a\n" (length rules))
+  `(register-ruleset*!
+    ,name ,groups ,var-ctx
+    ,(for/list ([rule (in-list rules)] [i (in-naturals 1)])
+      (match-define (list lhs rhs _) rule)
+      (define rule-name (string->symbol (format "~a-~a" name i)))
+      (log! "    ~a: ~a => ~a\n" rule-name lhs rhs)
+      (list rule-name lhs rhs))))
+
+;;
+;;  Core
+;;
+
+(define (get-rules json keys baseline?)
+  (for/list ([key (in-list keys)])
+    (match-define (list spec baseline groups type op-table) key)
+    (let/ec return
+      (for ([entry (in-list json)])
+        (when (and (hash? entry)
+                   (hash-has-key? entry 'enumo_spec_name)
+                   (hash-has-key? entry 'baseline_name)
+                   (equal? (hash-ref entry 'enumo_spec_name) spec)
+                   (equal? (hash-ref entry 'baseline_name) baseline))
+          (return
+            (list
+              spec
+              (if baseline?
+                  (let ([derivability (hash-ref entry 'enumo_to_baseline_all)])
+                    (append (hash-ref derivability 'enumo_derives_baseline_derivable)
+                            (hash-ref derivability 'enumo_derives_baseline_underivable)))
+                  (hash-ref (hash-ref entry 'rules) 'rules))
+              groups
+              type
+              op-table))))
+      (error 'get-rules "missing entry (~a . ~a)" spec baseline))))
+
+(define (get-rule-jsons config jsonfile)
+  (define json (read-json jsonfile))
   (match config
     ['enumo
-     #f]
+     (define keys `(("bool" "oopsla" (bool) bool ,bool-op-table)
+                    ("rational_best" "rational_best" (rational) real ,rational-op-table)
+                    ("exponential" "herbie" (exponential) real ,rational-op-table)
+                    ("trig" "herbie" (trig) real ,rational-op-table)))
+     (define baseline? #f)
+     (get-rules json keys baseline?)]
     ['enumo-rat
-     #f]
+     (define keys `(("rational_best" "rational_best" (rational) real ,rational-op-table)))
+     (define baseline? #f)
+     (get-rules json keys baseline?)]
     ['enumo-no-ff
-     #f]
+     (define keys `(("rational_best" "rational_best" (rational) real ,rational-op-table)))
+     (define baseline? #f)
+     (get-rules json keys baseline?)]
     ['ruler
-     #f]
+     (define keys `(("rational_best" "oopsla" (rational) real ,rational-op-table)))
+     (define baseline? #t)
+     (get-rules json keys baseline?)]
     [_
-     (error 'get-config "unexpected configuration ~a" config)]))
+     (error 'get-rule-jsons "unsupported configuration ~a" config)]))
 
 ;;
 ;;  File handling
 ;;
 
-(define (emit-rules! outfile)
-  (void))
+(define (emit-rules! jsons outfile)
+  (for ([entry (in-list jsons)])
+    (log! "  Parsing rules ...\n")
+    (match-define (list name json groups type op-table) entry)
+    (define vars (mutable-set))
+    (define rules
+      (for/fold ([rules '()] #:result (reverse rules))
+                ([rule (in-list json)] [counter (in-naturals 1)])
+        (match-define (list lhs rhs) (string-split rule " ==> "))
+        (define-values (rule* rule-vars) (parse-ruler-rule lhs rhs op-table))
+        (set-union! vars rule-vars)
+        (cond
+          [(and (set-member? features 'no-xor)
+                (or (set-member? (ops-in-expr (first rule*)) '^)
+                    (set-member? (ops-in-expr (second rule*)) '^)))
+           rules]
+          [else
+           (cons rule* rules)])))
+
+    (define-values (simplify non-simplify)
+      (let-values ([(simplify non-simplify) (partition (λ (r) (eq? (third r) 'simplify)) rules)])
+        (cond
+          [(and (eq? type 'bool) (set-member? features 'no-expansive-bool))
+           (values simplify (filter (λ (r) (not (symbol? (first r)))) non-simplify))]
+          [else
+           (values simplify non-simplify)])))
+
+    (define var-ctx (for/list ([v (in-set vars)]) (cons (string->symbol v) type)))
+    (pretty-write (make-ruleset name groups var-ctx non-simplify) outfile)
+    (newline outfile)
+    (pretty-write (make-ruleset (format "~a-simplify" name) (cons 'simplify groups) var-ctx simplify) outfile)
+    (newline outfile)
+    (log! "  Done\n")))
 
 (define (emit-prelude! outfile)
   (displayln "#lang racket\n" outfile)
@@ -237,10 +392,10 @@
   (printf "Generating rules.rkt for ~a from ~a with result at ~a\n" config json-path out-path)
   (define jsonfile (open-input-file json-path))
   (define outfile (open-output-file #:exists 'replace out-path))
-  (define cfg (get-config config))
+  (define jsons (get-rule-jsons config jsonfile))
 
   (emit-prelude! outfile)
-  (emit-rules! outfile)
+  (emit-rules! jsons outfile)
   (emit-ending! outfile)
 
   (close-input-port jsonfile)
