@@ -23,9 +23,9 @@ if field == "time":
         pairs[k] = new_times
 
 h = ('Herbie', pairs['main'])
-e = ('Enumo', pairs['enumo'])
-f = ('Enumo[-FF]', pairs['enumo-no-ff'])
-o = ('Enumo[Rat]', pairs['enumo-rat'])
+e = ('Renumo', pairs['enumo'])
+f = ('Renumo-FF', pairs['enumo-no-ff'])
+o = ('Renumo-R', pairs['enumo-rat'])
 r = ('Ruler', pairs['ruler'])
 # hl = ('Herbie[L]', pairs['main-lim'])
 # el = ('Enumo[L]', pairs['enumo-lim'])
@@ -40,16 +40,16 @@ for c, ds in listify:
     labs.append(c)
     vals.append(ds)
 
-fig, ax = plt.subplots(figsize=(6, 10))
+fig, ax = plt.subplots(figsize=(6, 5))
 ax.boxplot(vals)
 
 # manually set before deadline
 if str(field) == "output_parens":
     yname = "AST Size"
-    ax.set_ylim([0, 4000])
+    ax.set_ylim([0, 5000])
 elif str(field) == "time":
     yname = "Time (s)"
-    ax.set_ylim([0, 6000])
+    ax.set_ylim([0, 5000])
 elif str(field) == "avg_bits_err_improve":
     yname = "Average bits of error improved"
     ax.set_ylim([0, 3000])
@@ -59,9 +59,12 @@ else:
 
 title = yname + " over 30 seeds"
 #ax.set_title(title, fontsize=8)
-ax.set_xlabel('Rules used', labelpad=10)
-ax.set_ylabel(yname)
-ax.set_xticklabels(labs, fontsize=8)
+ax.set_xticklabels(labs)
+
+ax.set_xlabel('Rules used', labelpad=10, fontsize=10)
+ax.set_ylabel(yname, fontsize=10)
+plt.xticks(fontsize=10)
+plt.yticks(fontsize=10)
 
 plt.tight_layout()
 plt.savefig('by-config-all-tests-{}-boxplot.pdf'.format(field))

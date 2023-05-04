@@ -83,7 +83,7 @@ function do_branch {
   if [[ "$branch" == "using-ruler-baseline" || "$branch" == "using-ruler-nightlies" || "$branch" == "ruler-no-fast-forwarding" ]]; then
     # In case of broken nightlies, target different branch
     sed -i 's/main/oflatt-error-unsound/g' "$HERBIE_DIR/src/syntax/rules.rkt"
-    cp "$MYDIR/lib.rs" "$HERBIE_DIR/egg-herbie/src/lib.rs"
+    # cp "$MYDIR/lib.rs" "$HERBIE_DIR/egg-herbie/src/lib.rs"
     if [[ -n "$COMMIT" ]]; then
       sed -i "s/(define nightly-commit #f)/(define nightly-commit \"$COMMIT\")/g" "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
@@ -95,8 +95,6 @@ function do_branch {
       echo "" >> "$HERBIE_DIR/src/syntax/rules.rkt"
     fi
 
-    # cp "$MYDIR/matcher.rkt" "$HERBIE_DIR/src/core/matcher.rkt"
-    # cp "$MYDIR/simplify.rkt" "$HERBIE_DIR/src/core/simplify.rkt"
     if [[ "$name" == "ruler" ]]; then
       cp "$MYDIR/egg-herbie.rkt" "$HERBIE_DIR/src/core/egg-herbie.rkt"
     else
