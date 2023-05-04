@@ -40,5 +40,5 @@ pushd $BUILD_DIR
 # For patches
 git checkout "$BUILD_DIR/src/syntax/rules.rkt"
 # Checkout the branches
-git checkout main
+git checkout ruler-eval-unified
 popd

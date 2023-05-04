@@ -50,28 +50,26 @@ BUILD_DIR=$HERBIE_DIR bash install.sh
 rm -rf $BENCH_DIR
 mkdir -p $BENCH_DIR
 
-cp -r "$HERBIE_DIR/bench/hamming" "$BENCH_DIR/"
+cp -r "$HERBIE_DIR/bench/hamming" \
+      "$HERBIE_DIR/bench/mathematics" \
+      "$HERBIE_DIR/bench/numerics" \
+      "$HERBIE_DIR/bench/physics" \
+      "$HERBIE_DIR/bench/pbrt.fpcore" \
+      "$BENCH_DIR/"
 
-# cp -r "$HERBIE_DIR/bench/hamming" \
-#       "$HERBIE_DIR/bench/mathematics" \
-#       "$HERBIE_DIR/bench/numerics" \
-#       "$HERBIE_DIR/bench/physics" \
-#       "$HERBIE_DIR/bench/pbrt.fpcore" \
-#       "$BENCH_DIR/"
-
-# FPCORES=$(find $BENCH_DIR -name "*.fpcore")
-# for fpcore in $FPCORES; do
-#   echo "filtering $fpcore"
-#   racket "$MYDIR/filter.rkt" \
-#     --names "raw-angle from scale-rotated-ellipse ; \
-#              a from scale-rotated-ellipse ; \
-#              b from scale-rotated-ellipse ; \
-#              Simplification of discriminant from scale-rotated-ellipse ; \
-#              Distance on a great circle ; \
-#              Harley's example" \
-#     $fpcore >> "$fpcore.tmp"
-#   mv "$fpcore.tmp" $fpcore
-# done
+FPCORES=$(find $BENCH_DIR -name "*.fpcore")
+for fpcore in $FPCORES; do
+  echo "filtering $fpcore"
+  racket "$MYDIR/filter.rkt" \
+    --names "raw-angle from scale-rotated-ellipse ; \
+             a from scale-rotated-ellipse ; \
+             b from scale-rotated-ellipse ; \
+             Simplification of discriminant from scale-rotated-ellipse ; \
+             Distance on a great circle ; \
+             Harley's example" \
+    $fpcore >> "$fpcore.tmp"
+  mv "$fpcore.tmp" $fpcore
+done
 
 #
 #   Run the branches!!!
