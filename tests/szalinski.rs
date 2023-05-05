@@ -203,10 +203,8 @@ impl SynthLanguage for CF {
     }
 }
 
-fn paste_print(rs: &Ruleset<CF>) {
-    println!("\nPaste these vvv\n");
-    let mut i = 1;
-
+fn export_print(rs: &Ruleset<CF>) {
+    println!("RULER RULES START");
     fn fix(s: String) -> String {
         s.replace("Scale", "Affine Scale")
             .replace("Trans", "Affine Trans")
@@ -215,6 +213,7 @@ fn paste_print(rs: &Ruleset<CF>) {
             .replace("(Lit 1)", "1")
     }
 
+    let mut i = 1;
     for (_, rule) in rs {
         println!(
             "rw!(\"ruler{}\"; \"{}\" => \"{}\"),",
@@ -224,6 +223,7 @@ fn paste_print(rs: &Ruleset<CF>) {
         );
         i += 1;
     }
+    println!("RULER RULES END");
     println!("\n");
 }
 
@@ -282,7 +282,7 @@ mod tests {
         }
 
         learned_rules.pretty_print();
-        paste_print(&learned_rules);
+        export_print(&learned_rules);
 
         let mut most_atoms = 0;
         for (_, rule) in learned_rules {
