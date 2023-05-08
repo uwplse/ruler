@@ -276,7 +276,7 @@ mod test {
         let duration = start.elapsed();
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 
-        logger::write_output(&rules, &baseline, "bool", "oopsla", duration, (true, true));
+        logger::write_baseline(&rules, "bool", &baseline, "oopsla", duration);
     }
 
     #[test]

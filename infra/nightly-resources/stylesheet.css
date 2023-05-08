@@ -12,14 +12,10 @@ h3 {
     margin-bottom: 0;
 }
 
-.derive_table {
-    display: inline-table;
-}
-
-.derive_container {
-    display: inline-block;
-}
-
 textarea {
     width: 100%;
+}
+
+td {
+    vertical-align: top;
 }
