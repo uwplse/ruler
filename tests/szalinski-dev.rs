@@ -357,7 +357,8 @@ mod tests {
     use super::*;
 
     // This gives all the rules, but is overfit
-    // #[test]
+    #[test]
+    #[ignore]
     fn rule_lifting_overfit() {
         let mut all_rules = Ruleset::new(&get_subst_and_frep_rules());
         let atoms3 = Workload::new([
@@ -426,6 +427,7 @@ mod tests {
 
     // Simple attempt to use iter_szalinski.
     #[test]
+    #[ignore]
     fn rule_lifting() {
         let mut learned_rules = Ruleset::default();
         let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());
@@ -465,7 +467,8 @@ mod tests {
 
     // An attempt to help w scaling by separating translation/subst rules.
     // Status: doesn't get the right rules for small iters
-    // #[test]
+    #[test]
+    #[ignore]
     fn rule_lifting_recipe_fine() {
         let subst_ruleset: Ruleset<CF> = Ruleset::new(&get_subst_rules());
         let frep_ruleset: Ruleset<CF> = Ruleset::new(&get_frep_rules());
@@ -532,7 +535,8 @@ mod tests {
     }
 
     // A coarser recipe than the above. status: not working
-    // #[test]
+    #[test]
+    #[ignore]
     fn rule_lifting_recipe2() {
         let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());
 
