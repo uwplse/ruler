@@ -446,7 +446,11 @@ mod test {
             return;
         }
 
-        let limits = Limits::default();
+        let limits = Limits {	
+            iter: 3,	
+            node: 300000,
+            match_: 200_000,
+        };
         let mut all = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         all.extend(prior_rules());
         all.extend(Trig::get_lifting_rules());
