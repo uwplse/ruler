@@ -260,7 +260,8 @@ mod tests {
             .plug("bop", &bops.into())
     }
 
-    #[test] #[ignore]
+    #[test]
+    #[ignore]
     fn rule_lifting() {
         let mut learned_rules = Ruleset::default();
         let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());

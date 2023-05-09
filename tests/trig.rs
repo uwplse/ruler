@@ -446,8 +446,8 @@ mod test {
             return;
         }
 
-        let limits = Limits {	
-            iter: 3,	
+        let limits = Limits {
+            iter: 3,
             node: 300000,
             match_: 200_000,
         };
