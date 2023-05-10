@@ -877,6 +877,9 @@ pub mod test {
         guarded_rules.to_file("guard.rules");
         assert!(guarded_rules
             .0
+            .contains_key("(if ?a 0 (/ 0 ?a)) <=> (/ 0 ?a)"));
+        assert!(guarded_rules
+            .0
             .contains_key("(/ 0 ?a) ==> (if ?a 0 (/ ?a ?a))"));
     }
 
