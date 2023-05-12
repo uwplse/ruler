@@ -5,6 +5,7 @@ pub enum Filter {
     MetricLt(Metric, usize),
     MetricEq(Metric, usize),
     Contains(Pattern),
+    Excludes(Pattern),
     Canon(Vec<String>),
     And(Vec<Self>),
     Or(Vec<Self>),
@@ -23,6 +24,7 @@ impl Filter {
                         Sexp::List(args) => args.iter().any(|s| self.test(s)),
                     }
             }
+            Filter::Excludes(pat) => !&Filter::Contains(pat.clone()).test(sexp),
             Filter::Canon(symbols) => sexp.eq(&sexp.canon(symbols)),
             Filter::And(fs) => fs.iter().all(|f| f.test(sexp)),
             Filter::Or(fs) => fs.iter().any(|f| f.test(sexp)),
@@ -30,8 +32,37 @@ impl Filter {
         }
     }
 
+    pub(crate) fn and(self, other: Self) -> Self {
+        let all = match (self, other) {
+            (Filter::And(f1s), Filter::And(f2s)) => {
+                let mut all = f1s;
+                all.extend(f2s);
+                all
+            }
+            (Filter::And(fs), f) => {
+                let mut all = fs;
+                all.push(f);
+                all
+            }
+            (f, Filter::And(fs)) => {
+                let mut all = fs;
+                all.push(f);
+                all
+            }
+            (f1, f2) => vec![f1, f2],
+        };
+
+        Filter::And(all)
+    }
+
     pub(crate) fn is_monotonic(&self) -> bool {
-        matches!(self, Filter::MetricLt(_, _))
+        match self {
+            Filter::MetricLt(_, _) => true,
+            Filter::Excludes(_) => true,
+            // The conjunction of monotonic filters is monotonic
+            Filter::And(fs) => fs.iter().all(|f| f.is_monotonic()),
+            _ => false,
+        }
     }
 }
 
@@ -102,5 +133,15 @@ mod test {
             .force();
         let expected = Workload::new(["(+ a b)", "(+ a (+ a b))", "(+ (+ a b) (+ b a))"]).force();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn excludes() {
+        let pegs = Workload::new(["a", "b", "c", "d"]);
+        let wkld = Workload::new(["(OP X X)"])
+            .plug("X", &pegs)
+            .filter(Filter::Excludes("c".parse().unwrap()));
+
+        assert_eq!(wkld.len(), 9)
     }
 }

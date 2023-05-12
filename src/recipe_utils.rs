@@ -156,7 +156,7 @@ pub fn base_lang(n: usize) -> Workload {
 #[cfg(test)]
 mod test {
     use crate::{
-        enumo::Metric,
+        enumo::{Metric, Workload},
         recipe_utils::{base_lang, iter_metric},
     };
 
