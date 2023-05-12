@@ -299,7 +299,7 @@
       "(pow ?a 1/2) ==> (sqrt ?a)"
       "(pow ?a 1/3) ==> (cbrt ?a)"
     )
-    (exponential)
+    (exponents)
     real
     ,rational-op-table
   )
@@ -315,7 +315,7 @@
       "(log (exp ?a)) ==> ?a"
       "(exp (log ?a)) ==> ?a"
     )
-    (exponential)
+    (exponents)
     real
     ,rational-op-table
   )
@@ -378,10 +378,8 @@
     (let/ec return
       (for ([entry (in-list json)])
         (when (and (hash? entry)
-                   (hash-has-key? entry 'enumo_spec_name)
-                   (hash-has-key? entry 'baseline_name)
-                   (equal? (hash-ref entry 'enumo_spec_name) spec)
-                   (equal? (hash-ref entry 'baseline_name) baseline))
+                   (equal? (hash-ref entry 'enumo_spec_name #f) spec)
+                   (equal? (hash-ref entry 'baseline_name #f) baseline))
           (return
             (list
               spec
@@ -399,22 +397,22 @@
   (define json (read-json jsonfile))
   (match config
     ['enumo
-     (define keys `(("bool" "oopsla" (bool) bool ,bool-op-table)
-                    ("rational_best" "rational_best" (rational) real ,rational-op-table)
-                    ("exponential" "herbie" (exponential) real ,rational-op-table)
-                    ("trig" "herbie" (trig) real ,rational-op-table)))
+     (define keys `(("bool" "oopsla" (bools) bool ,bool-op-table)
+                    ("rational_best" "rational_best" (arithmetic) real ,rational-op-table)
+                    ("exponential" "herbie" (exponents) real ,rational-op-table)
+                    ("trig" "herbie" (trigonometry) real ,rational-op-table)))
      (define baseline? #f)
      (get-rules json keys baseline?)]
     ['enumo-rat
-     (define keys `(("rational_best" "rational_best" (rational) real ,rational-op-table)))
+     (define keys `(("rational_best" "rational_best" (arithmetic) real ,rational-op-table)))
      (define baseline? #f)
      (get-rules json keys baseline?)]
     ['enumo-no-ff
-     (define keys `(("rational_best" "rational_best" (rational) real ,rational-op-table)))
+     (define keys `(("rational_best" "rational_best" (arithmetic) real ,rational-op-table)))
      (define baseline? #f)
      (append (get-rules json keys baseline?) fast-fowarding-entries)]
     ['ruler
-     (define keys `(("rational_best" "oopsla" (rational) real ,rational-op-table)))
+     (define keys `(("rational_best" "oopsla" (arithmetic) real ,rational-op-table)))
      (define baseline? #t)
      (get-rules json keys baseline?)]
     [_
