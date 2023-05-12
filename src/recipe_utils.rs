@@ -229,4 +229,11 @@ mod test {
         assert_eq!(base_lang(2).len(), 4);
         assert_eq!(base_lang(3).len(), 5);
     }
+
+    #[test]
+    fn empty_plug() {
+        let wkld =
+            iter_metric(base_lang(3), "EXPR", Metric::Atoms, 7).plug("OP3", &Workload::empty());
+        assert_eq!(wkld.len(), 570);
+    }
 }

@@ -32,6 +32,21 @@ impl Filter {
         }
     }
 
+    fn subsumed_by(&self, fs: &Vec<Self>) -> bool {
+        if let Filter::MetricLt(met, n) = self {
+            for f in fs {
+                if let Filter::MetricLt(met1, n1) = f {
+                    if met == met1 && n >= &n1 {
+                        return true;
+                    }
+                }
+            }
+            false
+        } else {
+            false
+        }
+    }
+
     pub(crate) fn and(self, other: Self) -> Self {
         let all = match (self, other) {
             (Filter::And(f1s), Filter::And(f2s)) => {
@@ -51,8 +66,14 @@ impl Filter {
             }
             (f1, f2) => vec![f1, f2],
         };
+        let mut minimized = vec![];
+        for f in all {
+            if !f.subsumed_by(&minimized) {
+                minimized.push(f);
+            }
+        }
 
-        Filter::And(all)
+        Filter::And(minimized)
     }
 
     pub(crate) fn is_monotonic(&self) -> bool {
