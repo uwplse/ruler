@@ -36,7 +36,7 @@ impl Filter {
         if let Filter::MetricLt(met, n) = self {
             for f in fs {
                 if let Filter::MetricLt(met1, n1) = f {
-                    if met == met1 && n >= &n1 {
+                    if met == met1 && n >= n1 {
                         return true;
                     }
                 }
