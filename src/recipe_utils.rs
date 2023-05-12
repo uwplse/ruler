@@ -123,13 +123,19 @@ pub fn recursive_rules<L: SynthLanguage>(
         Ruleset::default()
     } else {
         let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone());
-        let wkld = iter_metric(base_lang(), "EXPR", metric, n)
+        let base_lang = if lang.tops.is_empty() {
+            base_lang(2)
+        } else {
+            base_lang(3)
+        };
+        let wkld = iter_metric(base_lang, "EXPR", metric, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .plug("VAR", &Workload::new(lang.vars))
-            .plug("CONST", &Workload::new(lang.consts))
-            .plug("UOP", &Workload::new(lang.uops))
-            .plug("BOP", &Workload::new(lang.bops))
-            .plug("TOP", &Workload::new(lang.tops));
+            .plug("VAL", &Workload::new(lang.consts))
+            .plug("OP1", &Workload::new(lang.uops))
+            .plug("OP2", &Workload::new(lang.bops))
+            // This will be no-op if there are no three-arg ops
+            .plug("OP3", &Workload::new(lang.tops));
         rec.extend(prior);
         let new = run_workload(wkld, rec.clone(), Limits::rulefinding(), true);
         let mut all = new;
@@ -138,28 +144,25 @@ pub fn recursive_rules<L: SynthLanguage>(
     }
 }
 
-pub fn base_lang() -> Workload {
-    Workload::new([
-        "VAR",
-        "CONST",
-        "(UOP EXPR)",
-        "(BOP EXPR EXPR)",
-        "(TOP EXPR EXPR EXPR)",
-    ])
+pub fn base_lang(n: usize) -> Workload {
+    let mut vals = vec!["VAR".to_string(), "VAL".to_string()];
+    for i in 1..(n + 1) {
+        let s = format!("(OP{}{})", i, " EXPR".repeat(i));
+        vals.push(s);
+    }
+    Workload::new(vals)
 }
 
 #[cfg(test)]
 mod test {
     use crate::{
-        enumo::{Filter, Metric},
+        enumo::Metric,
         recipe_utils::{base_lang, iter_metric},
     };
 
     #[test]
     fn iter_metric_test() {
-        let lang = base_lang().filter(Filter::Invert(Box::new(Filter::Contains(
-            "TOP".parse().unwrap(),
-        ))));
+        let lang = base_lang(2);
         let atoms1 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 1).force();
         assert_eq!(atoms1.len(), 2);
 
@@ -206,16 +209,24 @@ mod test {
     #[test]
     fn iter_metric_fast() {
         // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
-        let three = iter_metric(base_lang(), "EXPR", Metric::Atoms, 3);
-        assert_eq!(three.force().len(), 10);
+        let three = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 3);
+        assert_eq!(three.len(), 10);
 
-        let four = iter_metric(base_lang(), "EXPR", Metric::Atoms, 4);
-        assert_eq!(four.force().len(), 32);
+        let four = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 4);
+        assert_eq!(four.len(), 32);
 
-        let five = iter_metric(base_lang(), "EXPR", Metric::Atoms, 5);
-        assert_eq!(five.force().len(), 106);
+        let five = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 5);
+        assert_eq!(five.len(), 106);
 
-        let six = iter_metric(base_lang(), "EXPR", Metric::Atoms, 6);
-        assert_eq!(six.force().len(), 388);
+        let six = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 6);
+        assert_eq!(six.len(), 388);
+    }
+
+    #[test]
+    fn base_lang_test() {
+        assert_eq!(base_lang(0).len(), 2);
+        assert_eq!(base_lang(1).len(), 3);
+        assert_eq!(base_lang(2).len(), 4);
+        assert_eq!(base_lang(3).len(), 5);
     }
 }

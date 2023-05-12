@@ -437,21 +437,11 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
-        let before = self.len();
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
         while !self.is_empty() {
-            println!(
-                "Shrinking {}/{} candidates. Kept {} so far.",
-                self.len(),
-                before,
-                chosen.len()
-            );
-
             let selected = self.select(step_size, &mut invalid);
-            print!("Selected: ");
-            selected.pretty_print();
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
         }

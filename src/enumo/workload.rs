@@ -35,6 +35,14 @@ impl Workload {
         Self::Set(vec![])
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.force().is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.force().len()
+    }
+
     pub fn to_file(&self, filename: &str) {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
@@ -189,55 +197,55 @@ mod test {
         let plugged = wkld
             .plug("x", &pegs)
             .filter(Filter::MetricLt(Metric::Atoms, 2));
-        assert_eq!(plugged.force().len(), 3);
+        assert_eq!(plugged.len(), 3);
     }
 
     #[test]
     fn contains() {
-        let actual3 = iter_metric(base_lang(), "EXPR", Metric::Atoms, 3)
+        let actual3 = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 3)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .force();
 
         let expected3 = Workload::new([
             "VAR",
-            "(UOP VAR)",
-            "(UOP (UOP VAR))",
-            "(BOP VAR VAR)",
-            "(BOP VAR CONST)",
-            "(BOP CONST VAR)",
+            "(OP1 VAR)",
+            "(OP1 (OP1 VAR))",
+            "(OP2 VAR VAR)",
+            "(OP2 VAR VAL)",
+            "(OP2 VAL VAR)",
         ])
         .force();
 
         assert_eq!(actual3, expected3);
 
-        let actual4 = iter_metric(base_lang(), "EXPR", Metric::Atoms, 4)
+        let actual4 = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 4)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .force();
 
         let expected4 = Workload::new([
             "VAR",
-            "(UOP VAR)",
-            "(UOP (UOP VAR))",
-            "(UOP (UOP (UOP VAR)))",
-            "(UOP (BOP VAR VAR))",
-            "(UOP (BOP VAR CONST))",
-            "(UOP (BOP CONST VAR))",
-            "(BOP VAR VAR)",
-            "(BOP VAR CONST)",
-            "(BOP VAR (UOP VAR))",
-            "(BOP VAR (UOP CONST))",
-            "(BOP CONST VAR)",
-            "(BOP CONST (UOP VAR))",
-            "(BOP (UOP VAR) VAR)",
-            "(BOP (UOP VAR) CONST)",
-            "(BOP (UOP CONST) VAR)",
-            "(TOP VAR VAR VAR)",
-            "(TOP VAR VAR CONST)",
-            "(TOP VAR CONST VAR)",
-            "(TOP VAR CONST CONST)",
-            "(TOP CONST VAR VAR)",
-            "(TOP CONST VAR CONST)",
-            "(TOP CONST CONST VAR)",
+            "(OP1 VAR)",
+            "(OP1 (OP1 VAR))",
+            "(OP1 (OP1 (OP1 VAR)))",
+            "(OP1 (OP2 VAR VAR))",
+            "(OP1 (OP2 VAR VAL))",
+            "(OP1 (OP2 VAL VAR))",
+            "(OP2 VAR VAR)",
+            "(OP2 VAR VAL)",
+            "(OP2 VAR (OP1 VAR))",
+            "(OP2 VAR (OP1 VAL))",
+            "(OP2 VAL VAR)",
+            "(OP2 VAL (OP1 VAR))",
+            "(OP2 (OP1 VAR) VAR)",
+            "(OP2 (OP1 VAR) VAL)",
+            "(OP2 (OP1 VAL) VAR)",
+            "(OP3 VAR VAR VAR)",
+            "(OP3 VAR VAR VAL)",
+            "(OP3 VAR VAL VAR)",
+            "(OP3 VAR VAL VAL)",
+            "(OP3 VAL VAR VAR)",
+            "(OP3 VAL VAR VAL)",
+            "(OP3 VAL VAL VAR)",
         ])
         .force();
 
@@ -269,7 +277,7 @@ mod test {
 
         let wkld = w1.clone().append(w2.clone());
         let wkld = wkld.append(w3.clone());
-        assert_eq!(wkld.force().len(), 6);
+        assert_eq!(wkld.len(), 6);
         assert!(matches!(wkld, Workload::Set(_)));
 
         let wkld = w3.clone().append(w4.clone());

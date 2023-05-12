@@ -20,23 +20,16 @@ pub fn bool_rules() -> Ruleset<Bool> {
     );
     all.extend(r5);
 
-    let a7_canon = iter_metric(
-        base_lang().filter(Filter::Invert(Box::new(Filter::Contains(
-            "TOP".parse().unwrap(),
-        )))),
-        "EXPR",
-        Metric::Atoms,
-        7,
-    )
-    .plug("CONST", &Workload::empty())
-    .plug("VAR", &Workload::new(["a", "b", "c"]))
-    .plug("UOP", &Workload::new(["~"]))
-    .plug("BOP", &Workload::new(["&", "|", "^"]))
-    .filter(Filter::Canon(vec![
-        "a".to_string(),
-        "b".to_string(),
-        "c".to_string(),
-    ]));
+    let a7_canon = iter_metric(base_lang(2), "EXPR", Metric::Atoms, 7)
+        .plug("VAL", &Workload::empty())
+        .plug("VAR", &Workload::new(["a", "b", "c"]))
+        .plug("OP1", &Workload::new(["~"]))
+        .plug("OP2", &Workload::new(["&", "|", "^"]))
+        .filter(Filter::Canon(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ]));
     let r7 = run_workload(a7_canon, all.clone(), Limits::rulefinding(), true);
     all.extend(r7);
 

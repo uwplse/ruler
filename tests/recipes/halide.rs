@@ -47,6 +47,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         all_rules.clone(),
     );
     all_rules.extend(pred_only);
+
     let full = recursive_rules(
         Metric::Atoms,
         4,
@@ -61,6 +62,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
         ),
         all_rules.clone(),
     );
+    all_rules.extend(full);
+
     let nested_bops_arith = Workload::new(&["(bop e e)", "v"])
         .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))

@@ -458,13 +458,12 @@ mod tests {
     use super::*;
 
     fn iter_pos(n: usize) -> Workload {
-        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+        iter_metric(base_lang(2), "EXPR", Metric::Atoms, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
-            .plug("CONST", &Workload::empty())
+            .plug("VAL", &Workload::empty())
             .plug("VAR", &Workload::new(["a", "b"]))
-            .plug("UOP", &Workload::empty())
-            .plug("BOP", &Workload::new(["max", "min"]))
-            .plug("TOP", &Workload::empty())
+            .plug("OP1", &Workload::empty())
+            .plug("OP2", &Workload::new(["max", "min"]))
     }
 
     #[test]
