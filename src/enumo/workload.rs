@@ -194,50 +194,50 @@ mod test {
 
     #[test]
     fn contains() {
-        let actual3 = iter_metric(base_lang(), "EXPR", Metric::Atoms, 3)
+        let actual3 = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 3)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .force();
 
         let expected3 = Workload::new([
             "VAR",
-            "(UOP VAR)",
-            "(UOP (UOP VAR))",
-            "(BOP VAR VAR)",
-            "(BOP VAR CONST)",
-            "(BOP CONST VAR)",
+            "(OP1 VAR)",
+            "(OP1 (OP1 VAR))",
+            "(OP2 VAR VAR)",
+            "(OP2 VAR VAL)",
+            "(OP2 VAL VAR)",
         ])
         .force();
 
         assert_eq!(actual3, expected3);
 
-        let actual4 = iter_metric(base_lang(), "EXPR", Metric::Atoms, 4)
+        let actual4 = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 4)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .force();
 
         let expected4 = Workload::new([
             "VAR",
-            "(UOP VAR)",
-            "(UOP (UOP VAR))",
-            "(UOP (UOP (UOP VAR)))",
-            "(UOP (BOP VAR VAR))",
-            "(UOP (BOP VAR CONST))",
-            "(UOP (BOP CONST VAR))",
-            "(BOP VAR VAR)",
-            "(BOP VAR CONST)",
-            "(BOP VAR (UOP VAR))",
-            "(BOP VAR (UOP CONST))",
-            "(BOP CONST VAR)",
-            "(BOP CONST (UOP VAR))",
-            "(BOP (UOP VAR) VAR)",
-            "(BOP (UOP VAR) CONST)",
-            "(BOP (UOP CONST) VAR)",
-            "(TOP VAR VAR VAR)",
-            "(TOP VAR VAR CONST)",
-            "(TOP VAR CONST VAR)",
-            "(TOP VAR CONST CONST)",
-            "(TOP CONST VAR VAR)",
-            "(TOP CONST VAR CONST)",
-            "(TOP CONST CONST VAR)",
+            "(OP1 VAR)",
+            "(OP1 (OP1 VAR))",
+            "(OP1 (OP1 (OP1 VAR)))",
+            "(OP1 (OP2 VAR VAR))",
+            "(OP1 (OP2 VAR VAL))",
+            "(OP1 (OP2 VAL VAR))",
+            "(OP2 VAR VAR)",
+            "(OP2 VAR VAL)",
+            "(OP2 VAR (OP1 VAR))",
+            "(OP2 VAR (OP1 VAL))",
+            "(OP2 VAL VAR)",
+            "(OP2 VAL (OP1 VAR))",
+            "(OP2 (OP1 VAR) VAR)",
+            "(OP2 (OP1 VAR) VAL)",
+            "(OP2 (OP1 VAL) VAR)",
+            "(OP3 VAR VAR VAR)",
+            "(OP3 VAR VAR VAL)",
+            "(OP3 VAR VAL VAR)",
+            "(OP3 VAR VAL VAL)",
+            "(OP3 VAL VAR VAR)",
+            "(OP3 VAL VAR VAL)",
+            "(OP3 VAL VAL VAR)",
         ])
         .force();
 

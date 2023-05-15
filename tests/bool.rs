@@ -82,8 +82,6 @@ impl SynthLanguage for Bool {
     }
 
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
-        println!("initializing vars: {:?}", vars);
-
         let consts = vec![Some(true), Some(false)];
         let cvecs = self_product(&consts, vars.len());
 
@@ -131,13 +129,12 @@ mod test {
     use std::time::Instant;
 
     fn iter_bool(n: usize) -> Workload {
-        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+        iter_metric(base_lang(2), "EXPR", Metric::Atoms, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
-            .plug("CONST", &Workload::new(["true", "false"]))
+            .plug("VAL", &Workload::new(["true", "false"]))
             .plug("VAR", &Workload::new(["a", "b", "c"]))
-            .plug("UOP", &Workload::new(["~"]))
-            .plug("BOP", &Workload::new(["&", "|", "^", "->"]))
-            .plug("TOP", &Workload::empty())
+            .plug("OP1", &Workload::new(["~"]))
+            .plug("OP2", &Workload::new(["&", "|", "^", "->"]))
     }
 
     #[test]

@@ -119,13 +119,12 @@ mod tests {
     use super::*;
 
     fn iter_pos(n: usize) -> Workload {
-        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+        iter_metric(base_lang(2), "EXPR", Metric::Atoms, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
-            .plug("CONST", &Workload::new(["XH"]))
+            .plug("VAL", &Workload::new(["XH"]))
             .plug("VAR", &Workload::new(["a", "b", "c"]))
-            .plug("UOP", &Workload::new(["XO", "XI"]))
-            .plug("BOP", &Workload::new(["+", "*"]))
-            .plug("TOP", &Workload::empty())
+            .plug("OP1", &Workload::new(["XO", "XI"]))
+            .plug("OP2", &Workload::new(["+", "*"]))
     }
 
     #[test]
