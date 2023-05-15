@@ -203,23 +203,23 @@ mod test {
     fn iter_metric_fast() {
         // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
         let three = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 3);
-        assert_eq!(three.len(), 10);
+        assert_eq!(three.force().len(), 10);
 
         let four = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 4);
-        assert_eq!(four.len(), 32);
+        assert_eq!(four.force().len(), 32);
 
         let five = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 5);
-        assert_eq!(five.len(), 106);
+        assert_eq!(five.force().len(), 106);
 
         let six = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 6);
-        assert_eq!(six.len(), 388);
+        assert_eq!(six.force().len(), 388);
     }
 
     #[test]
     fn base_lang_test() {
-        assert_eq!(base_lang(0).len(), 2);
-        assert_eq!(base_lang(1).len(), 3);
-        assert_eq!(base_lang(2).len(), 4);
-        assert_eq!(base_lang(3).len(), 5);
+        assert_eq!(base_lang(0).force().len(), 2);
+        assert_eq!(base_lang(1).force().len(), 3);
+        assert_eq!(base_lang(2).force().len(), 4);
+        assert_eq!(base_lang(3).force().len(), 5);
     }
 }

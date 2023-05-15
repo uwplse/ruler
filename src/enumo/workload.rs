@@ -35,14 +35,6 @@ impl Workload {
         Self::Set(vec![])
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.force().is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.force().len()
-    }
-
     pub fn to_file(&self, filename: &str) {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
@@ -197,7 +189,7 @@ mod test {
         let plugged = wkld
             .plug("x", &pegs)
             .filter(Filter::MetricLt(Metric::Atoms, 2));
-        assert_eq!(plugged.len(), 3);
+        assert_eq!(plugged.force().len(), 3);
     }
 
     #[test]
@@ -277,7 +269,7 @@ mod test {
 
         let wkld = w1.clone().append(w2.clone());
         let wkld = wkld.append(w3.clone());
-        assert_eq!(wkld.len(), 6);
+        assert_eq!(wkld.force().len(), 6);
         assert!(matches!(wkld, Workload::Set(_)));
 
         let wkld = w3.clone().append(w4.clone());
