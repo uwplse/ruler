@@ -339,8 +339,6 @@
       "(* (sin ?a) (sin ?b)) ==> (/ (- (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)"
       "(* (cos ?a) (sin ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?b ?a)) (cis (~ (- ?b ?a))))) (* 4 I))"
       "(* (sin ?a) (cos ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?a ?b)) (cis (~ (- ?a ?b))))) (* 4 I))"
-      "(sqr ?a) ==> (* ?a ?a)"
-      "(* ?a ?a) ==> (sqr ?a)"
     )
     (trigonometry)
     real
@@ -402,7 +400,10 @@
                     ("exponential" "herbie" (exponents) real ,rational-op-table)
                     ("trig" "herbie" (trigonometry) real ,rational-op-table)))
      (define baseline? #f)
-     (get-rules json keys baseline?)]
+     (match-define (list exponential-prior)
+      (filter (λ (r) (equal? (car r) "exponential-lifting"))
+              fast-fowarding-entries))
+     (append (get-rules json keys baseline?) (list exponential-prior))]
     ['enumo-rat
      (define keys `(("rational_best" "rational_best" (arithmetic) real ,rational-op-table)))
      (define baseline? #f)
