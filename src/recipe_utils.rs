@@ -88,27 +88,20 @@ pub fn run_rule_lifting<L: SynthLanguage>(
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Lang {
-    pub consts: Vec<String>,
+    pub vals: Vec<String>,
     pub vars: Vec<String>,
-    pub uops: Vec<String>,
-    pub bops: Vec<String>,
-    pub tops: Vec<String>,
+    pub ops: Vec<Vec<String>>,
 }
 
 impl Lang {
-    pub fn new(
-        consts: &[&str],
-        vars: &[&str],
-        uops: &[&str],
-        bops: &[&str],
-        tops: &[&str],
-    ) -> Self {
+    pub fn new(vals: &[&str], vars: &[&str], ops: &[&[&str]]) -> Self {
         Self {
-            consts: consts.iter().map(|x| x.to_string()).collect(),
+            vals: vals.iter().map(|x| x.to_string()).collect(),
             vars: vars.iter().map(|x| x.to_string()).collect(),
-            uops: uops.iter().map(|x| x.to_string()).collect(),
-            bops: bops.iter().map(|x| x.to_string()).collect(),
-            tops: tops.iter().map(|x| x.to_string()).collect(),
+            ops: ops
+                .iter()
+                .map(|o| o.iter().map(|x| x.to_string()).collect())
+                .collect(),
         }
     }
 }
@@ -123,19 +116,19 @@ pub fn recursive_rules<L: SynthLanguage>(
         Ruleset::default()
     } else {
         let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone());
-        let base_lang = if lang.tops.is_empty() {
+        let base_lang = if lang.ops.len() == 2 {
             base_lang(2)
         } else {
             base_lang(3)
         };
-        let wkld = iter_metric(base_lang, "EXPR", metric, n)
+        let mut wkld = iter_metric(base_lang, "EXPR", metric, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .plug("VAR", &Workload::new(lang.vars))
-            .plug("VAL", &Workload::new(lang.consts))
-            .plug("OP1", &Workload::new(lang.uops))
-            .plug("OP2", &Workload::new(lang.bops))
-            // This will be no-op if there are no three-arg ops
-            .plug("OP3", &Workload::new(lang.tops));
+            .plug("VAL", &Workload::new(lang.vals));
+        // let ops = vec![lang.uops, lang.bops, lang.tops];
+        for (i, ops) in lang.ops.iter().enumerate() {
+            wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
+        }
         rec.extend(prior);
         let new = run_workload(wkld, rec.clone(), Limits::rulefinding(), true);
         let mut all = new;

@@ -27,9 +27,7 @@ pub mod test {
         let lang = Lang::new(
             &["0", "1"],
             &["a", "b", "c"],
-            &["~", "-"],
-            &["&", "|", "*", "--", "+", "<<", ">>"],
-            &[],
+            &[&["~", "-"], &["&", "|", "*", "--", "+", "<<", ">>"]],
         );
         rules.extend(recursive_rules(
             enumo::Metric::Atoms,

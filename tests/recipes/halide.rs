@@ -11,13 +11,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let bool_only = recursive_rules(
         Metric::Atoms,
         5,
-        Lang::new(
-            &["0", "1"],
-            &["a", "b", "c"],
-            &["!"],
-            &["&&", "||", "^"],
-            &[],
-        ),
+        Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||", "^"]]),
         all_rules.clone(),
     );
     all_rules.extend(bool_only);
@@ -27,9 +21,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
-            &["-"],
-            &["+", "-", "*", "min", "max"],
-            &[],
+            &[&["-"], &["+", "-", "*", "min", "max"]],
         ),
         all_rules.clone(),
     );
@@ -40,9 +32,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
-            &["-"],
-            &["<", "<=", "==", "!="],
-            &["select"],
+            &[&["-"], &["<", "<=", "==", "!="], &["select"]],
         ),
         all_rules.clone(),
     );
@@ -54,11 +44,13 @@ pub fn halide_rules() -> Ruleset<Pred> {
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
-            &["-", "!"],
             &[
-                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                &["-", "!"],
+                &[
+                    "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                ],
+                &["select"],
             ],
-            &["select"],
         ),
         all_rules.clone(),
     );
