@@ -12,9 +12,7 @@ pub fn bool_rules() -> Ruleset<Bool> {
         Lang::new(
             &["true", "false"],
             &["a", "b", "c"],
-            &["~"],
-            &["&", "|", "^"],
-            &[],
+            &[&["~"], &["&", "|", "^"]],
         ),
         Ruleset::default(),
     );
