@@ -163,6 +163,6 @@ mod test {
             .plug("X", &pegs)
             .filter(Filter::Excludes("c".parse().unwrap()));
 
-        assert_eq!(wkld.len(), 9)
+        assert_eq!(wkld.force().len(), 9)
     }
 }
