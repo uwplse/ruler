@@ -229,7 +229,6 @@ fn export_print(rs: &Ruleset<CF>) {
 
 #[cfg(test)]
 mod tests {
-    use itertools::max;
     use ruler::enumo::{Ruleset, Scheduler, Workload};
 
     use super::*;
