@@ -88,27 +88,20 @@ pub fn run_rule_lifting<L: SynthLanguage>(
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Lang {
-    pub consts: Vec<String>,
+    pub vals: Vec<String>,
     pub vars: Vec<String>,
-    pub uops: Vec<String>,
-    pub bops: Vec<String>,
-    pub tops: Vec<String>,
+    pub ops: Vec<Vec<String>>,
 }
 
 impl Lang {
-    pub fn new(
-        consts: &[&str],
-        vars: &[&str],
-        uops: &[&str],
-        bops: &[&str],
-        tops: &[&str],
-    ) -> Self {
+    pub fn new(vals: &[&str], vars: &[&str], ops: &[&[&str]]) -> Self {
         Self {
-            consts: consts.iter().map(|x| x.to_string()).collect(),
+            vals: vals.iter().map(|x| x.to_string()).collect(),
             vars: vars.iter().map(|x| x.to_string()).collect(),
-            uops: uops.iter().map(|x| x.to_string()).collect(),
-            bops: bops.iter().map(|x| x.to_string()).collect(),
-            tops: tops.iter().map(|x| x.to_string()).collect(),
+            ops: ops
+                .iter()
+                .map(|o| o.iter().map(|x| x.to_string()).collect())
+                .collect(),
         }
     }
 }
@@ -123,13 +116,19 @@ pub fn recursive_rules<L: SynthLanguage>(
         Ruleset::default()
     } else {
         let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone());
-        let wkld = iter_metric(base_lang(), "EXPR", metric, n)
+        let base_lang = if lang.ops.len() == 2 {
+            base_lang(2)
+        } else {
+            base_lang(3)
+        };
+        let mut wkld = iter_metric(base_lang, "EXPR", metric, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
             .plug("VAR", &Workload::new(lang.vars))
-            .plug("CONST", &Workload::new(lang.consts))
-            .plug("UOP", &Workload::new(lang.uops))
-            .plug("BOP", &Workload::new(lang.bops))
-            .plug("TOP", &Workload::new(lang.tops));
+            .plug("VAL", &Workload::new(lang.vals));
+        // let ops = vec![lang.uops, lang.bops, lang.tops];
+        for (i, ops) in lang.ops.iter().enumerate() {
+            wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
+        }
         rec.extend(prior);
         let new = run_workload(wkld, rec.clone(), Limits::rulefinding(), true);
         let mut all = new;
@@ -138,28 +137,25 @@ pub fn recursive_rules<L: SynthLanguage>(
     }
 }
 
-pub fn base_lang() -> Workload {
-    Workload::new([
-        "VAR",
-        "CONST",
-        "(UOP EXPR)",
-        "(BOP EXPR EXPR)",
-        "(TOP EXPR EXPR EXPR)",
-    ])
+pub fn base_lang(n: usize) -> Workload {
+    let mut vals = vec!["VAR".to_string(), "VAL".to_string()];
+    for i in 1..(n + 1) {
+        let s = format!("(OP{}{})", i, " EXPR".repeat(i));
+        vals.push(s);
+    }
+    Workload::new(vals)
 }
 
 #[cfg(test)]
 mod test {
     use crate::{
-        enumo::{Filter, Metric},
+        enumo::Metric,
         recipe_utils::{base_lang, iter_metric},
     };
 
     #[test]
     fn iter_metric_test() {
-        let lang = base_lang().filter(Filter::Invert(Box::new(Filter::Contains(
-            "TOP".parse().unwrap(),
-        ))));
+        let lang = base_lang(2);
         let atoms1 = iter_metric(lang.clone(), "EXPR", Metric::Atoms, 1).force();
         assert_eq!(atoms1.len(), 2);
 
@@ -206,16 +202,24 @@ mod test {
     #[test]
     fn iter_metric_fast() {
         // This test will not finish if the pushing monotonic filters through plugs optimization is not working.
-        let three = iter_metric(base_lang(), "EXPR", Metric::Atoms, 3);
+        let three = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 3);
         assert_eq!(three.force().len(), 10);
 
-        let four = iter_metric(base_lang(), "EXPR", Metric::Atoms, 4);
+        let four = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 4);
         assert_eq!(four.force().len(), 32);
 
-        let five = iter_metric(base_lang(), "EXPR", Metric::Atoms, 5);
+        let five = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 5);
         assert_eq!(five.force().len(), 106);
 
-        let six = iter_metric(base_lang(), "EXPR", Metric::Atoms, 6);
+        let six = iter_metric(base_lang(3), "EXPR", Metric::Atoms, 6);
         assert_eq!(six.force().len(), 388);
+    }
+
+    #[test]
+    fn base_lang_test() {
+        assert_eq!(base_lang(0).force().len(), 2);
+        assert_eq!(base_lang(1).force().len(), 3);
+        assert_eq!(base_lang(2).force().len(), 4);
+        assert_eq!(base_lang(3).force().len(), 5);
     }
 }

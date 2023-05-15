@@ -182,13 +182,12 @@ mod test {
     use super::*;
 
     fn iter_nat(n: usize) -> Workload {
-        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+        iter_metric(base_lang(2), "EXPR", Metric::Atoms, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
-            .plug("CONST", &Workload::new(["Z"]))
+            .plug("VAL", &Workload::new(["Z"]))
             .plug("VAR", &Workload::new(["a", "b", "c"]))
-            .plug("UOP", &Workload::new(["S"]))
-            .plug("BOP", &Workload::new(["+", "*"]))
-            .plug("TOP", &Workload::empty())
+            .plug("OP1", &Workload::new(["S"]))
+            .plug("OP2", &Workload::new(["+", "*"]))
     }
 
     #[test]

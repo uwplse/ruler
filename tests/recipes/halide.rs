@@ -11,13 +11,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let bool_only = recursive_rules(
         Metric::Atoms,
         5,
-        Lang::new(
-            &["0", "1"],
-            &["a", "b", "c"],
-            &["!"],
-            &["&&", "||", "^"],
-            &[],
-        ),
+        Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||", "^"]]),
         all_rules.clone(),
     );
     all_rules.extend(bool_only);
@@ -27,9 +21,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
-            &["-"],
-            &["+", "-", "*", "min", "max"],
-            &[],
+            &[&["-"], &["+", "-", "*", "min", "max"]],
         ),
         all_rules.clone(),
     );
@@ -40,27 +32,30 @@ pub fn halide_rules() -> Ruleset<Pred> {
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
-            &["-"],
-            &["<", "<=", "==", "!="],
-            &["select"],
+            &[&["-"], &["<", "<=", "==", "!="], &["select"]],
         ),
         all_rules.clone(),
     );
     all_rules.extend(pred_only);
+
     let full = recursive_rules(
         Metric::Atoms,
         4,
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
-            &["-", "!"],
             &[
-                "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                &["-", "!"],
+                &[
+                    "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                ],
+                &["select"],
             ],
-            &["select"],
         ),
         all_rules.clone(),
     );
+    all_rules.extend(full);
+
     let nested_bops_arith = Workload::new(&["(bop e e)", "v"])
         .plug("e", &Workload::new(&["(bop v v)", "(uop v)", "v"]))
         .plug("bop", &Workload::new(&["+", "-", "*", "<", "max", "min"]))

@@ -16,7 +16,7 @@ pub mod test {
     use ruler::{
         enumo::{self, Filter, Ruleset, Workload},
         logger,
-        recipe_utils::{iter_metric, recursive_rules, run_workload, Lang},
+        recipe_utils::{base_lang, iter_metric, recursive_rules, run_workload, Lang},
         Limits,
     };
 
@@ -28,9 +28,7 @@ pub mod test {
         let lang = Lang::new(
             &["0", "1"],
             &["a", "b", "c"],
-            &["~", "-"],
-            &["&", "|", "*", "--", "+", "<<", ">>"],
-            &[],
+            &[&["~", "-"], &["&", "|", "*", "--", "+", "<<", ">>"]],
         );
         rules.extend(recursive_rules(
             enumo::Metric::Atoms,
@@ -39,13 +37,11 @@ pub mod test {
             Ruleset::default(),
         ));
 
-        let base_lang = Workload::new(["VAR", "CONST", "(UOP EXPR)", "(BOP EXPR EXPR)"]);
-
-        let a6_canon = iter_metric(base_lang, "EXPR", enumo::Metric::Atoms, 6)
+        let a6_canon = iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
             .plug("VAR", &Workload::new(lang.vars))
-            .plug("CONST", &Workload::empty())
-            .plug("UOP", &Workload::new(lang.uops))
-            .plug("BOP", &Workload::new(lang.bops))
+            .plug("VAL", &Workload::empty())
+            .plug("OP1", &Workload::new(lang.ops[0].clone()))
+            .plug("OP2", &Workload::new(lang.ops[1].clone()))
             .filter(Filter::Canon(vec![
                 "a".to_string(),
                 "b".to_string(),
