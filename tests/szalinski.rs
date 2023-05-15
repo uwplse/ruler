@@ -236,10 +236,10 @@ mod tests {
 
     fn iter_szalinski(n: usize) -> Workload {
         let lang = Workload::new([
-            "(transformation v3 shape)",
-            "(Cube v3 false)",
-            "(Cylinder v3 params true)",
-            "(Sphere scalar params)",
+            "(TRANSFORMATION V3 SOLID)",
+            "(Cube V3 false)",
+            "(Cylinder V3 params true)",
+            "(Sphere SCALAR params)",
             "s",
         ]);
         let scalars: &[&str] = &["a", "(Lit 1)"];
@@ -251,13 +251,13 @@ mod tests {
             "(Vec3 a a a)",
             "(Vec3 a b c)",
             "(Vec3 d e f)",
-            "(Vec3 (op bop a d) (op bop b e) (op bop c f))",
+            "(Vec3 (op BOP a d) (op BOP b e) (op BOP c f))",
         ];
-        iter_metric(lang, "shape", Metric::Depth, n)
-            .plug("v3", &v3s.into())
-            .plug("transformation", &transformations.into())
-            .plug("scalar", &scalars.into())
-            .plug("bop", &bops.into())
+        iter_metric(lang, "SOLID", Metric::Depth, n)
+            .plug("V3", &v3s.into())
+            .plug("TRANSFORMATION", &transformations.into())
+            .plug("SCALAR", &scalars.into())
+            .plug("BOP", &bops.into())
     }
 
     #[test]
@@ -284,25 +284,6 @@ mod tests {
 
         learned_rules.pretty_print();
         export_print(&learned_rules);
-
-        let mut most_atoms = 0;
-        for (_, rule) in learned_rules {
-            let mut i = 0;
-            for s in rule.lhs.ast.as_ref() {
-                if s.to_string() != "op" && s.to_string() != "Lit" {
-                    i += 1;
-                }
-            }
-
-            let mut j = 0;
-            for s in rule.rhs.ast.as_ref() {
-                if s.to_string() != "op" && s.to_string() != "Lit" {
-                    j += 1;
-                }
-            }
-            most_atoms = max(vec![most_atoms, i, j]).unwrap();
-        }
-        println!("most atoms {}", most_atoms);
 
         let expected: Ruleset<CF> = Ruleset::new(&[
             "?a <=> (Trans (Vec3 (Lit 0) (Lit 0) (Lit 0)) ?a)",
