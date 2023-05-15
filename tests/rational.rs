@@ -1,13 +1,12 @@
-use egg::{AstSize, CostFunction, ENodeOrVar, Language, Rewrite};
+use egg::Rewrite;
 use num::{
-    rational::{Ratio, Rational64},
-    CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
+    rational::Ratio, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
 };
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
 };
-use std::{cmp::max, ops::*, time::Instant};
+use std::{ops::*, time::Instant};
 use symbolic_expressions::parser::parse_str;
 use symbolic_expressions::Sexp;
 use z3::ast::Ast;
@@ -215,7 +214,7 @@ impl SynthLanguage for Math {
 }
 
 impl Math {
-    fn one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
+    fn _one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
         let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
 
         let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
@@ -237,7 +236,7 @@ impl Math {
         }
     }
 
-    fn pat_to_sexp(pat: &Pattern<Math>) -> Sexp {
+    fn _pat_to_sexp(pat: &Pattern<Math>) -> Sexp {
         parse_str(&pat.to_string()).unwrap()
     }
 
@@ -519,7 +518,7 @@ fn neg(interval: &Interval<Constant>) -> Interval<Constant> {
     Interval::new(high.map(|x| -x), low.map(|x| -x))
 }
 
-fn abs(interval: &Interval<Constant>) -> Interval<Constant> {
+fn _abs(interval: &Interval<Constant>) -> Interval<Constant> {
     let low = interval.low.clone();
     let high = interval.high.clone();
 
@@ -846,12 +845,11 @@ pub mod test {
         let mut all_rules: Ruleset<Math> = Ruleset::default();
 
         let starting_rules = run_workload(
-            iter_metric(base_lang(), "EXPR", enumo::Metric::Atoms, 3)
-                .plug("CONST", &Workload::new(["-1", "0", "1"]))
+            iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 3)
+                .plug("VAL", &Workload::new(["-1", "0", "1"]))
                 .plug("VAR", &Workload::new(["a", "b", "c"]))
-                .plug("UOP", &Workload::new(["~", "fabs"]))
-                .plug("BOP", &Workload::new(["+", "*", "-", "/"]))
-                .plug("TOP", &Workload::empty()),
+                .plug("OP1", &Workload::new(["~", "fabs"]))
+                .plug("OP2", &Workload::new(["+", "*", "-", "/"])),
             all_rules.clone(),
             Limits::rulefinding(),
             false,
