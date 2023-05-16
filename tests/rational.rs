@@ -236,7 +236,7 @@ impl Math {
         }
     }
 
-    fn _pat_to_sexp(pat: &Pattern<Math>) -> Sexp {
+    fn pat_to_sexp(pat: &Pattern<Math>) -> Sexp {
         parse_str(&pat.to_string()).unwrap()
     }
 
