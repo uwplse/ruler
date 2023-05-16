@@ -311,6 +311,18 @@ impl Math {
         }
     }
 
+    /// Given an expression, returns a vector
+    /// of conditions for when the expression
+    /// divides by zero.
+    ///
+    /// For example, the expression
+    /// (/ 1 x) errors when (== x 0)
+    ///
+    /// The path variable stores the path conditions for reaching this expression.
+    ///
+    /// For example,
+    /// In (if x y z), the expression y
+    /// has condition (!= x 0)
     fn error_conditions<'a>(
         ctx: &'a z3::Context,
         sexp: Sexp,
@@ -351,7 +363,7 @@ impl Math {
                     }
                 };
             }
-            Sexp::String(_atom) => (),
+            Sexp::String(_) => (),
             Sexp::Empty => (),
         }
 
