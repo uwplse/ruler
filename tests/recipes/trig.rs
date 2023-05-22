@@ -72,12 +72,6 @@ pub fn trig_rules() -> Ruleset<Trig> {
     all.extend(rules3.clone());
     new.extend(rules3.clone());
 
-    let mut all = new.clone();
-    all.extend(prior_rules());
-    all.extend(prior);
-
-    let mut new = Ruleset::<Trig>::default();
-
     let non_square_filter = Filter::Invert(Box::new(Filter::Or(vec![
         Filter::Contains("(* (cos ?x) (cos ?x))".parse().unwrap()),
         Filter::Contains("(* (sin ?x) (sin ?x))".parse().unwrap()),
