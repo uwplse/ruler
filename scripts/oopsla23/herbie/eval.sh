@@ -89,6 +89,9 @@ function do_branch {
     mv $MYDIR/rules.rkt $HERBIE_DIR/src/syntax/rules.rkt
   fi
 
+  # Patch egg
+  sed -i 's#egg = "0.9.3"#egg = { git="https://github.com/egraphs-good/egg", rev="1e43469654a020af9dbffb4f437e8f4aa3082f05" }#g' $HERBIE_DIR/egg-herbie/Cargo.toml
+
   # Install
   make install
   popd

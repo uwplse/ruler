@@ -376,16 +376,19 @@
     (let/ec return
       (for ([entry (in-list json)])
         (when (and (hash? entry)
-                   (equal? (hash-ref entry 'enumo_spec_name #f) spec)
+                   (equal? (hash-ref entry 'spec_name #f) spec)
                    (equal? (hash-ref entry 'baseline_name #f) baseline))
           (return
             (list
               spec
-              (if baseline?
-                  (let ([derivability (hash-ref entry 'enumo_to_baseline_all)])
-                    (append (hash-ref derivability 'enumo_derives_baseline_derivable)
-                            (hash-ref derivability 'enumo_derives_baseline_underivable)))
-                  (hash-ref (hash-ref entry 'rules) 'rules))
+              (cond
+                [baseline?
+                 (define derivability (hash-ref entry 'derivability))
+                 (define enumo->baseline (hash-ref derivability 'enumo_derives_baseline))
+                 (define method (hash-ref enumo->baseline 'lhs))
+                 (append (hash-ref method 'can) (hash-ref method 'cannot))]
+                [else
+                 (hash-ref entry 'rules)])
               groups
               type
               op-table))))
