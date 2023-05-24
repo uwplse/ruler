@@ -27,8 +27,11 @@ FLAGS="-o generate:taylor --timeout 300"
 GROUP="main"
 RULES="$MYDIR/rules/output.json"
 
-if [ -z "$NUM_SEEDS" ]; then
-  NUM_SEEDS=1
+if [ -z "$1" ]; then
+  echo "expected a number of seeds to run"
+  exit 1
+else
+  NUM_SEEDS="$1"
 fi
 
 echo "Running with $NUM_SEEDS seeds"
