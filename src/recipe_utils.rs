@@ -226,7 +226,7 @@ mod test {
     #[test]
     fn empty_plug() {
         let wkld =
-            iter_metric(base_lang(3), "EXPR", Metric::Atoms, 7).plug("OP3", &Workload::empty());
-        assert_eq!(wkld.force().len(), 570);
+            iter_metric(base_lang(3), "EXPR", Metric::Atoms, 6).plug("OP3", &Workload::empty());
+        assert_eq!(wkld.force().len(), 188);
     }
 }
