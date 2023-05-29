@@ -47,7 +47,7 @@ To regenerate Table 4 from scratch, the Szalinski tool will have to be run end-t
 
 * Install [OpenSCAD](https://www.openscad.org/) from [https://launchpad.net/~openscad/+archive/ubuntu/releases](https://launchpad.net/~openscad/+archive/ubuntu/releases)
 
-Now, run the following from the `ruler` repository. It should finish within 30 minutes.
+Now, run the following from the `ruler` repository. It should finish within 30 minutes and print Table 4.
 ```
 ./scripts/oopsla23/sz-eval.sh
 ```
