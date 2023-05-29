@@ -20,8 +20,6 @@ This is the artifact for our paper
 
 * Install [OpenSCAD](https://www.openscad.org/) from [https://launchpad.net/~openscad/+archive/ubuntu/releases](https://launchpad.net/~openscad/+archive/ubuntu/releases)
 
-* Install git by typing `sudo apt install git`
-
 * Install pip by typing `sudo apt install python3-pip` and then
 install the following:
 ```
