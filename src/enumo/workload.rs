@@ -120,7 +120,13 @@ impl Workload {
     }
 
     pub fn plug(self, name: impl Into<String>, workload: &Workload) -> Self {
-        Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone()))
+        match workload {
+            // Empty plug is the same as filter excludes
+            Workload::Set(xs) if xs.is_empty() => {
+                self.filter(Filter::Excludes(name.into().parse().unwrap()))
+            }
+            _ => Workload::Plug(Box::new(self), name.into(), Box::new(workload.clone())),
+        }
     }
 
     pub fn append(self, workload: impl Into<Workload>) -> Self {
@@ -155,17 +161,13 @@ impl Workload {
     }
 
     pub fn filter(self, filter: Filter) -> Self {
-        if filter.is_monotonic() {
-            if let Workload::Plug(wkld, name, pegs) = self {
-                Workload::Filter(
-                    filter.clone(),
-                    Box::new(Workload::Plug(wkld, name, Box::new(pegs.filter(filter)))),
-                )
-            } else {
-                Workload::Filter(filter, Box::new(self))
-            }
-        } else {
-            Workload::Filter(filter, Box::new(self))
+        match self {
+            Workload::Plug(wkld, name, pegs) if filter.is_monotonic() => Workload::Filter(
+                filter.clone(),
+                Box::new(Workload::Plug(wkld, name, Box::new(pegs.filter(filter)))),
+            ),
+            Workload::Filter(f, w) => w.filter(f.and(filter)),
+            _ => Workload::Filter(filter, Box::new(self)),
         }
     }
 }

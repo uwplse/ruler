@@ -149,7 +149,7 @@ pub fn base_lang(n: usize) -> Workload {
 #[cfg(test)]
 mod test {
     use crate::{
-        enumo::Metric,
+        enumo::{Metric, Workload},
         recipe_utils::{base_lang, iter_metric},
     };
 
@@ -221,5 +221,12 @@ mod test {
         assert_eq!(base_lang(1).force().len(), 3);
         assert_eq!(base_lang(2).force().len(), 4);
         assert_eq!(base_lang(3).force().len(), 5);
+    }
+
+    #[test]
+    fn empty_plug() {
+        let wkld =
+            iter_metric(base_lang(3), "EXPR", Metric::Atoms, 7).plug("OP3", &Workload::empty());
+        assert_eq!(wkld.force().len(), 570);
     }
 }
