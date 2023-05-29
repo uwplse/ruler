@@ -13,6 +13,10 @@ This is the artifact for our paper
 
 * Install g++ by typing: `sudo apt-get install g++`
 
+* Install pip by typing `sudo apt install python3-pip` and then
+install the following:
+`pip3 install pandas && pip3 install "jinja2>=3"`
+
 ## Step-by-step
 
 Our paper has TODO quantitative evaluations:
@@ -42,10 +46,6 @@ To regenerate Table 4 from scratch, the Szalinski tool will have to be run end-t
   `sudo apt-get install libcgal-dev`
 
 * Install [OpenSCAD](https://www.openscad.org/) from [https://launchpad.net/~openscad/+archive/ubuntu/releases](https://launchpad.net/~openscad/+archive/ubuntu/releases)
-
-* Install pip by typing `sudo apt install python3-pip` and then
-install the following:
-`pip3 install pandas && pip3 install "jinja2>=3"`
 
 Now, run the following from the `ruler` repository. It should finish within 30 minutes.
 ```
