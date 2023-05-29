@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::rational_replicate::replicate_ruler1_recipe;
 
 use super::*;
@@ -46,7 +48,40 @@ pub fn best_enumo_recipe() -> Ruleset<Math> {
             })
             .collect(),
     );
-    rules.extend(factor_rules_filtered);
+
+    // remove if statements
+    // makes the rules unsound, but Herbie
+    // doesn't support if statements well
+    let factor_rules_stripped = Ruleset(
+        factor_rules_filtered
+            .0
+            .into_iter()
+            .map(|(name, rule)| {
+                let rhs_sexp = parse_str(&rule.rhs.to_string()).unwrap();
+                match rhs_sexp {
+                    Sexp::List(list) => {
+                        if list[0].to_string() == "if" {
+                            let rule = Rule::from_string(&format!(
+                                "{} => {}",
+                                rule.lhs,
+                                list[2].to_string()
+                            ))
+                            .unwrap()
+                            .0;
+                            (rule.name.clone(), rule)
+                        } else {
+                            (name, rule)
+                        }
+                    }
+                    _ => (name, rule),
+                }
+            })
+            .collect(),
+    );
+    println!("Stripped factor rules:");
+    factor_rules_stripped.pretty_print();
+
+    rules.extend(factor_rules_stripped);
 
     rules
 }

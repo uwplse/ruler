@@ -805,44 +805,31 @@ pub mod test {
 
         let start = Instant::now();
         let replicate_rules = replicate_ruler1_recipe();
-        let duration = start.elapsed();
+        let replicate_duration = start.elapsed();
 
         logger::write_baseline(
             &replicate_rules,
             "rational_replicate",
             &ruler1,
             "oopsla",
-            duration,
+            replicate_duration,
         );
         logger::write_baseline(
             &replicate_rules,
             "rational_replicate",
             &herbie,
             "herbie",
-            duration,
+            replicate_duration,
         );
 
         let start = Instant::now();
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
-        // herbie and ruler can't learn any if rules
-        // but crash if you include them
-        let without_if: Ruleset<Math> = Ruleset::new(
-            best_rules
-                .0
-                .iter()
-                .filter_map(|r| {
-                    if r.1.rhs.to_string().starts_with("(if") {
-                        None
-                    } else {
-                        Some(r.0.to_string().clone())
-                    }
-                })
-                .collect::<Vec<_>>(),
-        );
 
-        logger::write_baseline(&without_if, "rational_best", &ruler1, "oopsla", duration);
-        logger::write_baseline(&without_if, "rational_best", &herbie, "herbie", duration);
+        // TODO: rational_best causes unsoundness
+        // compared to ruler1 and herbie
+        /*logger::write_baseline(&best_rules, "rational_best", &ruler1, "oopsla", duration);
+        logger::write_baseline(&best_rules, "rational_best", &herbie, "herbie", duration);*/
         logger::write_baseline(
             &best_rules,
             "rational_best",
