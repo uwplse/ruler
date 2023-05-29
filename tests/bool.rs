@@ -301,6 +301,7 @@ mod test {
             Limits {
                 iter: 4,
                 node: 1000000,
+                match_: 200_000,
             },
             false,
         );
@@ -312,6 +313,7 @@ mod test {
             Limits {
                 iter: 4,
                 node: 1000000,
+                match_: 200_000,
             },
             false,
         );
@@ -323,6 +325,7 @@ mod test {
             Limits {
                 iter: 10,
                 node: 1000000,
+                match_: 1000,
             },
         );
         assert!(can.len() > 0);

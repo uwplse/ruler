@@ -1,82 +1,147 @@
 // Learn Szalinski rules by lowering to FRep
-// Status: work-in-progress.
-
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-use num::{rational::Ratio, BigInt, Signed, ToPrimitive, Zero};
-use num_bigint::ToBigInt;
-use rayon::vec;
+// Status: frozen. Develop on szalinski-dev.rs instead.
 use ruler::{
-    enumo::{Ruleset, Scheduler, Workload},
+    enumo::{Metric, Ruleset},
+    recipe_utils::iter_metric,
     *,
 };
-use std::time::Instant;
+use std::hash::Hash;
+use std::usize;
 
-pub type Constant = Ratio<BigInt>;
-
-fn get_nat_rules() -> Vec<&'static str> {
-    [
-        // Small subset of rat rules
-        "(+ ?b ?a) ==> (+ ?a ?b)",
-        "(* ?b ?a) ==> (* ?a ?b)",
-        "(+ 0 ?a) ==> ?a",
-        "?a ==> (+ 0 ?a)",
-        // "(* ?a 0) ==> 0",
-        "(* 1 ?a) ==> ?a",
-        "?a ==> (* 1 ?a)",
-        "(+ ?c (+ ?b ?a)) ==> (+ ?a (+ ?b ?c))",
-        "(* (* ?c ?b) ?a) ==> (* ?b (* ?c ?a))",
-        "(* (+ ?b ?b) ?a) ==> (* ?b (+ ?a ?a))",
-        "(+ ?a (max ?b ?c)) ==> (max (+ ?a ?b) (+ ?a ?c))",
-        "(max (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (max ?b ?c))",
-        "(+ ?a (min ?b ?c)) ==> (min (+ ?a ?b) (+ ?a ?c))",
-        "(min (+ ?a ?b) (+ ?a ?c)) ==> (+ ?a (min ?b ?c))",
-        "(max ?b ?a) ==> (max ?a ?b)",
-        "(min ?b ?a) ==> (min ?a ?b)",
-        "(min (max ?a ?b) ?a) ==> ?a",
-        "(max (min ?a ?b) ?a) ==> ?a",
-        "(max ?a ?a) ==> ?a",
-        "(min ?a ?a) ==> ?a",
-    ]
-    .into()
-}
+pub type Constant = i64;
 
 egg::define_language! {
- pub enum CaddyAndFRep  {
+ pub enum CF  {
     // FRep
-    "FRep" = FRep([Id; 1]),
-    "max" = Max([Id; 2]),
-    "min" = Min([Id; 2]),
-    "+" = Add([Id; 2]),
-    "-" = Sub([Id; 2]),
-    "*" = Mul([Id; 2]),
-    "/" = Div([Id; 2]),
-    // "~" = Neg(Id),
+    "max" = Max,
+    "min" = Min,
+    "+" = Add,
+    "-" = Sub,
+    "*" = Mul,
+    "/" = Div,
     "x" = DimX,
     "y" = DimY,
     "z" = DimZ,
-    "subst" = Subst([Id; 3]),
+    "subst" = Subst([Id; 4]),
+    "op" = Op([Id; 3]),
 
-    // "binop" = Binop([Id; 3]),
+    // Indicate that the containing expr cannot have x, y, or z
+    "Scalar" = Scalar(Id),
+    "Lit" = Lit(Id),
+    Literal(Constant),
 
     // Caddy
-    "Caddy" = Caddy([Id; 1]),
-    "Cuboid" = Cuboid([Id; 3]),
-    "Spheroid" = Spheroid([Id; 3]),
-    "Trans" = Trans([Id; 4]),
-    "Scale" = Scale([Id; 4]),
+    "Cube" = Cube([Id; 2]),
+    "Cylinder" = Cylinder([Id; 3]),
+    "Sphere" = Sphere([Id; 2]),
+    "Trans" = Trans([Id; 2]),
+    "Scale" = Scale([Id; 2]),
     "Union" = Union([Id; 2]),
     "Inter" = Inter([Id; 2]),
+    "Vec3" = Vec3([Id; 3]),
+    "true" = True,
+    "false" = False,
     "Empty" = Empty,
 
-    "Cheat" = Cheat([Id; 2]),
-
-    Lit(Constant),
     Var(egg::Symbol),
  }
 }
 
-impl SynthLanguage for CaddyAndFRep {
+fn get_subst_rules() -> Vec<&'static str> {
+    [
+        "(Lit ?x) ==> (Scalar (Lit ?x))",
+        "(subst ?x ?y ?z (Scalar ?a)) ==> (Scalar ?a)",
+        "(subst ?x ?y ?z x) ==> ?x",
+        "(subst ?x ?y ?z y) ==> ?y",
+        "(subst ?x ?y ?z z) ==> ?z",
+        "(subst ?x ?y ?z (op ?op ?a ?b)) ==> (op ?op (subst ?x ?y ?z ?a) (subst ?x ?y ?z ?b))",
+        "(subst ?x ?y ?z (subst ?x2 ?y2 ?z2 ?a)) ==>
+            (subst (subst ?x ?y ?z ?x2)
+                   (subst ?x ?y ?z ?y2)
+                   (subst ?x ?y ?z ?z2)
+                   ?a)",
+        "(subst x y z ?a) ==> ?a",
+        "(Scalar (op ?op ?a ?b)) ==> (op ?op (Scalar ?a) (Scalar ?b))",
+    ]
+    .into()
+}
+
+fn get_frep_rules() -> Vec<&'static str> {
+    [
+        "(op / ?a (Lit 1)) ==> ?a",
+        "(op - ?a (Lit 0)) ==> ?a",
+        "(op - (op / ?a ?c) (op / ?b ?c)) ==> (op / (op - ?a ?b) ?c)",
+        "(op - (op / ?a ?c) ?b) ==> (op / (op - ?a (op * ?b ?c)) ?c)",
+        "(op / (op / ?a ?b) ?c) ==> (op / ?a (op * ?b ?c))",
+        "(op - ?a (op + ?b ?c)) ==> (op - (op - ?a ?b) ?c)",
+        // "(op min (op max ?a ?b) ?a) ==> ?a",
+        // "(op max (op min ?a ?b) ?a) ==> ?a",
+        // "(op max ?a ?a) ==> ?a",
+        // "(op min ?a ?a) ==> ?a",
+    ]
+    .into()
+}
+
+fn get_subst_and_frep_rules() -> Vec<&'static str> {
+    let mut m = get_frep_rules();
+    m.extend(get_subst_rules());
+    m
+}
+
+fn get_lifting_rules() -> Vec<&'static str> {
+    [
+        "(Scale (Vec3 ?w ?h ?l) ?e) ==> (subst (op / x (Scalar ?w)) (op / y (Scalar ?h)) (op / z (Scalar ?l)) ?e)",
+        "(Cube (Vec3 ?a ?b ?c) false) ==>
+         (op min (op min (op min (op / x (Scalar ?a))
+                        (op / y (Scalar ?b)))
+                   (op / z (Scalar ?c)))
+              (op min (op min (op - (Lit 1) (op / x (Scalar ?a)))
+                        (op - (Lit 1) (op / y (Scalar ?b))))
+                   (op - (Lit 1) (op / z (Scalar ?c)))))",
+        "(Cylinder (Vec3 ?h ?r ?r) ?params true) ==>
+         (op min (op - (op - (Lit 1) (op * (op / x (Scalar ?r)) (op / x (Scalar ?r))))
+                 (op * (op / y (Scalar ?r)) (op / y (Scalar ?r))))
+              (op min (op - (op / (Lit 1) (Lit 2)) (op / z (Scalar ?h)))
+                   (op + (op / (Lit 1) (Lit 2)) (op / z (Scalar ?h)))))",
+        "(Sphere ?r ?params) ==> (op - (op - (op - (Lit 1) (op * (op / x (Scalar ?r)) (op / x (Scalar ?r))))
+                               (op * (op / y (Scalar ?r)) (op / y (Scalar ?r))))
+                            (op * (op / z (Scalar ?r)) (op / z (Scalar ?r))))",
+        "(Trans (Vec3 ?a ?b ?c) ?e) ==> (subst (op - x (Scalar ?a)) (op - y (Scalar ?b)) (op - z (Scalar ?c)) ?e)"
+    ].into()
+}
+
+fn is_caddy(node: &CF) -> bool {
+    match node {
+        CF::Max => false,
+        CF::Add => false,
+        CF::Min => false,
+        CF::Sub => false,
+        CF::Mul => false,
+        CF::Div => false,
+        CF::Op(_) => false,
+        CF::DimX => false,
+        CF::DimY => false,
+        CF::DimZ => false,
+        CF::Subst(_) => false,
+        CF::Scalar(_) => false,
+        CF::Literal(_) => false,
+        CF::Lit(_) => false,
+        CF::Cube(_) => true,
+        CF::Cylinder(_) => true,
+        CF::Sphere(_) => true,
+        CF::Trans(_) => true,
+        CF::Scale(_) => true,
+        CF::Union(_) => true,
+        CF::Inter(_) => true,
+        CF::Empty => true,
+        CF::Var(_) => false,
+        CF::Vec3(_) => true,
+        CF::True => true,
+        CF::False => true,
+    }
+}
+
+impl SynthLanguage for CF {
     type Constant = Constant;
 
     fn is_rule_lifting() -> bool {
@@ -84,35 +149,22 @@ impl SynthLanguage for CaddyAndFRep {
     }
 
     fn get_lifting_rules() -> Ruleset<Self> {
-        Ruleset::new(&[
-            "(/ x ?a) ==> (subst x x (/ x ?a))",
-            "(/ y ?a) ==> (subst y y (/ y ?a))",
-            "(/ z ?a) ==> (subst z z (/ z ?a))",
-            "(min (subst ?e ?from ?to) ?a) ==> (subst (min ?e ?a) ?from ?to)",
-            "(- ?a (subst ?e ?from ?to)) ==> (subst (- ?a ?e) ?from ?to)",
-            "(Cuboid ?a ?b ?c) ==> (FRep (- 1 (min (min (/ x ?a) (/ y ?b)) (/ z ?c))))",
-            "(Union (FRep ?a) (FRep ?b)) ==> (FRep (max ?a ?b))",
-            "(FRep (max ?a ?b)) ==> (Union (FRep ?a) (FRep ?b))",
-            "(Inter (FRep ?a) (FRep ?b)) ==> (FRep (min ?a ?b))",
-            "(FRep (min ?a ?b)) ==> (Inter (FRep ?a) (FRep ?b))",
-            // "(Empty) ==> (FRep (~ 1))",
-            "(Scale (FRep ?e) ?a ?b ?c)", // "(Cheat ?a ?b) ==> (Inter (FRep ?a) (Union (FRep ?a) (FRep ?b)))",
-        ])
+        Ruleset::new(&get_lifting_rules())
     }
 
     fn is_allowed_op(&self) -> bool {
-        matches!(
-            self,
-            CaddyAndFRep::FRep(_)
-                | CaddyAndFRep::Cuboid(_)
-                | CaddyAndFRep::Spheroid(_)
-                | CaddyAndFRep::Trans(_)
-                | CaddyAndFRep::Scale(_)
-                | CaddyAndFRep::Var(_)
-                | CaddyAndFRep::Union(_)
-                | CaddyAndFRep::Inter(_)
-                | CaddyAndFRep::Cheat(_)
-        )
+        is_caddy(self)
+            || matches!(
+                self,
+                CF::Var(_)
+                    | CF::Literal(_)
+                    | CF::Lit(_)
+                    | CF::Op(_)
+                    | CF::Div
+                    | CF::Mul
+                    | CF::Sub
+                    | CF::Add
+            )
     }
 
     // No eval needed for rule lifting
@@ -127,7 +179,7 @@ impl SynthLanguage for CaddyAndFRep {
     fn initialize_vars(_egraph: &mut EGraph<Self, SynthAnalysis>, _vars: &[String]) {}
 
     fn to_var(&self) -> Option<Symbol> {
-        if let CaddyAndFRep::Var(sym) = self {
+        if let CF::Var(sym) = self {
             Some(*sym)
         } else {
             None
@@ -135,15 +187,15 @@ impl SynthLanguage for CaddyAndFRep {
     }
 
     fn mk_var(sym: Symbol) -> Self {
-        CaddyAndFRep::Var(sym)
+        CF::Var(sym)
     }
 
     fn is_constant(&self) -> bool {
-        matches!(self, CaddyAndFRep::Lit(_))
+        matches!(self, CF::Literal(_))
     }
 
-    fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
-        CaddyAndFRep::Lit(c)
+    fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
+        CF::Literal(c)
     }
 
     fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
@@ -151,106 +203,100 @@ impl SynthLanguage for CaddyAndFRep {
     }
 }
 
+fn export_print(rs: &Ruleset<CF>) {
+    println!("RULER RULES START");
+    fn fix(s: String) -> String {
+        s.replace("Scale", "Affine Scale")
+            .replace("Trans", "Affine Trans")
+            .replace("op ", "")
+            .replace("(Lit 0)", "0") // TODO: regex or smth
+            .replace("(Lit 1)", "1")
+    }
+
+    let mut i = 1;
+    for (_, rule) in rs {
+        println!(
+            "rw!(\"ruler{}\"; \"{}\" => \"{}\"),",
+            i,
+            fix(rule.lhs.to_string()),
+            fix(rule.rhs.to_string())
+        );
+        i += 1;
+    }
+    println!("RULER RULES END");
+    println!("\n");
+}
+
 #[cfg(test)]
 mod tests {
-    use ruler::{
-        enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
-        recipe_utils::{base_lang, iter_metric, run_rule_lifting},
-    };
+    use ruler::enumo::{Ruleset, Scheduler, Workload};
 
     use super::*;
 
-    fn iter_pos(n: usize) -> Workload {
-        iter_metric(base_lang(2), "EXPR", Metric::Atoms, n)
-            .filter(Filter::Contains("VAR".parse().unwrap()))
-            .plug("VAL", &Workload::new(["Empty"]))
-            .plug("VAR", &Workload::new(["a", "b"]))
-            .plug("OP1", &Workload::new(["FRep"]))
-            .plug("OP2", &Workload::new(["Union", "Inter"]))
+    fn iter_szalinski(n: usize) -> Workload {
+        let lang = Workload::new([
+            "(TRANSFORMATION V3 SOLID)",
+            "(Cube V3 false)",
+            "(Cylinder V3 params true)",
+            "(Sphere SCALAR params)",
+            "s",
+        ]);
+        let scalars: &[&str] = &["a", "(Lit 1)"];
+        let transformations: &[&str] = &["Scale", "Trans"];
+        let bops: &[&str] = &["+", "*", "/"];
+        let v3s: &[&str] = &[
+            "(Vec3 (Lit 0) (Lit 0) (Lit 0))",
+            "(Vec3 (Lit 1) (Lit 1) (Lit 1))",
+            "(Vec3 a a a)",
+            "(Vec3 a b c)",
+            "(Vec3 d e f)",
+            "(Vec3 (op BOP a d) (op BOP b e) (op BOP c f))",
+        ];
+        iter_metric(lang, "SOLID", Metric::Depth, n)
+            .plug("V3", &v3s.into())
+            .plug("TRANSFORMATION", &transformations.into())
+            .plug("SCALAR", &scalars.into())
+            .plug("BOP", &bops.into())
     }
 
     #[test]
-    fn rule_lifting_recipe() {
-        let nat_rules = get_nat_rules();
-
-        let prior = Ruleset::new(&nat_rules);
-
-        let atoms3 = iter_pos(3);
-        // assert_eq!(atoms3.force().len(), 51);
-
+    #[ignore]
+    fn rule_lifting() {
+        let mut learned_rules = Ruleset::default();
+        let mut all_rules: Ruleset<CF> = Ruleset::new(&get_subst_and_frep_rules());
         let limits = Limits {
             iter: 4,
-            node: 10000000,
+            node: 10_000_000,
+            match_: 1_000_000,
         };
 
-        let eg_init = atoms3.to_egraph();
-        // Allowed rules: run on clone, apply unions, no candidates
-        let (allowed, _) = prior.partition(|eq| CaddyAndFRep::is_allowed_rewrite(&eq.lhs, &eq.rhs));
-        let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
+        for i in 2..4 {
+            let atoms = iter_szalinski(i);
+            let egraph = atoms.to_egraph::<CF>();
+            let mut candidates = Ruleset::allow_forbid_actual(egraph, all_rules.clone(), limits);
+            let (chosen, _) =
+                candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
 
-        // Translation rules: grow egraph, extract candidates, assert!(saturated)
-        let lifting_rules = CaddyAndFRep::get_lifting_rules();
-        let eg_denote = Scheduler::Simple(limits).run(&eg_allowed, &lifting_rules);
-        let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
-
-        // All rules: clone/no clone doesn't matter, extract candidates
-        let mut all_rules = prior;
-        all_rules.extend(lifting_rules);
-        let eg_final = Scheduler::Compress(limits).run(&eg_denote, &all_rules);
-        candidates.extend(Ruleset::extract_candidates(&eg_denote, &eg_final));
-
-        let rules = candidates;
-        for r in rules.0.values() {
-            println!("{}", r.name)
+            all_rules.extend(chosen.clone());
+            learned_rules.extend(chosen);
         }
-    }
 
-    // #[test]
-    fn _rule_lifting() {
-        let nat_rules = get_nat_rules();
+        learned_rules.pretty_print();
+        export_print(&learned_rules);
 
-        let mut all_rules: Ruleset<CaddyAndFRep> = Ruleset::default();
-        all_rules.extend(Ruleset::new(&nat_rules));
-
-        let atoms3 = iter_pos(8);
-        // assert_eq!(atoms3.force().len(), 51);
-
-        let rules3 = run_rule_lifting(
-            atoms3,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
-        // assert_eq!(rules3.len(), 6);
-        all_rules.extend(rules3);
-
-        let atoms4 = iter_pos(4);
-        // assert_eq!(atoms4.force().len(), 255);
-
-        let rules4 = run_rule_lifting(
-            atoms4,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
-        // assert_eq!(rules4.len(), 2);
-        all_rules.extend(rules4);
-
-        let atoms5 = iter_pos(5);
-        // assert_eq!(atoms5.force().len(), 1527);
-
-        let rules4 = run_rule_lifting(
-            atoms5,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
-        // assert_eq!(rules4.len(), 1);
+        let expected: Ruleset<CF> = Ruleset::new(&[
+            "?a <=> (Trans (Vec3 (Lit 0) (Lit 0) (Lit 0)) ?a)",
+            "?a <=> (Scale (Vec3 (Lit 1) (Lit 1) (Lit 1)) ?a)",
+            "(Scale (Vec3 ?b ?b ?b) (Cylinder (Vec3 (Lit 1) (Lit 1) (Lit 1)) ?a true)) <=> (Cylinder (Vec3 ?b ?b ?b) ?a true)",
+            "(Scale (Vec3 (op * ?f ?e) (op * ?d ?c) (op * ?b ?a)) (Cube (Vec3 (Lit 1) (Lit 1) (Lit 1)) false)) <=> (Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false))",
+            "(Scale (Vec3 ?g ?e ?c) (Scale (Vec3 ?f ?d ?b) ?a)) <=> (Scale (Vec3 (op * ?g ?f) (op * ?e ?d) (op * ?c ?b)) ?a)",
+            "(Trans (Vec3 (op + ?g ?d) (op + ?f ?c) (op + ?e ?b)) ?a) <=> (Trans (Vec3 ?g ?f ?e) (Trans (Vec3 ?d ?c ?b) ?a))",
+            "(Scale (Vec3 ?d ?c ?b) (Trans (Vec3 ?g ?f ?e) ?a)) <=> (Trans (Vec3 (op * ?g ?d) (op * ?f ?c) (op * ?e ?b)) (Scale (Vec3 ?d ?c ?b) ?a))",
+            "(Trans (Vec3 ?g ?e ?c) (Scale (Vec3 ?f ?d ?b) ?a)) <=> (Scale (Vec3 ?f ?d ?b) (Trans (Vec3 (op / ?g ?f) (op / ?e ?d) (op / ?c ?b)) ?a))",
+            "(Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false)) <=> (Cube (Vec3 (op * ?f ?e) (op * ?d ?c) (op * ?b ?a)) false)",
+        ]);
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
+        assert_eq!(can.len(), expected.len());
+        assert_eq!(cannot.len(), 0);
     }
 }

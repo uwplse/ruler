@@ -10,6 +10,7 @@ pub fn trig_rules() -> Ruleset<Trig> {
     let limits = Limits {
         iter: 3,
         node: 2000000,
+        match_: 200_000,
     };
     let mut prior: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
     prior.extend(prior_rules());

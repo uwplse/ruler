@@ -14,6 +14,7 @@ fn limits() -> Limits {
     Limits {
         iter: 3,
         node: 2_000_000,
+        match_: 200_000,
     }
 }
 
