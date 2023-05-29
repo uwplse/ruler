@@ -38,7 +38,7 @@ To show the results of a preexisting run, run the following from the `szalinski`
 ./to_latex.py
 ```
 
-To regenerate Table 4 from scratch, the Szalinski tool will have to be run end-to-end, which involves the following extra dependencies:
+To regenerate Table 4 from scratch, Szalinski will have to be run end-to-end, which involves the following extra dependencies:
 
 * Install jq by typing: `sudo apt-get install jq`
 
