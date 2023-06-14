@@ -85,7 +85,8 @@ pub mod test {
         rules.extend(run_workload(
             a6_canon,
             rules.clone(),
-            Limits::rulefinding(),
+            Limits::synthesis(),
+            Limits::minimize(),
             true,
         ));
 

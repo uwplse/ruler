@@ -192,50 +192,28 @@ mod test {
 
     #[test]
     fn simple() {
+        let limits = Limits {
+            iter: 3,
+            node: 1000000,
+            match_: 200_000,
+        };
         let mut all_rules = Ruleset::default();
         let atoms3 = iter_nat(3);
         assert_eq!(atoms3.force().len(), 39);
 
-        let rules3 = run_workload(
-            atoms3,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-                match_: 200_000,
-            },
-            false,
-        );
+        let rules3 = run_workload(atoms3, all_rules.clone(), limits, limits, false);
         all_rules.extend(rules3);
 
         let atoms4 = iter_nat(4);
         assert_eq!(atoms4.force().len(), 132);
 
-        let rules4 = run_workload(
-            atoms4,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-                match_: 200_000,
-            },
-            false,
-        );
+        let rules4 = run_workload(atoms4, all_rules.clone(), limits, limits, false);
         all_rules.extend(rules4);
 
         let atoms5 = iter_nat(5);
         assert_eq!(atoms5.force().len(), 819);
 
-        let rules5 = run_workload(
-            atoms5,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-                match_: 200_000,
-            },
-            false,
-        );
+        let rules5 = run_workload(atoms5, all_rules.clone(), limits, limits, false);
         all_rules.extend(rules5);
 
         let expected: Ruleset<Nat> = Ruleset::new(&[

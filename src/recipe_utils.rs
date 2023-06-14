@@ -28,13 +28,14 @@ pub fn substitute(workload: Workload, sub: Workload, atom: &str) -> Workload {
 pub fn run_workload<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
-    limits: Limits,
+    prior_limits: Limits,
+    minimize_limits: Limits,
     fast_match: bool,
 ) -> Ruleset<L> {
     let t = Instant::now();
 
     let egraph = workload.to_egraph::<L>();
-    let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+    let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
 
     let mut candidates = if fast_match {
         Ruleset::fast_cvec_match(&compressed)
@@ -43,7 +44,7 @@ pub fn run_workload<L: SynthLanguage>(
     };
 
     let num_prior = prior.len();
-    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(limits));
+    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
     let time = t.elapsed().as_secs_f64();
 
     println!(
@@ -62,15 +63,18 @@ pub fn run_workload<L: SynthLanguage>(
 pub fn run_rule_lifting<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
-    limits: Limits,
+    prior_limits: Limits,
+    minimize_limits: Limits,
 ) -> Ruleset<L> {
     let t = Instant::now();
 
     let egraph = workload.to_egraph::<L>();
     let num_prior = prior.len();
-    let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+    let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), prior_limits);
 
-    let chosen = candidates.minimize(prior, Scheduler::Compress(limits)).0;
+    let chosen = candidates
+        .minimize(prior, Scheduler::Compress(minimize_limits))
+        .0;
     let time = t.elapsed().as_secs_f64();
 
     println!(
@@ -130,7 +134,13 @@ pub fn recursive_rules<L: SynthLanguage>(
             wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
         }
         rec.extend(prior);
-        let new = run_workload(wkld, rec.clone(), Limits::rulefinding(), true);
+        let new = run_workload(
+            wkld,
+            rec.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+        );
         let mut all = new;
         all.extend(rec);
         all

@@ -69,7 +69,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let new = run_workload(
         nested_bops_arith,
         all_rules.clone(),
-        Limits::rulefinding(),
+        Limits::synthesis(),
+        Limits::minimize(),
         true,
     );
     all_rules.extend(new);
@@ -89,7 +90,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
     let new = run_workload(
         nested_bops_full,
         all_rules.clone(),
-        Limits::rulefinding(),
+        Limits::synthesis(),
+        Limits::minimize(),
         true,
     );
     all_rules.extend(new.clone());
