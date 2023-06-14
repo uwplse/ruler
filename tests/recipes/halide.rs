@@ -93,5 +93,16 @@ pub fn halide_rules() -> Ruleset<Pred> {
         true,
     );
     all_rules.extend(new.clone());
+
+    let select_wkld = Workload::new([
+        "(select V V V)",
+        "(OP V (select V V V))",
+        "(OP (select V V V) V)",
+    ])
+    .plug("OP", &Workload::new(["+", "*", "/"]))
+    .plug("V", &Workload::new(["a", "b", "c", "d", "e", "f"]));
+    let new = run_workload(select_wkld, Ruleset::default(), Limits::rulefinding(), true);
+    all_rules.extend(new.clone());
+
     all_rules
 }
