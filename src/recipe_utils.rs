@@ -43,14 +43,7 @@ pub fn run_workload<L: SynthLanguage>(
     };
 
     let num_prior = prior.len();
-    let (chosen, _) = candidates.minimize(
-        prior,
-        Scheduler::Compress(Limits {
-            iter: 1,
-            node: 100_000,
-            match_: 200_000,
-        }),
-    );
+    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(limits));
     let time = t.elapsed().as_secs_f64();
 
     println!(
