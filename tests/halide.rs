@@ -300,6 +300,7 @@ mod test {
     #[test]
     fn rules() {
         let start = Instant::now();
+        println!("Start rulefinding");
         let rules = halide_rules();
         let duration = start.elapsed();
         println!("{} rules in {} secs", rules.len(), duration.as_secs());
@@ -307,10 +308,12 @@ mod test {
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
 
         let start = Instant::now();
+        println!("Start derive");
         let (can, cannot) =
             rules.derive(ruler::DeriveType::LhsAndRhs, &baseline, Limits::deriving());
         let elapsed = start.elapsed();
         println!("{}, {} in {}", can.len(), cannot.len(), elapsed.as_secs());
+        cannot.pretty_print();
     }
 
     #[test]

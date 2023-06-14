@@ -177,23 +177,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         (yes, no)
     }
 
-    pub fn partition_log<F>(&self, f: F) -> (Self, Self)
-    where
-        F: Fn(&Rule<L>) -> bool + std::marker::Sync,
-    {
-        let rules: Vec<&Rule<L>> = self.0.values().collect();
-        let (yeses, nos): (Vec<_>, Vec<_>) = rules.into_par_iter().partition(|rule| {
-            let res = f(rule);
-            println!("{}", res);
-            res
-        });
-        let mut yes = Ruleset::default();
-        let mut no = Ruleset::default();
-        yes.add_all(yeses);
-        no.add_all(nos);
-        (yes, no)
-    }
-
     pub fn to_file(&self, filename: &str) {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
@@ -500,7 +483,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     // Use self rules to derive against rules. That is, partition against
     // into derivable / not-derivable with respect to self
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition_log(|rule| self.can_derive(derive_type, rule, limits))
+        against.partition(|rule| self.can_derive(derive_type, rule, limits))
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {

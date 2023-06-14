@@ -54,7 +54,7 @@ pub fn run_workload<L: SynthLanguage>(
         num_prior
     );
 
-    chosen.pretty_print();
+    // chosen.pretty_print();
 
     chosen
 }
