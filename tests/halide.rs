@@ -298,6 +298,22 @@ mod test {
     };
 
     #[test]
+    fn rules() {
+        let start = Instant::now();
+        let rules = halide_rules();
+        let duration = start.elapsed();
+        println!("{} rules in {} secs", rules.len(), duration.as_secs());
+
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+
+        let start = Instant::now();
+        let (can, cannot) =
+            rules.derive(ruler::DeriveType::LhsAndRhs, &baseline, Limits::deriving());
+        let elapsed = start.elapsed();
+        println!("{}, {} in {}", can.len(), cannot.len(), elapsed.as_secs());
+    }
+
+    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
