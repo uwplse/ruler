@@ -70,6 +70,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         nested_bops_arith,
         all_rules.clone(),
         Limits::rulefinding(),
+        Limits::rulefinding(),
         true,
     );
     all_rules.extend(new);
@@ -90,6 +91,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         nested_bops_full,
         all_rules.clone(),
         Limits::rulefinding(),
+        Limits::rulefinding(),
         true,
     );
     all_rules.extend(new.clone());
@@ -104,7 +106,17 @@ pub fn halide_rules() -> Ruleset<Pred> {
     .plug("OP", &Workload::new(["+", "-", "*"]))
     .plug("V", &Workload::new(["a", "b", "c", "d"]));
 
-    let new = run_workload(select_wkld, rat_only.clone(), Limits::rulefinding(), true);
+    let new = run_workload(
+        select_wkld,
+        rat_only.clone(),
+        Limits::rulefinding(),
+        Limits {
+            iter: 1,
+            node: 100_000,
+            match_: 100_000,
+        },
+        true,
+    );
     all_rules.extend(new.clone());
 
     let select_wkld = Workload::new([
@@ -116,7 +128,17 @@ pub fn halide_rules() -> Ruleset<Pred> {
     ])
     .plug("OP", &Workload::new(["min", "max"]))
     .plug("V", &Workload::new(["a", "b", "c", "d"]));
-    let new = run_workload(select_wkld, rat_only.clone(), Limits::rulefinding(), true);
+    let new = run_workload(
+        select_wkld,
+        rat_only.clone(),
+        Limits::rulefinding(),
+        Limits {
+            iter: 1,
+            node: 100_000,
+            match_: 100_000,
+        },
+        true,
+    );
     all_rules.extend(new.clone());
 
     all_rules

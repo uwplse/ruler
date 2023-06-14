@@ -34,6 +34,7 @@ pub fn bv4_fancy_rules() -> Ruleset<Bv> {
         a6_canon,
         rules.clone(),
         Limits::rulefinding(),
+        Limits::rulefinding(),
         true,
     ));
     rules

@@ -51,6 +51,7 @@ pub mod test {
             a6_canon,
             rules.clone(),
             Limits::rulefinding(),
+            Limits::rulefinding(),
             true,
         ));
 
