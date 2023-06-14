@@ -437,33 +437,18 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
-        self.partition(|r| r.is_valid())
-        // let total_cands = self.len();
-        // let missing: Ruleset<L> = Ruleset::from_file("halide_not_derivable.rules");
+        let mut invalid: Ruleset<L> = Default::default();
+        let mut chosen = prior.clone();
+        let step_size = 1;
+        while !self.is_empty() {
+            let selected = self.select(step_size, &mut invalid);
+            chosen.extend(selected.clone());
+            self.shrink(&chosen, scheduler);
+        }
+        // Return only the new rules
+        chosen.remove_all(prior);
 
-        // let (sound_cands, _) = self.partition(|r| r.is_valid());
-        // let (can, cannot) = sound_cands.derive(DeriveType::LhsAndRhs, &missing, Limits::deriving());
-        // println!("{}, {}", can.len(), cannot.len());
-
-        // let mut invalid: Ruleset<L> = Default::default();
-        // let mut chosen = prior.clone();
-        // let step_size = 1;
-        // while !self.is_empty() {
-        //     let selected = self.select(step_size, &mut invalid);
-        //     chosen.extend(selected.clone());
-        //     self.shrink(&chosen, scheduler);
-        // }
-        // // Return only the new rules
-        // chosen.remove_all(prior);
-
-        // println!(
-        //     "{} total cands, {} sound cands, {} chosen",
-        //     total_cands,
-        //     sound_cands.len(),
-        //     chosen.len()
-        // );
-
-        // (chosen, invalid)
+        (chosen, invalid)
     }
 
     pub fn can_derive(&self, derive_type: DeriveType, rule: &Rule<L>, limits: Limits) -> bool {
