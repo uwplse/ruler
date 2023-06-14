@@ -25,7 +25,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         ),
         all_rules.clone(),
     );
-    all_rules.extend(rat_only);
+    all_rules.extend(rat_only.clone());
     let pred_only = recursive_rules(
         Metric::Atoms,
         5,
@@ -96,12 +96,27 @@ pub fn halide_rules() -> Ruleset<Pred> {
 
     let select_wkld = Workload::new([
         "(select V V V)",
+        "(select V (OP V V) V)",
+        "(select V V (OP V V))",
+        "(select V (OP V V) (OP V V))",
         "(OP V (select V V V))",
-        "(OP (select V V V) V)",
     ])
-    .plug("OP", &Workload::new(["+", "*", "/"]))
-    .plug("V", &Workload::new(["a", "b", "c", "d", "e", "f"]));
-    let new = run_workload(select_wkld, Ruleset::default(), Limits::rulefinding(), true);
+    .plug("OP", &Workload::new(["+", "-", "*"]))
+    .plug("V", &Workload::new(["a", "b", "c", "d"]));
+
+    let new = run_workload(select_wkld, rat_only.clone(), Limits::rulefinding(), true);
+    all_rules.extend(new.clone());
+
+    let select_wkld = Workload::new([
+        "(select V V V)",
+        "(select V (OP V V) V)",
+        "(select V V (OP V V))",
+        "(select V (OP V V) (OP V V))",
+        "(OP V (select V V V))",
+    ])
+    .plug("OP", &Workload::new(["min", "max"]))
+    .plug("V", &Workload::new(["a", "b", "c", "d"]));
+    let new = run_workload(select_wkld, rat_only.clone(), Limits::rulefinding(), true);
     all_rules.extend(new.clone());
 
     all_rules
