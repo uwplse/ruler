@@ -25,7 +25,7 @@ pub fn halide_rules() -> Ruleset<Pred> {
         ),
         all_rules.clone(),
     );
-    all_rules.extend(rat_only);
+    all_rules.extend(rat_only.clone());
     let pred_only = recursive_rules(
         Metric::Atoms,
         5,
@@ -95,5 +95,47 @@ pub fn halide_rules() -> Ruleset<Pred> {
         true,
     );
     all_rules.extend(new.clone());
+
+    // NOTE: The following workloads do NOT use all_rules as prior rules
+    // Using all_rules as prior_rules leads to OOM
+    let select_base = Workload::new([
+        "(select V V V)",
+        "(select V (OP V V) V)",
+        "(select V V (OP V V))",
+        "(select V (OP V V) (OP V V))",
+        "(OP V (select V V V))",
+    ])
+    .plug("V", &Workload::new(["a", "b", "c", "d"]));
+
+    let arith = select_base
+        .clone()
+        .plug("OP", &Workload::new(["+", "-", "*"]));
+    let new = run_workload(
+        arith,
+        rat_only.clone(),
+        Limits::synthesis(),
+        Limits {
+            iter: 1,
+            node: 100_000,
+            match_: 100_000,
+        },
+        true,
+    );
+    all_rules.extend(new);
+
+    let arith = select_base.plug("OP", &Workload::new(["min", "max"]));
+    let new = run_workload(
+        arith,
+        rat_only.clone(),
+        Limits::synthesis(),
+        Limits {
+            iter: 1,
+            node: 100_000,
+            match_: 100_000,
+        },
+        true,
+    );
+    all_rules.extend(new);
+
     all_rules
 }
