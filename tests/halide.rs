@@ -298,6 +298,98 @@ mod test {
     };
 
     #[test]
+    fn select_rat_rules() {
+        let baseline = Ruleset::from_file("halide_not_derivable.rules");
+        let mut all_rules: Ruleset<Pred> = Ruleset::default();
+        let rat_only = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["-1", "0", "1"],
+                &["a", "b", "c"],
+                &[&["-"], &["+", "-", "*", "min", "max"]],
+            ),
+            all_rules.clone(),
+        );
+        all_rules.extend(rat_only);
+
+        let select_wkld = Workload::new([
+            "(select V V V)",
+            "(select V (OP V V) V)",
+            "(select V V (OP V V))",
+            "(select V (OP V V) (OP V V))",
+            "(OP V (select V V V))",
+        ])
+        .plug("OP", &Workload::new(["+", "-", "*"]))
+        .plug("V", &Workload::new(["a", "b", "c", "d"]));
+
+        let new = run_workload(
+            select_wkld,
+            all_rules.clone(),
+            Limits::rulefinding(),
+            Limits::rulefinding(),
+            true,
+        );
+        new.pretty_print();
+        all_rules.extend(new.clone());
+
+        let (can, cannot) =
+            all_rules.derive(ruler::DeriveType::LhsAndRhs, &baseline, Limits::deriving());
+        println!("{} {}", can.len(), cannot.len());
+        cannot.pretty_print();
+    }
+
+    #[test]
+    fn select_mm_rules() {
+        let baseline = Ruleset::from_file("halide_not_derivable.rules");
+        let mut all_rules: Ruleset<Pred> = Ruleset::default();
+        let rat_only = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["-1", "0", "1"],
+                &["a", "b", "c"],
+                &[&["-"], &["+", "-", "*", "min", "max"]],
+            ),
+            all_rules.clone(),
+        );
+        all_rules.extend(rat_only);
+
+        let select_wkld = Workload::new([
+            "(select V V V)",
+            "(select V (OP V V) V)",
+            "(select V V (OP V V))",
+            "(select V (OP V V) (OP V V))",
+            "(OP V (select V V V))",
+        ])
+        .plug("OP", &Workload::new(["min", "max"]))
+        .plug("V", &Workload::new(["a", "b", "c", "d"]));
+
+        let new = run_workload(
+            select_wkld,
+            all_rules.clone(),
+            Limits::rulefinding(),
+            Limits::rulefinding(),
+            true,
+        );
+        new.pretty_print();
+        all_rules.extend(new.clone());
+
+        let (can, cannot) =
+            all_rules.derive(ruler::DeriveType::LhsAndRhs, &baseline, Limits::deriving());
+        println!("{} {}", can.len(), cannot.len());
+        cannot.pretty_print();
+    }
+
+    #[test]
+    fn unsound_baseline() {
+        let rules: Ruleset<Pred> = Ruleset::from_file("halide_not_derivable.rules");
+        let (sound, unsound) = rules.partition(|r| r.is_valid());
+        println!("{} {}", sound.len(), unsound.len());
+        sound.pretty_print();
+    }
+
+    #[test]
     fn rules() {
         let start = Instant::now();
         println!("Start rulefinding");
@@ -305,15 +397,15 @@ mod test {
         let duration = start.elapsed();
         println!("{} rules in {} secs", rules.len(), duration.as_secs());
 
-        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        // let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
 
-        let start = Instant::now();
-        println!("Start derive");
-        let (can, cannot) =
-            rules.derive(ruler::DeriveType::LhsAndRhs, &baseline, Limits::deriving());
-        let elapsed = start.elapsed();
-        println!("{}, {} in {}", can.len(), cannot.len(), elapsed.as_secs());
-        cannot.pretty_print();
+        // let start = Instant::now();
+        // println!("Start derive");
+        // let (can, cannot) =
+        //     rules.derive(ruler::DeriveType::LhsAndRhs, &baseline, Limits::deriving());
+        // let elapsed = start.elapsed();
+        // println!("{}, {} in {}", can.len(), cannot.len(), elapsed.as_secs());
+        // cannot.pretty_print();
     }
 
     #[test]
@@ -412,6 +504,7 @@ mod test {
             nested_bops_arith,
             all_rules.clone(),
             Limits::rulefinding(),
+            Limits::rulefinding(),
             true,
         );
         all_rules.extend(new);
@@ -432,6 +525,7 @@ mod test {
             nested_bops_full,
             all_rules.clone(),
             Limits::rulefinding(),
+            Limits::rulefinding(),
             true,
         );
         all_rules.extend(new.clone());
@@ -447,7 +541,13 @@ mod test {
                 "e".to_string(),
                 "f".to_string(),
             ]));
-        let new = run_workload(select_max, all_rules.clone(), Limits::rulefinding(), true);
+        let new = run_workload(
+            select_max,
+            all_rules.clone(),
+            Limits::rulefinding(),
+            Limits::rulefinding(),
+            true,
+        );
         println!("select_max finished.");
         new.to_file("select-max.rules");
         all_rules.extend(new.clone());
@@ -463,7 +563,13 @@ mod test {
                 "e".to_string(),
                 "f".to_string(),
             ]));
-        let new = run_workload(select_arith, all_rules.clone(), Limits::rulefinding(), true);
+        let new = run_workload(
+            select_arith,
+            all_rules.clone(),
+            Limits::rulefinding(),
+            Limits::rulefinding(),
+            true,
+        );
         println!("select_arith finished.");
         new.to_file("select-arith.rules");
         all_rules.extend(new.clone());
