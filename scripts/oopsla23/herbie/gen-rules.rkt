@@ -370,9 +370,9 @@
   )
 ))
 
-(define (get-rules json keys baseline?)
+(define (get-rules json keys)
   (for/list ([key (in-list keys)])
-    (match-define (list spec baseline groups type op-table) key)
+    (match-define (list spec baseline groups type op-table baseline?) key)
     (let/ec return
       (for ([entry (in-list json)])
         (when (and (hash? entry)
@@ -397,28 +397,42 @@
 (define (get-rule-jsons config jsonfile)
   (define json (read-json jsonfile))
   (match config
-    ['enumo
-     (define keys `(("bool" "oopsla" (bools) bool ,bool-op-table)
-                    ("rational_best" "rational_best" (arithmetic) real ,rational-op-table)
-                    ("exponential" "herbie" (exponents) real ,rational-op-table)
-                    ("trig" "herbie" (trigonometry) real ,rational-op-table)))
-     (define baseline? #f)
+    ['enumo-ruler-rat
+     (define keys `(("bool" "oopsla" (bools) bool ,bool-op-table #f)
+                    ("rational_replicate" "oopsla" (arithmetic) real ,rational-op-table #t)
+                    ("exponential" "herbie" (exponents) real ,rational-op-table #f)
+                    ("trig" "herbie" (trigonometry) real ,rational-op-table #f)))
      (match-define (list exponential-prior)
       (filter (λ (r) (equal? (car r) "exponential-lifting"))
               fast-fowarding-entries))
-     (append (get-rules json keys baseline?) (list exponential-prior))]
+     (append (get-rules json keys) (list exponential-prior))]
+    ['enumo-replicate-rat
+     (define keys `(("bool" "oopsla" (bools) bool ,bool-op-table #f)
+                    ("rational_replicate" "oopsla" (arithmetic) real ,rational-op-table #f)
+                    ("exponential" "herbie" (exponents) real ,rational-op-table #f)
+                    ("trig" "herbie" (trigonometry) real ,rational-op-table #f)))
+     (match-define (list exponential-prior)
+      (filter (λ (r) (equal? (car r) "exponential-lifting"))
+              fast-fowarding-entries))
+     (append (get-rules json keys) (list exponential-prior))]
+    ['enumo
+     (define keys `(("bool" "oopsla" (bools) bool ,bool-op-table #f)
+                    ("rational_best" "rational_best" (arithmetic) real ,rational-op-table #f)
+                    ("exponential" "herbie" (exponents) real ,rational-op-table #f)
+                    ("trig" "herbie" (trigonometry) real ,rational-op-table #f)))
+     (match-define (list exponential-prior)
+      (filter (λ (r) (equal? (car r) "exponential-lifting"))
+              fast-fowarding-entries))
+     (append (get-rules json keys) (list exponential-prior))]
     ['enumo-rat
-     (define keys `(("rational_best" "rational_best" (arithmetic) real ,rational-op-table)))
-     (define baseline? #f)
-     (get-rules json keys baseline?)]
+     (define keys `(("rational_best" "rational_best" (arithmetic) real ,rational-op-table #f)))
+     (get-rules json keys)]
     ['enumo-no-ff
-     (define keys `(("rational_best" "rational_best" (arithmetic) real ,rational-op-table)))
-     (define baseline? #f)
-     (append (get-rules json keys baseline?) fast-fowarding-entries)]
+     (define keys `(("rational_best" "rational_best" (arithmetic) real ,rational-op-table #f)))
+     (append (get-rules json keys) fast-fowarding-entries)]
     ['ruler
-     (define keys `(("rational_best" "oopsla" (arithmetic) real ,rational-op-table)))
-     (define baseline? #t)
-     (get-rules json keys baseline?)]
+     (define keys `(("rational_best" "oopsla" (arithmetic) real ,rational-op-table #t)))
+     (get-rules json keys)]
     [_
      (error 'get-rule-jsons "unsupported configuration ~a" config)]))
 
@@ -503,16 +517,6 @@
     #:args (config json-path rkt-path)
     (case config
       [("main") (error 'gen-rules.rkt "Configuration not supported ~a" config)]
-      [("enumo") (gen-rules-rkt (string->symbol config)
-                                (string->path json-path)
-                                (string->path rkt-path))]
-      [("enumo-rat") (gen-rules-rkt (string->symbol config)
-                                    (string->path json-path)
-                                    (string->path rkt-path))]
-      [("enumo-no-ff") (gen-rules-rkt (string->symbol config)
-                                      (string->path json-path)
-                                      (string->path rkt-path))]
-      [("ruler") (gen-rules-rkt (string->symbol config)
-                                (string->path json-path)
-                                (string->path rkt-path))]
-      [else (error 'gen-rules.rkt "Unknown configuration ~a" config)])))
+      [else (gen-rules-rkt (string->symbol config)
+                           (string->path json-path)
+                           (string->path rkt-path))])))

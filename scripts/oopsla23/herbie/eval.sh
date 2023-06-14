@@ -93,7 +93,7 @@ function do_branch {
   fi
 
   # Patch egg
-  sed -i 's#egg = "0.9.3"#egg = { git="https://github.com/egraphs-good/egg", rev="1e43469654a020af9dbffb4f437e8f4aa3082f05" }#g' $HERBIE_DIR/egg-herbie/Cargo.toml
+  cp "$MYDIR/lib.rs" "$HERBIE_DIR/egg-herbie/src/lib.rs"
 
   # Install
   make install
@@ -114,6 +114,8 @@ function do_branch {
 
 do_branch main
 do_branch enumo
+do_branch enumo-ruler-rat
+do_branch enumo-replicate-rat
 do_branch enumo-no-ff
 do_branch enumo-rat
 do_branch ruler

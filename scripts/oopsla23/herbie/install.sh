@@ -39,6 +39,7 @@ git clone https://github.com/herbie-fp/herbie.git $BUILD_DIR ||    \
 pushd $BUILD_DIR
 # For patches
 git checkout "$BUILD_DIR/egg-herbie/Cargo.toml"
+git checkout "$BUILD_DIR/egg-herbie/src/lib.rs"
 git checkout "$BUILD_DIR/src/syntax/rules.rkt"
 # Checkout the branches
 git checkout ruler-eval-unified

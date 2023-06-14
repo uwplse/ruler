@@ -24,6 +24,8 @@ if field == "time":
 
 h = ('Herbie', pairs['main'])
 e = ('Renumo', pairs['enumo'])
+e2 = ('Renumo-Ru', pairs['enumo-ruler-rat'])
+e3 = ('Renumo-Re', pairs['enumo-replicate-rat'])
 f = ('Renumo-FF', pairs['enumo-no-ff'])
 o = ('Renumo-R', pairs['enumo-rat'])
 r = ('Ruler', pairs['ruler'])
@@ -32,7 +34,7 @@ r = ('Ruler', pairs['ruler'])
 # ol = ('Enumo[L, Rat]', pairs['enumo-rat-lim'])
 
 # listify = [h, e, f, o, r, hl, el]
-listify = [h, e, f, o, r]
+listify = [h, e, e2, e3, f, o, r]
 
 labs = []
 vals = []
@@ -63,7 +65,7 @@ ax.set_xticklabels(labs)
 
 ax.set_xlabel('Rules used', labelpad=10, fontsize=10)
 ax.set_ylabel(yname, fontsize=10)
-plt.xticks(fontsize=10)
+plt.xticks(fontsize=8)
 plt.yticks(fontsize=10)
 
 plt.tight_layout()
