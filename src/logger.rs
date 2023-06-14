@@ -195,13 +195,16 @@ fn get_derivability<L: SynthLanguage>(
     derive_type: DeriveType,
 ) -> Value {
     let start = Instant::now();
-    let (can, cannot) = ruleset.derive(derive_type, against, Limits::deriving());
+    // Only try to derive *sound* rules from the baseline
+    let (sound_against, unsound_against) = against.partition(|r| r.is_valid());
+    let (can, cannot) = ruleset.derive(derive_type, &sound_against, Limits::deriving());
     let elapsed = start.elapsed();
 
     json!({
         "derive_type": derive_type,
         "can": can.to_str_vec(),
         "cannot": cannot.to_str_vec(),
+        "unsound": unsound_against.to_str_vec(),
         "time": elapsed.as_secs_f64()
     })
 }
