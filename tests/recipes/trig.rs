@@ -9,152 +9,148 @@ use ruler::{
 pub fn trig_rules() -> Ruleset<Trig> {
     let limits = Limits {
         iter: 3,
-        node: 2000000,
+        node: 2_000_000,
         match_: 200_000,
     };
-    let mut prior: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
-    prior.extend(prior_rules());
 
-    let no_trig_2x = Filter::Invert(Box::new(Filter::Or(vec![
-        Filter::Contains("(sin (+ ?a ?a))".parse().unwrap()),
-        Filter::Contains("(cos (+ ?a ?a))".parse().unwrap()),
-        Filter::Contains("(tan (+ ?a ?a))".parse().unwrap()),
-    ])));
+    let rational: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+    let handwritten: Ruleset<Trig> = prior_rules();
+
+    let mut prior = Ruleset::default();
+    prior.extend(rational);
+    prior.extend(handwritten);
+
+    let mut all = prior.clone();
+    let mut new = Ruleset::default();
+
+    // Language Basics
+    let t_ops = Workload::new(["sin", "cos", "tan"]);
+    let t_consts = Workload::new([
+        "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
+    ]);
+    let consts = Workload::new(["-2", "-1", "0", "1", "2"]);
     let valid_trig = Filter::Invert(Box::new(Filter::Contains(
         "(tan (/ PI 2))".parse().unwrap(),
     )));
+    let no_tan = Filter::Excludes("tan".parse().unwrap());
 
-    let t_ops = Workload::new(["sin", "cos", "tan"]);
-    let consts = Workload::new([
-        "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
+    // Phase 1:
+    let wkld = Workload::new(["(OP V)"])
+        .plug("OP", &t_ops)
+        .plug("V", &t_consts)
+        .filter(valid_trig.clone());
+    let rules = run_rule_lifting(&wkld, all.clone(), limits);
+    all.extend(rules.clone());
+    new.extend(rules.clone());
+
+    // Phase 2:
+    let vals = Workload::Append(vec![
+        t_consts.clone(),
+        Workload::new(["a", "(~ a)", "(+ PI a)", "(- PI a)", "(+ a a)"]),
     ]);
-    let app = Workload::new(["(op v)"]);
-    let trig_constants = app
-        .clone()
-        .plug("op", &t_ops)
-        .plug("v", &consts)
-        .filter(valid_trig);
+    let simple_ops = Workload::new(["(OP V)"])
+        .plug("OP", &t_ops)
+        .plug("V", &vals)
+        .filter(valid_trig.clone());
+    let negations = Workload::new(["(~ V)"]).plug("V", &simple_ops);
+    let wkld = Workload::Append(vec![simple_ops, negations]);
+    let rules = run_rule_lifting(&wkld, all.clone(), limits);
+    all.extend(rules.clone());
+    new.extend(rules.clone());
 
-    let simple_terms = app.clone().plug("op", &t_ops).plug(
-        "v",
-        &Workload::new(["a", "(~ a)", "(+ PI a)", "(- PI a)", "(+ a a)"]),
-    );
+    // Phase 3:
+    let prev_wkld = wkld; // Re-use workload from previous phase
+    let vals = Workload::new(["(OP V)"])
+        .plug("OP", &t_ops)
+        .plug("V", &Workload::new(["a", "b"]));
+    let squares = Workload::new(["(sqr V)"]).plug("V", &vals);
+    let sum_of_squares = Workload::new(["(+ V V)", "(- V V)"]).plug("V", &squares);
+    let wkld = Workload::Append(vec![prev_wkld, sum_of_squares]);
+    let rules = run_rule_lifting(&wkld, all.clone(), limits);
+    all.extend(rules.clone());
+    new.extend(rules.clone());
 
-    let neg_terms = Workload::new(["(~ x)"]).plug("x", &simple_terms);
+    // Phase 4:
+    let wkld = Workload::Append(vec![
+        consts.clone(),
+        Workload::new(["(OP V)"]).plug("OP", &t_ops).plug(
+            "V",
+            &Workload::new(["a", "(- (/ PI 2) a)", "(+ (/ PI 2) a)", "(* 2 a)"]),
+        ),
+    ]);
+    let rules = run_rule_lifting(&wkld, all.clone(), limits);
+    all.extend(rules.clone());
+    new.extend(rules.clone());
 
-    let squares = Workload::new(["(sqr x)"])
-        .plug("x", &app)
-        .plug("op", &t_ops)
-        .plug("v", &Workload::new(["a", "b"]));
+    // Phase 5:
+    let trig_sqrs = Workload::new(["(sqr (OP V))"])
+        .plug("OP", &t_ops)
+        .plug("V", &Workload::new(["a"]));
+    let base = Workload::Append(vec![
+        trig_sqrs,
+        Workload::new(["(OP V)"]).plug("OP", &t_ops).plug(
+            "V",
+            &Workload::new(["a", "(- (/ PI 2) a)", "(+ (/ PI 2) a)", "(* 2 a)"]),
+        ),
+    ]);
+    let wkld = Workload::Append(vec![
+        consts.clone(),
+        Workload::new([
+            "V",
+            "(/ V 2)",
+            "(+ 1 V)",
+            "(- 1 V)",
+            "(/ (+ 1 V) 2)",
+            "(/ (- 1 V) 2)",
+        ])
+        .plug("V", &base),
+    ])
+    .filter(no_tan.clone());
+    let rules = run_rule_lifting(&wkld, all.clone(), limits);
+    all.extend(rules.clone());
+    new.extend(rules.clone());
 
-    let add = Workload::new(["(+ e e)", "(- e e)"]);
+    // Phase 6:
+    let base = Workload::new(["(OP V)"])
+        .plug("OP", &t_ops)
+        .plug("V", &Workload::new(["a", "b", "(+ a b)", "(- a b)"]));
+    let sum_and_prod = Workload::new(["(+ V V)", "(- V V)", "(* V V)"]).plug("V", &base);
+    let wkld = Workload::Append(vec![
+        consts.clone(),
+        Workload::new(["V", "(/ V 2)"]).plug("V", &sum_and_prod),
+    ])
+    .filter(no_tan.clone());
+    let rules = run_rule_lifting(&wkld, all.clone(), limits);
+    all.extend(rules.clone());
+    new.extend(rules.clone());
 
-    let sum_of_squares = add.plug("e", &squares);
+    // Phase 7:
+    let base = Workload::new(["(OP V)"])
+        .plug("OP", &t_ops)
+        .plug("V", &Workload::new(["a", "b"]));
+    let sum_of_prod =
+        Workload::new(["(+ (* V V) (* V V))", "(- (* V V) (* V V))"]).plug("V", &base);
 
-    let mut all = prior.clone();
-    let mut new = Ruleset::<Trig>::default();
+    let no_square = Filter::And(vec![
+        Filter::Excludes("(* (cos ?x) (cos ?x))".parse().unwrap()),
+        Filter::Excludes("(* (sin ?x) (sin ?x))".parse().unwrap()),
+    ]);
+    let wkld = Workload::Append(vec![
+        consts,
+        Workload::new(["(sin (+ a b))", "(cos (+ a b))"]),
+        base,
+        sum_of_prod,
+    ])
+    .filter(no_tan.clone())
+    .filter(no_square);
+    let rules = run_rule_lifting(&wkld, all.clone(), limits);
+    all.extend(rules.clone());
+    new.extend(rules.clone());
 
-    let wkld1 = trig_constants;
-    println!("Starting 1");
-    let rules1 = run_rule_lifting(wkld1.clone(), all.clone(), limits);
-    all.extend(rules1.clone());
-    new.extend(rules1.clone());
+    let orig = Ruleset::<Trig>::from_file("trig.rules");
+    let (can, cannot) = all.derive(DeriveType::LhsAndRhs, &orig, limits);
+    println!("{} {}", can.len(), cannot.len());
+    cannot.pretty_print();
 
-    let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
-    println!("Starting 2");
-    let rules2 = run_rule_lifting(wkld2.clone(), all.clone(), limits);
-    all.extend(rules2.clone());
-    new.extend(rules2.clone());
-
-    let trimmed_wkld2 = wkld2.clone().filter(no_trig_2x);
-    let wkld3 = Workload::Append(vec![trimmed_wkld2.clone(), sum_of_squares.clone()]);
-    println!("Starting 3");
-    let rules3 = run_rule_lifting(wkld3, all.clone(), limits);
-    all.extend(rules3.clone());
-    new.extend(rules3.clone());
-
-    let non_square_filter = Filter::Invert(Box::new(Filter::Or(vec![
-        Filter::Contains("(* (cos ?x) (cos ?x))".parse().unwrap()),
-        Filter::Contains("(* (sin ?x) (sin ?x))".parse().unwrap()),
-    ])));
-
-    let two_x_filter = Filter::Invert(Box::new(Filter::Contains("(+ ?x ?x)".parse().unwrap())));
-
-    let trivial_trig_filter = Filter::Invert(Box::new(Filter::Or(vec![
-        Filter::Contains("(cos (?op ?a ?b))".parse().unwrap()),
-        Filter::Contains("(sin (?op ?a ?b))".parse().unwrap()),
-    ])));
-
-    let trig_no_sub_filter = Filter::Invert(Box::new(Filter::Or(vec![
-        Filter::Contains("(cos (- ?a ?b))".parse().unwrap()),
-        Filter::Contains("(sin (- ?a ?b))".parse().unwrap()),
-    ])));
-
-    let t_ops = Workload::new(["sin", "cos"]);
-    let app = Workload::new(["(op v)"]);
-    let shift = Workload::new(["x", "(- 1 x)", "(+ 1 x)"]);
-    let scale_down = Workload::new(["x", "(/ x 2)"]);
-    let consts = Workload::new(["-2", "-1", "0", "1", "2"]);
-
-    let simple = app.clone().plug("op", &t_ops).plug(
-        "v",
-        &Workload::new(["a", "(- (/ PI 2) a)", "(+ (/ PI 2) a)", "(* 2 a)"]),
-    );
-
-    let trivial_squares = Workload::new(["(sqr x)"])
-        .plug("x", &app)
-        .plug("op", &t_ops)
-        .plug("v", &Workload::new(["a"]));
-
-    let two_var = app
-        .clone()
-        .plug("op", &t_ops)
-        .plug("v", &Workload::new(["a", "b", "(+ a b)", "(- a b)"]));
-    let sum_two_vars = Workload::new(["(+ x y)", "(- x y)"])
-        .plug("x", &two_var)
-        .plug("y", &two_var);
-    let prod_two_vars = Workload::new(["(* x y)"])
-        .plug("x", &two_var)
-        .plug("y", &two_var)
-        .filter(non_square_filter);
-
-    let sum_of_prod = Workload::new(["(+ x y)", "(- x y)"])
-        .plug("x", &prod_two_vars)
-        .plug("y", &prod_two_vars)
-        .filter(two_x_filter)
-        .filter(trivial_trig_filter);
-
-    let shifted_simple = shift.clone().plug("x", &simple);
-    let sum_and_prod = Workload::Append(vec![sum_two_vars.clone(), prod_two_vars.clone()]);
-    let shifted_simple_sqrs = Workload::Append(vec![shifted_simple, trivial_squares]);
-    let scaled_shifted_sqrs = scale_down.clone().plug("x", &shifted_simple_sqrs);
-
-    let scaled_sum_prod = scale_down.clone().plug("x", &sum_and_prod);
-
-    let two_var_no_sub = two_var.clone().filter(trig_no_sub_filter);
-
-    // Coangles
-    let wkld1 = Workload::Append(vec![simple, consts.clone()]);
-    let rules1 = run_rule_lifting(wkld1.clone(), all.clone(), limits);
-    all.extend(rules1.clone());
-    new.extend(rules1.clone());
-
-    // Power reduction
-    let wkld2 = Workload::Append(vec![scaled_shifted_sqrs, consts.clone()]);
-    let rules2 = run_rule_lifting(wkld2.clone(), all.clone(), limits);
-    all.extend(rules2.clone());
-    new.extend(rules2.clone());
-
-    // Product-to-sum
-    let wkld3 = Workload::Append(vec![scaled_sum_prod, consts.clone()]);
-    let rules3 = run_rule_lifting(wkld3.clone(), all.clone(), limits);
-    all.extend(rules3.clone());
-    new.extend(rules3.clone());
-
-    // Sums
-    let wkld4 = Workload::Append(vec![two_var_no_sub, sum_of_prod, consts.clone()]);
-    let rules4 = run_rule_lifting(wkld4.clone(), all.clone(), limits);
-    all.extend(rules4.clone());
-    new.extend(rules4.clone());
     new
 }

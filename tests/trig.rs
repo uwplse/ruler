@@ -350,6 +350,11 @@ mod test {
     }
 
     #[test]
+    fn rules() {
+        trig_rules();
+    }
+
+    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
@@ -390,7 +395,7 @@ mod test {
         let mut all = complex;
         all.extend(prior_rules());
 
-        let rules = run_rule_lifting(terms, all, limits);
+        let rules = run_rule_lifting(&terms, all, limits);
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);
