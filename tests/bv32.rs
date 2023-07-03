@@ -82,8 +82,10 @@ pub mod test {
                 "b".to_string(),
                 "c".to_string(),
             ]));
+        let consts = Workload::new(["0", "1"]);
+        let wkld = Workload::Append(vec![a6_canon, consts]);
         rules.extend(run_workload(
-            a6_canon,
+            wkld,
             rules.clone(),
             Limits::synthesis(),
             Limits::minimize(),
