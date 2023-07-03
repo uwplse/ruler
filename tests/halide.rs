@@ -392,7 +392,8 @@ mod test {
         let new = run_workload(
             nested_bops_arith,
             all_rules.clone(),
-            Limits::rulefinding(),
+            Limits::synthesis(),
+            Limits::minimize(),
             true,
         );
         all_rules.extend(new);
@@ -412,7 +413,8 @@ mod test {
         let new = run_workload(
             nested_bops_full,
             all_rules.clone(),
-            Limits::rulefinding(),
+            Limits::synthesis(),
+            Limits::minimize(),
             true,
         );
         all_rules.extend(new.clone());
@@ -428,7 +430,13 @@ mod test {
                 "e".to_string(),
                 "f".to_string(),
             ]));
-        let new = run_workload(select_max, all_rules.clone(), Limits::rulefinding(), true);
+        let new = run_workload(
+            select_max,
+            all_rules.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+        );
         println!("select_max finished.");
         new.to_file("select-max.rules");
         all_rules.extend(new.clone());
@@ -444,7 +452,13 @@ mod test {
                 "e".to_string(),
                 "f".to_string(),
             ]));
-        let new = run_workload(select_arith, all_rules.clone(), Limits::rulefinding(), true);
+        let new = run_workload(
+            select_arith,
+            all_rules.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+        );
         println!("select_arith finished.");
         new.to_file("select-arith.rules");
         all_rules.extend(new.clone());

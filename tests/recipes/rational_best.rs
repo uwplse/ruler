@@ -8,7 +8,7 @@ use ruler::{
 
 pub fn best_enumo_recipe() -> Ruleset<Math> {
     let mut rules = replicate_ruler1_recipe();
-    let limits = Limits::rulefinding();
+    let limits = Limits::synthesis();
 
     // Factorization
     println!("factorization");
