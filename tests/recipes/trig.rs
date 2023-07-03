@@ -147,10 +147,5 @@ pub fn trig_rules() -> Ruleset<Trig> {
     all.extend(rules.clone());
     new.extend(rules.clone());
 
-    let orig = Ruleset::<Trig>::from_file("trig.rules");
-    let (can, cannot) = all.derive(DeriveType::LhsAndRhs, &orig, limits);
-    println!("{} {}", can.len(), cannot.len());
-    cannot.pretty_print();
-
     new
 }
