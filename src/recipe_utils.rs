@@ -60,7 +60,7 @@ pub fn run_workload<L: SynthLanguage>(
 }
 
 pub fn run_rule_lifting<L: SynthLanguage>(
-    workload: Workload,
+    workload: &Workload,
     prior: Ruleset<L>,
     limits: Limits,
 ) -> Ruleset<L> {
@@ -72,6 +72,10 @@ pub fn run_rule_lifting<L: SynthLanguage>(
 
     let chosen = candidates.minimize(prior, Scheduler::Compress(limits)).0;
     let time = t.elapsed().as_secs_f64();
+
+    if chosen.is_empty() {
+        panic!("Didn't learn any rules!");
+    }
 
     println!(
         "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",

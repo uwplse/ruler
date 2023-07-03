@@ -201,7 +201,7 @@ mod tests {
         assert_eq!(atoms3.force().len(), 51);
 
         let rules3 = run_rule_lifting(
-            atoms3,
+            &atoms3,
             all_rules.clone(),
             Limits {
                 iter: 3,
@@ -215,7 +215,7 @@ mod tests {
         assert_eq!(atoms4.force().len(), 255);
 
         let rules4 = run_rule_lifting(
-            atoms4,
+            &atoms4,
             all_rules.clone(),
             Limits {
                 iter: 3,
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(atoms5.force().len(), 1527);
 
         let rules4 = run_rule_lifting(
-            atoms5,
+            &atoms5,
             all_rules.clone(),
             Limits {
                 iter: 3,
