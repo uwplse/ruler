@@ -35,7 +35,10 @@ mkdir -p "$NIGHTLY_DIR/data" "$NIGHTLY_DIR/output"
 
 # Run tests.
 pushd $TOP_DIR
-RUST_TEST_THREADS=1 cargo test --release
+RUST_TEST_THREADS=1 cargo test --release -- --nocapture > log.txt
+
+# Copy log
+cp log.txt "$NIGHTLY_DIR/output"
 popd
 
 # Update HTML index page.
