@@ -143,7 +143,7 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let scheduler = Scheduler::Compress(Limits::rulefinding());
+        let scheduler = Scheduler::Compress(Limits::synthesis());
 
         let egraph = scheduler.run(&atoms3.to_egraph(), &all_rules);
         let mut candidates = Ruleset::cvec_match(&egraph);
@@ -209,19 +209,37 @@ mod test {
         let atoms3 = iter_bool(3);
         assert_eq!(atoms3.force().len(), 93);
 
-        let rules3 = run_workload(atoms3, all_rules.clone(), Limits::rulefinding(), false);
+        let rules3 = run_workload(
+            atoms3,
+            all_rules.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            false,
+        );
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
         assert_eq!(atoms4.force().len(), 348);
 
-        let rules4 = run_workload(atoms4, all_rules.clone(), Limits::rulefinding(), false);
+        let rules4 = run_workload(
+            atoms4,
+            all_rules.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            false,
+        );
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
         assert_eq!(atoms5.force().len(), 4599);
 
-        let rules5 = run_workload(atoms5, all_rules.clone(), Limits::rulefinding(), false);
+        let rules5 = run_workload(
+            atoms5,
+            all_rules.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            false,
+        );
         all_rules.extend(rules5);
 
         let expected: Ruleset<Bool> = Ruleset::new(&[
@@ -295,28 +313,16 @@ mod test {
 
     #[test]
     fn derive_rules() {
-        let three: Ruleset<Bool> = run_workload(
-            iter_bool(3),
-            Ruleset::default(),
-            Limits {
-                iter: 4,
-                node: 1000000,
-                match_: 200_000,
-            },
-            false,
-        );
+        let limits = Limits {
+            iter: 4,
+            node: 1000000,
+            match_: 200_000,
+        };
+        let three: Ruleset<Bool> =
+            run_workload(iter_bool(3), Ruleset::default(), limits, limits, false);
         three.to_file("three.txt");
 
-        let four = run_workload(
-            iter_bool(4),
-            Ruleset::default(),
-            Limits {
-                iter: 4,
-                node: 1000000,
-                match_: 200_000,
-            },
-            false,
-        );
+        let four = run_workload(iter_bool(4), Ruleset::default(), limits, limits, false);
         four.to_file("four.txt");
 
         let (can, cannot) = three.derive(

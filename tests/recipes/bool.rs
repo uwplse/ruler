@@ -28,7 +28,13 @@ pub fn bool_rules() -> Ruleset<Bool> {
             "b".to_string(),
             "c".to_string(),
         ]));
-    let r7 = run_workload(a7_canon, all.clone(), Limits::rulefinding(), true);
+    let r7 = run_workload(
+        a7_canon,
+        all.clone(),
+        Limits::synthesis(),
+        Limits::minimize(),
+        true,
+    );
     all.extend(r7);
 
     all

@@ -28,14 +28,15 @@ pub fn substitute(workload: Workload, sub: Workload, atom: &str) -> Workload {
 fn run_workload_internal<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
-    limits: Limits,
+    prior_limits: Limits,
+    minimize_limits: Limits,
     fast_match: bool,
     allow_empty: bool,
 ) -> Ruleset<L> {
     let t = Instant::now();
 
     let egraph = workload.to_egraph::<L>();
-    let compressed = Scheduler::Compress(limits).run(&egraph, &prior);
+    let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
 
     let mut candidates = if fast_match {
         Ruleset::fast_cvec_match(&compressed)
@@ -44,7 +45,7 @@ fn run_workload_internal<L: SynthLanguage>(
     };
 
     let num_prior = prior.len();
-    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(limits));
+    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
     let time = t.elapsed().as_secs_f64();
 
     if chosen.is_empty() && !allow_empty {
@@ -67,24 +68,35 @@ fn run_workload_internal<L: SynthLanguage>(
 pub fn run_workload<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
-    limits: Limits,
+    prior_limits: Limits,
+    minimize_limits: Limits,
     fast_match: bool,
 ) -> Ruleset<L> {
-    run_workload_internal(workload, prior, limits, fast_match, false)
+    run_workload_internal(
+        workload,
+        prior,
+        prior_limits,
+        minimize_limits,
+        fast_match,
+        false,
+    )
 }
 
 pub fn run_rule_lifting<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
-    limits: Limits,
+    prior_limits: Limits,
+    minimize_limits: Limits,
 ) -> Ruleset<L> {
     let t = Instant::now();
 
     let egraph = workload.to_egraph::<L>();
     let num_prior = prior.len();
-    let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), limits);
+    let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), prior_limits);
 
-    let chosen = candidates.minimize(prior, Scheduler::Compress(limits)).0;
+    let chosen = candidates
+        .minimize(prior, Scheduler::Compress(minimize_limits))
+        .0;
     let time = t.elapsed().as_secs_f64();
 
     println!(
@@ -145,8 +157,14 @@ pub fn recursive_rules<L: SynthLanguage>(
         }
         rec.extend(prior);
         let allow_empty = n < 3;
-        let new =
-            run_workload_internal(wkld, rec.clone(), Limits::rulefinding(), true, allow_empty);
+        let new = run_workload_internal(
+            wkld,
+            rec.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+            allow_empty,
+        );
         let mut all = new;
         all.extend(rec);
         all

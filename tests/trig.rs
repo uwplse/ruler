@@ -390,7 +390,7 @@ mod test {
         let mut all = complex;
         all.extend(prior_rules());
 
-        let rules = run_rule_lifting(terms, all, limits);
+        let rules = run_rule_lifting(terms, all, limits, limits);
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);

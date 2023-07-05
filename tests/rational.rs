@@ -863,7 +863,8 @@ pub mod test {
                 .plug("OP1", &Workload::new(["~", "fabs"]))
                 .plug("OP2", &Workload::new(["+", "*", "-", "/"])),
             all_rules.clone(),
-            Limits::rulefinding(),
+            Limits::synthesis(),
+            Limits::minimize(),
             false,
         );
         all_rules.extend(starting_rules);
@@ -872,7 +873,8 @@ pub mod test {
             Workload::new(["(if e e e)"])
                 .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
             all_rules.clone(),
-            Limits::rulefinding(),
+            Limits::synthesis(),
+            Limits::minimize(),
             false,
         );
         all_rules.extend(basic_if_rules);
@@ -883,7 +885,13 @@ pub mod test {
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
         terms.to_file("guard.terms");
 
-        let guarded_rules = run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
+        let guarded_rules = run_workload(
+            terms,
+            all_rules.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            false,
+        );
         guarded_rules.to_file("guard.rules");
         assert!(guarded_rules
             .0
@@ -900,17 +908,14 @@ pub mod test {
         // regression test that captures a bug where we were not properly adding both directions
         // when we add candidates. See https://github.com/uwplse/ruler/pull/183
 
+        let limits = Limits {
+            iter: 3,
+            node: 300000,
+            match_: 200_000,
+        };
         let test = Workload::new(&["(if a b b)", "b"]);
-        let test_rules: Ruleset<Math> = run_workload(
-            test,
-            Ruleset::default(),
-            Limits {
-                iter: 3,
-                node: 300000,
-                match_: 200_000,
-            },
-            false,
-        );
+        let test_rules: Ruleset<Math> =
+            run_workload(test, Ruleset::default(), limits, limits, false);
         assert_eq!(test_rules.len(), 1);
     }
 }

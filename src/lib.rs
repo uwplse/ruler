@@ -68,8 +68,8 @@ pub enum DeriveType {
 }
 
 impl Limits {
-    // match oopsla limits
-    pub fn rulefinding() -> Self {
+    // match oopsla21 limits
+    pub fn synthesis() -> Self {
         Self {
             iter: 2,
             node: 300_000,
@@ -77,7 +77,16 @@ impl Limits {
         }
     }
 
-    // match oopsla limits
+    // match oopsla21 limits (oopsla21 did not distinguish between rulefinding and minimize limits)
+    pub fn minimize() -> Self {
+        Self {
+            iter: 2,
+            node: 300_000,
+            match_: 200_000,
+        }
+    }
+
+    // match oopsla21 limits
     pub fn deriving() -> Self {
         Self {
             iter: 5,
