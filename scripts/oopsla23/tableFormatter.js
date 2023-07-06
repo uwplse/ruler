@@ -64,9 +64,16 @@ function reformat(keyMap, rows) {
   return tableData;
 }
 
+// Optional Chaining is only available in Node 14+ and the version we have on
+// the VM is Node 12, so this convenience method just hides the object guard.
+function optionalChaining(obj, field) {
+  return obj && obj[field];
+}
+
 module.exports = {
   tryRound,
   formatRules,
   getDerivability,
   reformat,
+  optionalChaining,
 };

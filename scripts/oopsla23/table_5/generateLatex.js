@@ -52,6 +52,7 @@ function generateBvLatex() {
     Object.entries(keys).forEach(([key, f]) => {
       latexRow.push(f(row));
     });
+    // Note: replaceAll is only available in ES12+, so use `replace` with global regexp
     lines.push(String.raw`${latexRow.join(" & ").replace(/%/g, "\\%")} \\`);
   });
 

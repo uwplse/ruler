@@ -1,5 +1,5 @@
 const tableFormatter = require("../tableFormatter.js");
-const { tryRound, getDerivability, formatRules, reformat } = tableFormatter;
+const { tryRound, getDerivability, optionalChaining } = tableFormatter;
 const fs = require("fs");
 
 function generateBaselineLatex(tableName) {
@@ -50,12 +50,17 @@ function generateBaselineLatex(tableName) {
       lhs_percentage = getDerivability(
         row.derivability.enumo_derives_baseline.lhs
       );
-      lhs_time = tryRound(row.derivability.enumo_derives_baseline.lhs?.time);
+      lhs_time = tryRound(
+        optionalChaining(row.derivability.enumo_derives_baseline.lhs, "time")
+      );
       lhs_rhs_percentage = getDerivability(
         row.derivability.enumo_derives_baseline.lhs_rhs
       );
       lhs_rhs_time = tryRound(
-        row.derivability.enumo_derives_baseline.lhs_rhs?.time
+        optionalChaining(
+          row.derivability.enumo_derives_baseline.lhs_rhs,
+          "time"
+        )
       );
       return `${lhs_percentage} (${lhs_time}), ${lhs_rhs_percentage} (${lhs_rhs_time})`;
     },
@@ -63,12 +68,17 @@ function generateBaselineLatex(tableName) {
       lhs_percentage = getDerivability(
         row.derivability.baseline_derives_enumo.lhs
       );
-      lhs_time = tryRound(row.derivability.baseline_derives_enumo.lhs?.time);
+      lhs_time = tryRound(
+        optionalChaining(row.derivability.baseline_derives_enumo.lhs, "time")
+      );
       lhs_rhs_percentage = getDerivability(
         row.derivability.baseline_derives_enumo.lhs_rhs
       );
       lhs_rhs_time = tryRound(
-        row.derivability.baseline_derives_enumo.lhs_rhs?.time
+        optionalChaining(
+          row.derivability.baseline_derives_enumo.lhs_rhs,
+          "time"
+        )
       );
       return `${lhs_percentage} ${
         lhs_time ? `(${lhs_time})` : ""
