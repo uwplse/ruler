@@ -1,19 +1,21 @@
 echo "Starting BV experiment"
 
-# Clear logs
-rm -f log.txt
-rm -f output.json
+# Start from clean state
+rm -f out/
 rm -f ../../../nightly/data/output.json
+mkdir out/
 
 # Generate BV rules and compute derivability
-cargo test --release --package ruler --test bv8  -- test::compare --exact --nocapture >> log.txt
-cargo test --release --package ruler --test bv16 -- test::compare --exact --nocapture >> log.txt
+cargo test --release --package ruler --test bv8  -- test::compare --exact --nocapture >> out/log.txt
+cargo test --release --package ruler --test bv16 -- test::compare --exact --nocapture >> out/log.txt
 
-cp ../../../nightly/data/output.json .
+cp ../../../nightly/data/output.json out/
 
 # Generate latex table from output json
 node generateLatex.js
-pdflatex table.tex
+pdflatex -output-directory out out/table.tex
 
 
-echo "Done! Results are shown in table.pdf"
+if [ -f "out/table.pdf" ]; then
+  echo "Done! Results are shown in table.pdf"
+fi

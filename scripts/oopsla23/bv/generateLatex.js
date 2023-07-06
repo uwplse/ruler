@@ -52,7 +52,7 @@ function generateBvLatex() {
     Object.entries(keys).forEach(([key, f]) => {
       latexRow.push(f(row));
     });
-    lines.push(String.raw`${latexRow.join(" & ").replaceAll("%", "\\%")} \\`);
+    lines.push(String.raw`${latexRow.join(" & ").replace(/%/g, "\\%")} \\`);
   });
 
   lines.push(String.raw`\end{tabular}%`);
@@ -79,4 +79,4 @@ function getCaption(version) {
 }
 
 const latexLines = generateBvLatex();
-fs.writeFileSync("table.tex", latexLines.join("\n"));
+fs.writeFileSync("out/table.tex", latexLines.join("\n"));
