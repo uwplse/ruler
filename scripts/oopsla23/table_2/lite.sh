@@ -1,4 +1,4 @@
-echo "Starting Fast-Forwarding experiment (Full)"
+echo "Starting Guided Search experiment (Lite)"
 
 # Start from clean state
 rm -rf out/
@@ -6,9 +6,7 @@ rm -f ../../../nightly/data/output.json
 mkdir out/
 
 # Generate rules and compute derivability
-cargo test --release --package ruler --test exponential -- test::run --exact --nocapture >> out/log.txt
-cargo test --release --package ruler --test rational    -- test::run --exact --nocapture >> out/log.txt
-cargo test --release --package ruler --test trig        -- test::run --exact --nocapture >> out/log.txt
+cargo test --release --package ruler --test bool -- test::run --exact --nocapture >> out/log.txt
 
 cp ../../../nightly/data/output.json out/
 

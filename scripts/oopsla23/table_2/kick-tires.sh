@@ -1,4 +1,4 @@
-echo "Starting Fast-Forwarding experiment (Kick Tires)"
+echo "Starting Guided Seaarch experiment (Kick Tires)"
 
 # Start from clean state
 rm -rf out/
