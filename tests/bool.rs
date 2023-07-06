@@ -204,6 +204,18 @@ mod test {
     }
 
     #[test]
+    fn atoms3() {
+        let atoms3 = iter_bool(3);
+        run_workload::<Bool>(
+            atoms3,
+            Ruleset::default(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+        );
+    }
+
+    #[test]
     fn simple() {
         let mut all_rules = Ruleset::default();
         let atoms3 = iter_bool(3);
