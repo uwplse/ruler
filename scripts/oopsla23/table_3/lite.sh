@@ -1,13 +1,12 @@
-echo "Starting BV experiment"
+echo "Starting Fast-Forwarding experiment (Lite)"
 
 # Start from clean state
 rm -rf out/
 rm -f ../../../nightly/data/output.json
 mkdir out/
 
-# Generate BV rules and compute derivability
-cargo test --release --package ruler --test bv8  -- test::compare --exact --nocapture >> out/log.txt
-cargo test --release --package ruler --test bv16 -- test::compare --exact --nocapture >> out/log.txt
+# Generate rules and compute derivability
+cargo test --release --package ruler --test exponential -- test::run --exact --nocapture >> out/log.txt
 
 cp ../../../nightly/data/output.json out/
 

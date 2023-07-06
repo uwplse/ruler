@@ -56,7 +56,7 @@ function generateBvLatex() {
   });
 
   lines.push(String.raw`\end{tabular}%`);
-  lines = lines.concat(getCaption("bv"));
+  lines = lines.concat(getCaption());
   lines.push(String.raw`}%`);
   lines.push(String.raw`\label{table:bv}`);
   lines.push(String.raw`\end{table}`);
@@ -65,7 +65,7 @@ function generateBvLatex() {
   return lines;
 }
 
-function getCaption(version) {
+function getCaption() {
   return String.raw`\caption{
   Comparison of rule synthesis for different widths of bitvectors.
   Shown for each bitvector width are
