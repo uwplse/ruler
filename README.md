@@ -104,14 +104,13 @@ let a6_canon = iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
             "b".to_string(),
             "c".to_string(),
         ]));
-
 ```
 Ruler allows its users to decouple workload generation from rule synthesis. In the above code snippet, we are not finding rules at all: we are *just* building up a workload! `a6_canon` is pretty complicated, so let's break it up a bit to make it easier:
 
 ```
 iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
 ```
-Here, we specify that we want to enumerate all terms over *binary* operators by passing the argument 2 to `base_lang` (also included in `recipe_utils.rs`). We then enumerate all terms over binary operators up to 6 atoms in size.
+Here, we specify that we want to enumerate all terms up to 6 atoms in size over unary *or* binary operators. If we had passed 3 instead of 2 to `base_lang`, we would also enumerate over ternary operators.
 
 ```
 .plug("VAR", &Workload::new(lang.vars))
@@ -140,7 +139,6 @@ let wkld = Workload::Append(vec![a6_canon, consts]);
         Limits::minimize(),
         true,
     ));
-
     rules
 ```
 Finally, we are ready to run rule synthesis for the final time, which we do using the workload we just created, the rules we got from `recursive_rules`, and some resource limits. We return this final ruleset. This is a complete Ruler program!
