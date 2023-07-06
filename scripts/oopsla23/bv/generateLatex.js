@@ -6,7 +6,7 @@ const fs = require("fs");
 // Transformations include renaming columns, rounding numbers, and converting derivability
 // to percentages
 function getBvData() {
-  const data = JSON.parse(fs.readFileSync("output.json"));
+  const data = JSON.parse(fs.readFileSync("out/output.json"));
   let exps = data.filter((row) => row.TYPE === "bv");
 
   // Each key in this map corresponds to a column of the table

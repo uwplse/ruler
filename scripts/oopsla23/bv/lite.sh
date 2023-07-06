@@ -1,7 +1,7 @@
 echo "Starting BV experiment"
 
 # Start from clean state
-rm -f out/
+rm -rf out/
 rm -f ../../../nightly/data/output.json
 mkdir out/
 
