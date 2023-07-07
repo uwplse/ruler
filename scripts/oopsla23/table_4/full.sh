@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Synthesize rules
-cargo test --release --package ruler --test szalinski -- --ignored --nocapture > ../szalinski/rules.txt
+RAYON_NUM_THREADS=1 cargo test --release --package ruler --test szalinski -- --ignored --nocapture > ../szalinski/rules.txt
 
 # Check rule synthesis
 if ! [ -f ../szalinski/rules.txt ]; then
