@@ -123,9 +123,9 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - This experiment uses Renumo to infer rules for a variety of domains and compares the results against Ruler's rules for the same domains.
 - `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` runs Ruler for the `bool` domain using the Renumo program located at
+- `lite.sh` runs Renumo for the `bool` domain using the Renumo program located at
   `ruler/tests/recipes/bool.rs`.
-- `full.sh` runs Ruler for the `bool`, `bv4`, `bv32`, and `rational` domains using Renumo programs
+- `full.sh` runs Renumo for the `bool`, `bv4`, `bv32`, and `rational` domains using Renumo programs
   in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
@@ -133,14 +133,23 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 ### Experiment 2: Scaling to Large Domains
 
+- This experiment uses Renumo to infer rules for the Halide domain.
+- `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from `ruler/scripts/oopsla23/precomputed.json`
+- `lite.sh` runs Renumo to infer rules using the Renumo program located at `ruler/tests/recipes/halide.rs`
+  but does _not_ compute the derivability between the Renumo-inferred ruleset and Halide's rules.
+- `full.sh` runs Renumo to infer the Halide rules and computes the derivability between the Renumo rules and the Halide rules.
+- The data will be located at `out/output.json`
+- `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
+- `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
+
 ### Experiment 3: Rule Inference Using Fast-Forwarding
 
 - This experiment uses Renumo to infer rules for numeric domains (`exponential`, `rational`, and `trig`) and compares them against Herbie's handcrafted rules.
 - `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` runs Ruler for the `exponential` domain using the Renumo program located at
+- `lite.sh` runs Renumo for the `exponential` domain using the Renumo program located at
   `ruler/tests/recipes/exponential.rs`.
-- `full.sh` runs Ruler for the `exponential`, `rational`, and `trig` domains using Renumo programs in the `ruler/tests/recipes` directory.
+- `full.sh` runs Renumo for the `exponential`, `rational`, and `trig` domains using Renumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -158,9 +167,9 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - This experiment uses Renumo-inferred rules for `BV4` to construct rulesets for larger bitvectors (`BV8`, `BV16`, `BV32`, `BV64`, and `BV128`) and compares them against rulesets directly inferred for the larger bitvector domains.
 - `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` runs Ruler for the `BV8` domain using the Renumo program located at
+- `lite.sh` runs Renumo for the `BV8` domain using the Renumo program located at
   `ruler/tests/recipes/bv8.rs`.
-- `full.sh` runs Ruler for the `BV8`, `BV16`, `BV32`,
+- `full.sh` runs Renumo for the `BV8`, `BV16`, `BV32`,
   `BV64`, and `BV128` domains using Renumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`

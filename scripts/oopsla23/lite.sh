@@ -11,6 +11,13 @@ pushd table_2
 cp out/table.pdf ../out/table2.pdf
 popd
 
+# Experiment 2 (6.1.2)
+pushd exp_2
+./lite.sh
+cp out/table.pdf ../out/exp2.pdf
+popd
+
+
 # Table 3
 pushd table_3
 ./lite.sh

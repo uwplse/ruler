@@ -329,6 +329,34 @@ mod test {
         );
     }
 
+    #[test]
+    fn run_no_derive() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        let start = Instant::now();
+        let all_rules = halide_rules();
+        let duration = start.elapsed();
+
+        // oopsla-halide-baseline branch
+        // Run on nightly 4/12/2023
+        // time cargo run --release --bin halide -- synth --iters 1 --use-smt
+        // real	0m2.707s
+        // user	0m2.681s
+        // sys	0m0.028s
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+
+        logger::write_baseline(
+            &all_rules,
+            "halide",
+            &baseline,
+            "halide (no derive)",
+            duration,
+        );
+    }
+
     // This is the fancy 75% recipe that takes too much memory for Nightly to run it,
     // so it's commented out here, but it runs fine on Leviathan.
     // #[test]

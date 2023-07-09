@@ -65,6 +65,8 @@ pub fn write_baseline<L: SynthLanguage>(
         ("herbie", "rational_best"),
         ("halide", "oopsla halide (1 iter)"),
         ("oopsla halide (1 iter)", "halide"),
+        ("halide", "halide (no derive)"),
+        ("halide (no derive)", "halide"),
     ];
 
     let loc = count_lines(spec_name)

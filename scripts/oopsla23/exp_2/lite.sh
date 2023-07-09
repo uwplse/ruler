@@ -1,4 +1,4 @@
-echo "Starting Guided Search experiment (Full)"
+echo "Starting Guided Search experiment (Lite)"
 
 # Go to the right directory
 pushd scripts/oopsla23/exp_2
@@ -9,7 +9,7 @@ rm -f ../../../nightly/data/output.json
 mkdir out/
 
 # Generate rules and compute derivability
-cargo test --release --package ruler --test halide -- test::run --exact --nocapture >> out/log.txt
+cargo test --release --package ruler --test halide -- test::run_no_derive --exact --nocapture >> out/log.txt
 
 cp ../../../nightly/data/output.json out/
 

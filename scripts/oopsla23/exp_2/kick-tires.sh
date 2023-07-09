@@ -1,4 +1,4 @@
-echo "Starting Guided Seaarch experiment (Kick Tires)"
+echo "Starting Guided Search experiment (Kick Tires)"
 
 # Go to the right directory
 pushd scripts/oopsla23/table_2

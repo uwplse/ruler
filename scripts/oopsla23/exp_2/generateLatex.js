@@ -9,12 +9,20 @@ function generateLatex() {
     domain: (row) => row.spec_name,
     loc: (row) => row.loc,
     renumo_time: (row) => `${row.rules.length} (${tryRound(row.time)})`,
-    baseline_time: (row) =>
-      `${
-        row.derivability.enumo_derives_baseline.lhs.can.length +
-        row.derivability.enumo_derives_baseline.lhs.cannot.length
-      }`,
+    baseline_time: (row) => {
+      if (!!row.derivability.enumo_derives_baseline) {
+        return "-";
+      } else {
+        return `${
+          row.derivability.enumo_derives_baseline.lhs.can.length +
+          row.derivability.enumo_derives_baseline.lhs.cannot.length
+        }`;
+      }
+    },
     enumo_derives_baseline: (row) => {
+      if (!!row.derivability.enumo_derives_baseline) {
+        return "-";
+      }
       lhs_percentage = getDerivability(
         row.derivability.enumo_derives_baseline.lhs
       );
@@ -33,6 +41,9 @@ function generateLatex() {
       return `${lhs_percentage} (${lhs_time}), ${lhs_rhs_percentage} (${lhs_rhs_time})`;
     },
     baseline_derives_enumo: (row) => {
+      if (!!row.derivability.enumo_derives_baseline) {
+        return "-";
+      }
       lhs_percentage = getDerivability(
         row.derivability.baseline_derives_enumo.lhs
       );
