@@ -115,7 +115,7 @@ function do_branch {
 do_branch main
 do_branch enumo
 do_branch enumo-ruler-rat
-do_branch enumo-replicate-rat
+# do_branch enumo-replicate-rat
 do_branch enumo-no-ff
 do_branch enumo-rat
 do_branch ruler
