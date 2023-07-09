@@ -64,47 +64,107 @@ Please note that we have continued to work on Renumo since submission, so there 
 be small variation between the numbers reported in the submitted paper and the results
 produced by this artifact.
 
-## Experiment 1: Comparison against Ruler
+## Use Pre-Computed Data
 
-The goal is to reproduce `Table 2`.
+The goal is to reproduce the tables quickly using precomputed data.  
+From the `ruler/` directory, run
 
-- Ensure you are in the correct directory: `ruler/scripts/oopsla23/table_2`
-- Regenerate the table
-  - To generate the table from precomputed data, run `./kick-tires.sh`, which will
-    finish in less than a second.
-  - To regenerate a subset of the data, run `./lite.sh`, which will finish in a
-    couple minutes. This script runs the experiment from scratch for the `bool` domain only.
-  - To regenerate the full data, run `./full.sh`, which will finish in around 10
-    minutes.
-- Open `out/table.pdf` (or `out/table.tex`) to review the results.
+```
+./scripts/oopsla23/kick-tires.sh
+```
 
-Additional information about the scripts.
+Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
-- The bash scripts (`kick-tires.sh`, `lite.sh`, and `full.sh`) are the main entrypoints
-  for this part.
+- `table2.pdf` - Comparison against Ruler
+- `table3.pdf` - Rule inference using fast-forwarding
+- `table5.pdf` - Cross-domain ruleset manipulation
+
+## Use a Subset of Data
+
+The goal is to regenerate the data for the experiments that finish quickly.
+Some of the experiments take a long time to run and require significant memory,
+so the goal in this stage is to run a representative subset of the experiments
+that have lower resource requirements.  
+From the `ruler/` directory, run
+
+```
+./scripts/oopsla23/lite.sh
+```
+
+Navigate to `ruler/scripts/oopsla23/out` to review the results.
+
+- `table2.pdf` - Comparison against Ruler for `bool` domain only
+- `table3.pdf` - Rule inference using fast-forwarding for `exponential` domain only
+- `table5.pdf` - Cross-domain ruleset manipulation for `BV8` only
+
+## Regenerate All Data
+
+The goal is to run all of the experiments from scratch to fully replicate the data.
+This will take a long time to run and may require 32GB of memory.  
+From the `ruler/` directory, run
+
+```
+./scripts/oopsla23/full.sh
+```
+
+Navigate to `ruler/scripts/oopsla23/out` to review the results.
+
+- `table2.pdf` - Comparison against Ruler for `bool`, `bv4`, `bv32`, and
+  `rational` domains
+- `table3.pdf` - Rule inference using fast-forwarding for `exponential`,
+  `rational`, and `trig` domains
+- `table5.pdf` - Cross-domain ruleset manipulation for `BV8`, `BV16`, `BV32`,
+  `BV64`, and `BV128`.
+
+## Additional information about each experiment
+
+### Experiment 1: Comparison against Ruler
+
+- This experiment uses Renumo to infer rules for a variety of domains and compares the results against Ruler's rules for the same domains.
 - `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
 - `lite.sh` runs Ruler for the `bool` domain using the Renumo program located at
   `ruler/tests/recipes/bool.rs`.
 - `full.sh` runs Ruler for the `bool`, `bv4`, `bv32`, and `rational` domains using Renumo programs
   in the `ruler/tests/recipes` directory.
-- The results of running Ruler (or using the precomputed data) will be located at `out/output.json`
+- The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
 
-## Experiment 2: Scaling to Large Domains
+### Experiment 2: Scaling to Large Domains
 
-## Experiment 3: Rule Inference Using Fast-Forwarding
+### Experiment 3: Rule Inference Using Fast-Forwarding
 
-## Experiment 4: Fast-Forwarding Case Studies
+- This experiment uses Renumo to infer rules for numeric domains (`exponential`, `rational`, and `trig`) and compares them against Herbie's handcrafted rules.
+- `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
+  `ruler/scripts/oopsla23/precomputed.json`.
+- `lite.sh` runs Ruler for the `exponential` domain using the Renumo program located at
+  `ruler/tests/recipes/exponential.rs`.
+- `full.sh` runs Ruler for the `exponential`, `rational`, and `trig` domains using Renumo programs in the `ruler/tests/recipes` directory.
+- The data will be located at `out/output.json`
+- `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
+- `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
 
-### Case Study 1: Herbie
+### Experiment 4: Fast-Forwarding Case Studies
 
-### Case Study 2: Megalibm
+#### Case Study 1: Herbie
 
-### Case Study 3: Szalinski
+#### Case Study 2: Megalibm
 
-## Experiment 5: Cross-Domain Ruleset Manipulation
+#### Case Study 3: Szalinski
+
+### Experiment 5: Cross-Domain Ruleset Manipulation
+
+- This experiment uses Renumo-inferred rules for `BV4` to construct rulesets for larger bitvectors (`BV8`, `BV16`, `BV32`, `BV64`, and `BV128`) and compares them against rulesets directly inferred for the larger bitvector domains.
+- `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
+  `ruler/scripts/oopsla23/precomputed.json`.
+- `lite.sh` runs Ruler for the `BV8` domain using the Renumo program located at
+  `ruler/tests/recipes/bv8.rs`.
+- `full.sh` runs Ruler for the `BV8`, `BV16`, `BV32`,
+  `BV64`, and `BV128` domains using Renumo programs in the `ruler/tests/recipes` directory.
+- The data will be located at `out/output.json`
+- `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
+- `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
 
 <!-- ## Running from Previous Runs
 
