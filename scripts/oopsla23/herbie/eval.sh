@@ -38,7 +38,7 @@ echo "Running with $NUM_SEEDS seeds"
 
 # Output
 tstamp="$(date "+%Y-%m-%d_%H%M")"
-OUTDIR="$MYDIR/reports/$GROUP/$tstamp"
+OUTDIR="$MYDIR/reports/$tstamp"
 
 #
 #   Install Herbie
