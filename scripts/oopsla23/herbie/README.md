@@ -1,6 +1,6 @@
 ## Herbie evaluation
 
-Herbie evaluation for OOPSLA '23
+Herbie evaluation for OOPSLA 2023
 
 ### Dependencies
 
@@ -30,6 +30,7 @@ Directories:
 - `herbie`: directory where Herbie is installed
 - `plot`: plotting code stored under here
 - `reports`: Herbie reports generated here
+- `saved`: A previous run for use in the artifact
 - `rules`: Ruler rules need to be stored here to run the evaluation
 
 ### Results from Previous Runs
