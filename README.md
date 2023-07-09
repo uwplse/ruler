@@ -76,6 +76,7 @@ From the `ruler/` directory, run
 Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 - `table2.pdf` - Comparison against Ruler
+- `exp2.pdf` - Comparison against Halide
 - `table3.pdf` - Rule inference using fast-forwarding
 - `table5.pdf` - Cross-domain ruleset manipulation
 
@@ -94,6 +95,7 @@ From the `ruler/` directory, run
 Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 - `table2.pdf` - Comparison against Ruler for `bool` domain only
+- `exp2.pdf` - Comparison aginst Halide (rule inference only, no derivability)
 - `table3.pdf` - Rule inference using fast-forwarding for `exponential` domain only
 - `table5.pdf` - Cross-domain ruleset manipulation for `BV8` only
 
@@ -111,6 +113,7 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 - `table2.pdf` - Comparison against Ruler for `bool`, `bv4`, `bv32`, and
   `rational` domains
+- `exp2.pdf` - Comparison against Halide
 - `table3.pdf` - Rule inference using fast-forwarding for `exponential`,
   `rational`, and `trig` domains
 - `table5.pdf` - Cross-domain ruleset manipulation for `BV8`, `BV16`, `BV32`,
