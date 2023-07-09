@@ -1,13 +1,12 @@
-use egg::{AstSize, CostFunction, ENodeOrVar, Language, Rewrite};
+use egg::Rewrite;
 use num::{
-    rational::{Ratio, Rational64},
-    CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
+    rational::Ratio, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero,
 };
 use ruler::{
     enumo::{Rule, Ruleset, Scheduler, Workload},
     *,
 };
-use std::{cmp::max, ops::*, time::Instant};
+use std::{ops::*, time::Instant};
 use symbolic_expressions::parser::parse_str;
 use symbolic_expressions::Sexp;
 use z3::ast::Ast;
@@ -158,16 +157,45 @@ impl SynthLanguage for Math {
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
+        // TODO if you drop variables, it's unsound because
+        // we may have lost an error
+        /*if lhs.vars().into_iter().collect::<HashSet<Var>>()
+            != rhs.vars().into_iter().collect::<HashSet<Var>>()
+        {
+            return ValidationResult::Invalid;
+        }*/
+
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
         let solver = z3::Solver::new(&ctx);
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+        let lhs_denom = Self::error_conditions(
+            &ctx,
+            Self::pat_to_sexp(lhs),
+            z3::ast::Bool::from_bool(&ctx, true),
+        );
+        let rhs_denom = Self::error_conditions(
+            &ctx,
+            Self::pat_to_sexp(rhs),
+            z3::ast::Bool::from_bool(&ctx, true),
+        );
 
-        let assert_equal = lexpr._eq(&rexpr);
+        let mut assert_equal = lexpr._eq(&rexpr);
 
-        solver.assert(&assert_equal.not());
+        for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
+            assert_equal = condition.not().implies(&assert_equal);
+        }
+
+        let rhs_errors =
+            z3::ast::Bool::or(&ctx, &rhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
+        let lhs_errors =
+            z3::ast::Bool::or(&ctx, &lhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
+        let error_preserved = rhs_errors.iff(&lhs_errors);
+        let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
+
+        solver.assert(&assertion.clone().not());
         let res = Self::z3_res_to_validationresult(solver.check());
         /*if let ValidationResult::Valid = res {
             eprintln!("verifying {} => {}", lhs, rhs);
@@ -186,7 +214,7 @@ impl SynthLanguage for Math {
 }
 
 impl Math {
-    fn one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
+    fn _one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
         let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
 
         let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
@@ -283,6 +311,65 @@ impl Math {
         }
     }
 
+    /// Given an expression, returns a vector
+    /// of conditions for when the expression
+    /// divides by zero.
+    ///
+    /// For example, the expression
+    /// (/ 1 x) errors when (== x 0)
+    ///
+    /// The path variable stores the path conditions for reaching this expression.
+    ///
+    /// For example,
+    /// In (if x y z), the expression y
+    /// has condition (!= x 0)
+    fn error_conditions<'a>(
+        ctx: &'a z3::Context,
+        sexp: Sexp,
+        path: z3::ast::Bool<'a>,
+    ) -> Vec<z3::ast::Bool<'a>> {
+        let mut res = Vec::<z3::ast::Bool<'a>>::default();
+        match sexp {
+            Sexp::List(list) => {
+                if list[0] == Sexp::String("/".to_string()) {
+                    let denom = list[2].to_string();
+                    let expr = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(&denom.to_string().parse::<Pattern<Math>>().unwrap())
+                            .as_ref(),
+                    );
+                    let is_zero = expr._eq(&z3::ast::Real::from_real(ctx, 0, 1));
+
+                    res.push(z3::ast::Bool::and(ctx, &[&is_zero, &path]));
+                }
+
+                if list[0] == Sexp::String("if".to_string()) {
+                    let cond_real = egg_to_z3(
+                        &ctx,
+                        Self::instantiate(&list[1].to_string().parse::<Pattern<Math>>().unwrap())
+                            .as_ref(),
+                    );
+                    let zero = z3::ast::Real::from_real(ctx, 0, 1);
+                    let new_path_pos = z3::ast::Bool::and(
+                        &ctx,
+                        &[&path, &z3::ast::Bool::not(&cond_real._eq(&zero))],
+                    );
+                    let new_path_neg = z3::ast::Bool::and(&ctx, &[&path, &cond_real._eq(&zero)]);
+                    res.extend(Self::error_conditions(ctx, list[2].clone(), new_path_pos));
+                    res.extend(Self::error_conditions(ctx, list[3].clone(), new_path_neg));
+                } else {
+                    for s in list {
+                        res.extend(Self::error_conditions(ctx, s, path.clone()));
+                    }
+                };
+            }
+            Sexp::String(_) => (),
+            Sexp::Empty => (),
+        }
+
+        res
+    }
+
     fn run_workload_conditional(
         workload: Workload,
         prior: Ruleset<Self>,
@@ -345,6 +432,7 @@ impl Math {
         );
 
         result.pretty_print();
+
         result
     }
 }
@@ -365,16 +453,10 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 ctx,
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
-            Math::Div([x, y]) => {
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                let one = z3::ast::Real::from_real(ctx, 1, 1);
-                // Division by zero set to one
-                buf.push(z3::ast::Bool::ite(
-                    &buf[usize::from(*y)]._eq(&zero),
-                    &one,
-                    &z3::ast::Real::div(&buf[usize::from(*x)], &buf[usize::from(*y)]),
-                ))
-            }
+            Math::Div([x, y]) => buf.push(z3::ast::Real::div(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)],
+            )),
             Math::Neg(x) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*x)])),
             Math::Abs(a) => {
                 let inner = &buf[usize::from(*a)].clone();
@@ -448,7 +530,7 @@ fn neg(interval: &Interval<Constant>) -> Interval<Constant> {
     Interval::new(high.map(|x| -x), low.map(|x| -x))
 }
 
-fn abs(interval: &Interval<Constant>) -> Interval<Constant> {
+fn _abs(interval: &Interval<Constant>) -> Interval<Constant> {
     let low = interval.low.clone();
     let high = interval.high.clone();
 
@@ -707,6 +789,11 @@ pub mod test {
     }
 
     #[test]
+    fn just_best() {
+        best_enumo_recipe();
+    }
+
+    #[test]
     fn run() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
@@ -738,9 +825,31 @@ pub mod test {
         let start = Instant::now();
         let best_rules = best_enumo_recipe();
         let duration = start.elapsed();
+        // herbie and ruler can't learn any if rules
+        // but crash if you include them
+        let without_if: Ruleset<Math> = Ruleset::new(
+            best_rules
+                .0
+                .iter()
+                .filter_map(|r| {
+                    if r.1.rhs.to_string().starts_with("(if") {
+                        None
+                    } else {
+                        Some(r.0.to_string().clone())
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
 
-        logger::write_baseline(&best_rules, "rational_best", &ruler1, "oopsla", duration);
-        logger::write_baseline(&best_rules, "rational_best", &herbie, "herbie", duration);
+        logger::write_baseline(&without_if, "rational_best", &ruler1, "oopsla", duration);
+        logger::write_baseline(&without_if, "rational_best", &herbie, "herbie", duration);
+        logger::write_baseline(
+            &best_rules,
+            "rational_best",
+            &best_rules,
+            "rational_best",
+            duration,
+        );
     }
 
     #[test]
@@ -748,14 +857,14 @@ pub mod test {
         let mut all_rules: Ruleset<Math> = Ruleset::default();
 
         let starting_rules = run_workload(
-            iter_metric(base_lang(), "EXPR", enumo::Metric::Atoms, 3)
-                .plug("CONST", &Workload::new(["-1", "0", "1"]))
+            iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 3)
+                .plug("VAL", &Workload::new(["-1", "0", "1"]))
                 .plug("VAR", &Workload::new(["a", "b", "c"]))
-                .plug("UOP", &Workload::new(["~", "fabs"]))
-                .plug("BOP", &Workload::new(["+", "*", "-", "/"]))
-                .plug("TOP", &Workload::empty()),
+                .plug("OP1", &Workload::new(["~", "fabs"]))
+                .plug("OP2", &Workload::new(["+", "*", "-", "/"])),
             all_rules.clone(),
-            Limits::rulefinding(),
+            Limits::synthesis(),
+            Limits::minimize(),
             false,
         );
         all_rules.extend(starting_rules);
@@ -764,7 +873,8 @@ pub mod test {
             Workload::new(["(if e e e)"])
                 .plug("e", &Workload::new(["a", "b", "c", "-1", "0", "1"])),
             all_rules.clone(),
-            Limits::rulefinding(),
+            Limits::synthesis(),
+            Limits::minimize(),
             false,
         );
         all_rules.extend(basic_if_rules);
@@ -775,12 +885,20 @@ pub mod test {
             .plug("op", &Workload::new(["+", "-", "*", "/"]));
         terms.to_file("guard.terms");
 
-        let guarded_rules = run_workload(terms, all_rules.clone(), Limits::rulefinding(), false);
+        let guarded_rules = run_workload(
+            terms,
+            all_rules.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            false,
+        );
         guarded_rules.to_file("guard.rules");
-        assert!(guarded_rules.0.contains_key("(if ?a 1 (/ 1 ?a)) ==> 1"));
         assert!(guarded_rules
             .0
-            .contains_key("(/ 0 ?a) ==> (if ?a 0 (/ 1 ?a))"));
+            .contains_key("(if ?a 0 (/ 0 ?a)) ==> (/ 0 ?a)"));
+        assert!(guarded_rules
+            .0
+            .contains_key("(/ 0 ?a) ==> (if ?a 0 (/ ?a ?a))"));
     }
 
     // TODO write test that catches if cvecs are not initialized
@@ -790,9 +908,14 @@ pub mod test {
         // regression test that captures a bug where we were not properly adding both directions
         // when we add candidates. See https://github.com/uwplse/ruler/pull/183
 
+        let limits = Limits {
+            iter: 3,
+            node: 300000,
+            match_: 200_000,
+        };
         let test = Workload::new(&["(if a b b)", "b"]);
         let test_rules: Ruleset<Math> =
-            run_workload(test, Ruleset::default(), Limits::default(), false);
+            run_workload(test, Ruleset::default(), limits, limits, false);
         assert_eq!(test_rules.len(), 1);
     }
 }

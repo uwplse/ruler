@@ -373,6 +373,7 @@ mod test {
         let limits = Limits {
             iter: 3,
             node: 2000000,
+            match_: 200_000,
         };
 
         let terms = Workload::new([
@@ -389,7 +390,7 @@ mod test {
         let mut all = complex;
         all.extend(prior_rules());
 
-        let rules = run_rule_lifting(terms, all, limits);
+        let rules = run_rule_lifting(terms, all, limits, limits);
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);
@@ -445,7 +446,11 @@ mod test {
             return;
         }
 
-        let limits = Limits::default();
+        let limits = Limits {
+            iter: 3,
+            node: 300000,
+            match_: 200_000,
+        };
         let mut all = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         all.extend(prior_rules());
         all.extend(Trig::get_lifting_rules());

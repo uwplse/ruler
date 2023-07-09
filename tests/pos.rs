@@ -119,13 +119,12 @@ mod tests {
     use super::*;
 
     fn iter_pos(n: usize) -> Workload {
-        iter_metric(base_lang(), "EXPR", Metric::Atoms, n)
+        iter_metric(base_lang(2), "EXPR", Metric::Atoms, n)
             .filter(Filter::Contains("VAR".parse().unwrap()))
-            .plug("CONST", &Workload::new(["XH"]))
+            .plug("VAL", &Workload::new(["XH"]))
             .plug("VAR", &Workload::new(["a", "b", "c"]))
-            .plug("UOP", &Workload::new(["XO", "XI"]))
-            .plug("BOP", &Workload::new(["+", "*"]))
-            .plug("TOP", &Workload::empty())
+            .plug("OP1", &Workload::new(["XO", "XI"]))
+            .plug("OP2", &Workload::new(["+", "*"]))
     }
 
     #[test]
@@ -153,6 +152,7 @@ mod tests {
         let limits = Limits {
             iter: 3,
             node: 1000000,
+            match_: 200_000,
         };
 
         let eg_init = atoms3.to_egraph();
@@ -179,6 +179,11 @@ mod tests {
 
     #[test]
     fn rule_lifting() {
+        let limits = Limits {
+            iter: 3,
+            node: 1000000,
+            match_: 200_000,
+        };
         let nat_rules = [
             "(+ ?b ?a) ==> (+ ?a ?b)",
             "(* ?b ?a) ==> (* ?a ?b)",
@@ -200,40 +205,19 @@ mod tests {
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
 
-        let rules3 = run_rule_lifting(
-            atoms3,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
+        let rules3 = run_rule_lifting(atoms3, all_rules.clone(), limits, limits);
         all_rules.extend(rules3);
 
         let atoms4 = iter_pos(4);
         assert_eq!(atoms4.force().len(), 255);
 
-        let rules4 = run_rule_lifting(
-            atoms4,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
+        let rules4 = run_rule_lifting(atoms4, all_rules.clone(), limits, limits);
         all_rules.extend(rules4);
 
         let atoms5 = iter_pos(5);
         assert_eq!(atoms5.force().len(), 1527);
 
-        let rules4 = run_rule_lifting(
-            atoms5,
-            all_rules.clone(),
-            Limits {
-                iter: 3,
-                node: 1000000,
-            },
-        );
+        let rules4 = run_rule_lifting(atoms5, all_rules.clone(), limits, limits);
         all_rules.extend(rules4);
 
         let expected: Ruleset<Pos> = Ruleset::new(&[

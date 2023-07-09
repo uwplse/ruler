@@ -27,9 +27,7 @@ pub mod test {
         let lang = Lang::new(
             &["0", "1"],
             &["a", "b", "c"],
-            &["~", "-"],
-            &["&", "|", "*", "--", "+", "<<", ">>"],
-            &[],
+            &[&["~", "-"], &["&", "|", "*", "--", "+", "<<", ">>"]],
         );
         rules.extend(recursive_rules(
             enumo::Metric::Atoms,
@@ -39,19 +37,20 @@ pub mod test {
         ));
 
         // too slow for 128
-        // let base_lang = Workload::new(["VAR", "CONST", "(UOP EXPR)", "(BOP EXPR EXPR)"]);
-        // let a6_canon = iter_metric(base_lang, "EXPR", enumo::Metric::Atoms, 6)
+        // let a6_canon = iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
         //     .plug("VAR", &Workload::new(lang.vars))
-        //     .plug("CONST", &Workload::empty())
-        //     .plug("UOP", &Workload::new(lang.uops))
-        //     .plug("BOP", &Workload::new(lang.bops))
+        //     .plug("VAL", &Workload::empty())
+        //     .plug("OP1", &Workload::new(lang.uops))
+        //     .plug("OP2", &Workload::new(lang.bops))
         //     .filter(Filter::Canon(vec![
         //         "a".to_string(),
         //         "b".to_string(),
         //         "c".to_string(),
         //     ]));
+        // let consts = Workload::new(["0", "1"]);
+        // let wkld = Workload::Append(vec![a6_canon, consts]);
         // rules.extend(run_workload(
-        //     a6_canon,
+        //     wkld,
         //     rules.clone(),
         //     Limits::rulefinding(),
         //     true,

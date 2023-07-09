@@ -10,6 +10,7 @@ pub fn trig_rules() -> Ruleset<Trig> {
     let limits = Limits {
         iter: 3,
         node: 2000000,
+        match_: 200_000,
     };
     let mut prior: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
     prior.extend(prior_rules());
@@ -55,28 +56,22 @@ pub fn trig_rules() -> Ruleset<Trig> {
 
     let wkld1 = trig_constants;
     println!("Starting 1");
-    let rules1 = run_rule_lifting(wkld1.clone(), all.clone(), limits);
+    let rules1 = run_rule_lifting(wkld1.clone(), all.clone(), limits, limits);
     all.extend(rules1.clone());
     new.extend(rules1.clone());
 
     let wkld2 = Workload::Append(vec![wkld1, simple_terms, neg_terms]);
     println!("Starting 2");
-    let rules2 = run_rule_lifting(wkld2.clone(), all.clone(), limits);
+    let rules2 = run_rule_lifting(wkld2.clone(), all.clone(), limits, limits);
     all.extend(rules2.clone());
     new.extend(rules2.clone());
 
     let trimmed_wkld2 = wkld2.clone().filter(no_trig_2x);
     let wkld3 = Workload::Append(vec![trimmed_wkld2.clone(), sum_of_squares.clone()]);
     println!("Starting 3");
-    let rules3 = run_rule_lifting(wkld3, all.clone(), limits);
+    let rules3 = run_rule_lifting(wkld3, all.clone(), limits, limits);
     all.extend(rules3.clone());
     new.extend(rules3.clone());
-
-    let mut all = new.clone();
-    all.extend(prior_rules());
-    all.extend(prior);
-
-    let mut new = Ruleset::<Trig>::default();
 
     let non_square_filter = Filter::Invert(Box::new(Filter::Or(vec![
         Filter::Contains("(* (cos ?x) (cos ?x))".parse().unwrap()),
@@ -140,25 +135,25 @@ pub fn trig_rules() -> Ruleset<Trig> {
 
     // Coangles
     let wkld1 = Workload::Append(vec![simple, consts.clone()]);
-    let rules1 = run_rule_lifting(wkld1.clone(), all.clone(), limits);
+    let rules1 = run_rule_lifting(wkld1.clone(), all.clone(), limits, limits);
     all.extend(rules1.clone());
     new.extend(rules1.clone());
 
     // Power reduction
     let wkld2 = Workload::Append(vec![scaled_shifted_sqrs, consts.clone()]);
-    let rules2 = run_rule_lifting(wkld2.clone(), all.clone(), limits);
+    let rules2 = run_rule_lifting(wkld2.clone(), all.clone(), limits, limits);
     all.extend(rules2.clone());
     new.extend(rules2.clone());
 
     // Product-to-sum
     let wkld3 = Workload::Append(vec![scaled_sum_prod, consts.clone()]);
-    let rules3 = run_rule_lifting(wkld3.clone(), all.clone(), limits);
+    let rules3 = run_rule_lifting(wkld3.clone(), all.clone(), limits, limits);
     all.extend(rules3.clone());
     new.extend(rules3.clone());
 
     // Sums
     let wkld4 = Workload::Append(vec![two_var_no_sub, sum_of_prod, consts.clone()]);
-    let rules4 = run_rule_lifting(wkld4.clone(), all.clone(), limits);
+    let rules4 = run_rule_lifting(wkld4.clone(), all.clone(), limits, limits);
     all.extend(rules4.clone());
     new.extend(rules4.clone());
     new
