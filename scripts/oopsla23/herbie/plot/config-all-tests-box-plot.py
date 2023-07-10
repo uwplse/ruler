@@ -62,7 +62,7 @@ ax.set_xticklabels(labs)
 
 ax.set_xlabel('Rules used', labelpad=10, fontsize=10)
 ax.set_ylabel(yname, fontsize=10)
-plt.xticks(fontsize=8)
+plt.xticks(fontsize=10)
 plt.yticks(fontsize=10)
 
 plt.tight_layout()
