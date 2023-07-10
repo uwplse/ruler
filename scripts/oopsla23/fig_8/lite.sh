@@ -11,6 +11,6 @@ mkdir -f rules/
 cp ../precomputed.json rules/output.json
 
 # Regenerate data for a single seed
-bash eval.sh 1
+bash eval.sh 1 hamming
 
 cp reports/*/*.pdf out/

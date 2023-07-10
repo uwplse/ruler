@@ -53,12 +53,10 @@ BUILD_DIR=$HERBIE_DIR bash install.sh
 rm -rf $BENCH_DIR
 mkdir -p $BENCH_DIR
 
-cp -r "$HERBIE_DIR/bench/hamming" \
-      "$HERBIE_DIR/bench/mathematics" \
-      "$HERBIE_DIR/bench/numerics" \
-      "$HERBIE_DIR/bench/physics" \
-      "$HERBIE_DIR/bench/pbrt.fpcore" \
-      "$BENCH_DIR/"
+for bench in "${@:2}"
+do
+    cp -r "$HERBIE_DIR/bench/$bench" "$BENCH_DIR/"
+done
 
 FPCORES=$(find $BENCH_DIR -name "*.fpcore")
 for fpcore in $FPCORES; do
