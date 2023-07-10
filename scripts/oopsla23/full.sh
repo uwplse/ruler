@@ -23,6 +23,13 @@ pushd table_3
 cp out/table.pdf ../out/table3.pdf
 popd
 
+# Figure 8
+pushd fig_8
+./full.sh
+cp out/by-config-all-tests-time-boxplot.pdf ../out/fig8_time.pdf
+cp out/by-config-all-tests-avg_bits_err_improve-boxplot.pdf ../out/fig8.pdf
+popd
+
 # Table 5
 pushd table_5
 ./full.sh
