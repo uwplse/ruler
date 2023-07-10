@@ -5,12 +5,17 @@ const fs = require("fs");
 function generateLatex() {
   const data = JSON.parse(fs.readFileSync("out/output.json"));
   let rows = data.filter((o) => o.spec_name === "halide");
+  if (rows.length > 1) {
+    rows = rows.filter((o) => o.baseline_name === "halide");
+  }
+
+  const isEmpty = (obj) => Object.keys(obj).length === 0;
   let keys = {
     domain: (row) => row.spec_name,
     loc: (row) => row.loc,
     renumo_time: (row) => `${row.rules.length} (${tryRound(row.time)})`,
     baseline_time: (row) => {
-      if (!!row.derivability.enumo_derives_baseline) {
+      if (isEmpty(row.derivability.enumo_derives_baseline)) {
         return "-";
       } else {
         return `${
@@ -20,7 +25,7 @@ function generateLatex() {
       }
     },
     enumo_derives_baseline: (row) => {
-      if (!!row.derivability.enumo_derives_baseline) {
+      if (isEmpty(row.derivability.enumo_derives_baseline)) {
         return "-";
       }
       lhs_percentage = getDerivability(
@@ -41,7 +46,7 @@ function generateLatex() {
       return `${lhs_percentage} (${lhs_time}), ${lhs_rhs_percentage} (${lhs_rhs_time})`;
     },
     baseline_derives_enumo: (row) => {
-      if (!!row.derivability.enumo_derives_baseline) {
+      if (isEmpty(row.derivability.enumo_derives_baseline)) {
         return "-";
       }
       lhs_percentage = getDerivability(

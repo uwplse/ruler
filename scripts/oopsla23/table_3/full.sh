@@ -14,7 +14,7 @@ cp ../../../nightly/data/output.json out/
 
 # Generate latex table from output json
 node generateLatex.js
-pdflatex -output-directory out out/table.tex
+pdflatex -output-directory out out/table.tex > /dev/null
 
 
 if [ -f "out/table.pdf" ]; then
