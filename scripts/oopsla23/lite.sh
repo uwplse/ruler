@@ -30,4 +30,6 @@ pushd table_5
 cp out/table.pdf ../out/table5.pdf
 popd
 
+echo "Done! See scripts/ooopsla23/out for results"
+
 popd
