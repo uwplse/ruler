@@ -231,9 +231,9 @@ construct workloads, and find rules.
 
 See [here](OOPSLA21.md) for documentation on OOPSLA artifacts. -->
 
-### Extending Ruler to Support New Domains
+### Extending Renumo to Support New Domains
 
-Ruler's goal is to support rewrite inference for new domains,
+The Renumo DSL enables rewrite rule inference for any domain
 given a grammar, an interpreter, and a validation technique.
 To understand how to add support for a new domain,
 you can look at the domains in the `tests` directory.
@@ -242,7 +242,7 @@ but they all provide examples of how you can add support for new domains.
 
 ### Writing a Program to Infer Rules
 
-To show how users can write a Ruler program for rule inference, let's take a look at `bv4_fancy.rs`, located in the `tests/recipes` directory. This program showcases several of Ruler's provided features for "guided search"-style rule synthesis using one of the example domains, `bv.rs`, located in `src/`.
+To show how users can write a Renumo program for rule inference, let's take a look at `bv4_fancy.rs`, located in the `tests/recipes` directory. This program showcases several of Renumo's provided features for "guided search"-style rule synthesis using one of the example domains, `bv.rs`, located in `src/`.
 
 ```
 // create a new set of rules for bitvectors, initially empty
@@ -257,7 +257,7 @@ let lang = Lang::new(
 
 ```
 
-After initializing an empty ruleset, `rules`, we define a language we want to enumerate terms over. In this case, our language contains some constants (`0` and `1`), some variables (`a`, `b`, `c`), the unary operators `~` and `-`, and some binary operators, including `&`, `|`, `*`, and others. Note that `lang` is actually a subset of the operators supported by the `bv.rs` implementation—the operator `^`, for example, is _not_ included. This is one way Ruler allows users to easily omit information that is not important for their purposes, enabling for faster, more scalable synthesis.
+After initializing an empty ruleset, `rules`, we define a language we want to enumerate terms over. In this case, our language contains some constants (`0` and `1`), some variables (`a`, `b`, `c`), the unary operators (`~` and `-`), and some binary operators, including (`&`, `|`, `*`), and others. Note that `lang` is actually a subset of the operators supported by the `bv.rs` implementation—the operator `^`, for example, is _not_ included. This is one way Renumo allows users to easily omit information that is not important for their purposes, enabling for faster, more scalable synthesis.
 
 ```
 // find rules using terms over the provided language up to 5 atoms in size
@@ -270,9 +270,9 @@ rules.extend(recursive_rules(
 ));
 ```
 
-The `recursive_rules` function, included in `src/recipe_utils.rs`, is one of several convenience features included in Ruler. It recursively builds up a ruleset by enumerating all terms over a passed-in `Language` up to a specified size—in our case, the the language is `lang`, and the size is 5 `Atoms` (referring to the total size of the leaves of the subexpressions in the term). Other size metrics are supported, including `Depth` (depth of subexpressions) and `Lists` (number of operators).
-
-In `recursive_rules`, terms with a single atom are enumerated, rule synthesis occurs, and the newly-synthesized rules are used—along with any prior rules, in our case the empty starting ruleset—as known axioms to support rulefinding for 2-atom terms, etc.
+The `recursive_rules` function, included in `src/recipe_utils.rs`, is one of several convenience features included in Renumo. It recursively builds up a ruleset by enumerating all terms over a passed-in `Language` up to a specified size. Renumo supports three
+measures of term size: `Atoms` (number of literals in the term), `Depth`
+(depth of s-expression), and `Lists` (number of operators in the term).
 
 Once we've found all the rules up to 5 atoms in size, we append them to the starting ruleset.
 
@@ -289,20 +289,23 @@ let a6_canon = iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
         ]));
 ```
 
-Ruler allows its users to decouple workload generation from rule synthesis. In the above code snippet, we are not finding rules at all: we are _just_ building up a workload! `a6_canon` is pretty complicated, so let's break it up a bit to make it easier:
+Renumo allows its users to decouple workload generation from rule synthesis. In the above code snippet, we are not finding rules at all: we are _just_ building up a workload. `a6_canon` is pretty complicated, so let's break it up a bit to make it easier:
 
 ```
 iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
 ```
 
-Here, we specify that we want to enumerate all terms up to 6 atoms in size over unary _or_ binary operators. If we had passed 3 instead of 2 to `base_lang`, we would also enumerate over ternary operators.
+Here, we specify that we want to enumerate all terms up to 6 atoms. `base_lang(n)`
+is a convenience function that constructs a base workload for any language
+consisting of variables, constants, and operators with up to `n` arguments.
 
 ```
 .plug("VAR", &Workload::new(lang.vars))
 .plug("VAL", &Workload::empty())
 ```
 
-The `plug` operator is one of Ruler's most powerful features. An `EXPR` contains `VARS` (variables) and `VALS` (values) as its leaves, and `plug` specifies what can be "plugged in" as variables and values—in this case, a workload containing `lang`'s variables and an empty workload, respectively.
+`plug` is the core Renumo operator for constructing and composing workloads.
+An `EXPR` contains `VARS` (variables) and `VALS` (values) as its leaves, and `plug` specifies what can be "plugged in" as variables and values—in this case, a workload containing `lang`'s variables and an empty workload, respectively.
 
 ```
 .filter(Filter::Canon(vec![
@@ -312,7 +315,7 @@ The `plug` operator is one of Ruler's most powerful features. An `EXPR` contains
         ]));
 ```
 
-Ruler also supports filtering terms out of generated workloads that do not interest the user. In this case, after the workload is generated, terms that are not _canonicalized_ are removed. Canonicalization here means that `a` must be the first variable introduced. `a` can be followed by another `a` any number of times, but the next new variable introduced must be `b`, and so on. Canonicalization drastically expediates rule inference by eliminating duplicate terms, often representing the difference between a workload that is too large to perform rule inference over and one that finishes near-instantaneously.
+Renumo also supports filtering terms out of generated workloads that do not interest the user. In this case, after the workload is generated, terms that are not _canonicalized_ are removed. Canonicalization here means that `a` must be the first variable introduced. `a` can be followed by another `a` any number of times, but the next new variable introduced must be `b`, and so on. Canonicalization drastically expediates rule inference by eliminating duplicate terms, often representing the difference between a workload that is too large to perform rule inference over and one that finishes near-instantaneously.
 
 ```
 let consts = Workload::new(["0", "1"]);
@@ -333,4 +336,4 @@ let wkld = Workload::Append(vec![a6_canon, consts]);
     rules
 ```
 
-Finally, we are ready to run rule synthesis for the final time, which we do using the workload we just created, the rules we got from `recursive_rules`, and some resource limits. We return this final ruleset. This is a complete Ruler program!
+Finally, we are ready to run rule synthesis for the final time, which we do using the workload we just created, the rules we got from `recursive_rules`, and some resource limits. We return this final ruleset. This is a complete Renumo program!
