@@ -3,28 +3,25 @@
 This is the artifact for our paper "Equality Saturation Theory Exploration à la Carte".
 In our paper, we present a new domain-specific language for programmable theory exploration.
 
-- Available
-- Functional
-- Reusable
-
-If you use this work, please cite it using the following BibTeX.
-
-## <span style="color:red">TODO</span>
+- Available: The artifact is available on Zenodo.
+- Functional: Below we provide instructions for setting up the artifact. Then we list the claims made in the paper and provide instructions for how to reproduce the results to validate each claim.
+- Reusable: Finally, we provide instructions for extending Renumo, which describes how to set up Renumo on a different machine, modify the code, and extend the tool to new domains.
 
 ---
 
 ## Getting Started
 
-<span style="color:red">TODO: instructions for setting up the virtual machine</span>
+We recommend running the VM on a machine with more than 32 GB RAM to reproduce all the results from scratch. In particular, the Herbie, Megalibm, and Szalinski case studies are memory and time intensive. If you are only replicating the Renumo results (Experiments 1, 2, 3, and 5 below) or reproducing the results using precomputed data (see below), you should be fine with a machine that has 16 GB RAM.
 
-Ruler is a framework that uses equality saturation
-to automatically infer small, expressive
-rulesets for a domain.
-
-## Kick the Tires
-
-To check that you are able to run the tool, run `cargo bool` from the `ruler` directory. This should take less than a second. It will generate and print
-14 boolean rewrite rules.
+- Setting up the VM
+  - Download the `.ova` file
+  - Open VirtualBox and import the `.ova` file (`File -> import appliance`). Select the path to the `.ova` file then click `Continue`. On the next window that pops up, click `Import`. It should take a few minutes to import.
+  - If you plan on running the full eval from scratch, change the RAM to 32 GB (or more) by going to `Settings` under `System -> Motherboard`. Otherwise, skip this step.
+- Open the virtual machine image in VirtualBox by clicking on the green `Start` button.
+- Log in using username `aec` and password `aec23`
+- Open a terminal. Navigate to the `ruler` directory. The code and all dependencies are already installed and compiled, ready to be run.
+- To check that you are able to run the tool, run `cargo bool` from the `ruler` directory. This should take less than a second. It will generate and print 14 boolean rewrite rules.
+- Follow the instructions below to verify the results from previous rns and/or run the evaluation entirely from scratch.
 
 ## Overview
 
@@ -60,9 +57,9 @@ For each experiment, we include three ways to replicate the results:
 2. Recompute the data for a small subset of the experiment and reproduce the table or figure.
 3. Recompute the data for the entire experiment and reproduce the table or figure.
 
-Please note that we have continued to work on Renumo since submission, so there may
+**Please note that we have continued to work on Renumo since submission, so there may
 be small variation between the numbers reported in the submitted paper and the results
-produced by this artifact.
+produced by this artifact. In all cases, though, the results produced by this artifact support the claims made in the submitted paper.**
 
 ## Use Pre-Computed Data
 
@@ -156,6 +153,7 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
+- Due to a counting
 
 ### Experiment 4: Fast-Forwarding Case Studies
 
@@ -178,60 +176,56 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
 
-<!-- ## Running from Previous Runs
-
-Since many of our experiments take a long time to run from scratch, we have
-included precomputed data on the VM. The data is located at `ruler/scripts/oopsla23/precomputed.json`.
-Fo
-
-### Installation
-
-Ruler is implemented in [Rust](rust-lang.org/).
-You can install Rust [here](https://www.rust-lang.org/tools/install).
-To build Ruler, type `cargo build --release`.
-This should take a few minutes.
-
-### Dependencies
-
-To install Ruler, the following dependencies must be installed:
-
-- Rust
-- libz3
-
-If `libz3` is not offered on your system, you can edit `Cargo.toml` in this directory
-by changing the dependency `z3 = xxx` to `z3 = {version=xxx, features = ["static-link-z3"]}`.
-This will statically link to a built copy of z3 instead of dynamically linking, but the build
-process will take considerably longer.
-It is recommended that you install `libz3` if possible.
-
-### Usage
-
-`cargo test` will run all the tests, including tests that
-find rules for a handful of example domains. See the
-`tests` directory for examples of how to set up a domain,
-construct workloads, and find rules.
-
-### Project Layout
+## Project Layout
 
 - The source code resides in the `src` directory.
   - `lib.rs` is the main entrypoint and defines some auxiliary data types.
-  - `language.rs` defines the `SynthLanguage` trait, which must be implemented in order to use the Ruler DSL to find rules for a domain. There are two main things that must be implemented: an interpreter and a rule validator. (In the case of rule lifting, the interpreter is not needed.)
-  - `workload.rs` contains the `Workload` data type. Workloads evaluate to a list of terms (s-expressions). Workloads can be constructed directly from a list of s-expressions (`Workload::Set`), combined (`Workload::Append`), refined with a filter (`Workload::Filter`), or composed via plugs (`Workload::Plug`). Plug is a novel operation for generating workloads from smaller workloads. It takes two workloads, $W_1$ and $W_2$ and a string, $s$; for each term in $W_2$ that contains $s$, it “plugs” in the values in $W_1$ and generates a new workload which is a cross product of all the new plugged terms.
-  - `sexp.rs` contains an implementation of s-expressions.
-  - `equality.rs` defines a rewrite rule.
-  - `ruleset.rs` contains the `Ruleset` data type. Rulesets are implemented as an `IndexMap` of `Equality`. There are several operations over Rulesets that can be used to combine, compose, and refine rulesets. For example, `Ruleset::cvec_match` extracts a set of equalities from an egraph via cvec-matching; `Ruleset::minimize` can be used to eliminate redundant rules from a ruleset; `Ruleset::derive` tests the proving power of one ruleset compared to another.
-  - `filter.rs` defines the `Filter` data type which can be used to filter workloads. `pattern.rs` and `metric.rs` define data types that are used in `Filter`.
+  - `language.rs` defines the `SynthLanguage` trait, which must be implemented in order to use the Ruler DSL to find rules for a domain. There are two main things that must be implemented: an interpreter and a rule validator. (In the case of fast-forwarding, the interpreter is not needed.)
+  - `logger.rs` contains logic for outputting results of running Renumo to JSON
+  - `recipe_utils.rs` contains some common helper functions for use in Renumo programs. Everything in `recipe_utils` can be implemented directly using the Renumo core operators.
   - `util.rs` has some small helper functions.
+  - The core of the DSL is implemented in `enumo/`
+    - `workload.rs` contains the `Workload` data type. Workloads evaluate to a list of terms (s-expressions). Workloads can be constructed directly from a list of s-expressions (`Workload::Set`), combined (`Workload::Append`), refined with a filter (`Workload::Filter`), or composed via plugs (`Workload::Plug`). Plug is a novel operation for generating workloads from smaller workloads. It takes two workloads, $W_1$ and $W_2$ and a string, $s$; for each term in $W_2$ that contains $s$, it “plugs” in the values in $W_1$ and generates a new workload which is a cross product of all the new plugged terms.
+    - `ruleset.rs` contains the `Ruleset` data type. Rulesets are implemented as an `IndexMap` of `Equality`. There are several operations over Rulesets that can be used to combine, compose, and refine rulesets. For example, `Ruleset::cvec_match` extracts a set of equalities from an egraph via cvec-matching; `Ruleset::minimize` can be used to eliminate redundant rules from a ruleset; `Ruleset::derive` tests the proving power of one ruleset compared to another.
+    - `scheduler.rs` defines how to run equality saturating using a `Ruleset` and an `EGraph`. The three scheduling techniques provided in `Renumo` are `Simple`, `Saturating`, and `Compress`. Additional scheduling strategies can be implemented by adding to the `Scheduler` enum and adding a case to `Scheduler::run_internal`.
+    - `sexp.rs` contains an implementation of s-expressions.
+    - `rule.rs` defines a rewrite rule.
+    - `filter.rs` defines the `Filter` data type which can be used to filter workloads. `pattern.rs` and `metric.rs` define data types that are used in `Filter`.
 
-### Publications
+## Further Use / Extending Renumo
 
-- C. Nandi, M. Willsey, A. Zhu, Y. Wang, B. Saiki, A. Anderson, A. Schulz, D. Grossman, Z. Tatlock,
-  [_Rewrite Rule Inference Using Equality Saturation_](https://dl.acm.org/doi/abs/10.1145/3485496).
-  (OOPSLA 2021, Distinguished Paper Award)
+This section describes how to install Renumo on a diferent machine, the required dependencies, and how to extend the tool for other uses.
 
-See [here](OOPSLA21.md) for documentation on OOPSLA artifacts. -->
+### Dependencies
 
-### Extending Renumo to Support New Domains
+We tested our artifact on a Ubuntu 22.04 VM. To install and run the evaluation on a fresh machine with the same OS, the following dependencies must be installed:
+
+- Basic dependencies
+  - `git`
+  - `curl`
+  - `rust`
+  - `python3`
+  - `cmake`
+  - `python3-distutils`
+- Dependencies for Herbie, Megalibm, and Szalinski case studies
+  - `libssl-dev`
+  - `g++`
+  - `libcgal-dev`
+  - `sollya`
+  - `libmpc-dev`
+  - `pandas`
+  - `jinja2>=3`
+  - `Racket` (version 8.9)
+  - `openscad`
+- Dependencies for generating tables and plots
+  - `nodejs`
+  - `texlive-latex-base`
+  - `python3-matplotlib`
+  - `jq`
+
+After installing these dependencies and getting the Renumo code from Zenodo, run `cargo build --release` to build Renumo. This will take ~40 minutes.
+
+### Writing a Program to Infer Rules
 
 The Renumo DSL enables rewrite rule inference for any domain
 given a grammar, an interpreter, and a validation technique.
@@ -239,8 +233,6 @@ To understand how to add support for a new domain,
 you can look at the domains in the `tests` directory.
 Note that some domains are experimental and not reported in the paper,
 but they all provide examples of how you can add support for new domains.
-
-### Writing a Program to Infer Rules
 
 To show how users can write a Renumo program for rule inference, let's take a look at `bv4_fancy.rs`, located in the `tests/recipes` directory. This program showcases several of Renumo's provided features for "guided search"-style rule synthesis using one of the example domains, `bv.rs`, located in `src/`.
 
