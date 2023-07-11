@@ -5,12 +5,13 @@ rm -rf out/
 mkdir out/
 rm -rf reports/
 mkdir reports/
+rm -rf rules/
+mkdir rules/
 
 # Copy in rules
-mkdir -f rules/
 cp ../precomputed.json rules/output.json
 
 # Regenerate data for a single seed
-bash eval.sh 1 hamming
+bash eval.sh 5 hamming
 
 cp reports/*/*.pdf out/

@@ -24,14 +24,15 @@ if field == "time":
 
 h = ('Herbie', pairs['main'])
 e = ('Renumo', pairs['enumo'])
-e2 = ('Renumo-Ru', pairs['enumo-ruler-rat'])
+# e2 = ('Renumo-Ru', pairs['enumo-ruler-rat'])
 # e3 = ('Renumo-Re', pairs['enumo-replicate-rat'])
 f = ('Renumo-FF', pairs['enumo-no-ff'])
 o = ('Renumo-R', pairs['enumo-rat'])
 r = ('Ruler', pairs['ruler'])
 
 # listify = [h, e, f, o, r, hl, el]
-listify = [h, e, e2, f, o, r]
+# listify = [h, e, e2, f, o, r]
+listify = [h, e, f, o, r]
 
 labs = []
 vals = []
