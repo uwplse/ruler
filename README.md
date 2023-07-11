@@ -42,7 +42,7 @@ Our paper has five sections in the evaluation, each supported by a separate expe
     We perform three case studies evaluating Renumo's synthesized rules in `Herbie`,
    `Megalibm`, and `Szalinski`. `Figure 8`, `Figure 9`, `Figure 10`, and `Table 4` show the results
    of these case studies.
-5. **Do the abstrctions in Renumo enable cross-domain rule synthesis techniques?**  
+5. **Do the abstractions in Renumo enable cross-domain rule synthesis techniques?**  
    We show an example of the kind of ruleset manipulation made possible by Renumo by porting
    rules from small bitvectors to large bitvectors. We compare the quality of the rules and
    time to generate rules against rules synthesized directly for the large bitvectors.
@@ -61,7 +61,7 @@ For each experiment, we include three ways to replicate the results:
 be small variation between the numbers reported in the submitted paper and the results
 produced by this artifact. In all cases, though, the results produced by this artifact support the claims made in the submitted paper.**
 
-## Use Pre-Computed Data
+## Kick the Tires: Use Pre-Computed Data
 
 The goal is to reproduce the tables quickly using precomputed data.  
 From the `ruler/` directory, run
@@ -141,6 +141,7 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
+- For the purposes of replicating the experiment, the results are displayed in `out/table.pdf`, but in the paper, the results are explained in Section 6.1.2, not shown in a table.
 
 ### Experiment 3: Rule Inference Using Fast-Forwarding
 
@@ -180,7 +181,7 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 - The source code resides in the `src` directory.
   - `lib.rs` is the main entrypoint and defines some auxiliary data types.
-  - `language.rs` defines the `SynthLanguage` trait, which must be implemented in order to use the Ruler DSL to find rules for a domain. There are two main things that must be implemented: an interpreter and a rule validator. (In the case of fast-forwarding, the interpreter is not needed.)
+  - `language.rs` defines the `SynthLanguage` trait, which must be implemented in order to use the Renumo DSL to find rules for a domain. There are two main things that must be implemented: an interpreter and a rule validator. (In the case of fast-forwarding, the interpreter is not needed.)
   - `logger.rs` contains logic for outputting results of running Renumo to JSON
   - `recipe_utils.rs` contains some common helper functions for use in Renumo programs. Everything in `recipe_utils` can be implemented directly using the Renumo core operators.
   - `util.rs` has some small helper functions.
@@ -233,6 +234,8 @@ To understand how to add support for a new domain,
 you can look at the domains in the `tests` directory.
 Note that some domains are experimental and not reported in the paper,
 but they all provide examples of how you can add support for new domains.
+
+To use Renumo for a new domain, you must first implement the `SynthLanguage` trait for your domain. This requires implementing a rule validator and either an interpreter (for non-fast-forwarding domains) or a set of lifting rules (for fast-forwarding domains).
 
 To show how users can write a Renumo program for rule inference, let's take a look at `bv4_fancy.rs`, located in the `tests/recipes` directory. This program showcases several of Renumo's provided features for "guided search"-style rule synthesis using one of the example domains, `bv.rs`, located in `src/`.
 
