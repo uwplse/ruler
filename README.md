@@ -161,8 +161,7 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 #### Case Study 1: Herbie
 
-- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, `trig`, and `bool` domains into Herbie.
-- The goal is to reproduce `Figure 8` in the paper.
+- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, `trig`, and `bool` domains into Herbie. The goal is to reproduce `Figure 8` in the paper.
 - `kick-tires.sh` does not invoke Renumo or Herbie. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_8/saved/`
 - `lite.sh` does not invoke Renumo. It uses the precomputed Renumo data from `ruler/scripts/oopsla23/precomputed.json`. It runs a single Herbie benchmark (`hamming`) with 5 seeds. This will take a few hours to run.
 - `full.sh` runs Renumo for the `exponential`, `rational`, `trig`, and `bool` domains. It then runs all Herbie benchmarks with 30 seeds. This requires 32 GB RAM (minimum) and will take about 24 hours to run.
@@ -184,6 +183,15 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 #### Case Study 2: Megalibm
 
 #### Case Study 3: Szalinski
+
+- This experiment integrates Renumo-inferred rules into Szalinski. The goal is to reproduce `Table 4` in the paper.
+- This experiment requires our evaluation branch of Szalinski (https://github.com/rtjoa/szalinski/tree/eval) to be installed under `ruler/scripts/oopsla23/table_4/szalinski`. This is already installed and built on the VM.
+- `kick-tires.sh` does not invoke Renumo or Szalinski. It uses data from a previous run located at `ruler/scripts/oopsla23/table_4/precomputed.csv`
+- `lite.sh` does not invoke Renumo. It uses precomputed Renumo data from `ruler/scripts/oopsla23/table_4/precomputed.rules`. It reruns the Szalinski benchmarks using these rules. This will take about 30 minutes to run.
+- `full.sh` runs Renumo for the `szalinski` domain. This requires 32 GB RAM. Then it runs the Szalinski benchmarks using these rules. This will take about 45 minutes to run.
+- `copy-rules.py` reformats the Renumo-inferred rules for use by Szalinski
+- `to_latex.py` converts the output of Szalinski (`out/aec-table2/table2.csv`) to LaTeX, which will be written to `table.tex`.
+- `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
 
 ### Experiment 5: Cross-Domain Ruleset Manipulation
 
