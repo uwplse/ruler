@@ -113,6 +113,7 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - `exp2.pdf` - Comparison against Halide
 - `table3.pdf` - Rule inference using fast-forwarding for `exponential`,
   `rational`, and `trig` domains
+- `fig8.pdf` and `fig8_time.pdf` - Case study using Herbie
 - `table5.pdf` - Cross-domain ruleset manipulation for `BV8`, `BV16`, `BV32`,
   `BV64`, and `BV128`.
 
@@ -159,6 +160,26 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 ### Experiment 4: Fast-Forwarding Case Studies
 
 #### Case Study 1: Herbie
+
+- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, `trig`, and `bool` domains into Herbie.
+- The goal is to reproduce `Figure 8` in the paper.
+- `kick-tires.sh` does not invoke Renumo or Herbie. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_8/saved/`
+- `lite.sh` does not invoke Renumo. It uses the precomputed Renumo data from `ruler/scripts/oopsla23/precomputed.json`. It runs a single Herbie benchmark (`hamming`) with 5 seeds. This will take a few hours to run.
+- `full.sh` runs Renumo for the `exponential`, `rational`, `trig`, and `bool` domains. It then runs all Herbie benchmarks with 30 seeds. This requires 32 GB RAM (minimum) and will take about 24 hours to run.
+  - To run Herbie in parallel, set the environment variable `PARALLEL_SEEDS`.
+- Scripts
+  - `eval.sh`: top-level script for running the Herbie case study
+  - `install.sh`: installs Herbie under `herbie/`
+  - `seed-variance.sh`: script for running Herbie, possibly in parallel.
+  - `plot.sh`: top-level plotting script
+  - `plot/plot-results.sh`: preprocesses evaluation data or plotting
+  - `plot/config-all-tests-box-plot.py`: generates plots
+- Directory layout
+  - `bench`: directory where benchmarks are collated for evaluation
+  - `herbie`: directory where Herbie is installed
+  - `plot`: plotting code
+  - `saved`: a previous run for use in the artifact
+  - `rules`: Renumo rules should be stored here to run the Herbie case study
 
 #### Case Study 2: Megalibm
 
