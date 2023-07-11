@@ -30,6 +30,12 @@ cp saved/by-config-all-tests-time-boxplot.pdf ../out/fig8_time.pdf
 cp saved/by-config-all-tests-avg_bits_err_improve-boxplot.pdf ../out/fig8.pdf
 popd
 
+# Table 4
+pushd table_4
+./kick-tires.sh
+cp out/table.pdf ../out/table4.pdf
+popd
+
 # Table 5
 pushd table_5
 ./kick-tires.sh

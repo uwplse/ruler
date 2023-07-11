@@ -1,0 +1,41 @@
+
+running 1 test
+test tests::rule_lifting has been running for over 60 seconds
+(Scale (Vec3 (Lit 1) (Lit 1) (Lit 1)) ?a) <=> ?a
+?a <=> (Trans (Vec3 (Lit 0) (Lit 0) (Lit 0)) ?a)
+(Cylinder (Vec3 ?b ?b ?b) ?a true) <=> (Scale (Vec3 ?b ?b ?b) (Cylinder (Vec3 (Lit 1) (Lit 1) (Lit 1)) ?a true))
+(Sphere ?b ?a) <=> (Scale (Vec3 ?b ?b ?b) (Sphere (Lit 1) ?a))
+(Trans (Vec3 ?g ?e ?c) (Trans (Vec3 ?f ?d ?b) ?a)) <=> (Trans (Vec3 (op + ?g ?f) (op + ?e ?d) (op + ?c ?b)) ?a)
+(Scale (Vec3 (op * ?g ?d) (op * ?f ?c) (op * ?e ?b)) ?a) <=> (Scale (Vec3 ?g ?f ?e) (Scale (Vec3 ?d ?c ?b) ?a))
+(Trans (Vec3 (op * ?d ?g) (op * ?c ?f) (op * ?b ?e)) (Scale (Vec3 ?g ?f ?e) ?a)) <=> (Scale (Vec3 ?g ?f ?e) (Trans (Vec3 ?d ?c ?b) ?a))
+(Scale (Vec3 ?d ?c ?b) (Trans (Vec3 (op / ?g ?d) (op / ?f ?c) (op / ?e ?b)) ?a)) <=> (Trans (Vec3 ?g ?f ?e) (Scale (Vec3 ?d ?c ?b) ?a))
+(Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false)) <=> (Cube (Vec3 (op * ?f ?e) (op * ?d ?c) (op * ?b ?a)) false)
+(Scale (Vec3 (op * ?f ?c) (op * ?e ?b) (op * ?d ?a)) (Cube (Vec3 (Lit 1) (Lit 1) (Lit 1)) false)) <=> (Scale (Vec3 ?f ?e ?d) (Cube (Vec3 ?c ?b ?a) false))
+RULER RULES START
+rw!("ruler1"; "(Affine Scale (Vec3 1 1 1) ?a)" => "?a"),
+rw!("ruler2"; "?a" => "(Affine Scale (Vec3 1 1 1) ?a)"),
+rw!("ruler3"; "?a" => "(Affine Trans (Vec3 0 0 0) ?a)"),
+rw!("ruler4"; "(Affine Trans (Vec3 0 0 0) ?a)" => "?a"),
+rw!("ruler5"; "(Cylinder (Vec3 ?b ?b ?b) ?a true)" => "(Affine Scale (Vec3 ?b ?b ?b) (Cylinder (Vec3 1 1 1) ?a true))"),
+rw!("ruler6"; "(Affine Scale (Vec3 ?b ?b ?b) (Cylinder (Vec3 1 1 1) ?a true))" => "(Cylinder (Vec3 ?b ?b ?b) ?a true)"),
+rw!("ruler7"; "(Sphere ?b ?a)" => "(Affine Scale (Vec3 ?b ?b ?b) (Sphere 1 ?a))"),
+rw!("ruler8"; "(Affine Scale (Vec3 ?b ?b ?b) (Sphere 1 ?a))" => "(Sphere ?b ?a)"),
+rw!("ruler9"; "(Affine Trans (Vec3 ?g ?e ?c) (Affine Trans (Vec3 ?f ?d ?b) ?a))" => "(Affine Trans (Vec3 (+ ?g ?f) (+ ?e ?d) (+ ?c ?b)) ?a)"),
+rw!("ruler10"; "(Affine Trans (Vec3 (+ ?g ?f) (+ ?e ?d) (+ ?c ?b)) ?a)" => "(Affine Trans (Vec3 ?g ?e ?c) (Affine Trans (Vec3 ?f ?d ?b) ?a))"),
+rw!("ruler11"; "(Affine Scale (Vec3 (* ?g ?d) (* ?f ?c) (* ?e ?b)) ?a)" => "(Affine Scale (Vec3 ?g ?f ?e) (Affine Scale (Vec3 ?d ?c ?b) ?a))"),
+rw!("ruler12"; "(Affine Scale (Vec3 ?g ?f ?e) (Affine Scale (Vec3 ?d ?c ?b) ?a))" => "(Affine Scale (Vec3 (* ?g ?d) (* ?f ?c) (* ?e ?b)) ?a)"),
+rw!("ruler13"; "(Affine Trans (Vec3 (* ?d ?g) (* ?c ?f) (* ?b ?e)) (Affine Scale (Vec3 ?g ?f ?e) ?a))" => "(Affine Scale (Vec3 ?g ?f ?e) (Affine Trans (Vec3 ?d ?c ?b) ?a))"),
+rw!("ruler14"; "(Affine Scale (Vec3 ?g ?f ?e) (Affine Trans (Vec3 ?d ?c ?b) ?a))" => "(Affine Trans (Vec3 (* ?d ?g) (* ?c ?f) (* ?b ?e)) (Affine Scale (Vec3 ?g ?f ?e) ?a))"),
+rw!("ruler15"; "(Affine Scale (Vec3 ?d ?c ?b) (Affine Trans (Vec3 (/ ?g ?d) (/ ?f ?c) (/ ?e ?b)) ?a))" => "(Affine Trans (Vec3 ?g ?f ?e) (Affine Scale (Vec3 ?d ?c ?b) ?a))"),
+rw!("ruler16"; "(Affine Trans (Vec3 ?g ?f ?e) (Affine Scale (Vec3 ?d ?c ?b) ?a))" => "(Affine Scale (Vec3 ?d ?c ?b) (Affine Trans (Vec3 (/ ?g ?d) (/ ?f ?c) (/ ?e ?b)) ?a))"),
+rw!("ruler17"; "(Affine Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false))" => "(Cube (Vec3 (* ?f ?e) (* ?d ?c) (* ?b ?a)) false)"),
+rw!("ruler18"; "(Cube (Vec3 (* ?f ?e) (* ?d ?c) (* ?b ?a)) false)" => "(Affine Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false))"),
+rw!("ruler19"; "(Affine Scale (Vec3 (* ?f ?c) (* ?e ?b) (* ?d ?a)) (Cube (Vec3 1 1 1) false))" => "(Affine Scale (Vec3 ?f ?e ?d) (Cube (Vec3 ?c ?b ?a) false))"),
+rw!("ruler20"; "(Affine Scale (Vec3 ?f ?e ?d) (Cube (Vec3 ?c ?b ?a) false))" => "(Affine Scale (Vec3 (* ?f ?c) (* ?e ?b) (* ?d ?a)) (Cube (Vec3 1 1 1) false))"),
+RULER RULES END
+
+
+test tests::rule_lifting ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 69.33s
+
