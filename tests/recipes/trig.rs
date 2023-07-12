@@ -1,5 +1,5 @@
 use super::*;
-use crate::test::prior_rules;
+use crate::test::{prior_rules, rational_rules};
 use ruler::{
     enumo::{Filter, Ruleset, Workload},
     recipe_utils::run_rule_lifting,
@@ -12,7 +12,7 @@ pub fn trig_rules() -> Ruleset<Trig> {
         node: 2000000,
         match_: 200_000,
     };
-    let mut prior: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+    let mut prior: Ruleset<Trig> = rational_rules();
     prior.extend(prior_rules());
 
     let no_trig_2x = Filter::Invert(Box::new(Filter::Or(vec![
