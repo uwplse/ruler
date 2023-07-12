@@ -4,6 +4,9 @@
 rm -rf out/
 mkdir out/
 
+# Use precomputed Renumo rules
+cp ../precomputed.json megalibm/output.json
+
 pushd megalibm
 
 # Clean megalibm
