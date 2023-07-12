@@ -30,6 +30,12 @@ cp out/by-config-all-tests-time-boxplot.pdf ../out/fig8_time.pdf
 cp out/by-config-all-tests-avg_bits_err_improve-boxplot.pdf ../out/fig8.pdf
 popd
 
+# Figure 9
+pushd fig_9
+./full.sh
+cp -r out/ ../out/megalibm
+popd
+
 # Table 4
 pushd table_4
 ./full.sh
