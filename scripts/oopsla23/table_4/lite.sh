@@ -19,10 +19,10 @@ make -B out/aec-table2/table2.csv
 python3 to_latex.py
 pdflatex table.tex > /dev/null
 
+cp table.pdf ../out/table.pdf
+
 # Clean up Szalinski repo
 git restore .
 git clean -f
 
 popd
-
-cp szalinski/table.pdf out/table.pdf
