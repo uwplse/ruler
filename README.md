@@ -182,6 +182,12 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 #### Case Study 2: Megalibm
 
+- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, and `trig` dommains into Megalibm. The goal is to reproduce the results in `Figure 9` in the paper.
+- This experiment requires our evaluation branch of Megalibm (https://github.com/IanBriggs/megalibm/tree/ruler) to be installed under `ruler/scripts/oopsla23/fig_9/megalibm`. This is already installed and built on the VM.
+- `kick-tires.sh` does not invoke Renumo or Megalibm. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_9/megalibm/oopsla23`
+- `lite.sh` does not invoke Renumo. It uses precomputed Renumo data at `ruler/scripts/oopsla23/precomputed.json`. It runs the Megalibm benchmarks using these Renumo rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
+- `full.sh` runs Renumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules anad outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
+
 #### Case Study 3: Szalinski
 
 - This experiment integrates Renumo-inferred rules into Szalinski. The goal is to reproduce `Table 4` in the paper.

@@ -1,6 +1,13 @@
 #!/bin/bash
 
+# Start from clean slate
+rm -rf out/
+mkdir out/
+
 pushd megalibm
+
+# Clean megalibm
+rm -rf results/
 
 # kick the tires
 mkdir results
@@ -12,3 +19,5 @@ cp -r oopsla23/baseline/baseline results/baseline
 cp oopsla23/baseline/index.html results/baseline.html
 
 popd
+
+mv megalibm/results/* out/

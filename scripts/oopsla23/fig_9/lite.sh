@@ -6,12 +6,19 @@
 # use make nightly, get all the relevant json, and run the script that generates
 # comparison plots. 
 
+# Start from clean slate
+rm -rf out/
+mkdir out/
+
+# Use precomputed Renumo rules
+cp ../precomputed.json megalibm/output.json
+
 pushd megalibm
 
-rm -rf results/run
-
-# run the rules locally. 
-cp oopsla23/renumo_rules_1688715491.json rules.json
+# Clean megalibm slate
+rm -rf results/
+mkdir results/
+mkdir results/plots
 
 make
 make nightly
@@ -27,3 +34,5 @@ cp -r oopsla23/baseline/baseline results/baseline
 cp oopsla23/baseline/index.html results/baseline.html
 
 popd
+
+mv megalibm/results/* out/
