@@ -192,7 +192,14 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 #### Case Study 2: Megalibm
 
-The table in `Figure 9` in the paper was generated manually. These instructions will explain how to regenerate the underlying data using Megalibm. The output from Megalibm will be two HTML files: `baseline.html` and `results.html`.
+The table in `Figure 9` in the paper was generated manually. These instructions will explain how to regenerate the underlying data using Megalibm. The output from Megalibm will be three HTML files: `pareto.html`, `baseline.html`, and `renumo_run.html`.
+
+- `pareto.html` compares the pareto fronts of different generated implementations for each benchmark on each domain, evaluated on accuracy and speed. One of these figures was used in Figure 9 (cos over domain [-32, 32]).
+- `baseline.html` shows the results of running Megalibm with the baseline rules. The information collected through this page was used to generate the two baseline Megalibm columns in the table in Figure 9. To recreate the table, you will click on each 
+benchmark name to be taken to a page with new graphs pertaining to that benchmark. We looked at the graph of relative error over each domain, and counted the number of clusters or groupings from each implementation, which gave rise to the unique implementations. (We found that
+the number of unique implementations was constant across domains.) For the unique identities, we took the list of identities at the top of the page, and checked to see which could derive the others via multiple applications.
+- `renumo_run.html` shows the result of running Megalibm with Renumo rules. The infomration collected through this page as used to generate the two Renumo columns in the table in Figure 9. To collect these values, you should follow the same instructions as described
+- for `baseline.html` above.
 
 - This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, and `trig` dommains into Megalibm. The goal is to reproduce the results in `Figure 9` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_9`.
 - This experiment requires our evaluation branch of Megalibm (https://github.com/IanBriggs/megalibm/tree/ruler) to be installed under `ruler/scripts/oopsla23/fig_9/megalibm`. This is already installed and built on the VM.
