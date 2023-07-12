@@ -21,10 +21,10 @@ mkdir results/
 mkdir results/plots
 
 make
-make nightly
+make nightly &>> ../out/log.txt
 
 # now run comparison 
-python graph_against_baseline.py --directory=results/run/generated/
+python graph_against_baseline.py --directory=results/run/generated/ &>> ../out/log.txt
 
 cp -r results/run/generated results/generated
 cp results/run/index.html results/renumo_run.html

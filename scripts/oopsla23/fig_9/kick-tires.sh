@@ -12,7 +12,7 @@ rm -rf results/
 # kick the tires
 mkdir results
 mkdir results/plots
-python graph_against_baseline.py --directory=oopsla23/tool/
+python graph_against_baseline.py --directory=oopsla23/tool/ &>> ../out/log.txt
 
 cp oopsla23/baseline/style.css results/style.css
 cp -r oopsla23/baseline/baseline results/baseline
