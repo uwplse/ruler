@@ -324,6 +324,69 @@ mod test {
         Limits,
     };
 
+    // Starting set of rational rules
+    pub fn rational_rules() -> Ruleset<Trig> {
+        Ruleset::new([
+            "(- ?a (- ?b ?c)) ==> (- ?c (- ?b ?a))",
+            "(* ?a (* ?b ?c)) ==> (* ?b (* ?a ?c))",
+            "(- (- ?a ?b) ?c) ==> (- (- ?a ?c) ?b)",
+            "(+ ?a (+ ?b ?c)) ==> (+ ?c (+ ?a ?b))",
+            "(+ ?c (+ ?a ?b)) ==> (+ ?a (+ ?b ?c))",
+            "(- (+ ?a ?b) ?c) ==> (+ ?a (- ?b ?c))",
+            "(+ ?a (- ?b ?c)) ==> (- (+ ?a ?b) ?c)",
+            "(- ?a (- ?b ?c)) ==> (+ ?a (- ?c ?b))",
+            "(+ ?a (- ?c ?b)) ==> (- ?a (- ?b ?c))",
+            "(/ ?a (* ?b ?c)) ==> (/ (/ ?a ?b) ?c)",
+            "(/ (/ ?a ?b) ?c) ==> (/ ?a (* ?b ?c))",
+            "(- ?a (+ ?b ?c)) ==> (- (- ?a ?b) ?c)",
+            "(- (- ?a ?b) ?c) ==> (- ?a (+ ?b ?c))",
+            "(/ (- ?a ?b) ?c) ==> (- (/ ?a ?c) (/ ?b ?c))",
+            "(- (/ ?a ?c) (/ ?b ?c)) ==> (/ (- ?a ?b) ?c)",
+            "(- (* ?a ?b) (* ?a ?c)) ==> (* ?a (- ?b ?c))",
+            "(* ?a (- ?b ?c)) ==> (- (* ?a ?b) (* ?a ?c))",
+            "(/ (+ ?a ?b) ?c) ==> (+ (/ ?b ?c) (/ ?a ?c))",
+            "(+ (/ ?b ?c) (/ ?a ?c)) ==> (/ (+ ?a ?b) ?c)",
+            "(+ (* ?a ?b) (* ?b ?c)) ==> (* ?b (+ ?a ?c))",
+            "(* ?b (+ ?a ?c)) ==> (+ (* ?a ?b) (* ?b ?c))",
+            "(/ (- (* ?a ?b) ?c) ?b) ==> (- ?a (/ ?c ?b))",
+            "(- ?a (/ ?c ?b)) ==> (/ (- (* ?a ?b) ?c) ?b)",
+            "(/ ?a (- (/ ?b ?c) ?a)) ==> (/ ?c (- (/ ?b ?a) ?c))",
+            "(* ?a ?b) ==> (* ?b ?a)",
+            "(+ ?a ?b) ==> (+ ?b ?a)",
+            "(* ?a (+ ?b ?b)) ==> (* ?b (+ ?a ?a))",
+            "(+ ?a ?a) ==> (* 2 ?a)",
+            "(* 2 ?a) ==> (+ ?a ?a)",
+            "(/ ?a ?b) ==> (/ (+ ?a ?a) (+ ?b ?b))",
+            "(/ (+ ?a ?a) (+ ?b ?b)) ==> (/ ?a ?b)",
+            "(- (* ?a ?a) (* ?b ?b)) ==> (* (- ?a ?b) (+ ?a ?b))",
+            "(* (- ?a ?b) (+ ?a ?b)) ==> (- (* ?a ?a) (* ?b ?b))",
+            "(~ (~ ?a)) ==> ?a",
+            "?a ==> (~ (~ ?a))",
+            "?a ==> (* ?a 1)",
+            "(* ?a 1) ==> ?a",
+            "?a ==> (+ ?a 0)",
+            "(+ ?a 0) ==> ?a",
+            "?a ==> (/ ?a 1)",
+            "(/ ?a 1) ==> ?a",
+            "?a ==> (- ?a 0)",
+            "(- ?a 0) ==> ?a",
+            "(- ?a ?a) ==> 0",
+            "(/ ?a ?a) ==> 1",
+            "(~ ?a) ==> (/ ?a -1)",
+            "(/ ?a -1) ==> (~ ?a)",
+            "(~ ?a) ==> (* ?a -1)",
+            "(* ?a -1) ==> (~ ?a)",
+            "(~ ?a) ==> (- 0 ?a)",
+            "(- 0 ?a) ==> (~ ?a)",
+            "(/ 0 ?a) ==> 0",
+            "(* ?a 0) ==> 0",
+            "(- ?a -1) ==> (+ ?a 1)",
+            "(+ ?a 1) ==> (- ?a -1)",
+            "(- ?a 1) ==> (+ ?a -1)",
+            "(+ ?a -1) ==> (- ?a 1)",
+        ])
+    }
+
     // Extra rules about `cis` and `I` to "fast-forward" rule synthesis
     pub fn prior_rules() -> Ruleset<Trig> {
         Ruleset::new([
@@ -367,7 +430,7 @@ mod test {
 
     #[test]
     fn simple() {
-        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+        let complex: Ruleset<Trig> = rational_rules();
         assert_eq!(complex.len(), 57);
 
         let limits = Limits {
@@ -451,7 +514,7 @@ mod test {
             node: 300000,
             match_: 200_000,
         };
-        let mut all = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+        let mut all = rational_rules();
         all.extend(prior_rules());
         all.extend(Trig::get_lifting_rules());
         let mut all_but_exploratory = all.clone();
