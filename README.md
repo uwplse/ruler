@@ -21,7 +21,7 @@ We recommend running the VM on a machine with more than 32 GB RAM to reproduce a
 - Log in using username `aec` and password `aec23`
 - Open a terminal. Navigate to the `ruler` directory. The code and all dependencies are already installed and compiled, ready to be run.
 - To check that you are able to run the tool, run `cargo bool` from the `ruler` directory. This should take less than a second. It will generate and print 14 boolean rewrite rules.
-- Follow the instructions below to verify the results from previous rns and/or run the evaluation entirely from scratch.
+- Follow the instructions below to verify the results from previous runs and/or run the evaluation entirely from scratch.
 
 ## Overview
 
@@ -35,7 +35,7 @@ Our paper has five sections in the evaluation, each supported by a separate expe
    than Ruler. The results of this experiment are described in section 6.1.2 of the paper.
 3. **Can Renumo's fast-forwarding algorithm enable rule inference for new domains that**
    **prior work could not support?**  
-   We used Renumo's fast-forwarding algorithm to infer rules for `trig` and `exponential`,
+   We used Renumo's fast-forwarding algorithm to infer rules for the `trig` and `exponential`
    domains which are not supported by other rule synthesis tools. We compare these rules
    against Herbie's handcrafted rulesets. The results are shown in `Table 3`.
 4. **How does fast-forwarding impact client applications in terms of performance and results?**  
@@ -49,7 +49,7 @@ Our paper has five sections in the evaluation, each supported by a separate expe
    `Table 5` shows the results of this experiment.
 
 Many of these experiments take a long time to run and some require significant memory
-(see paper for the exact machine specifications we used to run thes experiments).
+(see paper for the exact machine specifications we used to run these experiments).
 
 For each experiment, we include three ways to replicate the results:
 
@@ -95,7 +95,7 @@ From the `ruler/` directory, run
 Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 - `table2.pdf` - Comparison against Ruler for `bool` domain only
-- `exp2.pdf` - Comparison aginst Halide (rule inference only, no derivability)
+- `exp2.pdf` - Comparison against Halide (rule inference only, no derivability)
 - `table3.pdf` - Rule inference using fast-forwarding for `exponential` domain only
 - `table4.pdf` - Case Study: Renumo rules in Szalinski using precomputed Renumo rules
 - `fig8.pdf` and `fig8_time.pdf` - Case Study: Renumo rules in Herbie using precomputed Renumo rules and a single Herbie benchmark
@@ -192,7 +192,7 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 #### Case Study 2: Megalibm
 
-- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, and `trig` dommains into Megalibm. The goal is to reproduce the results in `Figure 9` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_9`.
+- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, and `trig` domains into Megalibm. The goal is to reproduce the results in `Figure 9` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_9`.
 - This experiment requires our evaluation branch of Megalibm (https://github.com/IanBriggs/megalibm/tree/ruler) to be installed under `ruler/scripts/oopsla23/fig_9/megalibm`. This is already installed and built on the VM.
 - The table in `Figure 9` in the paper was generated manually. These instructions will explain how to regenerate the underlying data using Megalibm. The output from Megalibm will be three HTML files: `pareto.html`, `baseline.html`, and `renumo_run.html`.
   - `pareto.html` compares the pareto fronts of different generated implementations for each benchmark on each domain, evaluated on accuracy and speed. One of these figures was used in Figure 9 (cos over domain [-32, 32]).
@@ -202,7 +202,7 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
     ![Alt text](image.png)
 - `kick-tires.sh` does not invoke Renumo or Megalibm. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_9/megalibm/oopsla23`
 - `lite.sh` does not invoke Renumo. It uses precomputed Renumo data at `ruler/scripts/oopsla23/precomputed.json`. It runs the Megalibm benchmarks using these Renumo rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
-- `full.sh` runs Renumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules anad outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
+- `full.sh` runs Renumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
 - `megalib/src/nightly.sh` runs the benchmarks.
 - `megalibm/graph_against_baseline.py` generates the plots and makes the webpage.
 
@@ -240,7 +240,7 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
   - `util.rs` has some small helper functions.
   - The core of the DSL is implemented in `enumo/`
     - `workload.rs` contains the `Workload` data type. Workloads evaluate to a list of terms (s-expressions). Workloads can be constructed directly from a list of s-expressions (`Workload::Set`), combined (`Workload::Append`), refined with a filter (`Workload::Filter`), or composed via plugs (`Workload::Plug`). Plug is a novel operation for generating workloads from smaller workloads. It takes two workloads, $W_1$ and $W_2$ and a string, $s$; for each term in $W_2$ that contains $s$, it “plugs” in the values in $W_1$ and generates a new workload which is a cross product of all the new plugged terms.
-    - `ruleset.rs` contains the `Ruleset` data type. Rulesets are implemented as an `IndexMap` of `Equality`. There are several operations over Rulesets that can be used to combine, compose, and refine rulesets. For example, `Ruleset::cvec_match` extracts a set of equalities from an egraph via cvec-matching; `Ruleset::minimize` can be used to eliminate redundant rules from a ruleset; `Ruleset::derive` tests the proving power of one ruleset compared to another.
+    - `ruleset.rs` contains the `Ruleset` data type. Rulesets are implemented as an `IndexMap` of `Equality`. There are several operations over Rulesets that can be used to combine, compose, and refine rulesets. For example, `Ruleset::cvec_match` extracts a set of equalities from an e-graph via cvec-matching; `Ruleset::minimize` can be used to eliminate redundant rules from a ruleset; `Ruleset::derive` tests the proving power of one ruleset compared to another.
     - `scheduler.rs` defines how to run equality saturating using a `Ruleset` and an `EGraph`. The three scheduling techniques provided in `Renumo` are `Simple`, `Saturating`, and `Compress`. Additional scheduling strategies can be implemented by adding to the `Scheduler` enum and adding a case to `Scheduler::run_internal`.
     - `sexp.rs` contains an implementation of s-expressions.
     - `rule.rs` defines a rewrite rule.
@@ -248,7 +248,7 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 ## Further Use / Extending Renumo
 
-This section describes how to install Renumo on a diferent machine, the required dependencies, and how to extend the tool for other uses.
+This section describes how to install Renumo on a different machine, the required dependencies, and how to extend the tool for other uses.
 
 ### Dependencies
 
@@ -369,7 +369,7 @@ An `EXPR` contains `VARS` (variables) and `VALS` (values) as its leaves, and `pl
         ]));
 ```
 
-Renumo also supports filtering terms out of generated workloads that do not interest the user. In this case, after the workload is generated, terms that are not _canonicalized_ are removed. Canonicalization here means that `a` must be the first variable introduced. `a` can be followed by another `a` any number of times, but the next new variable introduced must be `b`, and so on. Canonicalization drastically expediates rule inference by eliminating duplicate terms, often representing the difference between a workload that is too large to perform rule inference over and one that finishes near-instantaneously.
+Renumo also supports filtering terms out of generated workloads that do not interest the user. In this case, after the workload is generated, terms that are not _canonicalized_ are removed. Canonicalization here means that `a` must be the first variable introduced. `a` can be followed by another `a` any number of times, but the next new variable introduced must be `b`, and so on. Canonicalization drastically expedites rule inference by eliminating duplicate terms, often representing the difference between a workload that is too large to perform rule inference over and one that finishes near-instantaneously.
 
 ```
 let consts = Workload::new(["0", "1"]);
