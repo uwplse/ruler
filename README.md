@@ -255,6 +255,12 @@ We tested our artifact on a Ubuntu 22.04 VM. To install and run the evaluation o
 
 After installing these dependencies and getting the Renumo code from Zenodo, run `cargo build --release` to build Renumo. This will take ~40 minutes.
 
+In order to run the case studies which integrate Renumo with other tools, you will need to install the other tools in the right places.
+
+- For Szalinski, run `git clone --branch eval https://github.com/rtjoa/szalinski` from the `ruler/scripts/oopsla23/table_4` directory.
+- For Megalibm, run `git clone --branch ruler https://github.com/IanBriggs/megalibm.git` from the `ruler/scripts/oopsla23/fig_9` directory.
+- For Herbie, run `BUILD_DIR=~/ruler/scripts/oopsla23/fig_8/herbie bash install.sh` from the `ruler/scripts/oopsla23/fig_8` directory.
+
 ### Writing a Program to Infer Rules
 
 The Renumo DSL enables rewrite rule inference for any domain
