@@ -155,7 +155,7 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
-- Due to a counting
+- Due to a counting error, the number of Herbie trig rules was incorrectly reported at 72. The correct number is 45, and the table has been updated to reflect this. This counting error only impacted the total number of rules, not the derivability percentages.
 
 ### Experiment 4: Fast-Forwarding Case Studies
 
