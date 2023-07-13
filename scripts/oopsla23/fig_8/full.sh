@@ -16,6 +16,6 @@ mkdir rules/
 cp ../../../nightly/data/output.json rules/
 
 # Regenerate data for 30 seeds
-bash eval.sh 1 hamming mathematics numerics physics pbrt.fpcore
+bash eval.sh 30 hamming mathematics numerics physics pbrt.fpcore >> out/log.txt
 
 cp reports/*/*.pdf out/

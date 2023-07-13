@@ -5,5 +5,5 @@ rm -rf out/
 mkdir out/
 
 # Regenerate plots using precomputed data
-./plot.sh saved/
+./plot.sh saved/ >> out/log.txt
 cp saved/*.pdf out/
