@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Starting Herbie Experiment (Full)"
+
 # Start from clean slate
 rm -rf out/
 mkdir out/

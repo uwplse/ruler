@@ -70,6 +70,8 @@ From the `ruler/` directory, run
 ./scripts/oopsla23/kick-tires.sh
 ```
 
+**This will take less than a minute to run.**
+
 Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 - `table2.pdf` - Comparison against Ruler
@@ -92,6 +94,8 @@ From the `ruler/` directory, run
 ./scripts/oopsla23/lite.sh
 ```
 
+**This will take a few hours to run.**
+
 Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
 - `table2.pdf` - Comparison against Ruler for `bool` domain only
@@ -111,6 +115,8 @@ From the `ruler/` directory, run
 ```
 ./scripts/oopsla23/full.sh
 ```
+
+**This will take about 24 hours to run.**
 
 Navigate to `ruler/scripts/oopsla23/out` to review the results.
 
@@ -132,12 +138,11 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 ### Experiment 1: Comparison against Ruler
 
 - This experiment uses Renumo to infer rules for a variety of domains and compares the results against Ruler's rules for the same domains. The goal is to replicate `Table 2` and the code for this experiment is located at `ruler/scripts/oopsla23/table2`.
-- `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
+- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` runs Renumo for the `bool` domain using the Renumo program located at
+- `lite.sh` (1-2 minutes) runs Renumo for the `bool` domain using the Renumo program located at
   `ruler/tests/recipes/bool.rs`.
-- `full.sh` runs Renumo for the `bool`, `bv4`, `bv32`, and `rational` domains using Renumo programs
-  in the `ruler/tests/recipes` directory.
+- `full.sh` (~10 minutes) runs Renumo for the `bool`, `bv4`, `bv32`, and `rational` domains using Renumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -145,10 +150,10 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 ### Experiment 2: Scaling to Large Domains
 
 - This experiment uses Renumo to infer rules for the Halide domain. The goal is to replicate the results in Section 6.1.2 and the code for this experiment is located at `ruler/scripts/oopsla23/exp2`.
-- `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from `ruler/scripts/oopsla23/precomputed.json`
-- `lite.sh` runs Renumo to infer rules using the Renumo program located at `ruler/tests/recipes/halide.rs`
+- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from `ruler/scripts/oopsla23/precomputed.json`
+- `lite.sh` (~5 minutes) runs Renumo to infer rules using the Renumo program located at `ruler/tests/recipes/halide.rs`
   but does _not_ compute the derivability between the Renumo-inferred ruleset and Halide's rules.
-- `full.sh` runs Renumo to infer the Halide rules and computes the derivability between the Renumo rules and the Halide rules.
+- `full.sh` (~45 minutes) runs Renumo to infer the Halide rules and computes the derivability between the Renumo rules and the Halide rules.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -157,11 +162,11 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 ### Experiment 3: Rule Inference Using Fast-Forwarding
 
 - This experiment uses Renumo to infer rules for numeric domains (`exponential`, `rational`, and `trig`) and compares them against Herbie's handcrafted rules. The goal is to replicate `Table 3` and the code for this experiment is located at `ruler/scripts/oopsla23/table3`.
-- `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
+- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` runs Renumo for the `exponential` domain using the Renumo program located at
+- `lite.sh` (1-2 minutes) runs Renumo for the `exponential` domain using the Renumo program located at
   `ruler/tests/recipes/exponential.rs`.
-- `full.sh` runs Renumo for the `exponential`, `rational`, and `trig` domains using Renumo programs in the `ruler/tests/recipes` directory.
+- `full.sh` (~30 minutes) runs Renumo for the `exponential`, `rational`, and `trig` domains using Renumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -172,9 +177,9 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 #### Case Study 1: Herbie
 
 - This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, `trig`, and `bool` domains into Herbie. The goal is to reproduce `Figure 8` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_8`.
-- `kick-tires.sh` does not invoke Renumo or Herbie. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_8/saved/`
-- `lite.sh` does not invoke Renumo. It uses the precomputed Renumo data from `ruler/scripts/oopsla23/precomputed.json`. It runs a single Herbie benchmark (`hamming`) with 5 seeds. This will take a few hours to run.
-- `full.sh` runs Renumo for the `exponential`, `rational`, `trig`, and `bool` domains. It then runs all Herbie benchmarks with 30 seeds. This requires 32 GB RAM (minimum) and will take about 24 hours to run.
+- `kick-tires.sh` (<1 minute) does not invoke Renumo or Herbie. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_8/saved/`
+- `lite.sh` (~1-2 hours) does not invoke Renumo. It uses the precomputed Renumo data from `ruler/scripts/oopsla23/precomputed.json`. It runs a single Herbie benchmark (`hamming`) with 5 seeds.
+- `full.sh` (~24 hours) runs Renumo for the `exponential`, `rational`, `trig`, and `bool` domains. It then runs all Herbie benchmarks with 30 seeds. This requires 32 GB RAM (minimum).
   - To run Herbie in parallel, set the environment variable `PARALLEL_SEEDS`.
 - Scripts
   - `eval.sh`: top-level script for running the Herbie case study
@@ -202,9 +207,9 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
   - To count the number of Unique Impls as reported in the table in `Figure 9`, click into the `core_function_sin`, `core_function_cos`, and `core_function_tan` benchmark pages to be taken to a new page with graphs specific to the benchmark. Look at the graph of relative error and count the number of clusters. The number of clusters should be the same across domains for each benchmark. For example, this graph has five groups (unique implementations): pink, blue, green/purple, black, and teal.
     ![Alt text](image.png)
   - To count the number of Unique Identities as reported in the table in `Figure 9`, enter `identities.log` and look at the list of identities found for each benchmark. Check to see which identities can derive each other via multiple applications of other identities, or via simplification.
-- `kick-tires.sh` does not invoke Renumo or Megalibm. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_9/megalibm/oopsla23`
-- `lite.sh` does not invoke Renumo. It uses precomputed Renumo data at `ruler/scripts/oopsla23/precomputed.json`. It runs the Megalibm benchmarks using these Renumo rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
-- `full.sh` runs Renumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
+- `kick-tires.sh` (<1 minute) does not invoke Renumo or Megalibm. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_9/megalibm/oopsla23`
+- `lite.sh` (~10 minutes) does not invoke Renumo. It uses precomputed Renumo data at `ruler/scripts/oopsla23/precomputed.json`. It runs the Megalibm benchmarks using these Renumo rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
+- `full.sh` (~1 hour) runs Renumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
 - `megalib/src/nightly.sh` runs the benchmarks.
 - `megalibm/graph_against_baseline.py` generates the plots and makes the webpage.
 
@@ -212,9 +217,9 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 - This experiment integrates Renumo-inferred rules into Szalinski. The goal is to reproduce `Table 4` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/table_4`.
 - This experiment requires our evaluation branch of Szalinski (https://github.com/rtjoa/szalinski/tree/eval) to be installed under `ruler/scripts/oopsla23/table_4/szalinski`. This is already installed and built on the VM.
-- `kick-tires.sh` does not invoke Renumo or Szalinski. It uses data from a previous run located at `ruler/scripts/oopsla23/table_4/precomputed.csv`
-- `lite.sh` does not invoke Renumo. It uses precomputed Renumo data from `ruler/scripts/oopsla23/table_4/precomputed.rules`. It reruns the Szalinski benchmarks using these rules. This will take about 30 minutes to run.
-- `full.sh` runs Renumo for the `szalinski` domain. This requires 32 GB RAM. Then it runs the Szalinski benchmarks using these rules. This will take about 45 minutes to run.
+- `kick-tires.sh` (<1 minute) does not invoke Renumo or Szalinski. It uses data from a previous run located at `ruler/scripts/oopsla23/table_4/precomputed.csv`
+- `lite.sh` (~30 minutes) does not invoke Renumo. It uses precomputed Renumo data from `ruler/scripts/oopsla23/table_4/precomputed.rules`. It reruns the Szalinski benchmarks using these rules.
+- `full.sh` (~45 minutes) runs Renumo for the `szalinski` domain. This requires 32 GB RAM. Then it runs the Szalinski benchmarks using these rules.
 - `szalinski/copy-rules.py` reformats the Renumo-inferred rules for use by Szalinski
 - `szalinski/to_latex.py` converts the output of Szalinski (`out/aec-table2/table2.csv`) to LaTeX, which will be written to `table.tex`.
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -222,11 +227,11 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 ### Experiment 5: Cross-Domain Ruleset Manipulation
 
 - This experiment uses Renumo-inferred rules for `BV4` to construct rulesets for larger bitvectors (`BV8`, `BV16`, `BV32`, `BV64`, and `BV128`) and compares them against rulesets directly inferred for the larger bitvector domains. The goal is to replicate `Table 5` and the code for this experiment is located at `ruler/scripts/oopsla23/table5`.
-- `kick-tires.sh` does not invoke Renumo, it just uses the precomputed data from
+- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` runs Renumo for the `BV8` domain using the Renumo program located at
+- `lite.sh` (~1-2 minutes) runs Renumo for the `BV8` domain using the Renumo program located at
   `ruler/tests/recipes/bv8.rs`.
-- `full.sh` runs Renumo for the `BV8`, `BV16`, `BV32`,
+- `full.sh` (~45 minutes) runs Renumo for the `BV8`, `BV16`, `BV32`,
   `BV64`, and `BV128` domains using Renumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`

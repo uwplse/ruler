@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+echo "Starting Szalinski Experiment (Kick Tires)"
+
 # Start from clean state
 rm -rf out/
 mkdir out/

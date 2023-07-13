@@ -6,6 +6,8 @@
 # use make nightly, get all the relevant json, and run the script that generates
 # comparison plots. 
 
+echo "Starting Megalibm Experiment (Lite)"
+
 # Start from clean slate
 rm -rf out/
 mkdir out/

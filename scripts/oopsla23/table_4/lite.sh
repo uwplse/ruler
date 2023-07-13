@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+echo "Starting Szalinski Experiment (Lite)"
+
 # Start from clean state
 rm -rf out/
 mkdir out/

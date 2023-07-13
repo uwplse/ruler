@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+echo "Starting Szalinski Experiment (Full)"
 
 # Start from clean state
 rm -rf out/
