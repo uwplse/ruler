@@ -194,12 +194,14 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 - This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, and `trig` domains into Megalibm. The goal is to reproduce the results in `Figure 9` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_9`.
 - This experiment requires our evaluation branch of Megalibm (https://github.com/IanBriggs/megalibm/tree/ruler) to be installed under `ruler/scripts/oopsla23/fig_9/megalibm`. This is already installed and built on the VM.
-- The table in `Figure 9` in the paper was generated manually. These instructions will explain how to regenerate the underlying data using Megalibm. The output from Megalibm will be three HTML files: `pareto.html`, `baseline.html`, and `renumo_run.html`.
+- The table in `Figure 9` in the paper was generated manually. These instructions will explain how to regenerate the underlying data using Megalibm. The output from Megalibm will be three HTML files and one log file, all inside the `results/` folder: `pareto.html`, `baseline.html`, `renumo_run.html`, and `identities.log`.
   - `pareto.html` compares the pareto fronts of different generated implementations for each benchmark on each domain, evaluated on accuracy and speed. One of these figures was used in Figure 9 (cos over domain [-32, 32]).
   - `baseline.html` shows the results of running Megalibm with the baseline rules.
   - `renumo_run.html` shows the results of running Megalibm with Renumo rules.
+  - `identities.log` shows all the identities that were found by Megalibm using the rules.
   - To count the number of Unique Impls as reported in the table in `Figure 9`, click into the `core_function_sin`, `core_function_cos`, and `core_function_tan` benchmark pages to be taken to a new page with graphs specific to the benchmark. Look at the graph of relative error and count the number of clusters. The number of clusters should be the same across domains for each benchmark. For example, this graph has five groups (unique implementations): pink, blue, green/purple, black, and teal.
     ![Alt text](image.png)
+  - To count the number of Unique Identities as reported in the table in `Figure 9`, enter `identities.log` and look at the list of identities found for each benchmark. Check to see which identities can derive each other via multiple applications of other identities, or via simplification.
 - `kick-tires.sh` does not invoke Renumo or Megalibm. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_9/megalibm/oopsla23`
 - `lite.sh` does not invoke Renumo. It uses precomputed Renumo data at `ruler/scripts/oopsla23/precomputed.json`. It runs the Megalibm benchmarks using these Renumo rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
 - `full.sh` runs Renumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
