@@ -26,7 +26,8 @@ mkdir results/plots
 rm -rf results/run
 
 make
-make nightly &>> ../out/log.txt
+make nightly >> run.log 2>&1
+cat run.log | awk '/we used the following/{flag=1} /megalibm_generate/{flag=0} flag' > results/identities.log
 
 # now run comparison 
 python graph_against_baseline.py --directory=results/run/generated/ &>> ../out/log.txt
