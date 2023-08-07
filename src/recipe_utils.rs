@@ -25,12 +25,13 @@ pub fn substitute(workload: Workload, sub: Workload, atom: &str) -> Workload {
     pegs
 }
 
-pub fn run_workload<L: SynthLanguage>(
+fn run_workload_internal<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
     prior_limits: Limits,
     minimize_limits: Limits,
     fast_match: bool,
+    allow_empty: bool,
 ) -> Ruleset<L> {
     let t = Instant::now();
 
@@ -47,6 +48,10 @@ pub fn run_workload<L: SynthLanguage>(
     let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
     let time = t.elapsed().as_secs_f64();
 
+    if chosen.is_empty() && !allow_empty {
+        panic!("Didn't learn any rules!");
+    }
+
     println!(
         "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
         chosen.bidir_len(),
@@ -58,6 +63,23 @@ pub fn run_workload<L: SynthLanguage>(
     chosen.pretty_print();
 
     chosen
+}
+
+pub fn run_workload<L: SynthLanguage>(
+    workload: Workload,
+    prior: Ruleset<L>,
+    prior_limits: Limits,
+    minimize_limits: Limits,
+    fast_match: bool,
+) -> Ruleset<L> {
+    run_workload_internal(
+        workload,
+        prior,
+        prior_limits,
+        minimize_limits,
+        fast_match,
+        false,
+    )
 }
 
 pub fn run_rule_lifting<L: SynthLanguage>(
@@ -134,12 +156,14 @@ pub fn recursive_rules<L: SynthLanguage>(
             wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
         }
         rec.extend(prior);
-        let new = run_workload(
+        let allow_empty = n < 3;
+        let new = run_workload_internal(
             wkld,
             rec.clone(),
             Limits::synthesis(),
             Limits::minimize(),
             true,
+            allow_empty,
         );
         let mut all = new;
         all.extend(rec);
