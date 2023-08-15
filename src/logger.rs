@@ -63,7 +63,6 @@ pub fn write_baseline<L: SynthLanguage>(
     let skip_derive = vec![
         ("herbie", "rational_replicate"),
         ("herbie", "rational_best"),
-        ("halide", "halide"),
         ("halide", "oopsla halide (1 iter)"),
         ("oopsla halide (1 iter)", "halide"),
     ];
