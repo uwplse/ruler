@@ -5,13 +5,13 @@ In our paper, we present a new domain-specific language for programmable theory 
 
 - Available: The artifact is available on Zenodo.
 - Functional: Below we provide instructions for setting up the artifact. Then we list the claims made in the paper and provide instructions for how to reproduce the results to validate each claim.
-- Reusable: Finally, we provide instructions for extending Renumo, which describes how to set up Renumo on a different machine, modify the code, and extend the tool to new domains.
+- Reusable: Finally, we provide instructions for extending Enumo, which describes how to set up Enumo on a different machine, modify the code, and extend the tool to new domains.
 
 ---
 
 ## Getting Started
 
-We recommend running the VM on a machine with more than 32 GB RAM to reproduce all the results from scratch. In particular, the Herbie, Megalibm, and Szalinski case studies are memory and time intensive. If you are only replicating the Renumo results (Experiments 1, 2, 3, and 5 below) or reproducing the results using precomputed data (see below), you should be fine with a machine that has 16 GB RAM.
+We recommend running the VM on a machine with more than 32 GB RAM to reproduce all the results from scratch. In particular, the Herbie, Megalibm, and Szalinski case studies are memory and time intensive. If you are only replicating the Enumo results (Experiments 1, 2, 3, and 5 below) or reproducing the results using precomputed data (see below), you should be fine with a machine that has 16 GB RAM.
 
 - Setting up the VM
   - Download the `.ova` file
@@ -27,23 +27,23 @@ We recommend running the VM on a machine with more than 32 GB RAM to reproduce a
 
 Our paper has five sections in the evaluation, each supported by a separate experiment.
 
-1. **How does guided enumeration in Renumo compare to prior work on rule synthesis?**  
-   We show that Renumo outperforms Ruler on `bool`, `bv4`, `bv32`, and `rational` domains.
+1. **How does guided enumeration in Enumo compare to prior work on rule synthesis?**  
+   We show that Enumo outperforms Ruler on `bool`, `bv4`, `bv32`, and `rational` domains.
    The results are in `Table 2`.
-2. **Can Renumo scale to larger grammars than existing tools can handle?**  
-   We present a case-study showing that Renumo is better at scaling to large grammars
+2. **Can Enumo scale to larger grammars than existing tools can handle?**  
+   We present a case-study showing that Enumo is better at scaling to large grammars
    than Ruler. The results of this experiment are described in section 6.1.2 of the paper.
-3. **Can Renumo's fast-forwarding algorithm enable rule inference for new domains that**
+3. **Can Enumo's fast-forwarding algorithm enable rule inference for new domains that**
    **prior work could not support?**  
-   We used Renumo's fast-forwarding algorithm to infer rules for the `trig` and `exponential`
+   We used Enumo's fast-forwarding algorithm to infer rules for the `trig` and `exponential`
    domains which are not supported by other rule synthesis tools. We compare these rules
    against Herbie's handcrafted rulesets. The results are shown in `Table 3`.
 4. **How does fast-forwarding impact client applications in terms of performance and results?**  
-    We perform three case studies evaluating Renumo's synthesized rules in `Herbie`,
+    We perform three case studies evaluating Enumo's synthesized rules in `Herbie`,
    `Megalibm`, and `Szalinski`. `Figure 8`, `Figure 9`, `Figure 10`, and `Table 4` show the results
    of these case studies.
-5. **Do the abstractions in Renumo enable cross-domain rule synthesis techniques?**  
-   We show an example of the kind of ruleset manipulation made possible by Renumo by porting
+5. **Do the abstractions in Enumo enable cross-domain rule synthesis techniques?**  
+   We show an example of the kind of ruleset manipulation made possible by Enumo by porting
    rules from small bitvectors to large bitvectors. We compare the quality of the rules and
    time to generate rules against rules synthesized directly for the large bitvectors.
    `Table 5` shows the results of this experiment.
@@ -57,7 +57,7 @@ For each experiment, we include three ways to replicate the results:
 2. Recompute the data for a small subset of the experiment and reproduce the table or figure.
 3. Recompute the data for the entire experiment and reproduce the table or figure.
 
-**Please note that we have continued to work on Renumo since submission, so there may
+**Please note that we have continued to work on Enumo since submission, so there may
 be small variation between the numbers reported in the submitted paper and the results
 produced by this artifact. In all cases, though, the results produced by this artifact support the claims made in the submitted paper.**
 
@@ -77,9 +77,9 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - `table2.pdf` - Comparison against Ruler
 - `exp2.pdf` - Comparison against Halide
 - `table3.pdf` - Rule inference using fast-forwarding
-- `table4.pdf` - Case Study: Renumo rules in Szalinski
-- `fig8.pdf` and `fig8_time.pdf` - Case Study: Renumo rules in Herbie
-- `megalibm/`- Case Study: Renumo rules in Megalibm (see below for instructions on how to interpret these results).
+- `table4.pdf` - Case Study: Enumo rules in Szalinski
+- `fig8.pdf` and `fig8_time.pdf` - Case Study: Enumo rules in Herbie
+- `megalibm/`- Case Study: Enumo rules in Megalibm (see below for instructions on how to interpret these results).
 - `table5.pdf` - Cross-domain ruleset manipulation
 
 ## Use a Subset of Data
@@ -101,9 +101,9 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - `table2.pdf` - Comparison against Ruler for `bool` domain only
 - `exp2.pdf` - Comparison against Halide (rule inference only, no derivability)
 - `table3.pdf` - Rule inference using fast-forwarding for `exponential` domain only
-- `table4.pdf` - Case Study: Renumo rules in Szalinski using precomputed Renumo rules
-- `fig8.pdf` and `fig8_time.pdf` - Case Study: Renumo rules in Herbie using precomputed Renumo rules and a single Herbie benchmark
-- `megalibm/`- Case Study: Renumo rules in Megalibm using precomputed Renumo rules (see below for instructions on how to interpret these results).
+- `table4.pdf` - Case Study: Enumo rules in Szalinski using precomputed Enumo rules
+- `fig8.pdf` and `fig8_time.pdf` - Case Study: Enumo rules in Herbie using precomputed Enumo rules and a single Herbie benchmark
+- `megalibm/`- Case Study: Enumo rules in Megalibm using precomputed Enumo rules (see below for instructions on how to interpret these results).
 - `table5.pdf` - Cross-domain ruleset manipulation for `BV8` only
 
 ## Regenerate All Data
@@ -125,9 +125,9 @@ Navigate to `ruler/scripts/oopsla23/out` to review the results.
 - `exp2.pdf` - Comparison against Halide
 - `table3.pdf` - Rule inference using fast-forwarding for `exponential`,
   `rational`, and `trig` domains
-- `table4.pdf` - Case Study: Renumo rules in Szalinski
-- `fig8.pdf` and `fig8_time.pdf` - Case Study: Renumo rules in Herbie
-- `megalibm/`- Case Study: Renumo rules in Megalibm (see below for instructions on how to interpret these results).
+- `table4.pdf` - Case Study: Enumo rules in Szalinski
+- `fig8.pdf` and `fig8_time.pdf` - Case Study: Enumo rules in Herbie
+- `megalibm/`- Case Study: Enumo rules in Megalibm (see below for instructions on how to interpret these results).
 - `table5.pdf` - Cross-domain ruleset manipulation for `BV8`, `BV16`, `BV32`,
   `BV64`, and `BV128`.
 
@@ -137,23 +137,23 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 ### Experiment 1: Comparison against Ruler
 
-- This experiment uses Renumo to infer rules for a variety of domains and compares the results against Ruler's rules for the same domains. The goal is to replicate `Table 2` and the code for this experiment is located at `ruler/scripts/oopsla23/table2`.
-- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from
+- This experiment uses Enumo to infer rules for a variety of domains and compares the results against Ruler's rules for the same domains. The goal is to replicate `Table 2` and the code for this experiment is located at `ruler/scripts/oopsla23/table2`.
+- `kick-tires.sh` (<1 minute) does not invoke Enumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` (1-2 minutes) runs Renumo for the `bool` domain using the Renumo program located at
+- `lite.sh` (1-2 minutes) runs Enumo for the `bool` domain using the Enumo program located at
   `ruler/tests/recipes/bool.rs`.
-- `full.sh` (~10 minutes) runs Renumo for the `bool`, `bv4`, `bv32`, and `rational` domains using Renumo programs in the `ruler/tests/recipes` directory.
+- `full.sh` (~10 minutes) runs Enumo for the `bool`, `bv4`, `bv32`, and `rational` domains using Enumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
 
 ### Experiment 2: Scaling to Large Domains
 
-- This experiment uses Renumo to infer rules for the Halide domain. The goal is to replicate the results in Section 6.1.2 and the code for this experiment is located at `ruler/scripts/oopsla23/exp2`.
-- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from `ruler/scripts/oopsla23/precomputed.json`
-- `lite.sh` (~5 minutes) runs Renumo to infer rules using the Renumo program located at `ruler/tests/recipes/halide.rs`
-  but does _not_ compute the derivability between the Renumo-inferred ruleset and Halide's rules.
-- `full.sh` (~45 minutes) runs Renumo to infer the Halide rules and computes the derivability between the Renumo rules and the Halide rules.
+- This experiment uses Enumo to infer rules for the Halide domain. The goal is to replicate the results in Section 6.1.2 and the code for this experiment is located at `ruler/scripts/oopsla23/exp2`.
+- `kick-tires.sh` (<1 minute) does not invoke Enumo, it just uses the precomputed data from `ruler/scripts/oopsla23/precomputed.json`
+- `lite.sh` (~5 minutes) runs Enumo to infer rules using the Enumo program located at `ruler/tests/recipes/halide.rs`
+  but does _not_ compute the derivability between the Enumo-inferred ruleset and Halide's rules.
+- `full.sh` (~45 minutes) runs Enumo to infer the Halide rules and computes the derivability between the Enumo rules and the Halide rules.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -161,12 +161,12 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 ### Experiment 3: Rule Inference Using Fast-Forwarding
 
-- This experiment uses Renumo to infer rules for numeric domains (`exponential`, `rational`, and `trig`) and compares them against Herbie's handcrafted rules. The goal is to replicate `Table 3` and the code for this experiment is located at `ruler/scripts/oopsla23/table3`.
-- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from
+- This experiment uses Enumo to infer rules for numeric domains (`exponential`, `rational`, and `trig`) and compares them against Herbie's handcrafted rules. The goal is to replicate `Table 3` and the code for this experiment is located at `ruler/scripts/oopsla23/table3`.
+- `kick-tires.sh` (<1 minute) does not invoke Enumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` (1-2 minutes) runs Renumo for the `exponential` domain using the Renumo program located at
+- `lite.sh` (1-2 minutes) runs Enumo for the `exponential` domain using the Enumo program located at
   `ruler/tests/recipes/exponential.rs`.
-- `full.sh` (~30 minutes) runs Renumo for the `exponential`, `rational`, and `trig` domains using Renumo programs in the `ruler/tests/recipes` directory.
+- `full.sh` (~30 minutes) runs Enumo for the `exponential`, `rational`, and `trig` domains using Enumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -176,10 +176,10 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 #### Case Study 1: Herbie
 
-- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, `trig`, and `bool` domains into Herbie. The goal is to reproduce `Figure 8` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_8`.
-- `kick-tires.sh` (<1 minute) does not invoke Renumo or Herbie. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_8/saved/`
-- `lite.sh` (~1-2 hours) does not invoke Renumo. It uses the precomputed Renumo data from `ruler/scripts/oopsla23/precomputed.json`. It runs a single Herbie benchmark (`hamming`) with 5 seeds.
-- `full.sh` (~24 hours) runs Renumo for the `exponential`, `rational`, `trig`, and `bool` domains. It then runs all Herbie benchmarks with 30 seeds. This requires 32 GB RAM (minimum).
+- This experiment integrates Enumo-inferred rules for the `exponential`, `rational`, `trig`, and `bool` domains into Herbie. The goal is to reproduce `Figure 8` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_8`.
+- `kick-tires.sh` (<1 minute) does not invoke Enumo or Herbie. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_8/saved/`
+- `lite.sh` (~1-2 hours) does not invoke Enumo. It uses the precomputed Enumo data from `ruler/scripts/oopsla23/precomputed.json`. It runs a single Herbie benchmark (`hamming`) with 5 seeds.
+- `full.sh` (~24 hours) runs Enumo for the `exponential`, `rational`, `trig`, and `bool` domains. It then runs all Herbie benchmarks with 30 seeds. This requires 32 GB RAM (minimum).
   - To run Herbie in parallel, set the environment variable `PARALLEL_SEEDS`.
 - Scripts
   - `eval.sh`: top-level script for running the Herbie case study
@@ -193,46 +193,46 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
   - `herbie`: directory where Herbie is installed
   - `plot`: plotting code
   - `saved`: a previous run for use in the artifact
-  - `rules`: Renumo rules should be stored here to run the Herbie case study
+  - `rules`: Enumo rules should be stored here to run the Herbie case study
 
 #### Case Study 2: Megalibm
 
-- This experiment integrates Renumo-inferred rules for the `exponential`, `rational`, and `trig` domains into Megalibm. The goal is to reproduce the results in `Figure 9` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_9`.
+- This experiment integrates Enumo-inferred rules for the `exponential`, `rational`, and `trig` domains into Megalibm. The goal is to reproduce the results in `Figure 9` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/fig_9`.
 - This experiment requires our evaluation branch of Megalibm (https://github.com/IanBriggs/megalibm/tree/ruler) to be installed under `ruler/scripts/oopsla23/fig_9/megalibm`. This is already installed and built on the VM.
 - The table in `Figure 9` in the paper was generated manually. These instructions will explain how to regenerate the underlying data using Megalibm. The output from Megalibm will be three HTML files and one log file, all inside the `results/` folder: `pareto.html`, `baseline.html`, `renumo_run.html`, and `identities.log`.
   - `pareto.html` compares the pareto fronts of different generated implementations for each benchmark on each domain, evaluated on accuracy and speed. One of these figures was used in Figure 9 (cos over domain [-32, 32]).
   - `baseline.html` shows the results of running Megalibm with the baseline rules.
-  - `renumo_run.html` shows the results of running Megalibm with Renumo rules.
+  - `renumo_run.html` shows the results of running Megalibm with Enumo rules.
   - `identities.log` shows all the identities that were found by Megalibm using the rules.
   - To count the number of Unique Impls as reported in the table in `Figure 9`, click into the `core_function_sin`, `core_function_cos`, and `core_function_tan` benchmark pages to be taken to a new page with graphs specific to the benchmark. Look at the graph of relative error and count the number of clusters. The number of clusters should be the same across domains for each benchmark. For example, this graph has five groups (unique implementations): pink, blue, green/purple, black, and teal.
     ![Alt text](image.png)
   - To count the number of Unique Identities as reported in the table in `Figure 9`, enter `identities.log` and look at the list of identities found for each benchmark. Check to see which identities can derive each other via multiple applications of other identities, or via simplification.
-- `kick-tires.sh` (<1 minute) does not invoke Renumo or Megalibm. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_9/megalibm/oopsla23`
-- `lite.sh` (~10 minutes) does not invoke Renumo. It uses precomputed Renumo data at `ruler/scripts/oopsla23/precomputed.json`. It runs the Megalibm benchmarks using these Renumo rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
-- `full.sh` (~1 hour) runs Renumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
+- `kick-tires.sh` (<1 minute) does not invoke Enumo or Megalibm. It uses data from a previous run located at `ruler/scripts/oopsla23/fig_9/megalibm/oopsla23`
+- `lite.sh` (~10 minutes) does not invoke Enumo. It uses precomputed Enumo data at `ruler/scripts/oopsla23/precomputed.json`. It runs the Megalibm benchmarks using these Enumo rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
+- `full.sh` (~1 hour) runs Enumo for the `exponential`, `rational`, and `trig` domains. Then it runs the Megalibm benchmarks using these rules and outputs the results to `ruler/scripts/oopsla23/fig_9/out`.
 - `megalib/src/nightly.sh` runs the benchmarks.
 - `megalibm/graph_against_baseline.py` generates the plots and makes the webpage.
 
 #### Case Study 3: Szalinski
 
-- This experiment integrates Renumo-inferred rules into Szalinski. The goal is to reproduce `Table 4` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/table_4`.
+- This experiment integrates Enumo-inferred rules into Szalinski. The goal is to reproduce `Table 4` in the paper and the code for this experiment is located at `ruler/scripts/oopsla23/table_4`.
 - This experiment requires our evaluation branch of Szalinski (https://github.com/rtjoa/szalinski/tree/eval) to be installed under `ruler/scripts/oopsla23/table_4/szalinski`. This is already installed and built on the VM.
-- `kick-tires.sh` (<1 minute) does not invoke Renumo or Szalinski. It uses data from a previous run located at `ruler/scripts/oopsla23/table_4/precomputed.csv`
-- `lite.sh` (~30 minutes) does not invoke Renumo. It uses precomputed Renumo data from `ruler/scripts/oopsla23/table_4/precomputed.rules`. It reruns the Szalinski benchmarks using these rules.
-- `full.sh` (~45 minutes) runs Renumo for the `szalinski` domain. This requires 32 GB RAM. Then it runs the Szalinski benchmarks using these rules.
-- `szalinski/copy-rules.py` reformats the Renumo-inferred rules for use by Szalinski
+- `kick-tires.sh` (<1 minute) does not invoke Enumo or Szalinski. It uses data from a previous run located at `ruler/scripts/oopsla23/table_4/precomputed.csv`
+- `lite.sh` (~30 minutes) does not invoke Enumo. It uses precomputed Enumo data from `ruler/scripts/oopsla23/table_4/precomputed.rules`. It reruns the Szalinski benchmarks using these rules.
+- `full.sh` (~45 minutes) runs Enumo for the `szalinski` domain. This requires 32 GB RAM. Then it runs the Szalinski benchmarks using these rules.
+- `szalinski/copy-rules.py` reformats the Enumo-inferred rules for use by Szalinski
 - `szalinski/to_latex.py` converts the output of Szalinski (`out/aec-table2/table2.csv`) to LaTeX, which will be written to `table.tex`.
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
 
 ### Experiment 5: Cross-Domain Ruleset Manipulation
 
-- This experiment uses Renumo-inferred rules for `BV4` to construct rulesets for larger bitvectors (`BV8`, `BV16`, `BV32`, `BV64`, and `BV128`) and compares them against rulesets directly inferred for the larger bitvector domains. The goal is to replicate `Table 5` and the code for this experiment is located at `ruler/scripts/oopsla23/table5`.
-- `kick-tires.sh` (<1 minute) does not invoke Renumo, it just uses the precomputed data from
+- This experiment uses Enumo-inferred rules for `BV4` to construct rulesets for larger bitvectors (`BV8`, `BV16`, `BV32`, `BV64`, and `BV128`) and compares them against rulesets directly inferred for the larger bitvector domains. The goal is to replicate `Table 5` and the code for this experiment is located at `ruler/scripts/oopsla23/table5`.
+- `kick-tires.sh` (<1 minute) does not invoke Enumo, it just uses the precomputed data from
   `ruler/scripts/oopsla23/precomputed.json`.
-- `lite.sh` (~1-2 minutes) runs Renumo for the `BV8` domain using the Renumo program located at
+- `lite.sh` (~1-2 minutes) runs Enumo for the `BV8` domain using the Enumo program located at
   `ruler/tests/recipes/bv8.rs`.
-- `full.sh` (~45 minutes) runs Renumo for the `BV8`, `BV16`, `BV32`,
-  `BV64`, and `BV128` domains using Renumo programs in the `ruler/tests/recipes` directory.
+- `full.sh` (~45 minutes) runs Enumo for the `BV8`, `BV16`, `BV32`,
+  `BV64`, and `BV128` domains using Enumo programs in the `ruler/tests/recipes` directory.
 - The data will be located at `out/output.json`
 - `generateLatex.js` converts `output.json` to LaTeX, which will be written to `out/table.tex`
 - `out/table.pdf` is generated from the `.tex` file using `pdflatex`.
@@ -241,21 +241,21 @@ Any of the experiments can also be run individually using the `kick-tires`, `lit
 
 - The source code resides in the `src` directory.
   - `lib.rs` is the main entrypoint and defines some auxiliary data types.
-  - `language.rs` defines the `SynthLanguage` trait, which must be implemented in order to use the Renumo DSL to find rules for a domain. There are two main things that must be implemented: an interpreter and a rule validator. (In the case of fast-forwarding, the interpreter is not needed.)
-  - `logger.rs` contains logic for outputting results of running Renumo to JSON
-  - `recipe_utils.rs` contains some common helper functions for use in Renumo programs. Everything in `recipe_utils` can be implemented directly using the Renumo core operators.
+  - `language.rs` defines the `SynthLanguage` trait, which must be implemented in order to use the Enumo DSL to find rules for a domain. There are two main things that must be implemented: an interpreter and a rule validator. (In the case of fast-forwarding, the interpreter is not needed.)
+  - `logger.rs` contains logic for outputting results of running Enumo to JSON
+  - `recipe_utils.rs` contains some common helper functions for use in Enumo programs. Everything in `recipe_utils` can be implemented directly using the Enumo core operators.
   - `util.rs` has some small helper functions.
   - The core of the DSL is implemented in `enumo/`
     - `workload.rs` contains the `Workload` data type. Workloads evaluate to a list of terms (s-expressions). Workloads can be constructed directly from a list of s-expressions (`Workload::Set`), combined (`Workload::Append`), refined with a filter (`Workload::Filter`), or composed via plugs (`Workload::Plug`). Plug is a novel operation for generating workloads from smaller workloads. It takes two workloads, $W_1$ and $W_2$ and a string, $s$; for each term in $W_2$ that contains $s$, it “plugs” in the values in $W_1$ and generates a new workload which is a cross product of all the new plugged terms.
     - `ruleset.rs` contains the `Ruleset` data type. Rulesets are implemented as an `IndexMap` of `Equality`. There are several operations over Rulesets that can be used to combine, compose, and refine rulesets. For example, `Ruleset::cvec_match` extracts a set of equalities from an e-graph via cvec-matching; `Ruleset::minimize` can be used to eliminate redundant rules from a ruleset; `Ruleset::derive` tests the proving power of one ruleset compared to another.
-    - `scheduler.rs` defines how to run equality saturating using a `Ruleset` and an `EGraph`. The three scheduling techniques provided in `Renumo` are `Simple`, `Saturating`, and `Compress`. Additional scheduling strategies can be implemented by adding to the `Scheduler` enum and adding a case to `Scheduler::run_internal`.
+    - `scheduler.rs` defines how to run equality saturating using a `Ruleset` and an `EGraph`. The three scheduling techniques provided in `Enumo` are `Simple`, `Saturating`, and `Compress`. Additional scheduling strategies can be implemented by adding to the `Scheduler` enum and adding a case to `Scheduler::run_internal`.
     - `sexp.rs` contains an implementation of s-expressions.
     - `rule.rs` defines a rewrite rule.
     - `filter.rs` defines the `Filter` data type which can be used to filter workloads. `pattern.rs` and `metric.rs` define data types that are used in `Filter`.
 
-## Further Use / Extending Renumo
+## Further Use / Extending Enumo
 
-This section describes how to install Renumo on a different machine, the required dependencies, and how to extend the tool for other uses.
+This section describes how to install Enumo on a different machine, the required dependencies, and how to extend the tool for other uses.
 
 ### Dependencies
 
@@ -284,9 +284,9 @@ We tested our artifact on a Ubuntu 22.04 VM. To install and run the evaluation o
   - `python3-matplotlib`
   - `jq`
 
-After installing these dependencies and getting the Renumo code from Zenodo, run `cargo build --release` to build Renumo. This will take ~40 minutes.
+After installing these dependencies and getting the Enumo code from Zenodo, run `cargo build --release` to build Enumo. This will take ~40 minutes.
 
-In order to run the case studies which integrate Renumo with other tools, you will need to install the other tools in the right places.
+In order to run the case studies which integrate Enumo with other tools, you will need to install the other tools in the right places.
 
 - For Szalinski, run `git clone --branch eval https://github.com/rtjoa/szalinski` from the `ruler/scripts/oopsla23/table_4` directory.
 - For Megalibm, run `git clone --branch ruler https://github.com/IanBriggs/megalibm.git` from the `ruler/scripts/oopsla23/fig_9` directory.
@@ -294,16 +294,16 @@ In order to run the case studies which integrate Renumo with other tools, you wi
 
 ### Writing a Program to Infer Rules
 
-The Renumo DSL enables rewrite rule inference for any domain
+The Enumo DSL enables rewrite rule inference for any domain
 given a grammar, an interpreter, and a validation technique.
 To understand how to add support for a new domain,
 you can look at the domains in the `tests` directory.
 Note that some domains are experimental and not reported in the paper,
 but they all provide examples of how you can add support for new domains.
 
-To use Renumo for a new domain, you must first implement the `SynthLanguage` trait for your domain. This requires implementing a rule validator and either an interpreter (for non-fast-forwarding domains) or a set of lifting rules (for fast-forwarding domains).
+To use Enumo for a new domain, you must first implement the `SynthLanguage` trait for your domain. This requires implementing a rule validator and either an interpreter (for non-fast-forwarding domains) or a set of lifting rules (for fast-forwarding domains).
 
-To show how users can write a Renumo program for rule inference, let's take a look at `bv4_fancy.rs`, located in the `tests/recipes` directory. This program showcases several of Renumo's provided features for "guided search"-style rule synthesis using one of the example domains, `bv.rs`, located in `src/`.
+To show how users can write an Enumo program for rule inference, let's take a look at `bv4_fancy.rs`, located in the `tests/recipes` directory. This program showcases several of Enumo's provided features for "guided search"-style rule synthesis using one of the example domains, `bv.rs`, located in `src/`.
 
 ```
 // create a new set of rules for bitvectors, initially empty
@@ -318,7 +318,7 @@ let lang = Lang::new(
 
 ```
 
-After initializing an empty ruleset, `rules`, we define a language we want to enumerate terms over. In this case, our language contains some constants (`0` and `1`), some variables (`a`, `b`, `c`), the unary operators (`~` and `-`), and some binary operators, including (`&`, `|`, `*`), and others. Note that `lang` is actually a subset of the operators supported by the `bv.rs` implementation—the operator `^`, for example, is _not_ included. This is one way Renumo allows users to easily omit information that is not important for their purposes, enabling for faster, more scalable synthesis.
+After initializing an empty ruleset, `rules`, we define a language we want to enumerate terms over. In this case, our language contains some constants (`0` and `1`), some variables (`a`, `b`, `c`), the unary operators (`~` and `-`), and some binary operators, including (`&`, `|`, `*`), and others. Note that `lang` is actually a subset of the operators supported by the `bv.rs` implementation—the operator `^`, for example, is _not_ included. This is one way Enumo allows users to easily omit information that is not important for their purposes, enabling for faster, more scalable synthesis.
 
 ```
 // find rules using terms over the provided language up to 5 atoms in size
@@ -331,7 +331,7 @@ rules.extend(recursive_rules(
 ));
 ```
 
-The `recursive_rules` function, included in `src/recipe_utils.rs`, is one of several convenience features included in Renumo. It recursively builds up a ruleset by enumerating all terms over a passed-in `Language` up to a specified size. Renumo supports three
+The `recursive_rules` function, included in `src/recipe_utils.rs`, is one of several convenience features included in Enumo. It recursively builds up a ruleset by enumerating all terms over a passed-in `Language` up to a specified size. Enumo supports three
 measures of term size: `Atoms` (number of literals in the term), `Depth`
 (depth of s-expression), and `Lists` (number of operators in the term).
 
@@ -350,7 +350,7 @@ let a6_canon = iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
         ]));
 ```
 
-Renumo allows its users to decouple workload generation from rule synthesis. In the above code snippet, we are not finding rules at all: we are _just_ building up a workload. `a6_canon` is pretty complicated, so let's break it up a bit to make it easier:
+Enumo allows its users to decouple workload generation from rule synthesis. In the above code snippet, we are not finding rules at all: we are _just_ building up a workload. `a6_canon` is pretty complicated, so let's break it up a bit to make it easier:
 
 ```
 iter_metric(base_lang(2), "EXPR", enumo::Metric::Atoms, 6)
@@ -365,7 +365,7 @@ consisting of variables, constants, and operators with up to `n` arguments.
 .plug("VAL", &Workload::empty())
 ```
 
-`plug` is the core Renumo operator for constructing and composing workloads.
+`plug` is the core Enumo operator for constructing and composing workloads.
 An `EXPR` contains `VARS` (variables) and `VALS` (values) as its leaves, and `plug` specifies what can be "plugged in" as variables and values—in this case, a workload containing `lang`'s variables and an empty workload, respectively.
 
 ```
@@ -376,7 +376,7 @@ An `EXPR` contains `VARS` (variables) and `VALS` (values) as its leaves, and `pl
         ]));
 ```
 
-Renumo also supports filtering terms out of generated workloads that do not interest the user. In this case, after the workload is generated, terms that are not _canonicalized_ are removed. Canonicalization here means that `a` must be the first variable introduced. `a` can be followed by another `a` any number of times, but the next new variable introduced must be `b`, and so on. Canonicalization drastically expedites rule inference by eliminating duplicate terms, often representing the difference between a workload that is too large to perform rule inference over and one that finishes near-instantaneously.
+Enumo also supports filtering terms out of generated workloads that do not interest the user. In this case, after the workload is generated, terms that are not _canonicalized_ are removed. Canonicalization here means that `a` must be the first variable introduced. `a` can be followed by another `a` any number of times, but the next new variable introduced must be `b`, and so on. Canonicalization drastically expedites rule inference by eliminating duplicate terms, often representing the difference between a workload that is too large to perform rule inference over and one that finishes near-instantaneously.
 
 ```
 let consts = Workload::new(["0", "1"]);
@@ -397,4 +397,4 @@ let wkld = Workload::Append(vec![a6_canon, consts]);
     rules
 ```
 
-Finally, we are ready to run rule synthesis for the final time, which we do using the workload we just created, the rules we got from `recursive_rules`, and some resource limits. We return this final ruleset. This is a complete Renumo program!
+Finally, we are ready to run rule synthesis for the final time, which we do using the workload we just created, the rules we got from `recursive_rules`, and some resource limits. We return this final ruleset. This is a complete Enumo program!
