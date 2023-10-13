@@ -165,7 +165,7 @@ pub fn write_bv_derivability<L: SynthLanguage>(
  * time: time in seconds
  * rules: array of rules
  */
-pub fn write_lifting_phase<L: SynthLanguage>(
+pub fn write_ff_phase<L: SynthLanguage>(
     phase1: Phase<L>,
     phase2: Phase<L>,
     phase3: Phase<L>,

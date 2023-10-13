@@ -434,7 +434,7 @@ mod test {
         // let (sound, _) = candidates.partition(|r| r.is_valid());
         let (sound, _) = candidates.minimize(minimize.rules, minimize.scheduler);
 
-        logger::write_lifting_phase(phase1, phase2, phase3, start.elapsed(), &sound);
+        logger::write_ff_phase(phase1, phase2, phase3, start.elapsed(), &sound);
 
         (sound, start.elapsed())
     }

@@ -113,13 +113,13 @@ pub fn run_fast_forwarding<L: SynthLanguage>(
     let eg_allowed = Scheduler::Compress(prior_limits).run(&eg_init, &allowed);
 
     // Translation rules: grow egraph, extract candidates, assert!(saturated)
-    let lifting_rules = L::get_exploratory_rules();
-    let eg_denote = Scheduler::Simple(prior_limits).run(&eg_allowed, &lifting_rules);
+    let exploratory = L::get_exploratory_rules();
+    let eg_denote = Scheduler::Simple(prior_limits).run(&eg_allowed, &exploratory);
     let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
 
     // All rules: compress e-graph, extract candidates
     let mut all_rules = prior.clone();
-    all_rules.extend(lifting_rules);
+    all_rules.extend(exploratory);
     let eg_final = Scheduler::Compress(prior_limits).run(&eg_denote, &all_rules);
     candidates.extend(Ruleset::extract_candidates(&eg_denote, &eg_final));
 

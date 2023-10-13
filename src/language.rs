@@ -216,7 +216,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
 
     /// Configures whether to run fast-forwarding or cvec algorithm for
     /// finding candidates.
-    /// If fast-forwarding is enabled, L::get_lifting_rewrites() and L::is_allowed_op()
+    /// If fast-forwarding is enabled, L::get_exploratory_rules() and L::is_allowed_op()
     /// must be implemented
     fn is_fast_forwarding() -> bool {
         false
@@ -227,7 +227,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     /// These are the exploratory rules that run in the second phase of the
     /// fast-forwarding algorithm
     fn get_exploratory_rules() -> Ruleset<Self> {
-        panic!("No lifting rules")
+        panic!("No exploratory rules")
     }
 
     /// Required for fast-forwarding
