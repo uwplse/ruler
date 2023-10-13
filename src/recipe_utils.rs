@@ -88,11 +88,16 @@ pub fn run_workload<L: SynthLanguage>(
     )
 }
 
-/// Runs rule inference via fast-forwarding:
-///     1. convert workload to e-graph
-///     2. Find candidates with the fast-forwarding algorithm
-///     3. Minimize the candidates with respect to the prior rules
-pub fn run_rule_lifting<L: SynthLanguage>(
+/// The fast-forwarding algorithm
+///     1. Convert workload to e-graph
+///     2. Find allowed rules in prior
+///     3. Compress the e-graph with allowed rules
+///     4. Grow the e-graph using the exploratory rules from the domain
+///     5. Extract rule candidates
+///     6. Compress the e-graph with all rules
+///     7. Extract rule candidates
+///     8. Minimize rule candidates
+pub fn run_fast_forwarding<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
     prior_limits: Limits,
@@ -100,9 +105,25 @@ pub fn run_rule_lifting<L: SynthLanguage>(
 ) -> Ruleset<L> {
     let t = Instant::now();
 
-    let egraph = workload.to_egraph::<L>();
+    let eg_init = workload.to_egraph::<L>();
     let num_prior = prior.len();
-    let mut candidates = Ruleset::allow_forbid_actual(egraph, prior.clone(), prior_limits);
+
+    // Allowed rules: compress e-graph, no candidates
+    let (allowed, _) = prior
+        .clone()
+        .partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
+    let eg_allowed = Scheduler::Compress(prior_limits).run(&eg_init, &allowed);
+
+    // Translation rules: grow egraph, extract candidates, assert!(saturated)
+    let lifting_rules = L::get_exploratory_rules();
+    let eg_denote = Scheduler::Simple(prior_limits).run(&eg_allowed, &lifting_rules);
+    let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
+
+    // All rules: compress e-graph, extract candidates
+    let mut all_rules = prior.clone();
+    all_rules.extend(lifting_rules);
+    let eg_final = Scheduler::Compress(prior_limits).run(&eg_denote, &all_rules);
+    candidates.extend(Ruleset::extract_candidates(&eg_denote, &eg_final));
 
     let chosen = candidates
         .minimize(prior, Scheduler::Compress(minimize_limits))

@@ -218,7 +218,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     /// finding candidates.
     /// If fast-forwarding is enabled, L::get_lifting_rewrites() and L::is_allowed_op()
     /// must be implemented
-    fn is_rule_lifting() -> bool {
+    fn is_fast_forwarding() -> bool {
         false
     }
 
@@ -226,7 +226,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     ///
     /// These are the exploratory rules that run in the second phase of the
     /// fast-forwarding algorithm
-    fn get_lifting_rules() -> Ruleset<Self> {
+    fn get_exploratory_rules() -> Ruleset<Self> {
         panic!("No lifting rules")
     }
 

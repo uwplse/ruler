@@ -46,11 +46,11 @@ impl Pos {
 impl SynthLanguage for Pos {
     type Constant = usize;
 
-    fn is_rule_lifting() -> bool {
+    fn is_fast_forwarding() -> bool {
         true
     }
 
-    fn get_lifting_rules() -> Ruleset<Self> {
+    fn get_exploratory_rules() -> Ruleset<Self> {
         Ruleset::new(&[
             "XH ==> (S Z)",
             "(S Z) ==> XH",
@@ -113,7 +113,7 @@ impl SynthLanguage for Pos {
 mod tests {
     use ruler::{
         enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
-        recipe_utils::{base_lang, iter_metric, run_rule_lifting},
+        recipe_utils::{base_lang, iter_metric, run_fast_forwarding},
     };
 
     use super::*;
@@ -161,7 +161,7 @@ mod tests {
         let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)
-        let lifting_rules = Pos::get_lifting_rules();
+        let lifting_rules = Pos::get_exploratory_rules();
         let eg_denote = Scheduler::Simple(limits).run(&eg_allowed, &lifting_rules);
         let mut candidates = Ruleset::extract_candidates(&eg_allowed, &eg_denote);
 
@@ -205,19 +205,19 @@ mod tests {
         let atoms3 = iter_pos(3);
         assert_eq!(atoms3.force().len(), 51);
 
-        let rules3 = run_rule_lifting(atoms3, all_rules.clone(), limits, limits);
+        let rules3 = run_fast_forwarding(atoms3, all_rules.clone(), limits, limits);
         all_rules.extend(rules3);
 
         let atoms4 = iter_pos(4);
         assert_eq!(atoms4.force().len(), 255);
 
-        let rules4 = run_rule_lifting(atoms4, all_rules.clone(), limits, limits);
+        let rules4 = run_fast_forwarding(atoms4, all_rules.clone(), limits, limits);
         all_rules.extend(rules4);
 
         let atoms5 = iter_pos(5);
         assert_eq!(atoms5.force().len(), 1527);
 
-        let rules4 = run_rule_lifting(atoms5, all_rules.clone(), limits, limits);
+        let rules4 = run_fast_forwarding(atoms5, all_rules.clone(), limits, limits);
         all_rules.extend(rules4);
 
         let expected: Ruleset<Pos> = Ruleset::new(&[

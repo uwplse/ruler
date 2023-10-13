@@ -38,11 +38,11 @@ fn is_bv_str(s: &'static str) -> impl Fn(&mut EGraph<BvBool, SynthAnalysis>, Id,
 impl SynthLanguage for BvBool {
     type Constant = BV<2>;
 
-    fn is_rule_lifting() -> bool {
+    fn is_fast_forwarding() -> bool {
         true
     }
 
-    fn get_lifting_rules() -> Ruleset<Self> {
+    fn get_exploratory_rules() -> Ruleset<Self> {
         let mut rules = Ruleset::new(&[
             "(first (not ?a)) ==> (~ (first ?a))",
             "(second (not ?a)) ==> (~ (second ?a))",

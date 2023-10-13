@@ -90,11 +90,11 @@ impl SynthLanguage for Exponential {
         ValidationResult::Valid
     }
 
-    fn is_rule_lifting() -> bool {
+    fn is_fast_forwarding() -> bool {
         true
     }
 
-    fn get_lifting_rules() -> enumo::Ruleset<Self> {
+    fn get_exploratory_rules() -> enumo::Ruleset<Self> {
         enumo::Ruleset::new(&[
             // definitions (denote)
             "(pow ?a ?b) ==> (exp (* ?b (log ?a)))",

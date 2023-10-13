@@ -148,11 +148,11 @@ egg::define_language! {
 impl SynthLanguage for Trig {
     type Constant = Real;
 
-    fn is_rule_lifting() -> bool {
+    fn is_fast_forwarding() -> bool {
         true
     }
 
-    fn get_lifting_rules() -> Ruleset<Self> {
+    fn get_exploratory_rules() -> Ruleset<Self> {
         Ruleset::new(&[
             // definition of sine, cosine, tangent
             // (sine)
@@ -320,7 +320,7 @@ mod test {
     use crate::trig::trig_rules;
     use ruler::{
         enumo::{Filter, Ruleset, Scheduler, Workload},
-        recipe_utils::run_rule_lifting,
+        recipe_utils::run_fast_forwarding,
         Limits,
     };
 
@@ -390,7 +390,7 @@ mod test {
         let mut all = complex;
         all.extend(prior_rules());
 
-        let rules = run_rule_lifting(terms, all, limits, limits);
+        let rules = run_fast_forwarding(terms, all, limits, limits);
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);
@@ -453,11 +453,11 @@ mod test {
         };
         let mut all = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         all.extend(prior_rules());
-        all.extend(Trig::get_lifting_rules());
+        all.extend(Trig::get_exploratory_rules());
         let mut all_but_exploratory = all.clone();
-        all_but_exploratory.remove_all(Trig::get_lifting_rules());
+        all_but_exploratory.remove_all(Trig::get_exploratory_rules());
         let (allowed, _) = all.partition(|r| Trig::is_allowed_rewrite(&r.lhs, &r.rhs));
-        let exploratory = Trig::get_lifting_rules();
+        let exploratory = Trig::get_exploratory_rules();
 
         let lits = Workload::new([
             "a", "b", "c", "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",

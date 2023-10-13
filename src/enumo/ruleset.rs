@@ -262,45 +262,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    /// The fast-forwarding algorithm
-    ///     1. Convert workload to e-graph
-    ///     2. Find allowed rules in prior
-    ///     3. Compress the e-graph with allowed rules
-    ///     4. Grow the e-graph using the exploratory rules from the domain
-    ///     5. Extract rule candidates
-    ///     6. Compress the e-graph with all rules
-    ///     7. Extract rule candidates
-    ///     8. Minimize rule candidates
-    pub fn allow_forbid_actual(
-        egraph: EGraph<L, SynthAnalysis>,
-        prior: Ruleset<L>,
-        limits: Limits,
-    ) -> Self {
-        /*
-         * eg_init ┌─────────┐ eg_allowed ┌────────┐ eg_denote ┌────────┐  eg_final
-         * ───────►│ allowed ├───────────►│ denote ├──────────►│  all   ├────────►
-         *         └─────────┘            └────────┘           └────────┘
-         */
-
-        let eg_init = egraph;
-        // Allowed rules: compress e-graph, no candidates
-        let (allowed, _) = prior.partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
-        let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
-
-        // Translation rules: grow egraph, extract candidates, assert!(saturated)
-        let lifting_rules = L::get_lifting_rules();
-        let eg_denote = Scheduler::Simple(limits).run(&eg_allowed, &lifting_rules);
-        let mut candidates = Self::extract_candidates(&eg_allowed, &eg_denote);
-
-        // All rules: compress e-graph, extract candidates
-        let mut all_rules = prior;
-        all_rules.extend(lifting_rules);
-        let eg_final = Scheduler::Compress(limits).run(&eg_denote, &all_rules);
-        candidates.extend(Self::extract_candidates(&eg_denote, &eg_final));
-
-        candidates
-    }
-
     /// Find candidates by CVec matching
     /// Pairs of e-classes with equivalent CVecs are rule candidates.
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
