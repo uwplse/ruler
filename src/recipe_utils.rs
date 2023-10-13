@@ -109,9 +109,7 @@ pub fn run_fast_forwarding<L: SynthLanguage>(
     let num_prior = prior.len();
 
     // Allowed rules: compress e-graph, no candidates
-    let (allowed, _) = prior
-        .clone()
-        .partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
+    let (allowed, _) = prior.partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
     let eg_allowed = Scheduler::Compress(prior_limits).run(&eg_init, &allowed);
 
     // Translation rules: grow egraph, extract candidates, assert!(saturated)
