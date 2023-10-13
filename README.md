@@ -5,7 +5,7 @@ It uses equality saturation to infer small, expressive rulesets for a domain.
 
 ### Publications
 
-- A. Pal, B. Saiki, R. Tjoa, C. Richey, A. Zhu, O. Flatt, M. Willsey, Z. Tatlock, C. Nandi,
+- (OOPSLA 2023) A. Pal, B. Saiki, R. Tjoa, C. Richey, A. Zhu, O. Flatt, M. Willsey, Z. Tatlock, C. Nandi,
   [_Equality Saturation Theory Exploration à la Carte_](https://ajpal.github.io/assets/files/enumo.pdf)
 
 - (OOPSLA 2021, Distinguished Paper Award) C. Nandi, M. Willsey, A. Zhu, Y. Wang, B. Saiki, A. Anderson, A. Schulz, D. Grossman, Z. Tatlock,
@@ -14,15 +14,9 @@ It uses equality saturation to infer small, expressive rulesets for a domain.
 \* This paper is based on an older version of this repository. If you are looking for the code
 associated with this paper, please use [this branch](https://github.com/uwplse/ruler/tree/oopsla21-aec).
 
-### Installation
+### Getting Started
 
 Enumo is implemented in [Rust](rust-lang.org/).
-You can install Rust [here](https://www.rust-lang.org/tools/install).
-To build Ruler, type `cargo build --release`.
-This should take a few minutes.
-
-### Dependencies
-
 To install Enumo, the following dependencies must be installed:
 
 - Rust
@@ -34,7 +28,9 @@ This will statically link to a built copy of z3 instead of dynamically linking, 
 process will take considerably longer.
 It is recommended that you install `libz3` if possible.
 
-### Usage
+To build Enumo, type `cargo build --release`. This should take a few minutes.
+
+Run `cargo doc --open` to build and open the documentation in a browser.
 
 `cargo test` will run all the tests, including tests that
 find rules for a handful of example domains. See the
