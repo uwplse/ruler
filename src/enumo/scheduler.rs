@@ -6,10 +6,16 @@ use crate::{EGraph, Id, Limits, SynthAnalysis, SynthLanguage};
 
 use super::*;
 
+/// Scheduling strategies for running equality saturation
 #[derive(Debug, Clone, Copy)]
 pub enum Scheduler {
+    /// equivalent to egg::SimpleScheduler
     Simple(Limits),
+    /// Partitions rules into saturating / non-saturating.
+    /// For each iteration, runs saturating rules to saturation, then one iteration of the non-saturating rules
     Saturating(Limits),
+    /// Runs equality saturation on a clone of the e-graph then applies merges to the e-graph
+    /// This ensures the number of e-classes in the e-graph does not grow.
     Compress(Limits),
 }
 

@@ -5,6 +5,7 @@ use crate::{
     Limits, SynthLanguage,
 };
 
+/// Iterate a grammar (represented as a workload) up to a certain size metric
 pub fn iter_metric(wkld: Workload, atom: &str, met: Metric, n: usize) -> Workload {
     let mut pegs = wkld.clone();
     for i in 1..(n + 1) {
@@ -65,6 +66,11 @@ fn run_workload_internal<L: SynthLanguage>(
     chosen
 }
 
+/// Runs rule inference:
+///     1. convert workload to e-graph
+///     2. If there are prior rules, compress the e-graph using them
+///     3. Find candidates via CVec matching
+///     4. Minimize the candidates with respect to the prior rules
 pub fn run_workload<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
@@ -82,6 +88,10 @@ pub fn run_workload<L: SynthLanguage>(
     )
 }
 
+/// Runs rule inference via fast-forwarding:
+///     1. convert workload to e-graph
+///     2. Find candidates with the fast-forwarding algorithm
+///     3. Minimize the candidates with respect to the prior rules
 pub fn run_rule_lifting<L: SynthLanguage>(
     workload: Workload,
     prior: Ruleset<L>,
@@ -132,6 +142,8 @@ impl Lang {
     }
 }
 
+/// Incrementally construct a ruleset by running rule inference up to a size bound,
+/// using previously-learned rules at each step.
 pub fn recursive_rules<L: SynthLanguage>(
     metric: Metric,
     n: usize,
@@ -171,6 +183,7 @@ pub fn recursive_rules<L: SynthLanguage>(
     }
 }
 
+/// Util function for making a grammar with variables, values, and operators with up to n arguments.
 pub fn base_lang(n: usize) -> Workload {
     let mut vals = vec!["VAR".to_string(), "VAL".to_string()];
     for i in 1..(n + 1) {

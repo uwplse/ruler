@@ -16,10 +16,19 @@ pub mod logger;
 pub mod recipe_utils;
 mod util;
 
+/// Egg Id
 pub type Id = egg::Id;
+
+/// Egg Symbol
 pub type Symbol = egg::Symbol;
+
+/// Egg Var
 pub type Var = egg::Var;
+
+/// E-graph
 pub type EGraph<L, N> = egg::EGraph<L, N>;
+
+/// Egg Pattern
 pub type Pattern<L> = egg::Pattern<L>;
 
 /// Faster hashMap implementation used in rustc
@@ -29,11 +38,14 @@ pub type HashSet<K> = rustc_hash::FxHashSet<K>;
 /// IndexMap data implementation used in rustc
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
 
-/// Validation result
+/// Whether a rule is sound.
 #[derive(Debug, Clone)]
 pub enum ValidationResult {
+    /// The rule is sound.
     Valid,
+    /// The rule is unsound.
     Invalid,
+    /// The soundness of the rule is unknown, for example, the SMT query timed out.
     Unknown,
 }
 
@@ -54,6 +66,7 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
     }
 }
 
+/// Resource limits for equality saturation.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     pub iter: usize,
@@ -61,9 +74,15 @@ pub struct Limits {
     pub match_: usize,
 }
 
+/// What metric for derivability to measure. Derivability tests whether a
+/// ruleset, R, can recover the proving power of a specified rule, lhs->rhs
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum DeriveType {
+    /// Tests whether the equivalence between lhs and rhs can be discovered
+    /// from an e-graph initialized only with lhs.
     Lhs,
+    /// Tests whether the equivalence between lhs and rhs can be discovered
+    /// from an e-graph initialized with lhs and rhs.
     LhsAndRhs,
 }
 
@@ -96,6 +115,7 @@ impl Limits {
     }
 }
 
+/// Used for interval analysis and constant folding
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Interval<T> {
     pub low: Option<T>,
@@ -125,9 +145,13 @@ impl<T> Default for Interval<T> {
     }
 }
 
+/// A scheduling phase for equality saturationg
 pub struct Phase<L: SynthLanguage> {
+    /// The rules to run
     pub rules: Ruleset<L>,
+    /// A name for the ruleset. Primarily used for logging and debugging.
     pub rules_name: String,
+    /// The schedule to use
     pub scheduler: Scheduler,
 }
 
@@ -142,8 +166,8 @@ impl<L: SynthLanguage> fmt::Display for Phase<L> {
     }
 }
 
-// Very minimal implementation of SynthLanguage for SymbolLang just so that we
-// can write domain-agnostic tests
+/// Very minimal implementation of SynthLanguage for SymbolLang just so that we
+/// can write domain-agnostic tests
 impl SynthLanguage for egg::SymbolLang {
     type Constant = usize;
 

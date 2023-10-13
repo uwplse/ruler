@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use super::*;
 
+/// Patterns
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Pattern {
     Wild,
