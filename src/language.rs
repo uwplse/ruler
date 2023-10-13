@@ -147,20 +147,30 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
     }
 }
 
+/// Characteristic Vector. Concrete evaluation on a sample of terms from the
+/// domain, used to identify rule candidates.
 pub type CVec<L> = Vec<Option<<L as SynthLanguage>::Constant>>;
+/// Value type in the domain.
 pub type Constant<L> = <L as SynthLanguage>::Constant;
 
+/// Trait for defining a language for which to synthesize rewrites.
 pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
+    /// Domain value type
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
-    // Overrideable hook into the egraph analysis modify method
-    // for language-specific purposes (such as custom constant folding)
+    /// Hook into the e-graph analysis modify method
+    /// Useful for domain-specific purposes (for example, constant folding)
     fn custom_modify(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
 
+    /// Interpreter for the domain.
+    /// This should return a CVec of the specified length
+    /// get_cvec can be used to get the CVecs of children nodes
     fn eval<'a, F>(&'a self, cvec_len: usize, _get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>;
 
+    /// Interval analysis for the domain.
+    /// By default, returns (-∞, ∞)
     fn mk_interval<'a, F>(&'a self, _get_interval: F) -> Interval<Self::Constant>
     where
         F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
@@ -168,22 +178,35 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         Interval::default()
     }
 
+    /// This function gets called when converting a workload to an e-graph
+    /// Given a list of variable names, it must add the variables to
+    /// the e-graph and may optionally do any additional initialization.
+    ///
+    /// Most commonly, this involves initializing the CVecs for variables with
+    /// sampled values from the domain.
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]);
 
     fn to_var(&self) -> Option<Symbol>;
+
+    /// Given a symbol, construct a variable node
     fn mk_var(sym: Symbol) -> Self;
+
+    /// Whether the node is a variable.
     fn is_var(&self) -> bool {
         self.to_var().is_some()
     }
 
+    /// Whether the node is a constant.
     fn is_constant(&self) -> bool;
-    /**
-     * Most domains don't need a reference to the egraph to make a constant node.
-     * However, Nat represents numbers recursively, so adding a new constant
-     * requires adding multiple nodes to the egraph.
-     */
+
+    /// Given a constant value, construct a node.
+    ///
+    /// Most domains won't need to use the egraph parameter to add a constant node.
+    /// However, Nat represents numbers recursively, so adding a new constant
+    /// requires adding multiple nodes to the egraph.
     fn mk_constant(c: Self::Constant, egraph: &mut EGraph<Self, SynthAnalysis>) -> Self;
 
+    /// Given a node, construct a pattern node
     fn to_enode_or_var(self) -> ENodeOrVar<Self> {
         match self.to_var() {
             Some(var) => ENodeOrVar::Var(format!("?{}", var).parse().unwrap()),
@@ -191,24 +214,33 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         }
     }
 
-    // Configures whether to run rule lifting or cvec algorithm for
-    // finding candidates.
-    // If rule lifting is enabled, L::get_lifting_rewrites() and L::is_allowed_op()
-    // must be implemented
+    /// Configures whether to run fast-forwarding or cvec algorithm for
+    /// finding candidates.
+    /// If fast-forwarding is enabled, L::get_lifting_rewrites() and L::is_allowed_op()
+    /// must be implemented
     fn is_rule_lifting() -> bool {
         false
     }
 
-    // Used for rule lifting
+    /// Required for fast-forwarding
+    ///
+    /// These are the exploratory rules that run in the second phase of the
+    /// fast-forwarding algorithm
     fn get_lifting_rules() -> Ruleset<Self> {
         panic!("No lifting rules")
     }
 
-    // Used for rule lifting
+    /// Required for fast-forwarding
+    ///
+    /// Determines whether a node may appear in a synthesized rule
     fn is_allowed_op(&self) -> bool {
         true
     }
 
+    /// Used by fast-forwarding
+    ///
+    /// Determines whether a rewrite rule may be selected.
+    /// A rewrite rule is allowed if it only contains allowed nodes on both sides.
     fn is_allowed_rewrite(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
         let pattern_is_extractable = |pat: &Pattern<Self>| {
             pat.ast.as_ref().iter().all(|n| match n {

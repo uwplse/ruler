@@ -10,6 +10,7 @@ use crate::{
 
 use super::{Rule, Scheduler};
 
+/// A set of rewrite rules
 #[derive(Clone, Debug)]
 pub struct Ruleset<L: SynthLanguage>(pub IndexMap<Arc<str>, Rule<L>>);
 
@@ -128,12 +129,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.insert(rule.name.clone(), rule);
     }
 
-    // Given a pair of recexprs, try to add rule candidates representing both
-    // directions (e1 ==> e2 and e2 ==> e1)
-    // This is actually a little bit subtle because it is important that we
-    // reuse the same generalized patterns for both directions.
-    // That is, this function *is not* equivalent to calling
-    // add(Rule::from_recexprs(e1, e2)); add(Rule::from_recexprs(e2, e1))
+    /// Given a pair of recexprs, try to add rule candidates representing both
+    /// directions (e1 ==> e2 and e2 ==> e1)
+    /// This is actually a little bit subtle because it is important that we
+    /// reuse the same generalized patterns for both directions.
+    /// That is, this function *is not* equivalent to calling
+    /// add(Rule::from_recexprs(e1, e2)); add(Rule::from_recexprs(e2, e1))
     fn add_from_recexprs(&mut self, e1: &RecExpr<L>, e2: &RecExpr<L>) {
         let map = &mut HashMap::default();
         let l_pat = L::generalize(e1, map);
@@ -164,6 +165,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.extend(other.0)
     }
 
+    /// Partition a ruleset by applying a predicate function to each rule in the ruleset
     pub fn partition<F>(&self, f: F) -> (Self, Self)
     where
         F: Fn(&Rule<L>) -> bool + std::marker::Sync,
@@ -220,6 +222,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
     }
 
+    /// Find candidates from two e-graphs
+    ///
+    /// If extracted terms l and r are in the same e-class in eg2,
+    /// but in different e-classes in eg1,
+    /// l=>r will be extracted as a rule candidate.
+    ///
+    /// This function should only be called on a pair of e-graphs such that
+    /// eg2 is the result of applying a ruleset to eg1.
     pub fn extract_candidates(
         eg1: &EGraph<L, SynthAnalysis>,
         eg2: &EGraph<L, SynthAnalysis>,
@@ -252,6 +262,15 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
+    /// The fast-forwarding algorithm
+    ///     1. Convert workload to e-graph
+    ///     2. Find allowed rules in prior
+    ///     3. Compress the e-graph with allowed rules
+    ///     4. Grow the e-graph using the exploratory rules from the domain
+    ///     5. Extract rule candidates
+    ///     6. Compress the e-graph with all rules
+    ///     7. Extract rule candidates
+    ///     8. Minimize rule candidates
     pub fn allow_forbid_actual(
         egraph: EGraph<L, SynthAnalysis>,
         prior: Ruleset<L>,
@@ -264,7 +283,7 @@ impl<L: SynthLanguage> Ruleset<L> {
          */
 
         let eg_init = egraph;
-        // Allowed rules: run on clone, apply unions, no candidates
+        // Allowed rules: compress e-graph, no candidates
         let (allowed, _) = prior.partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
         let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
@@ -273,7 +292,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let eg_denote = Scheduler::Simple(limits).run(&eg_allowed, &lifting_rules);
         let mut candidates = Self::extract_candidates(&eg_allowed, &eg_denote);
 
-        // All rules: clone/no clone doesn't matter, extract candidates
+        // All rules: compress e-graph, extract candidates
         let mut all_rules = prior;
         all_rules.extend(lifting_rules);
         let eg_final = Scheduler::Compress(limits).run(&eg_denote, &all_rules);
@@ -282,6 +301,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
+    /// Find candidates by CVec matching
+    /// Pairs of e-classes with equivalent CVecs are rule candidates.
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
         let time_start = std::time::Instant::now();
         // cvecs [𝑎1, . . . , 𝑎𝑛] and [𝑏1, . . . , 𝑏𝑛] match iff:
@@ -348,6 +369,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     // TODO: Figure out what to do with this- it doesn't match the definition
     // of cvec matching from the paper, but it is faster.
+    /// Faster version of CVec matching. May underestimate candidates when there are None values
     pub fn fast_cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Ruleset<L> {
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
 
@@ -436,6 +458,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
     }
 
+    /// Minimization algorithm for rule selection
+    ///     while there are still candidates to choose:
+    ///         1. select the best rule candidate
+    ///         2. filter out candidates that are redundant given the addition of the selected rule
     pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
@@ -451,6 +477,12 @@ impl<L: SynthLanguage> Ruleset<L> {
         (chosen, invalid)
     }
 
+    /// Whether a given rule can be derived by the ruleset with given resource limits
+    ///     1. Initialize an e-graph with the rule (lhs => rhs) being tested.
+    ///         If derive_type is Lhs, the e-graph is initialized with only lhs
+    ///         If derive_type is LhsAndRhs, the e-graph is initialized with lhs and rhs
+    ///     2. Run the ruleset
+    ///     3. Return true if the lhs and rhs are equivalent, false otherwise.
     pub fn can_derive(&self, derive_type: DeriveType, rule: &Rule<L>, limits: Limits) -> bool {
         let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
@@ -480,8 +512,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
     }
 
-    // Use self rules to derive against rules. That is, partition against
-    // into derivable / not-derivable with respect to self
+    /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
         against.partition(|rule| self.can_derive(derive_type, rule, limits))
     }

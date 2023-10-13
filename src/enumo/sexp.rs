@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use super::*;
 
+/// S-expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Sexp {
     Atom(String),

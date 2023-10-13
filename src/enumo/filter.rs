@@ -1,5 +1,6 @@
 use super::*;
 
+/// Workload filters
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Filter {
     MetricLt(Metric, usize),
@@ -13,6 +14,7 @@ pub enum Filter {
 }
 
 impl Filter {
+    /// Whether the given s-expression satisfies the filter.
     pub(crate) fn test(&self, sexp: &Sexp) -> bool {
         match self {
             Filter::MetricLt(metric, n) => sexp.measure(*metric) < *n,
@@ -32,6 +34,7 @@ impl Filter {
         }
     }
 
+    /// Whether this filter is implied by another filter in the provided list
     fn subsumed_by(&self, fs: &Vec<Self>) -> bool {
         if let Filter::MetricLt(met, n) = self {
             for f in fs {
@@ -47,6 +50,9 @@ impl Filter {
         }
     }
 
+    /// Conjunction of filters
+    ///
+    /// Flattens nested conjunctions when possible.
     pub(crate) fn and(self, other: Self) -> Self {
         let all = match (self, other) {
             (Filter::And(f1s), Filter::And(f2s)) => {
@@ -76,6 +82,11 @@ impl Filter {
         Filter::And(minimized)
     }
 
+    /// Whether the filter is monotonic.
+    ///
+    /// A filter, f, is monotonic if, for every term t satisfying f, every subterm s ∈ t also satisfies f
+    ///
+    /// Monotonic filters can be pushed through plugs.
     pub(crate) fn is_monotonic(&self) -> bool {
         match self {
             Filter::MetricLt(_, _) => true,

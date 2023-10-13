@@ -4,11 +4,16 @@ use std::sync::Arc;
 
 use crate::*;
 
+/// A Rewrite rule
 #[derive(Clone, Debug)]
 pub struct Rule<L: SynthLanguage> {
+    /// Readable name of the rewrite rule, formatted as lhs ==> rhs
     pub name: Arc<str>,
+    /// The pattern to match on
     pub lhs: Pattern<L>,
+    /// The pattern to merge
     pub rhs: Pattern<L>,
+    /// egg::Rewrite
     pub rewrite: Rewrite<L, SynthAnalysis>,
 }
 
@@ -58,6 +63,7 @@ impl<L: SynthLanguage> Rule<L> {
     }
 }
 
+/// Default Applier for rewrite rules
 struct Rhs<L: SynthLanguage> {
     rhs: Pattern<L>,
 }
@@ -107,6 +113,8 @@ impl<L: SynthLanguage> Rule<L> {
         })
     }
 
+    /// A rule is saturating if applying it is guaranteed not to add any
+    /// e-classes to the e-graph.
     pub fn is_saturating(&self) -> bool {
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let l_id = egraph.add_expr(&L::instantiate(&self.lhs));
@@ -125,6 +133,7 @@ impl<L: SynthLanguage> Rule<L> {
         L::score(&self.lhs, &self.rhs)
     }
 
+    /// Whether the rule is sound
     pub fn is_valid(&self) -> bool {
         matches!(L::validate(&self.lhs, &self.rhs), ValidationResult::Valid)
     }

@@ -4,6 +4,7 @@ use super::*;
 use crate::{SynthAnalysis, SynthLanguage};
 use std::io::Write;
 
+/// Workloads are sets of terms from a domain
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Workload {
     Set(Vec<Sexp>),
@@ -53,6 +54,8 @@ impl Workload {
         Self::Set(sexps)
     }
 
+    /// Materialize the workload into an e-graph
+    /// Will crash if there are terms in the e-graph that are not parseable as terms in domain L
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
         let sexps = self.force();
@@ -87,6 +90,7 @@ impl Workload {
         egraph
     }
 
+    /// Materialize workload into a vector of s-expressions
     pub fn force(&self) -> Vec<Sexp> {
         match self {
             Workload::Set(set) => set.clone(),
