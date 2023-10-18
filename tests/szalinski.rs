@@ -144,11 +144,11 @@ fn is_caddy(node: &CF) -> bool {
 impl SynthLanguage for CF {
     type Constant = Constant;
 
-    fn is_rule_lifting() -> bool {
+    fn is_fast_forwarding() -> bool {
         true
     }
 
-    fn get_lifting_rules() -> Ruleset<Self> {
+    fn get_exploratory_rules() -> Ruleset<Self> {
         Ruleset::new(&get_lifting_rules())
     }
 
@@ -229,7 +229,10 @@ fn export_print(rs: &Ruleset<CF>) {
 
 #[cfg(test)]
 mod tests {
-    use ruler::enumo::{Ruleset, Scheduler, Workload};
+    use ruler::{
+        enumo::{Ruleset, Workload},
+        recipe_utils::run_fast_forwarding,
+    };
 
     use super::*;
 
@@ -272,10 +275,7 @@ mod tests {
 
         for i in 2..4 {
             let atoms = iter_szalinski(i);
-            let egraph = atoms.to_egraph::<CF>();
-            let mut candidates = Ruleset::allow_forbid_actual(egraph, all_rules.clone(), limits);
-            let (chosen, _) =
-                candidates.minimize(learned_rules.clone(), Scheduler::Compress(limits));
+            let chosen = run_fast_forwarding(atoms, all_rules.clone(), limits, limits);
 
             all_rules.extend(chosen.clone());
             learned_rules.extend(chosen);
