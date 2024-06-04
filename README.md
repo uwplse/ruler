@@ -6,7 +6,7 @@ It uses equality saturation to infer small, expressive rulesets for a domain.
 ### Publications
 
 - (OOPSLA 2023) A. Pal, B. Saiki, R. Tjoa, C. Richey, A. Zhu, O. Flatt, M. Willsey, Z. Tatlock, C. Nandi,
-  [_Equality Saturation Theory Exploration à la Carte_](https://ajpal.github.io/assets/files/enumo.pdf)
+  [_Equality Saturation Theory Exploration à la Carte_](https://dl.acm.org/doi/10.1145/3622834)
 
 - (OOPSLA 2021, Distinguished Paper Award) C. Nandi, M. Willsey, A. Zhu, Y. Wang, B. Saiki, A. Anderson, A. Schulz, D. Grossman, Z. Tatlock,
   [_Rewrite Rule Inference Using Equality Saturation_](https://dl.acm.org/doi/abs/10.1145/3485496). \*
