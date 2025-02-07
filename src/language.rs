@@ -354,4 +354,12 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
+
+    fn validate_with_cond(
+        _cond: &Pattern<Self>,
+        _lhs: &Pattern<Self>,
+        _rhs: &Pattern<Self>,
+    ) -> ValidationResult {
+        ValidationResult::Valid
+    }
 }

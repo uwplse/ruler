@@ -3,7 +3,7 @@ use egg::{
 };
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{io::Write, sync::Arc};
+use std::{collections::HashSet, io::Write, sync::Arc};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -312,10 +312,38 @@ impl<L: SynthLanguage> Ruleset<L> {
                     .map(|(a, b)| a == b)
                     .collect();
 
+                // don't want a predicate which just means "if true" or "if false"
+                if pvec.iter().all(|x| *x) || pvec.iter().all(|x| !*x) {
+                    continue;
+                }
+
+                // now, let's vet the cvecs and make sure that they're good.
+                let mut unique_vals: HashSet<L::Constant> = HashSet::default();
+                for i in 0..pvec.len() {
+                    if pvec[i] {
+                        unique_vals.insert(cvec1[i].clone().unwrap());
+                        unique_vals.insert(cvec2[i].clone().unwrap());
+                    }
+                }
+
+                // we don't want to consider conditional rules which rewrite true ~> true, false ~>
+                // false
+                if unique_vals.len() == 1 {
+                    continue;
+                }
+
                 if let Some(pred_ids) = by_pvec.get(&pvec) {
                     for pred_id in pred_ids {
                         for id1 in by_cvec[cvec1].clone() {
+                            // We don't want to consider conditional rules of the form:
+                            // if cond then TRUE ~> cond
+                            if id1 == *pred_id {
+                                continue;
+                            }
                             for id2 in by_cvec[cvec2].clone() {
+                                if id2 == *pred_id {
+                                    continue;
+                                }
                                 let (c1, e1) = extract.find_best(id1);
                                 let (c2, e2) = extract.find_best(id2);
                                 let (_c3, pred) = extract.find_best(*pred_id);
@@ -459,6 +487,10 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // 3. return chosen candidates
         chosen
+    }
+
+    fn shrink_cond(&mut self, chosen: &Self, scheduler: Scheduler) {
+        todo!()
     }
 
     fn shrink(&mut self, chosen: &Self, scheduler: Scheduler) {

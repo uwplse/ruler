@@ -153,7 +153,14 @@ impl<L: SynthLanguage> Rule<L> {
 
     /// Whether the rule is sound
     pub fn is_valid(&self) -> bool {
-        matches!(L::validate(&self.lhs, &self.rhs), ValidationResult::Valid)
+        if self.name.contains("if") {
+            matches!(
+                L::validate_with_cond(todo!(), &self.lhs, &self.rhs),
+                ValidationResult::Valid
+            )
+        } else {
+            matches!(L::validate(&self.lhs, &self.rhs), ValidationResult::Valid)
+        }
     }
 }
 

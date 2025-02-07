@@ -51,6 +51,11 @@ fn run_workload_internal<L: SynthLanguage>(
     let conditional_candidates = Ruleset::conditional_cvec_match(&compressed);
     candidates.extend(conditional_candidates);
 
+    println!("candidates are:");
+    for c in &candidates {
+        println!("{}", c.0);
+    }
+
     let num_prior = prior.len();
     let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
     let time = t.elapsed().as_secs_f64();
