@@ -1,3 +1,4 @@
+use egg::{Condition, RecExpr, Subst};
 use num::{ToPrimitive, Zero};
 use ruler::*;
 use z3::ast::Ast;
@@ -30,6 +31,10 @@ egg::define_language! {
 
 impl SynthLanguage for Pred {
     type Constant = Constant;
+
+    fn constant_to_bool(c: &Self::Constant) -> Option<bool> {
+        Some(c != &0)
+    }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut get_cvec: F) -> CVec<Self>
     where

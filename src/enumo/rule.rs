@@ -1,4 +1,7 @@
-use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, Rewrite, Subst};
+use egg::{
+    Analysis, Applier, ConditionEqual, ConditionalApplier, ENodeOrVar, Language, PatternAst,
+    Rewrite, Subst,
+};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -100,6 +103,21 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 }
 
 impl<L: SynthLanguage> Rule<L> {
+    pub fn new_cond(l_pat: &Pattern<L>, r_pat: &Pattern<L>, cond_pat: &Pattern<L>) -> Option<Self> {
+        let name = format!("if {} then {} ==> {}", cond_pat, l_pat, r_pat);
+        let rhs = ConditionalApplier {
+            condition: ConditionEqual::new(cond_pat.clone(), "TRUE".parse().unwrap()),
+            applier: Rhs { rhs: r_pat.clone() },
+        };
+        let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
+        rewrite.map(|rw| Rule {
+            name: name.into(),
+            lhs: l_pat.clone(),
+            rhs: r_pat.clone(),
+            rewrite: rw,
+        })
+    }
+
     pub fn new(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Option<Self> {
         let name = format!("{} ==> {}", l_pat, r_pat);
         let rhs = Rhs { rhs: r_pat.clone() };

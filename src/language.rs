@@ -4,7 +4,8 @@ use std::{
 };
 
 use egg::{
-    Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
+    Analysis, AstSize, Condition, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst,
+    RecExpr,
 };
 
 use crate::*;
@@ -26,6 +27,9 @@ impl Default for SynthAnalysis {
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
+    /// a pvec is: if we treat this node as a predicate in the same environments as the cvec,
+    /// what do we get?
+    pub pvec: Option<Vec<bool>>,
     pub simplest: RecExpr<L>,
     pub interval: Interval<L::Constant>,
 }
@@ -33,6 +37,10 @@ pub struct Signature<L: SynthLanguage> {
 impl<L: SynthLanguage> Signature<L> {
     pub fn is_defined(&self) -> bool {
         self.cvec.is_empty() || self.cvec.iter().any(|v| v.is_some())
+    }
+
+    pub fn is_predicate(&self) -> bool {
+        self.pvec.is_some()
     }
 }
 
@@ -67,10 +75,20 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
             RecExpr::from(nodes)
         };
 
+        let cvec = enode.eval(egraph.analysis.cvec_len, get_cvec);
+        let pvec = if enode.treat_as_pvec() {
+            cvec.iter()
+                .map(|v| L::constant_to_bool(v.as_ref().unwrap()))
+                .collect()
+        } else {
+            None
+        };
+
         Signature {
-            cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
+            cvec,
             interval: enode.mk_interval(get_interval),
             simplest,
+            pvec,
         }
     }
 
@@ -157,6 +175,16 @@ pub type Constant<L> = <L as SynthLanguage>::Constant;
 pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     /// Domain value type
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
+
+    fn treat_as_pvec(&self) -> bool {
+        false
+    }
+
+    /// Converts a constant to a boolean.
+    /// Returns None when the conversion is not defined for the constant.
+    fn constant_to_bool(_c: &Self::Constant) -> Option<bool> {
+        None
+    }
 
     /// Hook into the e-graph analysis modify method
     /// Useful for domain-specific purposes (for example, constant folding)

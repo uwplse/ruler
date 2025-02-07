@@ -1,4 +1,6 @@
-use egg::{AstSize, EClass, Extractor, RecExpr};
+use egg::{
+    AstSize, Condition, ConditionEqual, ConditionalApplier, EClass, Extractor, RecExpr, Rewrite,
+};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{io::Write, sync::Arc};
@@ -129,6 +131,21 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.insert(rule.name.clone(), rule);
     }
 
+    fn add_cond_from_recexprs(&mut self, e1: &RecExpr<L>, e2: &RecExpr<L>, cond: &RecExpr<L>) {
+        let map = &mut HashMap::default();
+        let l_pat = L::generalize(e1, map);
+        let r_pat = L::generalize(e2, map);
+        let cond_pat = L::generalize(cond, map);
+        let forward = Rule::new_cond(&l_pat, &r_pat, &cond_pat);
+        let backward = Rule::new_cond(&r_pat, &l_pat, &cond_pat);
+        if let Some(forward) = forward {
+            self.add(forward);
+        }
+        if let Some(backward) = backward {
+            self.add(backward);
+        }
+    }
+
     /// Given a pair of recexprs, try to add rule candidates representing both
     /// directions (e1 ==> e2 and e2 ==> e1)
     /// This is actually a little bit subtle because it is important that we
@@ -255,6 +272,60 @@ impl<L: SynthLanguage> Ruleset<L> {
                     }
                     if e1 != e2 {
                         candidates.add_from_recexprs(&e1, &e2);
+                    }
+                }
+            }
+        }
+        candidates
+    }
+
+    /// Find conditional candidates through pvec/cvec matching.
+    /// TODO: @ninehusky:
+    /// We could find total candidates here as well, but I'll add that in later.
+    pub fn conditional_cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
+        let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
+
+        // TODO: @ninehusky: Let's consider making pvecs part of the analysis?
+        let mut by_pvec: IndexMap<Vec<bool>, Vec<Id>> = IndexMap::default();
+
+        for class in egraph.classes() {
+            if class.data.is_defined() {
+                by_cvec.entry(&class.data.cvec).or_default().push(class.id);
+            }
+
+            if class.data.pvec.is_some() {
+                let pvec = class.data.pvec.clone().unwrap();
+                by_pvec.entry(pvec).or_default().push(class.id);
+            }
+        }
+
+        let mut candidates = Ruleset::default();
+        let extract = Extractor::new(egraph, AstSize);
+
+        let mut i = 0;
+        for cvec1 in by_cvec.keys() {
+            i += 1;
+            for cvec2 in by_cvec.keys().skip(i) {
+                let pvec: Vec<bool> = cvec1
+                    .iter()
+                    .zip(cvec2.iter())
+                    .map(|(a, b)| a == b)
+                    .collect();
+
+                if let Some(pred_ids) = by_pvec.get(&pvec) {
+                    for pred_id in pred_ids {
+                        for id1 in by_cvec[cvec1].clone() {
+                            for id2 in by_cvec[cvec2].clone() {
+                                let (c1, e1) = extract.find_best(id1);
+                                let (c2, e2) = extract.find_best(id2);
+                                let (_c3, pred) = extract.find_best(*pred_id);
+                                if c1 == usize::MAX || c2 == usize::MAX {
+                                    continue;
+                                }
+
+                                candidates.add_cond_from_recexprs(&e1, &e2, &pred);
+                            }
+                        }
                     }
                 }
             }

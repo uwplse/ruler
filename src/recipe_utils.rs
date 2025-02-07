@@ -45,6 +45,12 @@ fn run_workload_internal<L: SynthLanguage>(
         Ruleset::cvec_match(&compressed)
     };
 
+    let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
+
+    // now, try to add some conditions into tha mix!
+    let conditional_candidates = Ruleset::conditional_cvec_match(&compressed);
+    candidates.extend(conditional_candidates);
+
     let num_prior = prior.len();
     let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
     let time = t.elapsed().as_secs_f64();
@@ -188,6 +194,7 @@ pub fn recursive_rules<L: SynthLanguage>(
         }
         rec.extend(prior);
         let allow_empty = n < 3;
+
         let new = run_workload_internal(
             wkld,
             rec.clone(),
