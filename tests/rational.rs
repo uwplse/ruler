@@ -305,6 +305,7 @@ impl Math {
             Some(Rule {
                 lhs: rule.lhs,
                 rhs,
+                cond: None,
                 name: name.into(),
                 rewrite,
             })

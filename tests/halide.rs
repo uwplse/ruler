@@ -181,11 +181,11 @@ impl SynthLanguage for Pred {
         let ctx = z3::Context::new(&cfg);
         let solver = z3::Solver::new(&ctx);
         let zero = z3::ast::Int::from_i64(&ctx, 0);
-        let cond =
+        let cexpr =
             z3::ast::Bool::not(&egg_to_z3(&ctx, Self::instantiate(cond).as_ref())._eq(&zero));
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        solver.assert(&z3::ast::Bool::implies(&cond, &lexpr._eq(&rexpr)).not());
+        solver.assert(&z3::ast::Bool::implies(&cexpr, &lexpr._eq(&rexpr)).not());
         match solver.check() {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
