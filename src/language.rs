@@ -265,6 +265,10 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         true
     }
 
+    fn condition_implies(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        false
+    }
+
     /// Used by fast-forwarding
     ///
     /// Determines whether a rewrite rule may be selected.
@@ -319,6 +323,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         RecExpr::from(nodes)
     }
 
+    // TODO: @ninehusky -- let's factor in a rule's condition to the size calculation.
     fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
         let l_size = AstSize.cost_rec(&lhs.ast) as i32;
         let r_size = AstSize.cost_rec(&rhs.ast) as i32;

@@ -156,6 +156,22 @@ impl SynthLanguage for Pred {
         Pred::Lit(c)
     }
 
+    fn condition_implies(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        let mut cfg = z3::Config::new();
+        cfg.set_timeout_msec(1000);
+        let ctx = z3::Context::new(&cfg);
+        let solver = z3::Solver::new(&ctx);
+        let zero = z3::ast::Int::from_i64(&ctx, 0);
+        let lhs = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref())
+            ._eq(&zero)
+            .not();
+        let rhs = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref())
+            ._eq(&zero)
+            .not();
+        solver.assert(&z3::ast::Bool::implies(&lhs, &rhs).not());
+        matches!(solver.check(), z3::SatResult::Unsat)
+    }
+
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);

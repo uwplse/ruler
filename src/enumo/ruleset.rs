@@ -523,9 +523,6 @@ impl<L: SynthLanguage> Ruleset<L> {
             // 1. make new egraph
             let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
 
-            println!("cond: {}", cond);
-            println!("num pairs: {}", pairs.len());
-
             let mut initial = vec![];
 
             // 2. insert lhs and rhs of all candidates as roots
@@ -537,10 +534,44 @@ impl<L: SynthLanguage> Ruleset<L> {
 
             // 3. compress with the rules we've chosen so far
             let true_term = egraph.add_expr(&"TRUE".parse().unwrap());
-            let cond = egraph.add_expr(&L::instantiate(&Pattern::from_str(&cond).unwrap()));
+            let cond_ast = &L::instantiate(&Pattern::from_str(&cond).unwrap());
+            let cond_pat = Pattern::from(cond_ast);
+            let cond = egraph.add_expr(&cond_ast.clone());
             egraph.union(cond, true_term);
 
-            // TODO: condition propogation here
+            // 3.5: do condition propogation
+            // first, merge all the conditions from the existing ruleset
+            for (_name, rule) in chosen {
+                if rule.cond.is_none() {
+                    continue;
+                }
+                let new_cond_ast = &L::instantiate(&rule.cond.clone().unwrap());
+                let new_cond_pat = Pattern::from(new_cond_ast);
+                if new_cond_pat == cond_pat {
+                    continue;
+                }
+                if L::condition_implies(&new_cond_pat, &cond_pat) {
+                    let new_cond = egraph.add_expr(&new_cond_ast.clone());
+                    egraph.union(new_cond, cond);
+                }
+            }
+
+            // ...and possibly repeat for the new rules, as well.
+            for rule in self.0.values() {
+                if rule.cond.is_none() {
+                    continue;
+                }
+                let new_cond_ast = &L::instantiate(&rule.cond.clone().unwrap());
+                let new_cond_pat = Pattern::from(new_cond_ast);
+                if new_cond_pat == cond_pat {
+                    continue;
+                }
+                if L::condition_implies(&new_cond_pat, &cond_pat) {
+                    let new_cond = egraph.add_expr(&new_cond_ast.clone());
+                    egraph.union(new_cond, cond);
+                }
+            }
+
             let egraph = scheduler.run(&egraph, chosen);
 
             // 4. go through candidates and if they have merged, then
