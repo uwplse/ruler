@@ -1,5 +1,8 @@
 use std::time::Instant;
 
+use egg::Pattern;
+use std::collections::HashMap;
+
 use crate::{
     enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
     Limits, SynthLanguage,
@@ -33,6 +36,10 @@ fn run_workload_internal<L: SynthLanguage>(
     minimize_limits: Limits,
     fast_match: bool,
     allow_empty: bool,
+    // pvec -> list of conditions with that pvec
+    conditions: Option<HashMap<Vec<bool>, Vec<Pattern<L>>>>,
+    // rules for how other conditions become true from other conditions which are true
+    propogation_rules: Option<Ruleset<L>>,
 ) -> Ruleset<L> {
     let t = Instant::now();
 
@@ -48,7 +55,7 @@ fn run_workload_internal<L: SynthLanguage>(
     let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
 
     // now, try to add some conditions into tha mix!
-    let mut conditional_candidates = Ruleset::conditional_cvec_match(&compressed);
+    let mut conditional_candidates = Ruleset::conditional_cvec_match(&compressed, true);
 
     let (chosen_cond, _) =
         conditional_candidates.minimize_cond(prior.clone(), Scheduler::Compress(minimize_limits));
@@ -87,6 +94,10 @@ pub fn run_workload<L: SynthLanguage>(
     prior_limits: Limits,
     minimize_limits: Limits,
     fast_match: bool,
+    // pvec -> list of conditions with that pvec
+    conditions: Option<HashMap<Vec<bool>, Vec<Pattern<L>>>>,
+    // rules for how other conditions become true from other conditions which are true
+    propogation_rules: Option<Ruleset<L>>,
 ) -> Ruleset<L> {
     run_workload_internal(
         workload,
@@ -95,6 +106,8 @@ pub fn run_workload<L: SynthLanguage>(
         minimize_limits,
         fast_match,
         false,
+        conditions,
+        propogation_rules,
     )
 }
 
@@ -173,6 +186,52 @@ impl Lang {
 
 /// Incrementally construct a ruleset by running rule inference up to a size bound,
 /// using previously-learned rules at each step.
+pub fn recursive_rules_cond<L: SynthLanguage>(
+    metric: Metric,
+    n: usize,
+    lang: Lang,
+    prior: Ruleset<L>,
+    conditions: HashMap<Vec<bool>, Vec<Pattern<L>>>,
+    propogation_rules: Ruleset<L>,
+) -> Ruleset<L> {
+    if n < 1 {
+        Ruleset::default()
+    } else {
+        let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone());
+        let base_lang = if lang.ops.len() == 2 {
+            base_lang(2)
+        } else {
+            base_lang(3)
+        };
+        let mut wkld = iter_metric(base_lang, "EXPR", metric, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("VAR", &Workload::new(lang.vars))
+            .plug("VAL", &Workload::new(lang.vals));
+        // let ops = vec![lang.uops, lang.bops, lang.tops];
+        for (i, ops) in lang.ops.iter().enumerate() {
+            wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
+        }
+        rec.extend(prior);
+        let allow_empty = n < 3;
+
+        let new = run_workload_internal(
+            wkld,
+            rec.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+            allow_empty,
+            Some(conditions),
+            Some(propogation_rules),
+        );
+        let mut all = new;
+        all.extend(rec);
+        all
+    }
+}
+
+/// Incrementally construct a ruleset by running rule inference up to a size bound,
+/// using previously-learned rules at each step.
 pub fn recursive_rules<L: SynthLanguage>(
     metric: Metric,
     n: usize,
@@ -206,6 +265,8 @@ pub fn recursive_rules<L: SynthLanguage>(
             Limits::minimize(),
             true,
             allow_empty,
+            None,
+            None,
         );
         let mut all = new;
         all.extend(rec);

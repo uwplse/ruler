@@ -120,6 +120,8 @@ pub fn halide_rules() -> Ruleset<Pred> {
             match_: 100_000,
         },
         true,
+        None,
+        None,
     );
     all_rules.extend(new);
 
