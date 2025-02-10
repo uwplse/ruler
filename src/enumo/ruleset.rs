@@ -1,9 +1,10 @@
 use egg::{
-    AstSize, Condition, ConditionEqual, ConditionalApplier, EClass, Extractor, RecExpr, Rewrite,
+    AstSize, Condition, ConditionEqual, ConditionalApplier, EClass, Extractor, Pattern, RecExpr,
+    Rewrite,
 };
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{collections::HashSet, io::Write, sync::Arc};
+use std::{collections::HashSet, io::Write, str::FromStr, sync::Arc};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -107,6 +108,16 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn condition_len(&self) -> usize {
+        let mut size = 0;
+        for (_, rule) in &self.0 {
+            if rule.cond.is_some() {
+                size += 1;
+            }
+        }
+        size
     }
 
     pub fn bidir_len(&self) -> usize {
@@ -490,7 +501,61 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     fn shrink_cond(&mut self, chosen: &Self, scheduler: Scheduler) {
-        todo!()
+        // 1. Sort by conditions.
+        let mut by_cond: HashMap<String, Vec<(Pattern<L>, Pattern<L>, Rule<L>)>> =
+            Default::default();
+
+        for rule in self.0.values() {
+            if rule.cond.is_none() {
+                continue;
+            }
+            let cond = rule.cond.clone().unwrap().to_string();
+            by_cond.entry(cond).or_default().push((
+                rule.lhs.clone(),
+                rule.rhs.clone(),
+                rule.clone(),
+            ));
+        }
+
+        let mut will_choose: Self = Default::default();
+
+        for (cond, pairs) in by_cond {
+            // 1. make new egraph
+            let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
+
+            println!("cond: {}", cond);
+            println!("num pairs: {}", pairs.len());
+
+            let mut initial = vec![];
+
+            // 2. insert lhs and rhs of all candidates as roots
+            for (lhs, rhs, rule) in pairs {
+                let lhs = egraph.add_expr(&L::instantiate(&lhs));
+                let rhs = egraph.add_expr(&L::instantiate(&rhs));
+                initial.push((lhs, rhs, rule.clone()));
+            }
+
+            // 3. compress with the rules we've chosen so far
+            let true_term = egraph.add_expr(&"TRUE".parse().unwrap());
+            let cond = egraph.add_expr(&L::instantiate(&Pattern::from_str(&cond).unwrap()));
+            egraph.union(cond, true_term);
+
+            // TODO: condition propogation here
+            let egraph = scheduler.run(&egraph, chosen);
+
+            // 4. go through candidates and if they have merged, then
+            // they are no longer candidates
+            for (l_id, r_id, rule) in initial {
+                if egraph.find(l_id) == egraph.find(r_id) {
+                    // candidate has merged (derivable from other rewrites)
+                    continue;
+                } else {
+                    will_choose.add(rule);
+                }
+            }
+        }
+
+        self.0 = will_choose.0;
     }
 
     fn shrink(&mut self, chosen: &Self, scheduler: Scheduler) {
@@ -520,6 +585,23 @@ impl<L: SynthLanguage> Ruleset<L> {
                 self.add(rule);
             }
         }
+    }
+
+    pub fn minimize_cond(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
+        let mut invalid: Ruleset<L> = Default::default();
+        let mut chosen = prior.clone();
+        let step_size = 1;
+        while !self.is_empty() {
+            let selected = self.select(step_size, &mut invalid);
+            chosen.extend(selected.clone());
+            println!("size before shrink: {}", self.len());
+            self.shrink_cond(&chosen, scheduler);
+            println!("size after shrink: {}", self.len());
+        }
+        // Return only the new rules
+        chosen.remove_all(prior);
+
+        (chosen, invalid)
     }
 
     /// Minimization algorithm for rule selection

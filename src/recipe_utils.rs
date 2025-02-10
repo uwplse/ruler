@@ -48,13 +48,11 @@ fn run_workload_internal<L: SynthLanguage>(
     let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
 
     // now, try to add some conditions into tha mix!
-    let conditional_candidates = Ruleset::conditional_cvec_match(&compressed);
-    candidates.extend(conditional_candidates);
+    let mut conditional_candidates = Ruleset::conditional_cvec_match(&compressed);
 
-    println!("candidates are:");
-    for c in &candidates {
-        println!("{}", c.0);
-    }
+    let (chosen_cond, _) =
+        conditional_candidates.minimize_cond(prior.clone(), Scheduler::Compress(minimize_limits));
+    candidates.extend(chosen_cond);
 
     let num_prior = prior.len();
     let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
@@ -65,8 +63,9 @@ fn run_workload_internal<L: SynthLanguage>(
     }
 
     println!(
-        "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+        "Learned {} bidirectional rewrites, and {} conditional rules ({} total rewrites) in {} using {} prior rewrites",
         chosen.bidir_len(),
+        chosen.condition_len(),
         chosen.len(),
         time,
         num_prior
