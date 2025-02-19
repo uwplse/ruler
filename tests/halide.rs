@@ -1,4 +1,5 @@
 use egg::{Condition, RecExpr, Subst};
+use enumo::Sexp;
 use num::{ToPrimitive, Zero};
 use ruler::*;
 use z3::ast::Ast;
@@ -162,14 +163,49 @@ impl SynthLanguage for Pred {
         let ctx = z3::Context::new(&cfg);
         let solver = z3::Solver::new(&ctx);
         let zero = z3::ast::Int::from_i64(&ctx, 0);
+
+        // given that the lhs is true, can we make the rhs false?
+
         let lhs = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref())
             ._eq(&zero)
             .not();
+
         let rhs = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref())
             ._eq(&zero)
             .not();
-        solver.assert(&z3::ast::Bool::implies(&lhs, &rhs).not());
-        matches!(solver.check(), z3::SatResult::Unsat)
+
+        let assertion = &lhs;
+
+        solver.assert(&assertion);
+
+        if matches!(solver.check(), z3::SatResult::Unsat) {
+            // don't want something that is always false
+            return false;
+        }
+
+        solver.reset();
+        let assertion = &rhs;
+
+        solver.assert(&assertion.not());
+
+        if matches!(solver.check(), z3::SatResult::Unsat) {
+            // don't want something that is always true
+            return false;
+        }
+
+        solver.reset();
+
+        let assertion = &z3::ast::Bool::implies(&lhs, &rhs).not();
+
+        solver.assert(assertion);
+
+        let res = solver.check();
+
+        if matches!(res, z3::SatResult::Unsat) {
+            true
+        } else {
+            false
+        }
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
@@ -188,10 +224,15 @@ impl SynthLanguage for Pred {
     }
 
     fn validate_with_cond(
-        cond: &Pattern<Self>,
         lhs: &Pattern<Self>,
         rhs: &Pattern<Self>,
+        cond: &Pattern<Self>,
     ) -> ValidationResult {
+        assert!(
+            cond.to_string().len() > 2,
+            "Conditional pattern: {}",
+            cond.to_string()
+        );
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
@@ -199,10 +240,14 @@ impl SynthLanguage for Pred {
         let zero = z3::ast::Int::from_i64(&ctx, 0);
         let cexpr =
             z3::ast::Bool::not(&egg_to_z3(&ctx, Self::instantiate(cond).as_ref())._eq(&zero));
+
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&z3::ast::Bool::implies(&cexpr, &lexpr._eq(&rexpr)).not());
-        match solver.check() {
+
+        let res = solver.check();
+
+        match res {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
@@ -336,16 +381,66 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
 mod halide;
 
 mod test {
-    use crate::halide::halide_rules;
-    use crate::Pred;
-    use std::time::{Duration, Instant};
+    use crate::halide::{
+        halide_rules, halide_rules_for_caviar_conditional, halide_rules_for_caviar_total_only,
+    };
+    use crate::{egg_to_z3, Pred};
+    use std::{
+        sync::Arc,
+        time::{Duration, Instant},
+    };
 
+    use egg::{AstSize, Extractor, Pattern, RecExpr};
     use ruler::{
-        enumo::{Filter, Metric, Ruleset, Workload},
+        enumo::{Filter, Metric, Rule, Ruleset, Workload},
         logger,
         recipe_utils::{recursive_rules, run_workload, Lang},
         Limits,
     };
+    use ruler::{SynthAnalysis, SynthLanguage};
+    use z3::ast::Ast;
+
+    #[test]
+    fn halide_sandbox() {
+        let (rule, _) = Rule::<Pred>::from_string("(min ?a ?b) => ?a if (<= ?a ?b)").unwrap();
+
+        assert!(rule.is_valid());
+
+        // derivabiility test -- the first should be derivable from the second
+        let mut ruleset: Ruleset<Pred> = Ruleset::new(&[
+            // it's a dummy rule, the condition is unnecessary but we just want to make sure the
+            // propogation works.
+            "(min ?x ?x) => ?x if (< ?x 0)",
+            "(min ?x ?x) => ?x if (< ?x 1)",
+        ]);
+
+        let (chosen, _) = ruleset.minimize_cond(
+            Ruleset::default(),
+            ruler::enumo::Scheduler::Compress(Limits::minimize()),
+            &Ruleset::default(),
+        );
+
+        assert_eq!(chosen.len(), 1);
+    }
+
+    #[test]
+    fn playground() {
+        let cfg = z3::Config::new();
+        let ctx = z3::Context::new(&cfg);
+        let solver = z3::Solver::new(&ctx);
+
+        let lhs_pat: Pattern<Pred> = "( / ( + v0 48 ) 40 )".parse().unwrap();
+
+        let lhs = egg_to_z3(&ctx, Pred::instantiate(&lhs_pat).as_ref());
+
+        let rhs_pat: Pattern<Pred> = "0".parse().unwrap();
+
+        let rhs = egg_to_z3(&ctx, Pred::instantiate(&rhs_pat).as_ref());
+
+        solver.assert(&lhs._eq(&rhs).not());
+
+        println!("result: {:?}", solver.check());
+    }
 
     #[test]
     fn run() {
@@ -355,7 +450,9 @@ mod test {
         }
 
         let start = Instant::now();
-        let all_rules = halide_rules();
+        // let all_rules = halide_rules();
+        let all_rules = halide_rules_for_caviar_conditional();
+        println!("done");
         let duration = start.elapsed();
 
         // oopsla-halide-baseline branch

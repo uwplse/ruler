@@ -52,31 +52,26 @@ impl<L: SynthLanguage> Rule<L> {
             let l_pat: Pattern<L> = l.parse().unwrap();
             let r_pat: Pattern<L> = r.parse().unwrap();
 
+            let name = make_name(&l_pat, &r_pat, cond.clone());
+
             let forwards = Self {
-                name: make_name(&l_pat, &r_pat, cond.clone()).into(),
+                name: name.clone().into(),
                 lhs: l_pat.clone(),
                 rhs: r_pat.clone(),
                 cond: cond.clone(),
-                rewrite: Rewrite::new(
-                    format!("{} ==> {}", l_pat, r_pat),
-                    l_pat.clone(),
-                    Rhs { rhs: r_pat.clone() },
-                )
-                .unwrap(),
+                rewrite: Rewrite::new(name.clone(), l_pat.clone(), Rhs { rhs: r_pat.clone() })
+                    .unwrap(),
             };
 
             if s.contains("<=>") {
+                let backwards_name = make_name(&r_pat, &l_pat, cond.clone());
                 let backwards = Self {
-                    name: make_name(&r_pat, &l_pat, cond.clone()).into(),
+                    name: backwards_name.clone().into(),
                     lhs: r_pat.clone(),
                     rhs: l_pat.clone(),
                     cond: cond.clone(),
-                    rewrite: Rewrite::new(
-                        format!("{} ==> {}", r_pat, l_pat),
-                        r_pat,
-                        Rhs { rhs: l_pat },
-                    )
-                    .unwrap(),
+                    rewrite: Rewrite::new(Symbol::from(backwards_name), r_pat, Rhs { rhs: l_pat })
+                        .unwrap(),
                 };
                 Ok((forwards, Some(backwards)))
             } else {
@@ -172,7 +167,7 @@ impl<L: SynthLanguage> Rule<L> {
     }
 
     pub fn score(&self) -> impl Ord + Debug {
-        L::score(&self.lhs, &self.rhs)
+        L::score(&self.lhs, &self.rhs, &self.cond)
     }
 
     /// Whether the rule is sound

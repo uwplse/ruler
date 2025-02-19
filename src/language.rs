@@ -324,38 +324,81 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     }
 
     // TODO: @ninehusky -- let's factor in a rule's condition to the size calculation.
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
-        let l_size = AstSize.cost_rec(&lhs.ast) as i32;
-        let r_size = AstSize.cost_rec(&rhs.ast) as i32;
-        let mut vars: HashSet<Var> = Default::default();
-        vars.extend(lhs.vars());
-        vars.extend(rhs.vars());
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>, cond: &Option<Pattern<Self>>) -> [i32; 5] {
+        if let Some(cond) = cond {
+            let c_size = AstSize.cost_rec(&cond.ast) as i32;
+            let l_size = AstSize.cost_rec(&lhs.ast) as i32;
+            let r_size = AstSize.cost_rec(&rhs.ast) as i32;
+            let mut vars: HashSet<Var> = Default::default();
+            vars.extend(lhs.vars());
+            vars.extend(rhs.vars());
+            vars.extend(cond.vars());
 
-        let mut ops: HashSet<String> = Default::default();
-        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-            if !node.is_leaf() {
-                ops.insert(node.to_string());
+            let mut ops: HashSet<String> = Default::default();
+            for node in lhs
+                .ast
+                .as_ref()
+                .iter()
+                .chain(rhs.ast.as_ref())
+                .chain(cond.ast.as_ref())
+            {
+                if !node.is_leaf() {
+                    ops.insert(node.to_string());
+                }
             }
+
+            let num_consts = lhs
+                .ast
+                .as_ref()
+                .iter()
+                .chain(rhs.ast.as_ref())
+                .chain(cond.ast.as_ref())
+                .filter(|n| match n {
+                    ENodeOrVar::ENode(n) => n.is_constant(),
+                    ENodeOrVar::Var(_) => false,
+                })
+                .count() as i32;
+
+            [
+                vars.len() as i32,
+                -num_consts,
+                -i32::max(l_size, -i32::max(r_size, c_size)),
+                -(l_size + r_size + c_size),
+                -(ops.len() as i32),
+            ]
+        } else {
+            let l_size = AstSize.cost_rec(&lhs.ast) as i32;
+            let r_size = AstSize.cost_rec(&rhs.ast) as i32;
+            let mut vars: HashSet<Var> = Default::default();
+            vars.extend(lhs.vars());
+            vars.extend(rhs.vars());
+
+            let mut ops: HashSet<String> = Default::default();
+            for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+                if !node.is_leaf() {
+                    ops.insert(node.to_string());
+                }
+            }
+
+            let num_consts = lhs
+                .ast
+                .as_ref()
+                .iter()
+                .chain(rhs.ast.as_ref())
+                .filter(|n| match n {
+                    ENodeOrVar::ENode(n) => n.is_constant(),
+                    ENodeOrVar::Var(_) => false,
+                })
+                .count() as i32;
+
+            [
+                vars.len() as i32,
+                -num_consts,
+                -i32::max(l_size, r_size),
+                -(l_size + r_size),
+                -(ops.len() as i32),
+            ]
         }
-
-        let num_consts = lhs
-            .ast
-            .as_ref()
-            .iter()
-            .chain(rhs.ast.as_ref())
-            .filter(|n| match n {
-                ENodeOrVar::ENode(n) => n.is_constant(),
-                ENodeOrVar::Var(_) => false,
-            })
-            .count() as i32;
-
-        [
-            vars.len() as i32,
-            -num_consts,
-            -i32::max(l_size, r_size),
-            -(l_size + r_size),
-            -(ops.len() as i32),
-        ]
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;

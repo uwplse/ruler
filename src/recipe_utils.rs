@@ -1,11 +1,10 @@
 use std::time::Instant;
 
 use egg::Pattern;
-use std::collections::HashMap;
 
 use crate::{
     enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
-    Limits, SynthLanguage,
+    HashMap, Limits, SynthLanguage,
 };
 
 /// Iterate a grammar (represented as a workload) up to a certain size metric
@@ -42,6 +41,7 @@ fn run_workload_internal<L: SynthLanguage>(
     propogation_rules: Option<Ruleset<L>>,
 ) -> Ruleset<L> {
     let t = Instant::now();
+    let num_prior = prior.len();
 
     let egraph = workload.to_egraph::<L>();
     let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
@@ -52,17 +52,30 @@ fn run_workload_internal<L: SynthLanguage>(
         Ruleset::cvec_match(&compressed)
     };
 
-    let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
+    let mut chosen: Ruleset<L> = prior.clone();
 
-    // now, try to add some conditions into tha mix!
-    let mut conditional_candidates = Ruleset::conditional_cvec_match(&compressed, true);
+    // minimize the total candidates with respect to the prior rules
+    let (chosen_total, _) =
+        candidates.minimize(prior.clone(), Scheduler::Compress(minimize_limits));
 
-    let (chosen_cond, _) =
-        conditional_candidates.minimize_cond(prior.clone(), Scheduler::Compress(minimize_limits));
-    candidates.extend(chosen_cond);
+    chosen.extend(chosen_total.clone());
 
-    let num_prior = prior.len();
-    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
+    let compressed = Scheduler::Compress(prior_limits).run(&egraph, &chosen_total);
+
+    if let Some(conditions) = conditions {
+        // now, try to add some conditions into tha mix!
+        let mut conditional_candidates =
+            Ruleset::conditional_cvec_match(&compressed, &conditions, true);
+
+        let (chosen_cond, _) = conditional_candidates.minimize_cond(
+            chosen.clone(),
+            Scheduler::Compress(minimize_limits),
+            &propogation_rules.unwrap(),
+        );
+        chosen.extend(chosen_cond.clone());
+    }
+
+    // let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
     let time = t.elapsed().as_secs_f64();
 
     if chosen.is_empty() && !allow_empty {
@@ -191,8 +204,8 @@ pub fn recursive_rules_cond<L: SynthLanguage>(
     n: usize,
     lang: Lang,
     prior: Ruleset<L>,
-    conditions: HashMap<Vec<bool>, Vec<Pattern<L>>>,
-    propogation_rules: Ruleset<L>,
+    conditions: &HashMap<Vec<bool>, Vec<Pattern<L>>>,
+    propogation_rules: &Ruleset<L>,
 ) -> Ruleset<L> {
     if n < 1 {
         Ruleset::default()
@@ -221,8 +234,8 @@ pub fn recursive_rules_cond<L: SynthLanguage>(
             Limits::minimize(),
             true,
             allow_empty,
-            Some(conditions),
-            Some(propogation_rules),
+            Some(conditions.clone()),
+            Some(propogation_rules.clone()),
         );
         let mut all = new;
         all.extend(rec);
