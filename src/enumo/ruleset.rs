@@ -594,9 +594,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         println!("candidates : {}", self.len());
         while !self.is_empty() {
             let selected = self.select(step_size, &mut invalid);
-            // assert_eq!(selected.len(), 1);
             // TODO: why do I need this here? what does it mean when `self.select` returns nothing?
-            if selected.len() == 0 {
+            if selected.is_empty() {
                 continue;
             }
             chosen.extend(selected.clone());
