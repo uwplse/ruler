@@ -106,7 +106,7 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
         Lang::new(
             &["-1", "0", "1"],
             &["a", "b", "c"],
-            &[&[], &["+", "-", "*", "min", "max"]],
+            &[&[], &["+", "-", "*", "/", "%", "min", "max"]],
         ),
         all_rules.clone(),
         &pvec_to_terms,
@@ -136,7 +136,7 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
             &[
                 &["!"],
                 &[
-                    "&&", "||", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                    "&&", "||", "+", "-", "*", "/", "%", "min", "max", "<", "<=", "==", "!=",
                 ],
                 &[],
             ],
@@ -191,7 +191,7 @@ pub fn halide_rules_for_caviar_total_only() -> Ruleset<Pred> {
             &[
                 &["!"],
                 &[
-                    "&&", "||", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                    "&&", "||", "+", "-", "*", "/", "%", "min", "max", "<", "<=", "==", "!=",
                 ],
                 &[],
             ],

@@ -7,6 +7,7 @@ type Constant = i64;
 egg::define_language! {
   pub enum Pred {
     Lit(Constant),
+    "abs" = Abs(Id),
     "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
     "==" = Eq([Id;2]),
@@ -21,6 +22,7 @@ egg::define_language! {
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
     "/" = Div([Id; 2]),
+    "%" = Mod([Id; 2]),
     "min" = Min([Id; 2]),
     "max" = Max([Id; 2]),
     "select" = Select([Id; 3]),
@@ -50,6 +52,7 @@ impl SynthLanguage for Pred {
         let zero = 0.to_i64().unwrap();
         match self {
             Pred::Lit(c) => vec![Some(*c); cvec_len],
+            Pred::Abs(x) => map!(get_cvec, x => Some(x.abs())),
             Pred::Lt([x, y]) => {
                 map!(get_cvec, x, y => if x < y {Some(one)} else {Some(zero)})
             }
@@ -102,6 +105,13 @@ impl SynthLanguage for Pred {
                 Some(zero)
               } else {
                 x.checked_div(*y)
+              }
+            }),
+            Pred::Mod([x, y]) => map!(get_cvec, x, y => {
+              if y.is_zero() {
+                Some(zero)
+              } else {
+                x.checked_rem(*y)
               }
             }),
             Pred::Min([x, y]) => map!(get_cvec, x, y => Some(*x.min(y))),
@@ -256,6 +266,14 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
     for node in expr.as_ref().iter() {
         match node {
             Pred::Lit(c) => buf.push(z3::ast::Int::from_i64(ctx, c.to_i64().unwrap())),
+            Pred::Abs(x) => {
+                let l = &buf[usize::from(*x)];
+                buf.push(z3::ast::Bool::ite(
+                    &z3::ast::Int::lt(l, &zero),
+                    &z3::ast::Int::unary_minus(l),
+                    l,
+                ))
+            }
             Pred::Lt([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
@@ -344,6 +362,15 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
                     &r._eq(&zero),
                     &zero,
                     &z3::ast::Int::div(l, r),
+                ))
+            }
+            Pred::Mod([x, y]) => {
+                let l = &buf[usize::from(*x)];
+                let r = &buf[usize::from(*y)];
+                buf.push(z3::ast::Bool::ite(
+                    &r._eq(&zero),
+                    &zero,
+                    &z3::ast::Int::modulo(l, r),
                 ))
             }
             Pred::Min([x, y]) => {

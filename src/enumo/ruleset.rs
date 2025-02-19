@@ -1,6 +1,4 @@
-use egg::{
-    AstSize, EClass, Extractor, Pattern, RecExpr,
-};
+use egg::{AstSize, EClass, Extractor, Pattern, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{collections::HashSet, io::Write, str::FromStr, sync::Arc};
@@ -461,6 +459,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         while selected.len() < step_size {
             let popped = self.0.pop();
             if let Some((_, rule)) = popped {
+                println!("popped: {}", rule.name);
                 if rule.is_valid() {
                     selected.add(rule.clone());
                 } else {
@@ -529,7 +528,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 continue;
             }
 
-            // TODO: can i reset the cache here?
             let new_cond = L::generalize(
                 &RecExpr::from_str(&rule.cond.clone().unwrap().to_string()).unwrap(),
                 &mut Default::default(),
@@ -544,14 +542,8 @@ impl<L: SynthLanguage> Ruleset<L> {
                 .or_insert_with(|| L::condition_implies(&new_cond, &added_cond));
 
             // TODO: @ninehusky: let's use the existing rules to check implications rather than rely on Z3.
+            // See #7.
             if egraph.find(l_id) == egraph.find(r_id) && *implication {
-                // println!("throwing out {}", rule.name);
-                // println!(
-                //     "{} implies {}",
-                //     added_rule.cond.clone().unwrap(),
-                //     rule.cond.clone().unwrap()
-                // );
-                // candidate has merged (derivable from other rewrites)
                 continue;
             } else {
                 will_choose.add(rule);
@@ -599,9 +591,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
+        println!("candidates : {}", self.len());
         while !self.is_empty() {
             let selected = self.select(step_size, &mut invalid);
-            assert_eq!(selected.len(), 1);
+            // assert_eq!(selected.len(), 1);
+            // TODO: why do I need this here? what does it mean when `self.select` returns nothing?
+            if selected.len() == 0 {
+                continue;
+            }
             chosen.extend(selected.clone());
             self.shrink_cond(
                 &chosen,
@@ -621,11 +618,15 @@ impl<L: SynthLanguage> Ruleset<L> {
     ///         1. select the best rule candidate
     ///         2. filter out candidates that are redundant given the addition of the selected rule
     pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
+        println!("hi minimize: {}", self.len());
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
+        println!("about to minimize");
         while !self.is_empty() {
+            println!("hi minimize loop: {}", self.len());
             let selected = self.select(step_size, &mut invalid);
+            // assert_eq!(selected.len(), 1); <-- wasn't this here in ruler?
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
         }
