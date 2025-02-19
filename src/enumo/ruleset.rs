@@ -594,6 +594,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         while !self.is_empty() {
             let selected = self.select(step_size, &mut invalid);
             // TODO: why do I need this here? what does it mean when `self.select` returns nothing?
+            // See #10.
             if selected.is_empty() {
                 continue;
             }
