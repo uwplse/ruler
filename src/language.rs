@@ -4,8 +4,7 @@ use std::{
 };
 
 use egg::{
-    Analysis, AstSize, Condition, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst,
-    RecExpr,
+    Analysis, AstSize, CostFunction, DidMerge, ENodeOrVar, FromOp, Language, PatternAst, RecExpr,
 };
 
 use crate::*;
@@ -60,7 +59,7 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
             let mut nodes: Vec<L> = vec![];
             let mut map: HashMap<Id, Id> = HashMap::default();
             enode.for_each(|id| {
-                if map.get(&id).is_none() {
+                if !map.contains_key(&id) {
                     let s = get_simplest(&id);
                     let i = nodes.len();
                     for n in s.as_ref() {
@@ -265,7 +264,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         true
     }
 
-    fn condition_implies(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+    fn condition_implies(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> bool {
         false
     }
 
@@ -404,9 +403,9 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
 
     fn validate_with_cond(
-        lhs: &Pattern<Self>,
-        rhs: &Pattern<Self>,
-        cond: &Pattern<Self>,
+        _lhs: &Pattern<Self>,
+        _rhs: &Pattern<Self>,
+        _cond: &Pattern<Self>,
     ) -> ValidationResult {
         ValidationResult::Valid
     }

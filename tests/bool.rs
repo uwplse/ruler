@@ -215,6 +215,8 @@ mod test {
             Limits::synthesis(),
             Limits::minimize(),
             false,
+            None,
+            None,
         );
         all_rules.extend(rules3);
 
@@ -227,6 +229,8 @@ mod test {
             Limits::synthesis(),
             Limits::minimize(),
             false,
+            None,
+            None,
         );
         all_rules.extend(rules4);
 
@@ -239,6 +243,8 @@ mod test {
             Limits::synthesis(),
             Limits::minimize(),
             false,
+            None,
+            None,
         );
         all_rules.extend(rules5);
 
