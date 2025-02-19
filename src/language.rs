@@ -26,6 +26,9 @@ impl Default for SynthAnalysis {
 #[derive(Debug, Clone)]
 pub struct Signature<L: SynthLanguage> {
     pub cvec: CVec<L>,
+    /// a pvec is: if we treat this node as a predicate in the same environments as the cvec,
+    /// what do we get?
+    pub pvec: Option<Vec<bool>>,
     pub simplest: RecExpr<L>,
     pub interval: Interval<L::Constant>,
 }
@@ -33,6 +36,10 @@ pub struct Signature<L: SynthLanguage> {
 impl<L: SynthLanguage> Signature<L> {
     pub fn is_defined(&self) -> bool {
         self.cvec.is_empty() || self.cvec.iter().any(|v| v.is_some())
+    }
+
+    pub fn is_predicate(&self) -> bool {
+        self.pvec.is_some()
     }
 }
 
@@ -52,25 +59,35 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
             let mut nodes: Vec<L> = vec![];
             let mut map: HashMap<Id, Id> = HashMap::default();
             enode.for_each(|id| {
-                if map.get(&id).is_none() {
+                map.entry(id).or_insert_with(|| {
                     let s = get_simplest(&id);
                     let i = nodes.len();
                     for n in s.as_ref() {
                         nodes.push(n.clone().map_children(|id| Id::from(usize::from(id) + i)));
                     }
 
-                    map.insert(id, Id::from(nodes.len() - 1));
-                }
+                    Id::from(nodes.len() - 1)
+                });
             });
 
             nodes.push(enode.clone().map_children(|id| *map.get(&id).unwrap()));
             RecExpr::from(nodes)
         };
 
+        let cvec = enode.eval(egraph.analysis.cvec_len, get_cvec);
+        let pvec = if enode.treat_as_pvec() {
+            cvec.iter()
+                .map(|v| L::constant_to_bool(v.as_ref().unwrap()))
+                .collect()
+        } else {
+            None
+        };
+
         Signature {
-            cvec: enode.eval(egraph.analysis.cvec_len, get_cvec),
+            cvec,
             interval: enode.mk_interval(get_interval),
             simplest,
+            pvec,
         }
     }
 
@@ -158,6 +175,16 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     /// Domain value type
     type Constant: Clone + Hash + Eq + Debug + Display + Ord;
 
+    fn treat_as_pvec(&self) -> bool {
+        false
+    }
+
+    /// Converts a constant to a boolean.
+    /// Returns None when the conversion is not defined for the constant.
+    fn constant_to_bool(_c: &Self::Constant) -> Option<bool> {
+        None
+    }
+
     /// Hook into the e-graph analysis modify method
     /// Useful for domain-specific purposes (for example, constant folding)
     fn custom_modify(_egraph: &mut EGraph<Self, SynthAnalysis>, _id: Id) {}
@@ -237,6 +264,10 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         true
     }
 
+    fn condition_implies(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> bool {
+        false
+    }
+
     /// Used by fast-forwarding
     ///
     /// Determines whether a rewrite rule may be selected.
@@ -291,39 +322,91 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         RecExpr::from(nodes)
     }
 
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> [i32; 5] {
-        let l_size = AstSize.cost_rec(&lhs.ast) as i32;
-        let r_size = AstSize.cost_rec(&rhs.ast) as i32;
-        let mut vars: HashSet<Var> = Default::default();
-        vars.extend(lhs.vars());
-        vars.extend(rhs.vars());
+    // TODO: @ninehusky -- let's factor in a rule's condition to the size calculation.
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>, cond: &Option<Pattern<Self>>) -> [i32; 5] {
+        if let Some(cond) = cond {
+            let c_size = AstSize.cost_rec(&cond.ast) as i32;
+            let l_size = AstSize.cost_rec(&lhs.ast) as i32;
+            let r_size = AstSize.cost_rec(&rhs.ast) as i32;
+            let mut vars: HashSet<Var> = Default::default();
+            vars.extend(lhs.vars());
+            vars.extend(rhs.vars());
+            vars.extend(cond.vars());
 
-        let mut ops: HashSet<String> = Default::default();
-        for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
-            if !node.is_leaf() {
-                ops.insert(node.to_string());
+            let mut ops: HashSet<String> = Default::default();
+            for node in lhs
+                .ast
+                .as_ref()
+                .iter()
+                .chain(rhs.ast.as_ref())
+                .chain(cond.ast.as_ref())
+            {
+                if !node.is_leaf() {
+                    ops.insert(node.to_string());
+                }
             }
+
+            let num_consts = lhs
+                .ast
+                .as_ref()
+                .iter()
+                .chain(rhs.ast.as_ref())
+                .chain(cond.ast.as_ref())
+                .filter(|n| match n {
+                    ENodeOrVar::ENode(n) => n.is_constant(),
+                    ENodeOrVar::Var(_) => false,
+                })
+                .count() as i32;
+
+            [
+                vars.len() as i32,
+                -num_consts,
+                -i32::max(l_size, -i32::max(r_size, c_size)),
+                -(l_size + r_size + c_size),
+                -(ops.len() as i32),
+            ]
+        } else {
+            let l_size = AstSize.cost_rec(&lhs.ast) as i32;
+            let r_size = AstSize.cost_rec(&rhs.ast) as i32;
+            let mut vars: HashSet<Var> = Default::default();
+            vars.extend(lhs.vars());
+            vars.extend(rhs.vars());
+
+            let mut ops: HashSet<String> = Default::default();
+            for node in lhs.ast.as_ref().iter().chain(rhs.ast.as_ref()) {
+                if !node.is_leaf() {
+                    ops.insert(node.to_string());
+                }
+            }
+
+            let num_consts = lhs
+                .ast
+                .as_ref()
+                .iter()
+                .chain(rhs.ast.as_ref())
+                .filter(|n| match n {
+                    ENodeOrVar::ENode(n) => n.is_constant(),
+                    ENodeOrVar::Var(_) => false,
+                })
+                .count() as i32;
+
+            [
+                vars.len() as i32,
+                -num_consts,
+                -i32::max(l_size, r_size),
+                -(l_size + r_size),
+                -(ops.len() as i32),
+            ]
         }
-
-        let num_consts = lhs
-            .ast
-            .as_ref()
-            .iter()
-            .chain(rhs.ast.as_ref())
-            .filter(|n| match n {
-                ENodeOrVar::ENode(n) => n.is_constant(),
-                ENodeOrVar::Var(_) => false,
-            })
-            .count() as i32;
-
-        [
-            vars.len() as i32,
-            -num_consts,
-            -i32::max(l_size, r_size),
-            -(l_size + r_size),
-            -(ops.len() as i32),
-        ]
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult;
+
+    fn validate_with_cond(
+        _lhs: &Pattern<Self>,
+        _rhs: &Pattern<Self>,
+        _cond: &Pattern<Self>,
+    ) -> ValidationResult {
+        ValidationResult::Valid
+    }
 }

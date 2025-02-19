@@ -90,6 +90,8 @@ pub mod test {
             Limits::synthesis(),
             Limits::minimize(),
             true,
+            None,
+            None,
         ));
 
         let duration = start.elapsed();

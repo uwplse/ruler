@@ -6,7 +6,6 @@ use ruler::{
     *,
 };
 use std::hash::Hash;
-use std::usize;
 
 pub type Constant = i64;
 

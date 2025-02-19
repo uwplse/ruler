@@ -1,4 +1,7 @@
-use egg::{Analysis, Applier, ENodeOrVar, Language, PatternAst, Rewrite, Subst};
+use egg::{
+    Analysis, Applier, ConditionEqual, ConditionalApplier, ENodeOrVar, Language, PatternAst,
+    Rewrite, Subst,
+};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -13,45 +16,62 @@ pub struct Rule<L: SynthLanguage> {
     pub lhs: Pattern<L>,
     /// The pattern to merge
     pub rhs: Pattern<L>,
+    /// The condition under which the rule is sound
+    pub cond: Option<Pattern<L>>,
     /// egg::Rewrite
     pub rewrite: Rewrite<L, SynthAnalysis>,
 }
 
 impl<L: SynthLanguage> Display for Rule<L> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ==> {}", self.lhs, self.rhs)
+        match &self.cond {
+            Some(cond) => write!(f, "{} ==> {} if {}", self.lhs, self.rhs, cond),
+            None => write!(f, "{} ==> {}", self.lhs, self.rhs),
+        }
     }
 }
 
 impl<L: SynthLanguage> Rule<L> {
     pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
+        let make_name = |lhs: &Pattern<L>, rhs: &Pattern<L>, cond: Option<Pattern<L>>| -> String {
+            match cond {
+                None => format!("{} ==> {}", lhs, rhs),
+                Some(cond) => format!("{} ==> {} if {}", lhs, rhs, cond),
+            }
+        };
+
+        let (s, cond) = {
+            if let Some((l, r)) = s.split_once(" if ") {
+                let cond: Pattern<L> = r.parse().unwrap();
+                (l, Some(cond))
+            } else {
+                (s, None)
+            }
+        };
         if let Some((l, r)) = s.split_once("=>") {
             let l_pat: Pattern<L> = l.parse().unwrap();
             let r_pat: Pattern<L> = r.parse().unwrap();
 
+            let name = make_name(&l_pat, &r_pat, cond.clone());
+
             let forwards = Self {
-                name: format!("{} ==> {}", l_pat, r_pat).into(),
+                name: name.clone().into(),
                 lhs: l_pat.clone(),
                 rhs: r_pat.clone(),
-                rewrite: Rewrite::new(
-                    format!("{} ==> {}", l_pat, r_pat),
-                    l_pat.clone(),
-                    Rhs { rhs: r_pat.clone() },
-                )
-                .unwrap(),
+                cond: cond.clone(),
+                rewrite: Rewrite::new(name.clone(), l_pat.clone(), Rhs { rhs: r_pat.clone() })
+                    .unwrap(),
             };
 
             if s.contains("<=>") {
+                let backwards_name = make_name(&r_pat, &l_pat, cond.clone());
                 let backwards = Self {
-                    name: format!("{} ==> {}", r_pat, l_pat).into(),
+                    name: backwards_name.clone().into(),
                     lhs: r_pat.clone(),
                     rhs: l_pat.clone(),
-                    rewrite: Rewrite::new(
-                        format!("{} ==> {}", r_pat, l_pat),
-                        r_pat,
-                        Rhs { rhs: l_pat },
-                    )
-                    .unwrap(),
+                    cond: cond.clone(),
+                    rewrite: Rewrite::new(Symbol::from(backwards_name), r_pat, Rhs { rhs: l_pat })
+                        .unwrap(),
                 };
                 Ok((forwards, Some(backwards)))
             } else {
@@ -100,6 +120,22 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 }
 
 impl<L: SynthLanguage> Rule<L> {
+    pub fn new_cond(l_pat: &Pattern<L>, r_pat: &Pattern<L>, cond_pat: &Pattern<L>) -> Option<Self> {
+        let name = format!("{} ==> {} if {}", l_pat, r_pat, cond_pat);
+        let rhs = ConditionalApplier {
+            condition: ConditionEqual::new(cond_pat.clone(), "TRUE".parse().unwrap()),
+            applier: Rhs { rhs: r_pat.clone() },
+        };
+        let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
+        rewrite.map(|rw| Rule {
+            name: name.into(),
+            lhs: l_pat.clone(),
+            rhs: r_pat.clone(),
+            cond: Some(cond_pat.clone()),
+            rewrite: rw,
+        })
+    }
+
     pub fn new(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Option<Self> {
         let name = format!("{} ==> {}", l_pat, r_pat);
         let rhs = Rhs { rhs: r_pat.clone() };
@@ -109,6 +145,7 @@ impl<L: SynthLanguage> Rule<L> {
             name: name.into(),
             lhs: l_pat.clone(),
             rhs: r_pat.clone(),
+            cond: None,
             rewrite: rw,
         })
     }
@@ -130,12 +167,19 @@ impl<L: SynthLanguage> Rule<L> {
     }
 
     pub fn score(&self) -> impl Ord + Debug {
-        L::score(&self.lhs, &self.rhs)
+        L::score(&self.lhs, &self.rhs, &self.cond)
     }
 
     /// Whether the rule is sound
     pub fn is_valid(&self) -> bool {
-        matches!(L::validate(&self.lhs, &self.rhs), ValidationResult::Valid)
+        if self.cond.is_some() {
+            matches!(
+                L::validate_with_cond(&self.lhs, &self.rhs, &self.cond.clone().unwrap()),
+                ValidationResult::Valid
+            )
+        } else {
+            matches!(L::validate(&self.lhs, &self.rhs), ValidationResult::Valid)
+        }
     }
 }
 
@@ -172,6 +216,7 @@ mod test {
             .unwrap();
         assert!(backwards.is_none());
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+        assert_eq!(forwards.cond, None);
 
         // Unidirectional rule with ==> delimeter
         let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) ==> (* c d)")
@@ -179,13 +224,27 @@ mod test {
             .unwrap();
         assert!(backwards.is_none());
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+        assert_eq!(forwards.cond, None);
 
         // Bidirectional rule <=>
         let (forwards, backwards) = Rule::<egg::SymbolLang>::from_string("(* a b) <=> (* c d)")
             .ok()
             .unwrap();
         assert!(backwards.is_some());
-        assert_eq!(backwards.unwrap().name.to_string(), "(* c d) ==> (* a b)");
+        let bk = backwards.unwrap();
+        assert_eq!(bk.name.to_string(), "(* c d) ==> (* a b)");
+        assert_eq!(bk.cond, None);
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+        assert_eq!(forwards.cond, None);
+
+        // Conditional rules:
+        let (forwards, backwards) =
+            Rule::<egg::SymbolLang>::from_string("(* a b) ==> (* c d) if (+ e f)")
+                .ok()
+                .unwrap();
+        assert!(backwards.is_none());
+        assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d) if (+ e f)");
+        assert!(forwards.cond.is_some());
+        assert_eq!(forwards.cond.unwrap().to_string(), "(+ e f)");
     }
 }

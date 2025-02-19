@@ -1,7 +1,9 @@
-use egg::{AstSize, EClass, Extractor, RecExpr};
+use egg::{
+    AstSize, EClass, Extractor, Pattern, RecExpr,
+};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{io::Write, sync::Arc};
+use std::{collections::HashSet, io::Write, str::FromStr, sync::Arc};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -107,6 +109,16 @@ impl<L: SynthLanguage> Ruleset<L> {
         self.0.len()
     }
 
+    pub fn condition_len(&self) -> usize {
+        let mut size = 0;
+        for (_, rule) in &self.0 {
+            if rule.cond.is_some() {
+                size += 1;
+            }
+        }
+        size
+    }
+
     pub fn bidir_len(&self) -> usize {
         let mut bidir = 0;
         let mut unidir = 0;
@@ -127,6 +139,21 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub fn add(&mut self, rule: Rule<L>) {
         self.0.insert(rule.name.clone(), rule);
+    }
+
+    fn add_cond_from_recexprs(&mut self, e1: &RecExpr<L>, e2: &RecExpr<L>, cond: &RecExpr<L>) {
+        let map = &mut HashMap::default();
+        let l_pat = L::generalize(e1, map);
+        let r_pat = L::generalize(e2, map);
+        let cond_pat = L::generalize(cond, map);
+        let forward = Rule::new_cond(&l_pat, &r_pat, &cond_pat);
+        let backward = Rule::new_cond(&r_pat, &l_pat, &cond_pat);
+        if let Some(forward) = forward {
+            self.add(forward);
+        }
+        if let Some(backward) = backward {
+            self.add(backward);
+        }
     }
 
     /// Given a pair of recexprs, try to add rule candidates representing both
@@ -262,6 +289,75 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
+    // TODO: @ninehusky: should this just be integrated into normal `cvec_match`?
+    // See #5.
+    pub fn conditional_cvec_match(
+        egraph: &EGraph<L, SynthAnalysis>,
+        conditions: &HashMap<Vec<bool>, Vec<Pattern<L>>>,
+        restrict: bool,
+    ) -> Self {
+        let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
+
+        for class in egraph.classes() {
+            if class.data.is_defined() {
+                by_cvec.entry(&class.data.cvec).or_default().push(class.id);
+            }
+        }
+
+        let mut candidates = Ruleset::default();
+        let extract = Extractor::new(egraph, AstSize);
+
+        let mut i = 0;
+        for cvec1 in by_cvec.keys() {
+            i += 1;
+            for cvec2 in by_cvec.keys().skip(i) {
+                let pvec: Vec<bool> = cvec1
+                    .iter()
+                    .zip(cvec2.iter())
+                    .map(|(a, b)| a == b)
+                    .collect();
+
+                if pvec.iter().all(|x| *x) || pvec.iter().all(|x| !*x) {
+                    continue;
+                }
+
+                // now, let's vet the cvecs and make sure that they're good.
+                let mut unique_vals: HashSet<L::Constant> = HashSet::default();
+                for i in 0..pvec.len() {
+                    if pvec[i] {
+                        unique_vals.insert(cvec1[i].clone().unwrap());
+                        unique_vals.insert(cvec2[i].clone().unwrap());
+                    }
+                }
+
+                // we don't want to consider conditional rules which rewrite true ~> true, false ~>
+                // false
+                if restrict && unique_vals.len() < 2 {
+                    continue;
+                }
+
+                if let Some(pred_patterns) = conditions.get(&pvec) {
+                    for pred_pat in pred_patterns {
+                        for id1 in by_cvec[cvec1].clone() {
+                            for id2 in by_cvec[cvec2].clone() {
+                                let (c1, e1) = extract.find_best(id1);
+                                let (c2, e2) = extract.find_best(id2);
+                                let pred: RecExpr<L> =
+                                    RecExpr::from_str(&pred_pat.to_string()).unwrap();
+                                if c1 == usize::MAX || c2 == usize::MAX {
+                                    continue;
+                                }
+
+                                candidates.add_cond_from_recexprs(&e1, &e2, &pred);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        candidates
+    }
+
     /// Find candidates by CVec matching
     /// Pairs of e-classes with equivalent CVecs are rule candidates.
     pub fn cvec_match(egraph: &EGraph<L, SynthAnalysis>) -> Self {
@@ -390,6 +486,81 @@ impl<L: SynthLanguage> Ruleset<L> {
         chosen
     }
 
+    fn shrink_cond(
+        &mut self,
+        chosen: &Self,
+        scheduler: Scheduler,
+        prop_rules: &Self,
+        added_rule: &Rule<L>,
+    ) {
+        let mut will_choose: Self = Default::default();
+
+        // 1. make new egraph
+        let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
+
+        let mut initial = vec![];
+
+        // 2. insert lhs and rhs of all candidates as roots
+        for rule in self.0.values() {
+            let lhs = egraph.add_expr(&L::instantiate(&rule.lhs));
+            let rhs = egraph.add_expr(&L::instantiate(&rule.rhs));
+            initial.push((lhs, rhs, rule.clone()));
+        }
+
+        let true_term = egraph.add_expr(&"TRUE".parse().unwrap());
+        let cond_ast = &L::instantiate(&added_rule.cond.clone().unwrap());
+        let cond = egraph.add_expr(&cond_ast.clone());
+        egraph.union(cond, true_term);
+
+        // 2.5: do condition propogation
+        let egraph = scheduler.run(&egraph, prop_rules);
+
+        // 3. compress with the rules we've chosen so far
+        let egraph = scheduler.run(&egraph, chosen);
+
+        let mut cache: HashMap<(String, String), bool> = Default::default();
+
+        // 4. go through candidates. for each candidate `if c then l ~> r`, if
+        // l and r have merged and this rule's condition implies the candidate's, then they are no longer candidates.
+        for (l_id, r_id, rule) in initial {
+            // a conditional rule can never derive a total rule unless its condition
+            // is equivalent to "TRUE".
+            if rule.cond.is_none() {
+                continue;
+            }
+
+            // TODO: can i reset the cache here?
+            let new_cond = L::generalize(
+                &RecExpr::from_str(&rule.cond.clone().unwrap().to_string()).unwrap(),
+                &mut Default::default(),
+            );
+            let added_cond = L::generalize(
+                &RecExpr::from_str(&cond_ast.to_string()).unwrap(),
+                &mut Default::default(),
+            );
+
+            let implication = cache
+                .entry((new_cond.clone().to_string(), added_cond.clone().to_string()))
+                .or_insert_with(|| L::condition_implies(&new_cond, &added_cond));
+
+            // TODO: @ninehusky: let's use the existing rules to check implications rather than rely on Z3.
+            if egraph.find(l_id) == egraph.find(r_id) && *implication {
+                // println!("throwing out {}", rule.name);
+                // println!(
+                //     "{} implies {}",
+                //     added_rule.cond.clone().unwrap(),
+                //     rule.cond.clone().unwrap()
+                // );
+                // candidate has merged (derivable from other rewrites)
+                continue;
+            } else {
+                will_choose.add(rule);
+            }
+        }
+
+        self.0 = will_choose.0;
+    }
+
     fn shrink(&mut self, chosen: &Self, scheduler: Scheduler) {
         // 1. make new egraph
         // let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
@@ -417,6 +588,32 @@ impl<L: SynthLanguage> Ruleset<L> {
                 self.add(rule);
             }
         }
+    }
+
+    pub fn minimize_cond(
+        &mut self,
+        prior: Ruleset<L>,
+        scheduler: Scheduler,
+        prop_rules: &Self,
+    ) -> (Self, Self) {
+        let mut invalid: Ruleset<L> = Default::default();
+        let mut chosen = prior.clone();
+        let step_size = 1;
+        while !self.is_empty() {
+            let selected = self.select(step_size, &mut invalid);
+            assert_eq!(selected.len(), 1);
+            chosen.extend(selected.clone());
+            self.shrink_cond(
+                &chosen,
+                scheduler,
+                prop_rules,
+                selected.0.values().next().unwrap(),
+            );
+        }
+        // Return only the new rules
+        chosen.remove_all(prior);
+
+        (chosen, invalid)
     }
 
     /// Minimization algorithm for rule selection

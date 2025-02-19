@@ -1,8 +1,10 @@
 use std::time::Instant;
 
+use egg::Pattern;
+
 use crate::{
     enumo::{Filter, Metric, Ruleset, Scheduler, Workload},
-    Limits, SynthLanguage,
+    HashMap, Limits, SynthLanguage,
 };
 
 /// Iterate a grammar (represented as a workload) up to a certain size metric
@@ -33,8 +35,13 @@ fn run_workload_internal<L: SynthLanguage>(
     minimize_limits: Limits,
     fast_match: bool,
     allow_empty: bool,
+    // pvec -> list of conditions with that pvec
+    conditions: Option<HashMap<Vec<bool>, Vec<Pattern<L>>>>,
+    // rules for how other conditions become true from other conditions which are true
+    propogation_rules: Option<Ruleset<L>>,
 ) -> Ruleset<L> {
     let t = Instant::now();
+    let num_prior = prior.len();
 
     let egraph = workload.to_egraph::<L>();
     let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
@@ -45,8 +52,30 @@ fn run_workload_internal<L: SynthLanguage>(
         Ruleset::cvec_match(&compressed)
     };
 
-    let num_prior = prior.len();
-    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
+    let mut chosen: Ruleset<L> = prior.clone();
+
+    // minimize the total candidates with respect to the prior rules
+    let (chosen_total, _) =
+        candidates.minimize(prior.clone(), Scheduler::Compress(minimize_limits));
+
+    chosen.extend(chosen_total.clone());
+
+    let compressed = Scheduler::Compress(prior_limits).run(&egraph, &chosen_total);
+
+    if let Some(conditions) = conditions {
+        // now, try to add some conditions into tha mix!
+        let mut conditional_candidates =
+            Ruleset::conditional_cvec_match(&compressed, &conditions, true);
+
+        let (chosen_cond, _) = conditional_candidates.minimize_cond(
+            chosen.clone(),
+            Scheduler::Compress(minimize_limits),
+            &propogation_rules.unwrap(),
+        );
+        chosen.extend(chosen_cond.clone());
+    }
+
+    // let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
     let time = t.elapsed().as_secs_f64();
 
     if chosen.is_empty() && !allow_empty {
@@ -54,8 +83,9 @@ fn run_workload_internal<L: SynthLanguage>(
     }
 
     println!(
-        "Learned {} bidirectional rewrites ({} total rewrites) in {} using {} prior rewrites",
+        "Learned {} bidirectional rewrites, and {} conditional rules ({} total rewrites) in {} using {} prior rewrites",
         chosen.bidir_len(),
+        chosen.condition_len(),
         chosen.len(),
         time,
         num_prior
@@ -77,6 +107,10 @@ pub fn run_workload<L: SynthLanguage>(
     prior_limits: Limits,
     minimize_limits: Limits,
     fast_match: bool,
+    // pvec -> list of conditions with that pvec
+    conditions: Option<HashMap<Vec<bool>, Vec<Pattern<L>>>>,
+    // rules for how other conditions become true from other conditions which are true
+    propogation_rules: Option<Ruleset<L>>,
 ) -> Ruleset<L> {
     run_workload_internal(
         workload,
@@ -85,6 +119,8 @@ pub fn run_workload<L: SynthLanguage>(
         minimize_limits,
         fast_match,
         false,
+        conditions,
+        propogation_rules,
     )
 }
 
@@ -163,6 +199,52 @@ impl Lang {
 
 /// Incrementally construct a ruleset by running rule inference up to a size bound,
 /// using previously-learned rules at each step.
+pub fn recursive_rules_cond<L: SynthLanguage>(
+    metric: Metric,
+    n: usize,
+    lang: Lang,
+    prior: Ruleset<L>,
+    conditions: &HashMap<Vec<bool>, Vec<Pattern<L>>>,
+    propogation_rules: &Ruleset<L>,
+) -> Ruleset<L> {
+    if n < 1 {
+        Ruleset::default()
+    } else {
+        let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone());
+        let base_lang = if lang.ops.len() == 2 {
+            base_lang(2)
+        } else {
+            base_lang(3)
+        };
+        let mut wkld = iter_metric(base_lang, "EXPR", metric, n)
+            .filter(Filter::Contains("VAR".parse().unwrap()))
+            .plug("VAR", &Workload::new(lang.vars))
+            .plug("VAL", &Workload::new(lang.vals));
+        // let ops = vec![lang.uops, lang.bops, lang.tops];
+        for (i, ops) in lang.ops.iter().enumerate() {
+            wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
+        }
+        rec.extend(prior);
+        let allow_empty = n < 3;
+
+        let new = run_workload_internal(
+            wkld,
+            rec.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+            allow_empty,
+            Some(conditions.clone()),
+            Some(propogation_rules.clone()),
+        );
+        let mut all = new;
+        all.extend(rec);
+        all
+    }
+}
+
+/// Incrementally construct a ruleset by running rule inference up to a size bound,
+/// using previously-learned rules at each step.
 pub fn recursive_rules<L: SynthLanguage>(
     metric: Metric,
     n: usize,
@@ -188,6 +270,7 @@ pub fn recursive_rules<L: SynthLanguage>(
         }
         rec.extend(prior);
         let allow_empty = n < 3;
+
         let new = run_workload_internal(
             wkld,
             rec.clone(),
@@ -195,6 +278,8 @@ pub fn recursive_rules<L: SynthLanguage>(
             Limits::minimize(),
             true,
             allow_empty,
+            None,
+            None,
         );
         let mut all = new;
         all.extend(rec);

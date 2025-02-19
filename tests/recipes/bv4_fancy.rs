@@ -37,6 +37,8 @@ pub fn bv4_fancy_rules() -> Ruleset<Bv> {
         Limits::synthesis(),
         Limits::minimize(),
         true,
+        None,
+        None,
     ));
 
     rules

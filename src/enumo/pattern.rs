@@ -132,14 +132,14 @@ mod test {
 
     #[test]
     fn matches() {
-        let patterns: Vec<Pattern> = vec!["*", "x", "(+ ?x ?x)"]
+        let patterns: Vec<Pattern> = ["*", "x", "(+ ?x ?x)"]
             .iter()
             .map(|x| x.parse::<Pattern>().unwrap())
             .collect();
 
         let exprs = Workload::new(["a", "x", "(+ x y)", "(+ y y)", "(+ (* a b) (* a b))"]).force();
 
-        let expected = vec![
+        let expected = [
             vec![true, true, true, true, true],
             vec![false, true, false, false, false],
             vec![false, false, false, true, true],

@@ -31,6 +31,17 @@ egg::define_language! {
 impl SynthLanguage for Pred {
     type Constant = Constant;
 
+    fn constant_to_bool(c: &Self::Constant) -> Option<bool> {
+        Some(c != &0)
+    }
+
+    fn treat_as_pvec(&self) -> bool {
+        match self {
+            Pred::Lt(_) | Pred::Leq(_) | Pred::Eq(_) | Pred::Neq(_) => true,
+            _ => false,
+        }
+    }
+
     fn eval<'a, F>(&'a self, cvec_len: usize, mut get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
@@ -38,49 +49,49 @@ impl SynthLanguage for Pred {
         let one = 1.to_i64().unwrap();
         let zero = 0.to_i64().unwrap();
         match self {
-            Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
+            Pred::Lit(c) => vec![Some(*c); cvec_len],
             Pred::Lt([x, y]) => {
-                map!(get_cvec, x, y => if x < y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x < y {Some(one)} else {Some(zero)})
             }
             Pred::Leq([x, y]) => {
-                map!(get_cvec, x, y => if x <= y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x <= y {Some(one)} else {Some(zero)})
             }
             Pred::Eq([x, y]) => {
-                map!(get_cvec, x, y => if x == y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x == y {Some(one)} else {Some(zero)})
             }
             Pred::Neq([x, y]) => {
-                map!(get_cvec, x, y => if x != y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x != y {Some(one)} else {Some(zero)})
             }
             Pred::Implies([x, y]) => {
                 map!(get_cvec, x, y => {
-                  let xbool = x.clone() != zero;
-                  let ybool = y.clone() != zero;
-                  if !xbool || ybool {Some(one.clone())} else {Some(zero.clone())}
+                  let xbool = *x != zero;
+                  let ybool = *y != zero;
+                  if !xbool || ybool {Some(one)} else {Some(zero)}
                 })
             }
             Pred::Not(x) => {
-                map!(get_cvec, x => if x.clone() == zero { Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x => if *x == zero { Some(one)} else {Some(zero)})
             }
             Pred::Neg(x) => map!(get_cvec, x => Some(-x)),
             Pred::And([x, y]) => {
                 map!(get_cvec, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if xbool && ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                    let xbool = *x != zero;
+                    let ybool = *y != zero;
+                    if xbool && ybool { Some(one) } else { Some(zero) }
                 })
             }
             Pred::Or([x, y]) => {
                 map!(get_cvec, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if xbool || ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                    let xbool = *x != zero;
+                    let ybool = *y != zero;
+                    if xbool || ybool { Some(one) } else { Some(zero) }
                 })
             }
             Pred::Xor([x, y]) => {
                 map!(get_cvec, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if xbool ^ ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                    let xbool = *x != zero;
+                    let ybool = *y != zero;
+                    if xbool ^ ybool { Some(one) } else { Some(zero) }
                 })
             }
             Pred::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(*y)),
@@ -88,16 +99,16 @@ impl SynthLanguage for Pred {
             Pred::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(*y)),
             Pred::Div([x, y]) => map!(get_cvec, x, y => {
               if y.is_zero() {
-                Some(zero.clone())
+                Some(zero)
               } else {
                 x.checked_div(*y)
               }
             }),
-            Pred::Min([x, y]) => map!(get_cvec, x, y => Some(x.min(y).clone())),
-            Pred::Max([x, y]) => map!(get_cvec, x, y => Some(x.max(y).clone())),
+            Pred::Min([x, y]) => map!(get_cvec, x, y => Some(*x.min(y))),
+            Pred::Max([x, y]) => map!(get_cvec, x, y => Some(*x.max(y))),
             Pred::Select([x, y, z]) => map!(get_cvec, x, y, z => {
-              let xbool = x.clone() != zero;
-              if xbool {Some(y.clone())} else {Some(z.clone())}
+              let xbool = *x != zero;
+              if xbool {Some(*y)} else {Some(*z)}
             }),
             Pred::Var(_) => vec![],
         }
@@ -144,6 +155,57 @@ impl SynthLanguage for Pred {
         Pred::Lit(c)
     }
 
+    fn condition_implies(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+        let mut cfg = z3::Config::new();
+        cfg.set_timeout_msec(1000);
+        let ctx = z3::Context::new(&cfg);
+        let solver = z3::Solver::new(&ctx);
+        let zero = z3::ast::Int::from_i64(&ctx, 0);
+
+        // given that the lhs is true, can we make the rhs false?
+
+        let lhs = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref())
+            ._eq(&zero)
+            .not();
+
+        let rhs = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref())
+            ._eq(&zero)
+            .not();
+
+        let assertion = &lhs;
+
+        solver.assert(assertion);
+
+        if matches!(solver.check(), z3::SatResult::Unsat) {
+            // don't want something that is always false
+            return false;
+        }
+
+        solver.reset();
+        let assertion = &rhs;
+
+        solver.assert(&assertion.not());
+
+        if matches!(solver.check(), z3::SatResult::Unsat) {
+            // don't want something that is always true
+            return false;
+        }
+
+        solver.reset();
+
+        let assertion = &z3::ast::Bool::implies(&lhs, &rhs).not();
+
+        solver.assert(assertion);
+
+        let res = solver.check();
+
+        if matches!(res, z3::SatResult::Unsat) {
+            true
+        } else {
+            false
+        }
+    }
+
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
@@ -153,6 +215,33 @@ impl SynthLanguage for Pred {
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&lexpr._eq(&rexpr).not());
         match solver.check() {
+            z3::SatResult::Unsat => ValidationResult::Valid,
+            z3::SatResult::Unknown => ValidationResult::Unknown,
+            z3::SatResult::Sat => ValidationResult::Invalid,
+        }
+    }
+
+    fn validate_with_cond(
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+        cond: &Pattern<Self>,
+    ) -> ValidationResult {
+        assert!(cond.to_string().len() > 2, "Conditional pattern: {}", cond);
+        let mut cfg = z3::Config::new();
+        cfg.set_timeout_msec(1000);
+        let ctx = z3::Context::new(&cfg);
+        let solver = z3::Solver::new(&ctx);
+        let zero = z3::ast::Int::from_i64(&ctx, 0);
+        let cexpr =
+            z3::ast::Bool::not(&egg_to_z3(&ctx, Self::instantiate(cond).as_ref())._eq(&zero));
+
+        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+        solver.assert(&z3::ast::Bool::implies(&cexpr, &lexpr._eq(&rexpr)).not());
+
+        let res = solver.check();
+
+        match res {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
@@ -285,17 +374,26 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
 #[path = "./recipes/halide.rs"]
 mod halide;
 
+#[allow(unused_imports)]
 mod test {
-    use crate::halide::halide_rules;
-    use crate::Pred;
-    use std::time::{Duration, Instant};
+    use crate::halide::{
+        halide_rules, halide_rules_for_caviar_conditional, halide_rules_for_caviar_total_only,
+    };
+    use crate::{egg_to_z3, Pred};
+    use std::{
+        sync::Arc,
+        time::{Duration, Instant},
+    };
 
+    use egg::{AstSize, Extractor, Pattern, RecExpr};
     use ruler::{
-        enumo::{Filter, Metric, Ruleset, Workload},
+        enumo::{Filter, Metric, Rule, Ruleset, Workload},
         logger,
         recipe_utils::{recursive_rules, run_workload, Lang},
         Limits,
     };
+    use ruler::{SynthAnalysis, SynthLanguage};
+    use z3::ast::Ast;
 
     #[test]
     fn run() {
@@ -305,7 +403,9 @@ mod test {
         }
 
         let start = Instant::now();
-        let all_rules = halide_rules();
+        // let all_rules = halide_rules();
+        let all_rules = halide_rules_for_caviar_conditional();
+        println!("done");
         let duration = start.elapsed();
 
         // oopsla-halide-baseline branch
