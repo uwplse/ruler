@@ -59,15 +59,15 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
             let mut nodes: Vec<L> = vec![];
             let mut map: HashMap<Id, Id> = HashMap::default();
             enode.for_each(|id| {
-                if !map.contains_key(&id) {
+                map.entry(id).or_insert_with(|| {
                     let s = get_simplest(&id);
                     let i = nodes.len();
                     for n in s.as_ref() {
                         nodes.push(n.clone().map_children(|id| Id::from(usize::from(id) + i)));
                     }
 
-                    map.insert(id, Id::from(nodes.len() - 1));
-                }
+                    Id::from(nodes.len() - 1)
+                });
             });
 
             nodes.push(enode.clone().map_children(|id| *map.get(&id).unwrap()));
