@@ -1,6 +1,5 @@
 use egg::{
-    AstSize, Condition, ConditionEqual, ConditionalApplier, EClass, Extractor, Pattern, RecExpr,
-    Rewrite,
+    AstSize, EClass, Extractor, Pattern, RecExpr,
 };
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -333,10 +332,8 @@ impl<L: SynthLanguage> Ruleset<L> {
 
                 // we don't want to consider conditional rules which rewrite true ~> true, false ~>
                 // false
-                if restrict {
-                    if unique_vals.len() < 2 {
-                        continue;
-                    }
+                if restrict && unique_vals.len() < 2 {
+                    continue;
                 }
 
                 if let Some(pred_patterns) = conditions.get(&pvec) {
@@ -609,7 +606,7 @@ impl<L: SynthLanguage> Ruleset<L> {
             self.shrink_cond(
                 &chosen,
                 scheduler,
-                &prop_rules,
+                prop_rules,
                 selected.0.values().next().unwrap(),
             );
         }

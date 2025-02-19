@@ -1,4 +1,4 @@
-use egg::{AstSize, EGraph, Extractor, Pattern, RecExpr, Rewrite};
+use egg::{EGraph, Pattern, RecExpr, Rewrite};
 use ruler::{
     enumo::{Filter, Metric, Rule, Ruleset, Workload},
     recipe_utils::{
@@ -59,7 +59,7 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
 
         pvec_to_terms
             .entry(pvec)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(cond1_pat.clone());
 
         for cond2 in forced.iter().skip(i) {
