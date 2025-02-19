@@ -1,4 +1,3 @@
-use egg::Condition;
 use num::{ToPrimitive, Zero};
 use ruler::*;
 use z3::ast::Ast;
@@ -227,11 +226,7 @@ impl SynthLanguage for Pred {
         rhs: &Pattern<Self>,
         cond: &Pattern<Self>,
     ) -> ValidationResult {
-        assert!(
-            cond.to_string().len() > 2,
-            "Conditional pattern: {}",
-            cond
-        );
+        assert!(cond.to_string().len() > 2, "Conditional pattern: {}", cond);
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);

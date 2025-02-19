@@ -13,6 +13,7 @@ use crate::{count_lines, enumo::Ruleset, DeriveType, Limits, Phase, SynthLanguag
  * parses the file into an array, adds the new JSON objec to
  * the array, and writes it back to the file
  */
+#[allow(clippy::suspicious_open_options)]
 fn add_json_to_file(json: Value) {
     let path = "nightly/data/output.json";
     std::fs::create_dir_all("nightly/data").unwrap_or_else(|e| panic!("Error creating dir: {}", e));
@@ -60,8 +61,10 @@ pub fn write_baseline<L: SynthLanguage>(
     // and a.derive(b) will *not* run.
     // Note: b.derive(a) will still be computed unless (b, a)
     // is also in this list.
-    let skip_derive = [("herbie", "rational_replicate"),
-        ("herbie", "rational_best")];
+    let skip_derive = [
+        ("herbie", "rational_replicate"),
+        ("herbie", "rational_best"),
+    ];
 
     let loc = count_lines(spec_name)
         .map(|x| x.to_string())

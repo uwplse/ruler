@@ -139,9 +139,11 @@ mod test {
 
         let exprs = Workload::new(["a", "x", "(+ x y)", "(+ y y)", "(+ (* a b) (* a b))"]).force();
 
-        let expected = [vec![true, true, true, true, true],
+        let expected = [
+            vec![true, true, true, true, true],
             vec![false, true, false, false, false],
-            vec![false, false, false, true, true]];
+            vec![false, false, false, true, true],
+        ];
 
         for (i, pat) in patterns.iter().enumerate() {
             for (j, expr) in exprs.iter().enumerate() {

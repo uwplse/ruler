@@ -55,7 +55,7 @@ impl SynthLanguage for Math {
             }),
             Math::Neg(x) => map!(get_cvec, x => Some(-x)),
             Math::Abs(a) => map!(get_cvec, a => Some(a.abs())),
-            Math::Lit(c) => vec![Some(c.clone()); cvec_len],
+            Math::Lit(c) => vec![Some(*c); cvec_len],
             Math::Var(_) => vec![],
             Math::If([x, y, z]) => get_cvec(x)
                 .iter()
@@ -84,13 +84,13 @@ impl SynthLanguage for Math {
         let mut get_const = |x: &'a Id| {
             let ival = get_interval(x);
             if ival.low == ival.high {
-                ival.low.clone()
+                ival.low
             } else {
                 None
             }
         };
         match self {
-            Math::Lit(n) => Some(n.clone()),
+            Math::Lit(n) => Some(*n),
             Math::Var(_) => None,
             Math::Neg(x) => get_const(x).map(|c| -c),
             Math::Abs(a) => get_const(a).map(|c| c.abs()),
@@ -122,7 +122,7 @@ impl SynthLanguage for Math {
                 }
             }
         }
-        .map(|c| Interval::new(Some(c.clone()), Some(c)))
+        .map(|c| Interval::new(Some(c), Some(c)))
         .unwrap_or_default()
     }
 
@@ -196,12 +196,12 @@ impl SynthLanguage for Math {
         let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
 
         solver.assert(&assertion.clone().not());
-        let res = Self::z3_res_to_validationresult(solver.check());
+        
         /*if let ValidationResult::Valid = res {
             eprintln!("verifying {} => {}", lhs, rhs);
         eprintln!("assertion: {}", assertion);
         }*/
-        res
+        Self::z3_res_to_validationresult(solver.check())
     }
 
     fn is_constant(&self) -> bool {
@@ -215,7 +215,7 @@ impl SynthLanguage for Math {
 
 impl Math {
     fn _one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
-        let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
+        let zero_z3 = z3::ast::Real::from_real(ctx, 0, 1);
 
         let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
         for d in denoms {
@@ -242,17 +242,14 @@ impl Math {
 
     fn all_denominators(sexp: Sexp) -> HashSet<String> {
         let mut res = HashSet::<String>::default();
-        match sexp {
-            Sexp::List(list) => {
-                if list[0] == Sexp::String("/".to_string()) {
-                    res.insert(list[2].to_string());
-                }
-
-                for s in list {
-                    res.extend(Self::all_denominators(s));
-                }
+        if let Sexp::List(list) = sexp {
+            if list[0] == Sexp::String("/".to_string()) {
+                res.insert(list[2].to_string());
             }
-            _ => (),
+
+            for s in list {
+                res.extend(Self::all_denominators(s));
+            }
         }
 
         res
@@ -280,7 +277,7 @@ impl Math {
             let mut condition: Sexp = parse_str(iterator.next().unwrap()).unwrap();
 
             // TODO doesn't handle multiple denominators
-            if let Some(_) = iterator.next() {
+            if iterator.next().is_some() {
                 return None;
             }
             for denom in iterator {
@@ -335,7 +332,7 @@ impl Math {
                 if list[0] == Sexp::String("/".to_string()) {
                     let denom = list[2].to_string();
                     let expr = egg_to_z3(
-                        &ctx,
+                        ctx,
                         Self::instantiate(&denom.to_string().parse::<Pattern<Math>>().unwrap())
                             .as_ref(),
                     );
@@ -346,16 +343,16 @@ impl Math {
 
                 if list[0] == Sexp::String("if".to_string()) {
                     let cond_real = egg_to_z3(
-                        &ctx,
+                        ctx,
                         Self::instantiate(&list[1].to_string().parse::<Pattern<Math>>().unwrap())
                             .as_ref(),
                     );
                     let zero = z3::ast::Real::from_real(ctx, 0, 1);
                     let new_path_pos = z3::ast::Bool::and(
-                        &ctx,
+                        ctx,
                         &[&path, &z3::ast::Bool::not(&cond_real._eq(&zero))],
                     );
-                    let new_path_neg = z3::ast::Bool::and(&ctx, &[&path, &cond_real._eq(&zero)]);
+                    let new_path_neg = z3::ast::Bool::and(ctx, &[&path, &cond_real._eq(&zero)]);
                     res.extend(Self::error_conditions(ctx, list[2].clone(), new_path_pos));
                     res.extend(Self::error_conditions(ctx, list[3].clone(), new_path_neg));
                 } else {
@@ -465,7 +462,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
                 buf.push(z3::ast::Bool::ite(
                     &z3::ast::Real::le(inner, &zero),
                     &z3::ast::Real::unary_minus(inner),
-                    &inner,
+                    inner,
                 ));
             }
             Math::Lit(c) => buf.push(z3::ast::Real::from_real(
@@ -526,14 +523,14 @@ fn sign(interval: &Interval<Constant>) -> Sign {
 }
 
 fn neg(interval: &Interval<Constant>) -> Interval<Constant> {
-    let low = interval.low.clone();
-    let high = interval.high.clone();
+    let low = interval.low;
+    let high = interval.high;
     Interval::new(high.map(|x| -x), low.map(|x| -x))
 }
 
 fn _abs(interval: &Interval<Constant>) -> Interval<Constant> {
-    let low = interval.low.clone();
-    let high = interval.high.clone();
+    let low = interval.low;
+    let high = interval.high;
 
     match (low, high) {
         (None, None) => Interval::new(None, None),
@@ -558,12 +555,10 @@ fn _abs(interval: &Interval<Constant>) -> Interval<Constant> {
                 } else {
                     Interval::new(Some(-x), Some(y))
                 }
+            } else if y.is_negative() {
+                Interval::new(Some(x), Some(-y))
             } else {
-                if y.is_negative() {
-                    Interval::new(Some(x), Some(-y))
-                } else {
-                    Interval::new(Some(x), Some(y))
-                }
+                Interval::new(Some(x), Some(y))
             }
         }
     }
@@ -596,22 +591,22 @@ fn mul(a: &Interval<Constant>, b: &Interval<Constant>) -> Interval<Constant> {
         }
 
         (Sign::Positive, Sign::ContainsZero) => {
-            Interval::new(mul_opts(a.high.clone(), b.low), mul_opts(a.high, b.high))
+            Interval::new(mul_opts(a.high, b.low), mul_opts(a.high, b.high))
         }
         (Sign::ContainsZero, Sign::Positive) => {
-            Interval::new(mul_opts(a.low, b.high.clone()), mul_opts(a.high, b.high))
+            Interval::new(mul_opts(a.low, b.high), mul_opts(a.high, b.high))
         }
 
         (Sign::Negative, Sign::ContainsZero) => {
-            Interval::new(mul_opts(a.low.clone(), b.high), mul_opts(a.low, b.low))
+            Interval::new(mul_opts(a.low, b.high), mul_opts(a.low, b.low))
         }
         (Sign::ContainsZero, Sign::Negative) => {
-            Interval::new(mul_opts(a.high, b.low.clone()), mul_opts(a.low, b.low))
+            Interval::new(mul_opts(a.high, b.low), mul_opts(a.low, b.low))
         }
 
         (Sign::ContainsZero, Sign::ContainsZero) => {
-            let al_bh = mul_opts(a.low.clone(), b.high.clone());
-            let ah_bl = mul_opts(a.high.clone(), b.low.clone());
+            let al_bh = mul_opts(a.low, b.high);
+            let ah_bl = mul_opts(a.high, b.low);
             let min = al_bh.zip(ah_bl).map(|(x, y)| x.min(y));
 
             let ah_bh = mul_opts(a.high, b.high);
@@ -867,6 +862,8 @@ pub mod test {
             Limits::synthesis(),
             Limits::minimize(),
             false,
+            None,
+            None,
         );
         all_rules.extend(starting_rules);
 
@@ -877,6 +874,8 @@ pub mod test {
             Limits::synthesis(),
             Limits::minimize(),
             false,
+            None,
+            None,
         );
         all_rules.extend(basic_if_rules);
 
@@ -892,6 +891,8 @@ pub mod test {
             Limits::synthesis(),
             Limits::minimize(),
             false,
+            None,
+            None,
         );
         guarded_rules.to_file("guard.rules");
         assert!(guarded_rules
@@ -916,7 +917,7 @@ pub mod test {
         };
         let test = Workload::new(&["(if a b b)", "b"]);
         let test_rules: Ruleset<Math> =
-            run_workload(test, Ruleset::default(), limits, limits, false);
+            run_workload(test, Ruleset::default(), limits, limits, false, None, None);
         assert_eq!(test_rules.len(), 1);
     }
 }
