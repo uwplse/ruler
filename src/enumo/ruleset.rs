@@ -459,7 +459,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         while selected.len() < step_size {
             let popped = self.0.pop();
             if let Some((_, rule)) = popped {
-                println!("popped: {}", rule.name);
                 if rule.is_valid() {
                     selected.add(rule.clone());
                 } else {
@@ -617,13 +616,10 @@ impl<L: SynthLanguage> Ruleset<L> {
     ///         1. select the best rule candidate
     ///         2. filter out candidates that are redundant given the addition of the selected rule
     pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
-        println!("hi minimize: {}", self.len());
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
-        println!("about to minimize");
         while !self.is_empty() {
-            println!("hi minimize loop: {}", self.len());
             let selected = self.select(step_size, &mut invalid);
             // assert_eq!(selected.len(), 1); <-- wasn't this here in ruler?
             chosen.extend(selected.clone());
