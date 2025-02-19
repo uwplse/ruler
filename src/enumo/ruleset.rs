@@ -290,9 +290,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         candidates
     }
 
-    /// Find conditional candidates through pvec/cvec matching.
-    /// TODO: @ninehusky:
-    /// We could find total candidates here as well, but I'll add that in later.
+    // TODO: @ninehusky: should this just be integrated into normal `cvec_match`?
+    // See #5.
     pub fn conditional_cvec_match(
         egraph: &EGraph<L, SynthAnalysis>,
         conditions: &HashMap<Vec<bool>, Vec<Pattern<L>>>,
@@ -319,7 +318,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                     .map(|(a, b)| a == b)
                     .collect();
 
-                // don't want a predicate which just means "if true" or "if false"
                 if pvec.iter().all(|x| *x) || pvec.iter().all(|x| !*x) {
                     continue;
                 }
@@ -344,12 +342,9 @@ impl<L: SynthLanguage> Ruleset<L> {
                 if let Some(pred_patterns) = conditions.get(&pvec) {
                     for pred_pat in pred_patterns {
                         for id1 in by_cvec[cvec1].clone() {
-                            // We don't want to consider conditional rules of the form:
-                            // if cond then TRUE ~> cond
                             for id2 in by_cvec[cvec2].clone() {
                                 let (c1, e1) = extract.find_best(id1);
                                 let (c2, e2) = extract.find_best(id2);
-                                // seems sketch to me.
                                 let pred: RecExpr<L> =
                                     RecExpr::from_str(&pred_pat.to_string()).unwrap();
                                 if c1 == usize::MAX || c2 == usize::MAX {
@@ -520,14 +515,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         let cond = egraph.add_expr(&cond_ast.clone());
         egraph.union(cond, true_term);
 
-        // {x > 0, x > 1, ...}
-        // {if x > 1 === TRUE then union(x > 0, TRUE)}
-        //
-        // if x > 1 then a -> b
-        // if x > 0 then b -> c
-        //
-        // for (if x > -1 then a -> c) in candidates:
-        //
         // 2.5: do condition propogation
         let egraph = scheduler.run(&egraph, prop_rules);
 
@@ -605,18 +592,6 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
     }
-
-    // R = {...} :: r
-    // R = {if c1 then l1 -> r1}
-    // r = {if c2 then l2 -> r2}
-    //
-    // l1 == l2, r1 == r2, c1 => c2
-    //
-    // for c in candidates:
-    //    if c.cond == None:
-    //       candidates.shrink(R :: c)
-    //    else:
-    //       candidates.shrink_cond(R :: c)
 
     pub fn minimize_cond(
         &mut self,

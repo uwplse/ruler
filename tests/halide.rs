@@ -380,6 +380,7 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
 #[path = "./recipes/halide.rs"]
 mod halide;
 
+#[allow(unused_imports)]
 mod test {
     use crate::halide::{
         halide_rules, halide_rules_for_caviar_conditional, halide_rules_for_caviar_total_only,
@@ -399,48 +400,6 @@ mod test {
     };
     use ruler::{SynthAnalysis, SynthLanguage};
     use z3::ast::Ast;
-
-    #[test]
-    fn halide_sandbox() {
-        let (rule, _) = Rule::<Pred>::from_string("(min ?a ?b) => ?a if (<= ?a ?b)").unwrap();
-
-        assert!(rule.is_valid());
-
-        // derivabiility test -- the first should be derivable from the second
-        let mut ruleset: Ruleset<Pred> = Ruleset::new(&[
-            // it's a dummy rule, the condition is unnecessary but we just want to make sure the
-            // propogation works.
-            "(min ?x ?x) => ?x if (< ?x 0)",
-            "(min ?x ?x) => ?x if (< ?x 1)",
-        ]);
-
-        let (chosen, _) = ruleset.minimize_cond(
-            Ruleset::default(),
-            ruler::enumo::Scheduler::Compress(Limits::minimize()),
-            &Ruleset::default(),
-        );
-
-        assert_eq!(chosen.len(), 1);
-    }
-
-    #[test]
-    fn playground() {
-        let cfg = z3::Config::new();
-        let ctx = z3::Context::new(&cfg);
-        let solver = z3::Solver::new(&ctx);
-
-        let lhs_pat: Pattern<Pred> = "( / ( + v0 48 ) 40 )".parse().unwrap();
-
-        let lhs = egg_to_z3(&ctx, Pred::instantiate(&lhs_pat).as_ref());
-
-        let rhs_pat: Pattern<Pred> = "0".parse().unwrap();
-
-        let rhs = egg_to_z3(&ctx, Pred::instantiate(&rhs_pat).as_ref());
-
-        solver.assert(&lhs._eq(&rhs).not());
-
-        println!("result: {:?}", solver.check());
-    }
 
     #[test]
     fn run() {
