@@ -12,6 +12,8 @@ egg::define_language! {
     "abs" = Abs(Id),
     "<" = Lt([Id;2]),
     "<=" = Leq([Id;2]),
+    "<" = Gt([Id;2]),
+    "<=" = Geq([Id;2]),
     "==" = Eq([Id;2]),
     "!=" = Neq([Id;2]),
     "->" = Implies([Id; 2]),
@@ -61,6 +63,12 @@ impl SynthLanguage for Pred {
             }
             Pred::Leq([x, y]) => {
                 map!(get_cvec, x, y => if x <= y {Some(one)} else {Some(zero)})
+            }
+            Pred::Gt([x, y]) => {
+                map!(get_cvec, x, y => if x > y {Some(one)} else {Some(zero)})
+            }
+            Pred::Geq([x, y]) => {
+                map!(get_cvec, x, y => if x >= y {Some(one)} else {Some(zero)})
             }
             Pred::Eq([x, y]) => {
                 map!(get_cvec, x, y => if x == y {Some(one)} else {Some(zero)})
