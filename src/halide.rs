@@ -1,5 +1,6 @@
 use crate::*;
 
+use enumo::Sexp;
 use num::{ToPrimitive, Zero};
 use z3::ast::Ast;
 
@@ -393,4 +394,216 @@ pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
         }
     }
     buf.pop().unwrap()
+}
+
+pub fn validate_expression(expr: &Sexp) -> ValidationResult {
+    pub fn sexpr_to_z3<'a>(ctx: &'a z3::Context, expr: &Sexp) -> z3::ast::Int<'a> {
+        match expr {
+            Sexp::Atom(a) => {
+                if let Ok(c) = a.parse::<i64>() {
+                    z3::ast::Int::from_i64(ctx, c)
+                } else {
+                    z3::ast::Int::new_const(ctx, a.to_string())
+                }
+            }
+            Sexp::List(l) => {
+                let mut iter = l.iter();
+                let head = iter.next().unwrap();
+                let tail = iter.collect::<Vec<_>>();
+                match head.to_string().as_str() {
+                    "abs" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::lt(&x, &z3::ast::Int::from_i64(ctx, 0)),
+                            &z3::ast::Int::unary_minus(&x),
+                            &x,
+                        )
+                    }
+                    "<" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::lt(&x, &y),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "<=" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::le(&x, &y),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "==" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::_eq(&x, &y),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "!=" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::_eq(&x, &y),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                        )
+                    }
+                    "->" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        let x_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &x,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        let y_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &y,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        z3::ast::Bool::ite(
+                            &z3::ast::Bool::implies(&x_not_z, &y_not_z),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "!" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::_eq(&x, &z3::ast::Int::from_i64(ctx, 0)),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "-" => {
+                        if tail.len() == 1 {
+                            z3::ast::Int::unary_minus(&sexpr_to_z3(ctx, tail[0]))
+                        } else {
+                            let x = sexpr_to_z3(ctx, tail[0]);
+                            let y = sexpr_to_z3(ctx, tail[1]);
+                            z3::ast::Int::sub(ctx, &[&x, &y])
+                        }
+                    }
+                    "&&" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        let x_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &x,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        let y_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &y,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        z3::ast::Bool::ite(
+                            &z3::ast::Bool::and(ctx, &[&x_not_z, &y_not_z]),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "||" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        let x_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &x,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        let y_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &y,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        z3::ast::Bool::ite(
+                            &z3::ast::Bool::or(ctx, &[&x_not_z, &y_not_z]),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "^" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        let x_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &x,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        let y_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &y,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        z3::ast::Bool::ite(
+                            &z3::ast::Bool::xor(&x_not_z, &y_not_z),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    "+" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Int::add(ctx, &[&x, &y])
+                    }
+                    "*" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Int::mul(ctx, &[&x, &y])
+                    }
+                    "/" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::_eq(&y, &z3::ast::Int::from_i64(ctx, 0)),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                            &z3::ast::Int::div(&x, &y),
+                        )
+                    }
+                    "%" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::_eq(&y, &z3::ast::Int::from_i64(ctx, 0)),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                            &z3::ast::Int::modulo(&x, &y),
+                        )
+                    }
+                    "min" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(&z3::ast::Int::le(&x, &y), &x, &y)
+                    }
+                    "max" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(&z3::ast::Int::le(&x, &y), &y, &x)
+                    }
+                    "select" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        let z = sexpr_to_z3(ctx, tail[2]);
+                        let x_not_z = z3::ast::Bool::not(&z3::ast::Int::_eq(
+                            &x,
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        ));
+                        z3::ast::Bool::ite(&x_not_z, &y, &z)
+                    }
+                    _ => panic!("Unknown operator: {}", head),
+                }
+            }
+        }
+    }
+
+    let mut cfg = z3::Config::new();
+    cfg.set_timeout_msec(1000);
+    let ctx = z3::Context::new(&cfg);
+    let solver = z3::Solver::new(&ctx);
+    let zero = z3::ast::Int::from_i64(&ctx, 0);
+    let expr = sexpr_to_z3(&ctx, expr);
+    solver.assert(&expr._eq(&zero));
+    match solver.check() {
+        z3::SatResult::Unsat => ValidationResult::Valid,
+        z3::SatResult::Unknown => ValidationResult::Unknown,
+        z3::SatResult::Sat => ValidationResult::Invalid,
+    }
 }
