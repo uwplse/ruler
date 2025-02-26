@@ -38,11 +38,12 @@ impl SynthLanguage for Pred {
         Some(c != &0)
     }
 
+    // TODO: @ninehusky -- delete this.
     fn treat_as_pvec(&self) -> bool {
-        match self {
-            Pred::Lt(_) | Pred::Leq(_) | Pred::Eq(_) | Pred::Neq(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Pred::Lt(_) | Pred::Leq(_) | Pred::Eq(_) | Pred::Neq(_)
+        )
     }
 
     fn eval<'a, F>(&'a self, cvec_len: usize, mut get_cvec: F) -> CVec<Self>
@@ -210,11 +211,7 @@ impl SynthLanguage for Pred {
 
         let res = solver.check();
 
-        if matches!(res, z3::SatResult::Unsat) {
-            true
-        } else {
-            false
-        }
+        matches!(res, z3::SatResult::Unsat)
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
