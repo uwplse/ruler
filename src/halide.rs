@@ -291,6 +291,16 @@ pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
                 let r = &buf[usize::from(*y)];
                 buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), &one, &zero))
             }
+            Pred::Gt([x, y]) => {
+                let l = &buf[usize::from(*x)];
+                let r = &buf[usize::from(*y)];
+                buf.push(z3::ast::Bool::ite(&z3::ast::Int::gt(l, r), &one, &zero))
+            }
+            Pred::Geq([x, y]) => {
+                let l = &buf[usize::from(*x)];
+                let r = &buf[usize::from(*y)];
+                buf.push(z3::ast::Bool::ite(&z3::ast::Int::ge(l, r), &one, &zero))
+            }
             Pred::Eq([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
@@ -441,6 +451,24 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
                         let y = sexpr_to_z3(ctx, tail[1]);
                         z3::ast::Bool::ite(
                             &z3::ast::Int::le(&x, &y),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    ">" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::gt(&x, &y),
+                            &z3::ast::Int::from_i64(ctx, 1),
+                            &z3::ast::Int::from_i64(ctx, 0),
+                        )
+                    }
+                    ">=" => {
+                        let x = sexpr_to_z3(ctx, tail[0]);
+                        let y = sexpr_to_z3(ctx, tail[1]);
+                        z3::ast::Bool::ite(
+                            &z3::ast::Int::ge(&x, &y),
                             &z3::ast::Int::from_i64(ctx, 1),
                             &z3::ast::Int::from_i64(ctx, 0),
                         )
