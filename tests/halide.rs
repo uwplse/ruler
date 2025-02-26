@@ -5,8 +5,7 @@ mod halide;
 #[allow(unused_imports)]
 mod test {
     use crate::halide::{
-        halide_limited_grammar, halide_rules, halide_rules_for_caviar_conditional,
-        halide_rules_for_caviar_total_only,
+        halide_rules, halide_rules_for_caviar_conditional, halide_rules_for_caviar_total_only,
     };
     use ruler::halide::{egg_to_z3, Pred};
     use std::{

@@ -7,7 +7,7 @@ use ruler::{
     HashMap, Limits, SynthAnalysis, SynthLanguage,
 };
 
-use crate::Pred;
+use ruler::halide::Pred;
 
 fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, Ruleset<Pred>) {
     // Start by pre-computing a bunch of stuff about conditions.
