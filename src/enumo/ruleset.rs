@@ -292,7 +292,6 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn conditional_cvec_match(
         egraph: &EGraph<L, SynthAnalysis>,
         conditions: &HashMap<Vec<bool>, Vec<Pattern<L>>>,
-        restrict: bool,
     ) -> Self {
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
 
@@ -315,22 +314,9 @@ impl<L: SynthLanguage> Ruleset<L> {
                     .map(|(a, b)| a == b)
                     .collect();
 
+                println!("pvec for {:?} and {:?} is {:?}", cvec1, cvec2, pvec);
+
                 if pvec.iter().all(|x| *x) || pvec.iter().all(|x| !*x) {
-                    continue;
-                }
-
-                // now, let's vet the cvecs and make sure that they're good.
-                let mut unique_vals: HashSet<L::Constant> = HashSet::default();
-                for i in 0..pvec.len() {
-                    if pvec[i] {
-                        unique_vals.insert(cvec1[i].clone().unwrap());
-                        unique_vals.insert(cvec2[i].clone().unwrap());
-                    }
-                }
-
-                // we don't want to consider conditional rules which rewrite true ~> true, false ~>
-                // false
-                if restrict && unique_vals.len() < 2 {
                     continue;
                 }
 
@@ -346,6 +332,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                                     continue;
                                 }
 
+                                println!("{} => {} if {}", e1, e2, pred);
                                 candidates.add_cond_from_recexprs(&e1, &e2, &pred);
                             }
                         }

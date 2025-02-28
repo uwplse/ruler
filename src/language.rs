@@ -75,19 +75,12 @@ impl<L: SynthLanguage> Analysis<L> for SynthAnalysis {
         };
 
         let cvec = enode.eval(egraph.analysis.cvec_len, get_cvec);
-        let pvec = if enode.treat_as_pvec() {
-            cvec.iter()
-                .map(|v| L::constant_to_bool(v.as_ref().unwrap()))
-                .collect()
-        } else {
-            None
-        };
 
         Signature {
             cvec,
             interval: enode.mk_interval(get_interval),
             simplest,
-            pvec,
+            pvec: None,
         }
     }
 
