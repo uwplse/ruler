@@ -41,14 +41,6 @@ impl SynthLanguage for Pred {
         Some(c != &0)
     }
 
-    // TODO: @ninehusky -- delete this.
-    fn treat_as_pvec(&self) -> bool {
-        matches!(
-            self,
-            Pred::Lt(_) | Pred::Leq(_) | Pred::Eq(_) | Pred::Neq(_)
-        )
-    }
-
     fn eval<'a, F>(&'a self, cvec_len: usize, mut get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
@@ -111,20 +103,8 @@ impl SynthLanguage for Pred {
             Pred::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(*y)),
             Pred::Sub([x, y]) => map!(get_cvec, x, y => x.checked_sub(*y)),
             Pred::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(*y)),
-            Pred::Div([x, y]) => map!(get_cvec, x, y => {
-              if y.is_zero() {
-                Some(zero)
-              } else {
-                x.checked_div(*y)
-              }
-            }),
-            Pred::Mod([x, y]) => map!(get_cvec, x, y => {
-              if y.is_zero() {
-                Some(zero)
-              } else {
-                x.checked_rem(*y)
-              }
-            }),
+            Pred::Div([x, y]) => map!(get_cvec, x, y => x.checked_div(*y)),
+            Pred::Mod([x, y]) => map!(get_cvec, x, y => x.checked_rem(*y)),
             Pred::Min([x, y]) => map!(get_cvec, x, y => Some(*x.min(y))),
             Pred::Max([x, y]) => map!(get_cvec, x, y => Some(*x.max(y))),
             Pred::Select([x, y, z]) => map!(get_cvec, x, y, z => {
@@ -176,7 +156,17 @@ impl SynthLanguage for Pred {
         Pred::Lit(c)
     }
 
-    fn condition_implies(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+    fn condition_implies(
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+        cache: &mut HashMap<(String, String), bool>,
+    ) -> bool {
+        let lhs_str = lhs.to_string();
+        let rhs_str = rhs.to_string();
+        if cache.contains_key(&(lhs_str.clone(), rhs_str.clone())) {
+            return *cache.get(&(lhs_str, rhs_str)).unwrap();
+        }
+
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
@@ -199,6 +189,7 @@ impl SynthLanguage for Pred {
 
         if matches!(solver.check(), z3::SatResult::Unsat) {
             // don't want something that is always false
+            cache.insert((lhs_str, rhs_str), false);
             return false;
         }
 
@@ -209,6 +200,7 @@ impl SynthLanguage for Pred {
 
         if matches!(solver.check(), z3::SatResult::Unsat) {
             // don't want something that is always true
+            cache.insert((lhs_str, rhs_str), false);
             return false;
         }
 
@@ -219,8 +211,9 @@ impl SynthLanguage for Pred {
         solver.assert(assertion);
 
         let res = solver.check();
-
-        matches!(res, z3::SatResult::Unsat)
+        let implies = matches!(res, z3::SatResult::Unsat);
+        cache.insert((lhs_str, rhs_str), implies);
+        implies
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
@@ -372,24 +365,14 @@ pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
                 ctx,
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
-            Pred::Div([x, y]) => {
-                let l = &buf[usize::from(*x)];
-                let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(
-                    &r._eq(&zero),
-                    &zero,
-                    &z3::ast::Int::div(l, r),
-                ))
-            }
-            Pred::Mod([x, y]) => {
-                let l = &buf[usize::from(*x)];
-                let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(
-                    &r._eq(&zero),
-                    &zero,
-                    &z3::ast::Int::modulo(l, r),
-                ))
-            }
+            Pred::Div([x, y]) => buf.push(z3::ast::Int::div(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)].clone(),
+            )),
+            Pred::Mod([x, y]) => buf.push(z3::ast::Int::modulo(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)].clone(),
+            )),
             Pred::Min([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
@@ -589,20 +572,12 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
                     "/" => {
                         let x = sexpr_to_z3(ctx, tail[0]);
                         let y = sexpr_to_z3(ctx, tail[1]);
-                        z3::ast::Bool::ite(
-                            &z3::ast::Int::_eq(&y, &z3::ast::Int::from_i64(ctx, 0)),
-                            &z3::ast::Int::from_i64(ctx, 0),
-                            &z3::ast::Int::div(&x, &y),
-                        )
+                        z3::ast::Int::div(&x, &y)
                     }
                     "%" => {
                         let x = sexpr_to_z3(ctx, tail[0]);
                         let y = sexpr_to_z3(ctx, tail[1]);
-                        z3::ast::Bool::ite(
-                            &z3::ast::Int::_eq(&y, &z3::ast::Int::from_i64(ctx, 0)),
-                            &z3::ast::Int::from_i64(ctx, 0),
-                            &z3::ast::Int::modulo(&x, &y),
-                        )
+                        z3::ast::Int::modulo(&x, &y)
                     }
                     "min" => {
                         let x = sexpr_to_z3(ctx, tail[0]);

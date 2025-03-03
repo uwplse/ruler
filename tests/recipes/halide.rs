@@ -32,6 +32,8 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
 
     let mut pvec_to_terms: HashMap<Vec<bool>, Vec<Pattern<Pred>>> = HashMap::default();
 
+    let mut cache: HashMap<(String, String), bool> = HashMap::default();
+
     let mut cond_prop_ruleset = Ruleset::default();
 
     let forced = wkld.filter(Filter::MetricEq(Metric::Atoms, 3)).force();
@@ -66,7 +68,7 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
             let cond2_recexpr: RecExpr<Pred> = cond2.to_string().parse().unwrap();
             let cond2_pat = Pattern::from(&cond2_recexpr);
 
-            if Pred::condition_implies(&cond1_pat.clone(), &cond2_pat) {
+            if Pred::condition_implies(&cond1_pat.clone(), &cond2_pat, &mut cache) {
                 let rw_name = format!("{} => {}", cond2, true_recexpr);
                 let rw: Rewrite<Pred, SynthAnalysis> = Rewrite::new(
                     rw_name.clone(),
@@ -93,6 +95,7 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
 pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures();
     let mut all_rules = Ruleset::default();
+
     let bool_only = recursive_rules(
         Metric::Atoms,
         5,
@@ -127,25 +130,23 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     );
     all_rules.extend(pred_only);
 
-    let full = recursive_rules_cond(
-        Metric::Atoms,
-        4,
-        Lang::new(
-            &["-1", "0", "1"],
-            &["a", "b", "c"],
-            &[
-                &["!"],
-                &[
-                    "&&", "||", "+", "-", "*", "/", "%", "min", "max", "<", "<=", "==", "!=",
-                ],
-                &[],
-            ],
-        ),
-        all_rules.clone(),
-        &pvec_to_terms,
-        &cond_prop_ruleset,
-    );
-    all_rules.extend(full);
+    // let full = recursive_rules(
+    //     Metric::Atoms,
+    //     4,
+    //     Lang::new(
+    //         &[],
+    //         &["a", "b", "c"],
+    //         &[
+    //             &["!"],
+    //             &[
+    //                 "&&", "||", "+", "-", "*", "/", "%", "min", "max", "<", "<=", "==", "!=",
+    //             ],
+    //             &[],
+    //         ],
+    //     ),
+    //     all_rules.clone(),
+    // );
+    // all_rules.extend(full);
 
     all_rules
 }

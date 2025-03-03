@@ -31,9 +31,9 @@ mod test {
         }
 
         let start = Instant::now();
-        // let all_rules = halide_rules();
         let all_rules = halide_rules_for_caviar_conditional();
         println!("done");
+        return;
         let duration = start.elapsed();
 
         // oopsla-halide-baseline branch

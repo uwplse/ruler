@@ -1,7 +1,7 @@
 use egg::{AstSize, EClass, Extractor, Pattern, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{collections::HashSet, io::Write, str::FromStr, sync::Arc};
+use std::{io::Write, str::FromStr, sync::Arc};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -292,7 +292,6 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn conditional_cvec_match(
         egraph: &EGraph<L, SynthAnalysis>,
         conditions: &HashMap<Vec<bool>, Vec<Pattern<L>>>,
-        restrict: bool,
     ) -> Self {
         let mut by_cvec: IndexMap<&CVec<L>, Vec<Id>> = IndexMap::default();
 
@@ -316,21 +315,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                     .collect();
 
                 if pvec.iter().all(|x| *x) || pvec.iter().all(|x| !*x) {
-                    continue;
-                }
-
-                // now, let's vet the cvecs and make sure that they're good.
-                let mut unique_vals: HashSet<L::Constant> = HashSet::default();
-                for i in 0..pvec.len() {
-                    if pvec[i] {
-                        unique_vals.insert(cvec1[i].clone().unwrap());
-                        unique_vals.insert(cvec2[i].clone().unwrap());
-                    }
-                }
-
-                // we don't want to consider conditional rules which rewrite true ~> true, false ~>
-                // false
-                if restrict && unique_vals.len() < 2 {
                     continue;
                 }
 
@@ -536,13 +520,11 @@ impl<L: SynthLanguage> Ruleset<L> {
                 &mut Default::default(),
             );
 
-            let implication = cache
-                .entry((new_cond.clone().to_string(), added_cond.clone().to_string()))
-                .or_insert_with(|| L::condition_implies(&new_cond, &added_cond));
+            let implication = L::condition_implies(&new_cond, &added_cond, &mut cache);
 
             // TODO: @ninehusky: let's use the existing rules to check implications rather than rely on Z3.
             // See #7.
-            if egraph.find(l_id) == egraph.find(r_id) && *implication {
+            if egraph.find(l_id) == egraph.find(r_id) && implication {
                 continue;
             } else {
                 will_choose.add(rule);
