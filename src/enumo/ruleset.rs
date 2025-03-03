@@ -314,8 +314,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                     .map(|(a, b)| a == b)
                     .collect();
 
-                println!("pvec for {:?} and {:?} is {:?}", cvec1, cvec2, pvec);
-
                 if pvec.iter().all(|x| *x) || pvec.iter().all(|x| !*x) {
                     continue;
                 }
@@ -332,7 +330,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                                     continue;
                                 }
 
-                                println!("{} => {} if {}", e1, e2, pred);
                                 candidates.add_cond_from_recexprs(&e1, &e2, &pred);
                             }
                         }
@@ -483,6 +480,8 @@ impl<L: SynthLanguage> Ruleset<L> {
         // 1. make new egraph
         let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
 
+        let mut cache: HashMap<(String, String), bool> = Default::default();
+
         let mut initial = vec![];
 
         // 2. insert lhs and rhs of all candidates as roots
@@ -523,13 +522,11 @@ impl<L: SynthLanguage> Ruleset<L> {
                 &mut Default::default(),
             );
 
-            let implication = cache
-                .entry((new_cond.clone().to_string(), added_cond.clone().to_string()))
-                .or_insert_with(|| L::condition_implies(&new_cond, &added_cond));
+            let implication = L::condition_implies(&new_cond, &added_cond, &mut cache);
 
             // TODO: @ninehusky: let's use the existing rules to check implications rather than rely on Z3.
             // See #7.
-            if egraph.find(l_id) == egraph.find(r_id) && *implication {
+            if egraph.find(l_id) == egraph.find(r_id) && implication {
                 continue;
             } else {
                 will_choose.add(rule);

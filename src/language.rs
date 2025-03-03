@@ -257,7 +257,11 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         true
     }
 
-    fn condition_implies(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> bool {
+    fn condition_implies(
+        _lhs: &Pattern<Self>,
+        _rhs: &Pattern<Self>,
+        _cache: &mut HashMap<(String, String), bool>,
+    ) -> bool {
         false
     }
 

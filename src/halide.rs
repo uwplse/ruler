@@ -164,7 +164,17 @@ impl SynthLanguage for Pred {
         Pred::Lit(c)
     }
 
-    fn condition_implies(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> bool {
+    fn condition_implies(
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+        cache: &mut HashMap<(String, String), bool>,
+    ) -> bool {
+        let lhs_str = lhs.to_string();
+        let rhs_str = rhs.to_string();
+        if cache.contains_key(&(lhs_str.clone(), rhs_str.clone())) {
+            return *cache.get(&(lhs_str, rhs_str)).unwrap();
+        }
+
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
         let ctx = z3::Context::new(&cfg);
@@ -187,6 +197,7 @@ impl SynthLanguage for Pred {
 
         if matches!(solver.check(), z3::SatResult::Unsat) {
             // don't want something that is always false
+            cache.insert((lhs_str, rhs_str), false);
             return false;
         }
 
@@ -197,6 +208,7 @@ impl SynthLanguage for Pred {
 
         if matches!(solver.check(), z3::SatResult::Unsat) {
             // don't want something that is always true
+            cache.insert((lhs_str, rhs_str), false);
             return false;
         }
 
@@ -207,8 +219,9 @@ impl SynthLanguage for Pred {
         solver.assert(assertion);
 
         let res = solver.check();
-
-        matches!(res, z3::SatResult::Unsat)
+        let implies = matches!(res, z3::SatResult::Unsat);
+        cache.insert((lhs_str, rhs_str), implies);
+        implies
     }
 
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
