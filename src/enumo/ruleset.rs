@@ -1,7 +1,7 @@
 use egg::{AstSize, EClass, Extractor, Pattern, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{collections::HashSet, io::Write, str::FromStr, sync::Arc};
+use std::{io::Write, str::FromStr, sync::Arc};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -479,8 +479,6 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         // 1. make new egraph
         let mut egraph: EGraph<L, SynthAnalysis> = EGraph::default();
-
-        let mut cache: HashMap<(String, String), bool> = Default::default();
 
         let mut initial = vec![];
 
