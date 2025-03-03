@@ -125,7 +125,8 @@ pub fn write_bv_derivability<L: SynthLanguage>(
 
     // Compute derivability
     let start = Instant::now();
-    let (can, cannot) = sound_bv4.derive(DeriveType::LhsAndRhs, &gen_rules, Limits::deriving());
+    let (can, cannot) =
+        sound_bv4.derive(DeriveType::LhsAndRhs, &gen_rules, Limits::deriving(), &None);
     let derive_time = start.elapsed();
     let lhsrhs = json!({
         "can": can.to_str_vec(),
@@ -134,7 +135,7 @@ pub fn write_bv_derivability<L: SynthLanguage>(
     });
 
     let start = Instant::now();
-    let (can, cannot) = sound_bv4.derive(DeriveType::Lhs, &gen_rules, Limits::deriving());
+    let (can, cannot) = sound_bv4.derive(DeriveType::Lhs, &gen_rules, Limits::deriving(), &None);
     let derive_time = start.elapsed();
     let lhs = json!({
         "can": can.to_str_vec(),
@@ -194,7 +195,7 @@ fn get_derivability<L: SynthLanguage>(
     derive_type: DeriveType,
 ) -> Value {
     let start = Instant::now();
-    let (can, cannot) = ruleset.derive(derive_type, against, Limits::deriving());
+    let (can, cannot) = ruleset.derive(derive_type, against, Limits::deriving(), &None);
     let elapsed = start.elapsed();
 
     json!({
