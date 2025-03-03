@@ -89,7 +89,6 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
         }
     }
 
-    println!("PVEC TO TERMS: {:?}", pvec_to_terms);
     (pvec_to_terms, cond_prop_ruleset)
 }
 
