@@ -41,14 +41,6 @@ impl SynthLanguage for Pred {
         Some(c != &0)
     }
 
-    // TODO: @ninehusky -- delete this.
-    fn treat_as_pvec(&self) -> bool {
-        matches!(
-            self,
-            Pred::Lt(_) | Pred::Leq(_) | Pred::Eq(_) | Pred::Neq(_)
-        )
-    }
-
     fn eval<'a, F>(&'a self, cvec_len: usize, mut get_cvec: F) -> CVec<Self>
     where
         F: FnMut(&'a Id) -> &'a CVec<Self>,
