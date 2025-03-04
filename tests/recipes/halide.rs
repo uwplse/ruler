@@ -69,7 +69,7 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
             let cond2_pat = Pattern::from(&cond2_recexpr);
 
             if Pred::condition_implies(&cond1_pat.clone(), &cond2_pat, &mut cache) {
-                let rw_name = format!("{} => {}", cond2, true_recexpr);
+                let rw_name = format!("{} => {} if {} == true", cond1, cond2, cond1);
                 let rw: Rewrite<Pred, SynthAnalysis> = Rewrite::new(
                     rw_name.clone(),
                     Pattern::from(&true_recexpr.clone()),

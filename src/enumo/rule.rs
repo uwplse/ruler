@@ -54,17 +54,37 @@ impl<L: SynthLanguage> Rule<L> {
 
             let name = make_name(&l_pat, &r_pat, cond.clone());
 
-            let forwards = Self {
-                name: name.clone().into(),
-                lhs: l_pat.clone(),
-                rhs: r_pat.clone(),
-                cond: cond.clone(),
-                rewrite: Rewrite::new(name.clone(), l_pat.clone(), Rhs { rhs: r_pat.clone() })
-                    .unwrap(),
+            let forwards = if cond.is_some() {
+                let rewrite = Rewrite::new(
+                    name.clone(),
+                    l_pat.clone(),
+                    ConditionalApplier {
+                        condition: ConditionEqual::new(
+                            cond.clone().unwrap(),
+                            "TRUE".parse().unwrap(),
+                        ),
+                        applier: Rhs { rhs: r_pat.clone() },
+                    },
+                )
+                .unwrap();
+
+                Self {
+                    name: name.clone().into(),
+                    lhs: l_pat.clone(),
+                    rhs: r_pat.clone(),
+                    cond: cond.clone(),
+                    rewrite,
+                }
+            } else {
+                Self::new_cond(&l_pat, &r_pat, &cond.clone().unwrap()).unwrap()
             };
 
             if s.contains("<=>") {
                 let backwards_name = make_name(&r_pat, &l_pat, cond.clone());
+                assert!(
+                    cond.is_none(),
+                    "Conditional bidirectional rules not supported."
+                );
                 let backwards = Self {
                     name: backwards_name.clone().into(),
                     lhs: r_pat.clone(),

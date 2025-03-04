@@ -614,6 +614,56 @@ impl<L: SynthLanguage> Ruleset<L> {
         (chosen, invalid)
     }
 
+    /// Whether a given conditional rule can be derived by the ruleset with given resource limits
+    ///     1. Initialize an e-graph with the rule (lhs => rhs) being tested.
+    ///         If derive_type is Lhs, the e-graph is initialized with only lhs
+    ///         If derive_type is LhsAndRhs, the e-graph is initialized with lhs and rhs
+    ///     2. Add "TRUE" into the e-graph, and union it with the condition.
+    ///     3. Run the condition propogation rules, i.e., set every condition which follows from
+    ///        the given rule's condition to "TRUE".
+    ///     4. Run the ruleset
+    ///     5. Return true if the lhs and rhs are equivalent, false otherwise.
+    pub fn can_derive_cond(
+        &self,
+        derive_type: DeriveType,
+        rule: &Rule<L>,
+        limits: Limits,
+        condition_propogation_rules: &Self,
+    ) -> bool {
+        let scheduler = Scheduler::Saturating(limits);
+        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
+        let lexpr = &L::instantiate(&rule.lhs);
+        let rexpr = &L::instantiate(&rule.rhs);
+
+        let cond = &L::instantiate(&rule.cond.clone().unwrap());
+        let cond_id = egraph.add_expr(cond);
+        let true_id = egraph.add_expr(&"TRUE".parse().unwrap());
+        egraph.union(cond_id, true_id);
+
+        match derive_type {
+            DeriveType::Lhs => {
+                egraph.add_expr(lexpr);
+            }
+            DeriveType::LhsAndRhs => {
+                egraph.add_expr(lexpr);
+                egraph.add_expr(rexpr);
+            }
+        }
+
+        let egraph = scheduler.run(&egraph, condition_propogation_rules);
+        let out_egraph = scheduler.run_derive(&egraph, self, rule);
+
+        let l_id = out_egraph
+            .lookup_expr(lexpr)
+            .unwrap_or_else(|| panic!("Did not find {}", lexpr));
+        let r_id = out_egraph.lookup_expr(rexpr);
+        if let Some(r_id) = r_id {
+            l_id == r_id
+        } else {
+            false
+        }
+    }
+
     /// Whether a given rule can be derived by the ruleset with given resource limits
     ///     1. Initialize an e-graph with the rule (lhs => rhs) being tested.
     ///         If derive_type is Lhs, the e-graph is initialized with only lhs
@@ -650,15 +700,32 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
-    pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|rule| self.can_derive(derive_type, rule, limits))
+    pub fn derive(
+        &self,
+        derive_type: DeriveType,
+        against: &Self,
+        limits: Limits,
+        condition_propogation_rules: &Option<Self>,
+    ) -> (Self, Self) {
+        against.partition(|rule| {
+            if rule.cond.is_some() {
+                self.can_derive_cond(
+                    derive_type,
+                    rule,
+                    limits,
+                    condition_propogation_rules.as_ref().unwrap(),
+                )
+            } else {
+                self.can_derive(derive_type, rule, limits)
+            }
+        })
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {
         let r1: Ruleset<L> = Ruleset::from_file(one);
         let r2: Ruleset<L> = Ruleset::from_file(two);
 
-        let (can, cannot) = r1.derive(derive_type, &r2, Limits::deriving());
+        let (can, cannot) = r1.derive(derive_type, &r2, Limits::deriving(), &None);
         println!(
             "Using {} ({}) to derive {} ({}).\nCan derive {}, cannot derive {}. Missing:",
             one,
