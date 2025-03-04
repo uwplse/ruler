@@ -8,7 +8,7 @@ use crate::{
     SynthAnalysis, SynthLanguage,
 };
 
-use super::{Rule, Scheduler, Workload};
+use super::{Rule, Scheduler};
 
 /// A set of rewrite rules
 #[derive(Clone, Debug)]
@@ -713,7 +713,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                     derive_type,
                     rule,
                     limits,
-                    &condition_propogation_rules.as_ref().unwrap(),
+                    condition_propogation_rules.as_ref().unwrap(),
                 )
             } else {
                 self.can_derive(derive_type, rule, limits)
