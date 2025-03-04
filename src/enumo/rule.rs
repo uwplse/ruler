@@ -76,7 +76,14 @@ impl<L: SynthLanguage> Rule<L> {
                     rewrite,
                 }
             } else {
-                Self::new_cond(&l_pat, &r_pat, &cond.clone().unwrap()).unwrap()
+                Self {
+                    name: name.clone().into(),
+                    lhs: l_pat.clone(),
+                    rhs: r_pat.clone(),
+                    cond: cond.clone(),
+                    rewrite: Rewrite::new(name.clone(), l_pat.clone(), Rhs { rhs: r_pat.clone() })
+                        .unwrap(),
+                }
             };
 
             if s.contains("<=>") {
