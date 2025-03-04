@@ -8,7 +8,7 @@ use crate::{
     SynthAnalysis, SynthLanguage,
 };
 
-use super::{Rule, Scheduler};
+use super::{Rule, Scheduler, Workload};
 
 /// A set of rewrite rules
 #[derive(Clone, Debug)]
