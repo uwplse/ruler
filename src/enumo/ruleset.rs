@@ -575,7 +575,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         println!("candidates: {}", self.len());
 
         for c in self.0.values() {
-            println!("candidate -- {}", c);
+            if c.cond.is_some() {
+                println!("conditional candidate -- {}", c);
+            }
         }
         while !self.is_empty() {
             let selected = self.select(step_size, &mut invalid);
@@ -711,8 +713,15 @@ impl<L: SynthLanguage> Ruleset<L> {
         limits: Limits,
         condition_propogation_rules: &Option<Self>,
     ) -> (Self, Self) {
+        println!(
+            "condition propogation rules: {}",
+            condition_propogation_rules.is_some()
+        );
         against.partition(|rule| {
             if rule.cond.is_some() {
+                if condition_propogation_rules.is_none() {
+                    panic!("Condition propogation rules required for conditional rules. You gave me: {:?}", rule);
+                }
                 self.can_derive_cond(
                     derive_type,
                     rule,

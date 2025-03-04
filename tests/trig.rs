@@ -394,7 +394,7 @@ mod test {
 
         let expected: Ruleset<Trig> =
             Ruleset::new(&["(sin (* PI 2)) <=> 0", "0 <=> (sin 0)", "0 <=> (sin PI)"]);
-        let (can, cannot) = rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
+        let (can, cannot) = rules.derive(DeriveType::Lhs, &expected, Limits::deriving(), &None);
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
