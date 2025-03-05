@@ -634,7 +634,7 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
     solver.assert(&expr._eq(&zero));
     // the solver was unable to find a way to make the expression false
     if matches!(solver.check(), z3::SatResult::Unsat) {
-        ValidationResult::Invalid
+        ValidationResult::Valid
     } else {
         ValidationResult::Unknown
     }
