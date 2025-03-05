@@ -101,35 +101,20 @@ mod test {
 
     #[test]
     fn run() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
+        let rule_path = match std::env::var("HALIDE_RULES_OUTPUT_PATH") {
+            Ok(path) => Some(path),
+            Err(_) => None,
+        };
 
         let start = Instant::now();
         let all_rules = halide_rules_for_caviar_conditional();
-        println!("done");
-        return;
-        let duration = start.elapsed();
-
-        // oopsla-halide-baseline branch
-        // Run on nightly 4/12/2023
-        // time cargo run --release --bin halide -- synth --iters 1 --use-smt
-        // real	0m2.707s
-        // user	0m2.681s
-        // sys	0m0.028s
-        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
-        let oopsla_duration = Duration::from_secs_f32(3.354);
-
-        logger::write_baseline(&all_rules, "halide", &baseline, "halide", duration);
-
-        logger::write_baseline(
-            &oopsla_halide,
-            "oopsla halide (1 iter)",
-            &baseline,
-            "halide",
-            oopsla_duration,
-        );
+        let end = Instant::now();
+        println!("finished in {:?}", end.duration_since(start));
+        if rule_path.is_some() {
+            println!("writing halide rules to: {}", rule_path.clone().unwrap());
+            all_rules.to_file(rule_path.unwrap().as_str());
+        } else {
+            println!("skipping writing halide rules");
+        }
     }
 }

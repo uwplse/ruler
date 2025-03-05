@@ -629,11 +629,9 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
 
     // Check if expr != 0 is unsat (i.e., expr can never be true)
     solver.assert(&expr._eq(&zero).not());
-    let result = match solver.check() {
+    match solver.check() {
         z3::SatResult::Unsat => ValidationResult::Invalid,
         z3::SatResult::Unknown => ValidationResult::Unknown,
         z3::SatResult::Sat => ValidationResult::Unknown,
-    };
-
-    return result;
+    }
 }
