@@ -1,7 +1,7 @@
 use crate::*;
 
 use enumo::Sexp;
-use num::{ToPrimitive, Zero};
+use num::ToPrimitive;
 use z3::ast::Ast;
 
 type Constant = i64;
@@ -224,12 +224,11 @@ impl SynthLanguage for Pred {
         let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&lexpr._eq(&rexpr).not());
-        let res = match solver.check() {
+        match solver.check() {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
-        };
-        res
+        }
     }
 
     fn validate_with_cond(
@@ -250,12 +249,11 @@ impl SynthLanguage for Pred {
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&z3::ast::Bool::implies(&cexpr, &lexpr._eq(&rexpr)).not());
 
-        let res = match solver.check() {
+        match solver.check() {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,
-        };
-        res
+        }
     }
 }
 
@@ -612,10 +610,9 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
     let zero = z3::ast::Int::from_i64(&ctx, 0);
     let expr = sexpr_to_z3(&ctx, expr);
     solver.assert(&expr._eq(&zero));
-    let res = match solver.check() {
+    match solver.check() {
         z3::SatResult::Unsat => ValidationResult::Valid,
         z3::SatResult::Unknown => ValidationResult::Unknown,
         z3::SatResult::Sat => ValidationResult::Invalid,
-    };
-    res
+    }
 }
