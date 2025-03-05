@@ -1,7 +1,7 @@
 use crate::*;
 
 use enumo::Sexp;
-use num::{ToPrimitive, Zero};
+use num::ToPrimitive;
 use z3::ast::Ast;
 
 type Constant = i64;
@@ -249,9 +249,7 @@ impl SynthLanguage for Pred {
         let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
         solver.assert(&z3::ast::Bool::implies(&cexpr, &lexpr._eq(&rexpr)).not());
 
-        let res = solver.check();
-
-        match res {
+        match solver.check() {
             z3::SatResult::Unsat => ValidationResult::Valid,
             z3::SatResult::Unknown => ValidationResult::Unknown,
             z3::SatResult::Sat => ValidationResult::Invalid,

@@ -11,7 +11,8 @@ use ruler::halide::Pred;
 
 fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, Ruleset<Pred>) {
     // Start by pre-computing a bunch of stuff about conditions.
-    let condition_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
+    // let condition_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
+    let condition_lang = Lang::new(&["0"], &["a"], &[&[], &["!="]]);
 
     // chuck em all into an e-graph.
     let base_lang = if condition_lang.ops.len() == 2 {
@@ -32,26 +33,24 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
 
     let mut pvec_to_terms: HashMap<Vec<bool>, Vec<Pattern<Pred>>> = HashMap::default();
 
-    let mut cache: HashMap<(String, String), bool> = HashMap::default();
+    let wkld = wkld.filter(Filter::MetricEq(Metric::Atoms, 3));
 
-    let mut cond_prop_ruleset = Ruleset::default();
+    let cond_prop_ruleset = Pred::get_condition_propogation_rules(&wkld);
 
-    let forced = wkld.filter(Filter::MetricEq(Metric::Atoms, 3)).force();
+    println!("cond prop rules: {}", cond_prop_ruleset.len());
+    for rule in &cond_prop_ruleset {
+        println!("{}", rule.0);
+    }
 
-    let true_recexpr: RecExpr<Pred> = "TRUE".parse().unwrap();
+    for cond in wkld.force() {
+        let cond: RecExpr<Pred> = cond.to_string().parse().unwrap();
+        let cond_pat = Pattern::from(&cond);
 
-    let mut i = 0;
-    println!("forced: {:?}", forced.len());
-    for cond1 in forced.clone() {
-        i += 1;
-        let cond1: RecExpr<Pred> = cond1.to_string().parse().unwrap();
-        let cond1_pat = Pattern::from(&cond1);
-
-        let cond1_id = egraph
-            .lookup_expr(&cond1_pat.to_string().parse().unwrap())
+        let cond_id = egraph
+            .lookup_expr(&cond_pat.to_string().parse().unwrap())
             .unwrap();
 
-        let pvec = egraph[cond1_id]
+        let pvec = egraph[cond_id]
             .data
             .cvec
             .clone()
@@ -62,31 +61,7 @@ fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, 
         pvec_to_terms
             .entry(pvec)
             .or_default()
-            .push(cond1_pat.clone());
-
-        for cond2 in forced.iter().skip(i) {
-            let cond2_recexpr: RecExpr<Pred> = cond2.to_string().parse().unwrap();
-            let cond2_pat = Pattern::from(&cond2_recexpr);
-
-            if Pred::condition_implies(&cond1_pat.clone(), &cond2_pat, &mut cache) {
-                let rw_name = format!("{} => {} if {} == true", cond1, cond2, cond1);
-                let rw: Rewrite<Pred, SynthAnalysis> = Rewrite::new(
-                    rw_name.clone(),
-                    Pattern::from(&true_recexpr.clone()),
-                    cond2_pat.clone(),
-                )
-                .unwrap();
-                let rule: Rule<Pred> = Rule {
-                    name: format!("{} => {}", cond2, true_recexpr).into(),
-                    lhs: Pattern::from(&true_recexpr.clone()),
-                    rhs: cond2_pat.clone(),
-                    // if cond1 is true, then cond1 -> cond2.
-                    cond: Some(cond1_pat.clone()),
-                    rewrite: rw,
-                };
-                cond_prop_ruleset.add(rule);
-            }
-        }
+            .push(cond_pat.clone());
     }
 
     (pvec_to_terms, cond_prop_ruleset)
@@ -96,41 +71,60 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures();
     let mut all_rules = Ruleset::default();
 
-    let bool_only = recursive_rules(
-        Metric::Atoms,
-        5,
-        Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||"]]),
-        all_rules.clone(),
-    );
-    all_rules.extend(bool_only);
+    // let div_rules = recursive_rules_cond(
+    //     Metric::Atoms,
+    //     5,
+    //     Lang::new(&["0", "1"], &["a"], &[&[], &["/"]]),
+    //     all_rules.clone(),
+    //     &pvec_to_terms,
+    //     &cond_prop_ruleset,
+    // );
+    // all_rules.extend(div_rules);
+
+    // let bool_only = recursive_rules(
+    //     Metric::Atoms,
+    //     5,
+    //     Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||"]]),
+    //     all_rules.clone(),
+    // );
+    // all_rules.extend(bool_only);
+    // let rat_only = recursive_rules_cond(
+    //     Metric::Atoms,
+    //     5,
+    //     Lang::new(
+    //         &["-1", "0", "1"],
+    //         &["a", "b", "c"],
+    //         &[&[], &["+", "-", "*", "/", "%", "min", "max"]],
+    //     ),
+    //     all_rules.clone(),
+    //     &pvec_to_terms,
+    //     &cond_prop_ruleset,
+    // );
+    //
     let rat_only = recursive_rules_cond(
         Metric::Atoms,
         5,
-        Lang::new(
-            &["-1", "0", "1"],
-            &["a", "b", "c"],
-            &[&[], &["+", "-", "*", "/", "%", "min", "max"]],
-        ),
+        Lang::new(&["0"], &["a"], &[&[], &["+", "-", "*", "/", "%"]]),
         all_rules.clone(),
         &pvec_to_terms,
         &cond_prop_ruleset,
     );
     all_rules.extend(rat_only.clone());
-    let pred_only = recursive_rules_cond(
-        Metric::Atoms,
-        5,
-        Lang::new(
-            &["-1", "0", "1"],
-            &["a", "b", "c"],
-            &[&[], &["<", "<=", "==", "!="], &[]],
-        ),
-        all_rules.clone(),
-        &pvec_to_terms,
-        &cond_prop_ruleset,
-    );
-    all_rules.extend(pred_only);
+    // let pred_only = recursive_rules_cond(
+    //     Metric::Atoms,
+    //     5,
+    //     Lang::new(
+    //         &["-1", "0", "1"],
+    //         &["a", "b", "c"],
+    //         &[&[], &["<", "<=", "==", "!="], &[]],
+    //     ),
+    //     all_rules.clone(),
+    //     &pvec_to_terms,
+    //     &cond_prop_ruleset,
+    // );
+    // all_rules.extend(pred_only);
 
-    // let full = recursive_rules(
+    // // let full = recursive_rules(
     //     Metric::Atoms,
     //     4,
     //     Lang::new(

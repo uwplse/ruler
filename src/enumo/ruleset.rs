@@ -572,7 +572,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
-        println!("candidates : {}", self.len());
         while !self.is_empty() {
             let selected = self.select(step_size, &mut invalid);
             // TODO: why do I need this here? what does it mean when `self.select` returns nothing?
@@ -709,6 +708,9 @@ impl<L: SynthLanguage> Ruleset<L> {
     ) -> (Self, Self) {
         against.partition(|rule| {
             if rule.cond.is_some() {
+                if condition_propogation_rules.is_none() {
+                    panic!("Condition propogation rules required for conditional rules. You gave me: {:?}", rule);
+                }
                 self.can_derive_cond(
                     derive_type,
                     rule,

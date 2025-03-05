@@ -294,7 +294,7 @@ mod tests {
             "(Trans (Vec3 ?g ?e ?c) (Scale (Vec3 ?f ?d ?b) ?a)) <=> (Scale (Vec3 ?f ?d ?b) (Trans (Vec3 (op / ?g ?f) (op / ?e ?d) (op / ?c ?b)) ?a))",
             "(Scale (Vec3 ?f ?d ?b) (Cube (Vec3 ?e ?c ?a) false)) <=> (Cube (Vec3 (op * ?f ?e) (op * ?d ?c) (op * ?b ?a)) false)",
         ]);
-        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving());
+        let (can, cannot) = all_rules.derive(DeriveType::Lhs, &expected, Limits::deriving(), &None);
         assert_eq!(can.len(), expected.len());
         assert_eq!(cannot.len(), 0);
     }
