@@ -395,6 +395,13 @@ pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
     buf.pop().unwrap()
 }
 
+// This function returns if the given expression is valid or not, where validity is defined as:
+// Valid   ==> The expression is always true (evaluates to 1), no matter the values of the variables inside.
+// Invalid ==> The expression is always false (evaluates to 0), no matter the values of the
+// variables inside.
+// Unknown ==> Either the solver timed out, or the expression is impossible to condense to one of the two above.
+//             One such expression is `x < 0`, which is neither always true nor always false.
+//             In Caviar, this corresponds to the "Impossible" stop result.
 pub fn validate_expression(expr: &Sexp) -> ValidationResult {
     pub fn sexpr_to_z3<'a>(ctx: &'a z3::Context, expr: &Sexp) -> z3::ast::Int<'a> {
         match expr {
@@ -609,10 +616,23 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
     let solver = z3::Solver::new(&ctx);
     let zero = z3::ast::Int::from_i64(&ctx, 0);
     let expr = sexpr_to_z3(&ctx, expr);
-    solver.assert(&expr._eq(&zero));
-    match solver.check() {
+    solver.assert(&expr._eq(&zero).not());
+    let false_res = match solver.check() {
         z3::SatResult::Unsat => ValidationResult::Valid,
         z3::SatResult::Unknown => ValidationResult::Unknown,
         z3::SatResult::Sat => ValidationResult::Invalid,
+    };
+    // the solver was unable to find a way to make the expression true
+    if matches!(false_res, ValidationResult::Invalid) {
+        return false_res;
+    }
+
+    solver.reset();
+    solver.assert(&expr._eq(&zero));
+    // the solver was unable to find a way to make the expression false
+    if matches!(solver.check(), z3::SatResult::Unsat) {
+        ValidationResult::Invalid
+    } else {
+        ValidationResult::Unknown
     }
 }
