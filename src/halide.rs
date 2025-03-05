@@ -402,6 +402,9 @@ pub fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
 // Unknown ==> Either the solver timed out, or the expression is impossible to condense to one of the two above.
 //             One such expression is `x < 0`, which is neither always true nor always false.
 //             In Caviar, this corresponds to the "Impossible" stop result.
+// This function is different from `Self::validate` in that `validate` only checks to see if a
+// given statement is true, while this function checks if the statement is always true or always
+// false (forall).
 pub fn validate_expression(expr: &Sexp) -> ValidationResult {
     pub fn sexpr_to_z3<'a>(ctx: &'a z3::Context, expr: &Sexp) -> z3::ast::Int<'a> {
         match expr {
