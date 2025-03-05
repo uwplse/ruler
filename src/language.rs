@@ -350,8 +350,24 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
         RecExpr::from(nodes)
     }
 
-    // TODO: @ninehusky -- let's factor in a rule's condition to the size calculation.
-    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>, cond: &Option<Pattern<Self>>) -> [i32; 5] {
+    fn score(lhs: &Pattern<Self>, rhs: &Pattern<Self>, cond: &Option<Pattern<Self>>) -> i32 {
+        let c_size = if cond.is_some() {
+            AstSize.cost_rec(&cond.clone().unwrap().ast) as i32
+        } else {
+            0
+        };
+        let l_size = AstSize.cost_rec(&lhs.ast) as i32;
+        let r_size = AstSize.cost_rec(&rhs.ast) as i32;
+
+        -(l_size + r_size + c_size)
+    }
+
+    #[allow(dead_code)]
+    fn score_original(
+        lhs: &Pattern<Self>,
+        rhs: &Pattern<Self>,
+        cond: &Option<Pattern<Self>>,
+    ) -> [i32; 5] {
         if let Some(cond) = cond {
             let c_size = AstSize.cost_rec(&cond.ast) as i32;
             let l_size = AstSize.cost_rec(&lhs.ast) as i32;
