@@ -572,13 +572,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
-        println!("candidates: {}", self.len());
-
-        for c in self.0.values() {
-            if c.cond.is_some() {
-                println!("conditional candidate -- {}", c);
-            }
-        }
         while !self.is_empty() {
             let selected = self.select(step_size, &mut invalid);
             // TODO: why do I need this here? what does it mean when `self.select` returns nothing?

@@ -26,6 +26,7 @@ mod test {
     use ruler::{SynthAnalysis, SynthLanguage};
     use z3::ast::Ast;
 
+    #[test]
     fn test_conditional_deriability_direct() {
         // tests that {`if x >= 0 then x ~> |x|`} derives `if x > 5 then x ~> |x|`.
         let (rule_a, _): (Rule<Pred>, _) = Rule::from_string("x ==> (abs x) if (>= x 0)").unwrap();
@@ -61,6 +62,7 @@ mod test {
         assert!(cannot.len() == 1);
     }
 
+    #[test]
     fn test_conditional_derivability_step() {
         // tests that {`if x >= 0 then x ~> |x|`} derives `if x > 5 then x ~> |x|`.
         let (rule_a, _): (Rule<Pred>, _) = Rule::from_string("x ==> (abs x) if (>= x 0)").unwrap();
