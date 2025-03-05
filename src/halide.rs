@@ -619,23 +619,21 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
     let solver = z3::Solver::new(&ctx);
     let zero = z3::ast::Int::from_i64(&ctx, 0);
     let expr = sexpr_to_z3(&ctx, expr);
-    solver.assert(&expr._eq(&zero).not());
-    let false_res = match solver.check() {
-        z3::SatResult::Unsat => ValidationResult::Valid,
-        z3::SatResult::Unknown => ValidationResult::Unknown,
-        z3::SatResult::Sat => ValidationResult::Invalid,
-    };
-    // the solver was unable to find a way to make the expression true
-    if matches!(false_res, ValidationResult::Invalid) {
-        return false_res;
-    }
 
-    solver.reset();
+    // Check if expr == 0 is unsat (i.e., expr can never be false)
     solver.assert(&expr._eq(&zero));
-    // the solver was unable to find a way to make the expression false
     if matches!(solver.check(), z3::SatResult::Unsat) {
-        ValidationResult::Valid
-    } else {
-        ValidationResult::Unknown
+        return ValidationResult::Valid; // AlwaysTrue
     }
+    solver.reset();
+
+    // Check if expr != 0 is unsat (i.e., expr can never be true)
+    solver.assert(&expr._eq(&zero).not());
+    let result = match solver.check() {
+        z3::SatResult::Unsat => ValidationResult::Invalid,
+        z3::SatResult::Unknown => ValidationResult::Unknown,
+        z3::SatResult::Sat => ValidationResult::Unknown,
+    };
+
+    return result;
 }
