@@ -706,10 +706,6 @@ impl<L: SynthLanguage> Ruleset<L> {
         limits: Limits,
         condition_propogation_rules: &Option<Self>,
     ) -> (Self, Self) {
-        println!(
-            "condition propogation rules: {}",
-            condition_propogation_rules.is_some()
-        );
         against.partition(|rule| {
             if rule.cond.is_some() {
                 if condition_propogation_rules.is_none() {
