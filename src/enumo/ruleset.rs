@@ -306,6 +306,7 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         let mut i = 0;
         for cvec1 in by_cvec.keys() {
+            assert_eq!(cvec1.len(), conditions.keys().next().unwrap().len());
             i += 1;
             for cvec2 in by_cvec.keys().skip(i) {
                 let pvec: Vec<bool> = cvec1
