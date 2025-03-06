@@ -106,7 +106,7 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     let rat_only = recursive_rules_cond(
         Metric::Atoms,
         7,
-        Lang::new(&["0", "1"], &["a", "b"], &[&[], &["+", "max", "<"]]),
+        Lang::new(&[], &["a", "b"], &[&[], &["+", "max", "<"]]),
         all_rules.clone(),
         &pvec_to_terms,
         &cond_prop_ruleset,
