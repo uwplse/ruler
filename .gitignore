@@ -34,3 +34,6 @@ out/
 # Exceptions
 !scripts/oopsla21/ablation/submitted-plots/**/*.pdf
 !scripts/oopsla21/ablation/submitted-plots/**/*.json
+
+# Don't want flamegraphs.
+flamegraph.svg
