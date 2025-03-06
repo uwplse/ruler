@@ -101,20 +101,13 @@ mod test {
 
     #[test]
     fn run() {
-        let rule_path = match std::env::var("HALIDE_RULES_OUTPUT_PATH") {
-            Ok(path) => Some(path),
-            Err(_) => None,
-        };
+        let rule_path = "chompy-rules.txt";
 
         let start = Instant::now();
         let all_rules = halide_rules_for_caviar_conditional();
         let end = Instant::now();
         println!("finished in {:?}", end.duration_since(start));
-        if rule_path.is_some() {
-            println!("writing halide rules to: {}", rule_path.clone().unwrap());
-            all_rules.to_file(rule_path.unwrap().as_str());
-        } else {
-            println!("skipping writing halide rules");
-        }
+        println!("writing halide rules to: {}", rule_path);
+        all_rules.to_file(rule_path);
     }
 }
