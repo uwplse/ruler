@@ -12,7 +12,7 @@ use ruler::halide::Pred;
 fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, Ruleset<Pred>) {
     // Start by pre-computing a bunch of stuff about conditions.
     // let condition_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
-    let condition_lang = Lang::new(&["0"], &["a"], &[&[], &["!="]]);
+    let condition_lang = Lang::new(&["0"], &["a", "b"], &[&[], &["<", "<=", "!="]]);
 
     // chuck em all into an e-graph.
     let base_lang = if condition_lang.ops.len() == 2 {
@@ -105,8 +105,8 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     // briefly committing this über simple ruleset so the CI can run quickly.
     let rat_only = recursive_rules_cond(
         Metric::Atoms,
-        3,
-        Lang::new(&["0", "1"], &["a"], &[&[], &["+", "-", "*", "/", "%"]]),
+        7,
+        Lang::new(&["0", "1"], &["a", "b"], &[&[], &["+", "max", "<"]]),
         all_rules.clone(),
         &pvec_to_terms,
         &cond_prop_ruleset,
