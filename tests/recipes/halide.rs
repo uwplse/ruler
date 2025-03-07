@@ -74,7 +74,7 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     let bool_only = recursive_rules(
         Metric::Atoms,
         7,
-        Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||", "^"]]),
+        Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||"]]),
         all_rules.clone(),
     );
 
