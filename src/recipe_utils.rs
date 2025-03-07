@@ -223,11 +223,13 @@ pub fn recursive_rules_cond<L: SynthLanguage>(
         for (i, ops) in lang.ops.iter().enumerate() {
             wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
         }
+
+        // wkld = wkld.append(Workload::new(&["0", "1"]));
         rec.extend(prior);
         let allow_empty = n < 3;
 
         let new = run_workload_internal(
-            wkld,
+            wkld.append(Workload::new(&["0", "1"])),
             rec.clone(),
             Limits::synthesis(),
             Limits::minimize(),
