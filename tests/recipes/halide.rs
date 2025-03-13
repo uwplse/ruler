@@ -71,10 +71,25 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures();
     let mut all_rules = Ruleset::default();
 
+    let equality = recursive_rules_cond(
+        Metric::Atoms,
+        5,
+        Lang::new(
+            &[],
+            &["a", "b", "c"],
+            &[&["!"], &["==", "!=", "<", ">", ">=", "<="]],
+        ),
+        all_rules.clone(),
+        &pvec_to_terms,
+        &cond_prop_ruleset,
+    );
+
+    all_rules.extend(equality);
+
     let bool_only = recursive_rules(
         Metric::Atoms,
-        7,
-        Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||"]]),
+        5,
+        Lang::new(&[], &["a", "b", "c"], &[&["!"], &["&&", "||"]]),
         all_rules.clone(),
     );
 
@@ -82,7 +97,7 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
 
     let rat_only = recursive_rules(
         Metric::Atoms,
-        7,
+        5,
         Lang::new(&[], &["a", "b", "c"], &[&[], &["+", "-", "*"]]),
         all_rules.clone(),
     );
@@ -91,7 +106,7 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
 
     let div_only = recursive_rules_cond(
         Metric::Atoms,
-        7,
+        5,
         Lang::new(&[], &["a", "b", "c"], &[&[], &["/", "%"]]),
         all_rules.clone(),
         &pvec_to_terms,
