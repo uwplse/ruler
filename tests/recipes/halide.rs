@@ -12,7 +12,7 @@ use ruler::halide::Pred;
 fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, Ruleset<Pred>) {
     // Start by pre-computing a bunch of stuff about conditions.
     // let condition_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
-    let condition_lang = Lang::new(&["0"], &["a"], &[&[], &["!="]]);
+    let condition_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
 
     // chuck em all into an e-graph.
     let base_lang = if condition_lang.ops.len() == 2 {
@@ -71,78 +71,71 @@ pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures();
     let mut all_rules = Ruleset::default();
 
-    // let div_rules = recursive_rules_cond(
-    //     Metric::Atoms,
-    //     5,
-    //     Lang::new(&["0", "1"], &["a"], &[&[], &["/"]]),
-    //     all_rules.clone(),
-    //     &pvec_to_terms,
-    //     &cond_prop_ruleset,
-    // );
-    // all_rules.extend(div_rules);
-
-    // let bool_only = recursive_rules(
-    //     Metric::Atoms,
-    //     5,
-    //     Lang::new(&["0", "1"], &["a", "b", "c"], &[&["!"], &["&&", "||"]]),
-    //     all_rules.clone(),
-    // );
-    // all_rules.extend(bool_only);
-    // let rat_only = recursive_rules_cond(
-    //     Metric::Atoms,
-    //     5,
-    //     Lang::new(
-    //         &["-1", "0", "1"],
-    //         &["a", "b", "c"],
-    //         &[&[], &["+", "-", "*", "/", "%", "min", "max"]],
-    //     ),
-    //     all_rules.clone(),
-    //     &pvec_to_terms,
-    //     &cond_prop_ruleset,
-    // );
-    //
-
-    // briefly committing this über simple ruleset so the CI can run quickly.
-    let rat_only = recursive_rules_cond(
+    let equality = recursive_rules_cond(
         Metric::Atoms,
-        3,
-        Lang::new(&["0", "1"], &["a"], &[&[], &["+", "-", "*", "/", "%"]]),
+        5,
+        Lang::new(
+            &[],
+            &["a", "b", "c"],
+            &[&["!"], &["==", "!=", "<", ">", ">=", "<="]],
+        ),
         all_rules.clone(),
         &pvec_to_terms,
         &cond_prop_ruleset,
     );
-    all_rules.extend(rat_only.clone());
-    // let pred_only = recursive_rules_cond(
-    //     Metric::Atoms,
-    //     5,
-    //     Lang::new(
-    //         &["-1", "0", "1"],
-    //         &["a", "b", "c"],
-    //         &[&[], &["<", "<=", "==", "!="], &[]],
-    //     ),
-    //     all_rules.clone(),
-    //     &pvec_to_terms,
-    //     &cond_prop_ruleset,
-    // );
-    // all_rules.extend(pred_only);
 
-    // // let full = recursive_rules(
-    //     Metric::Atoms,
-    //     4,
-    //     Lang::new(
-    //         &[],
-    //         &["a", "b", "c"],
-    //         &[
-    //             &["!"],
-    //             &[
-    //                 "&&", "||", "+", "-", "*", "/", "%", "min", "max", "<", "<=", "==", "!=",
-    //             ],
-    //             &[],
-    //         ],
-    //     ),
-    //     all_rules.clone(),
-    // );
-    // all_rules.extend(full);
+    all_rules.extend(equality);
+
+    let bool_only = recursive_rules(
+        Metric::Atoms,
+        5,
+        Lang::new(&[], &["a", "b", "c"], &[&["!"], &["&&", "||"]]),
+        all_rules.clone(),
+    );
+
+    all_rules.extend(bool_only);
+
+    let rat_only = recursive_rules(
+        Metric::Atoms,
+        5,
+        Lang::new(&[], &["a", "b", "c"], &[&[], &["+", "-", "*"]]),
+        all_rules.clone(),
+    );
+
+    all_rules.extend(rat_only);
+
+    let div_only = recursive_rules_cond(
+        Metric::Atoms,
+        5,
+        Lang::new(&[], &["a", "b", "c"], &[&[], &["/", "%"]]),
+        all_rules.clone(),
+        &pvec_to_terms,
+        &cond_prop_ruleset,
+    );
+
+    all_rules.extend(div_only);
+
+    let min_plus = recursive_rules_cond(
+        Metric::Atoms,
+        7,
+        Lang::new(&[], &["a", "b", "c"], &[&[], &["+", "min"]]),
+        all_rules.clone(),
+        &pvec_to_terms,
+        &cond_prop_ruleset,
+    );
+
+    all_rules.extend(min_plus);
+
+    let max_plus = recursive_rules_cond(
+        Metric::Atoms,
+        7,
+        Lang::new(&[], &["a", "b", "c"], &[&[], &["+", "max"]]),
+        all_rules.clone(),
+        &pvec_to_terms,
+        &cond_prop_ruleset,
+    );
+
+    all_rules.extend(max_plus);
 
     all_rules
 }

@@ -43,7 +43,8 @@ fn run_workload_internal<L: SynthLanguage>(
     let t = Instant::now();
     let num_prior = prior.len();
 
-    let egraph = workload.to_egraph::<L>();
+    // TODO @ninehusky: this will break non-Halide tests.
+    let egraph = workload.append(Workload::new(&["0", "1"])).to_egraph::<L>();
     let compressed = Scheduler::Compress(prior_limits).run(&egraph, &prior);
 
     let mut candidates = if fast_match {
@@ -209,7 +210,14 @@ pub fn recursive_rules_cond<L: SynthLanguage>(
     if n < 1 {
         Ruleset::default()
     } else {
-        let mut rec = recursive_rules(metric, n - 1, lang.clone(), prior.clone());
+        let mut rec = recursive_rules_cond(
+            metric,
+            n - 1,
+            lang.clone(),
+            prior.clone(),
+            conditions,
+            propogation_rules,
+        );
         let base_lang = if lang.ops.len() == 2 {
             base_lang(2)
         } else {
@@ -223,6 +231,7 @@ pub fn recursive_rules_cond<L: SynthLanguage>(
         for (i, ops) in lang.ops.iter().enumerate() {
             wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
         }
+
         rec.extend(prior);
         let allow_empty = n < 3;
 
