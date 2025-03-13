@@ -338,11 +338,6 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
         }
-        println!("start candidates: {}", candidates.len());
-        for c in &candidates {
-            println!("{}", c.1);
-        }
-        println!("end candidates");
 
         candidates
     }
