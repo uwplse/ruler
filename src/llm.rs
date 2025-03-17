@@ -8,21 +8,12 @@ You are an expert in generating a list of terms for a given
 programming language. The syntax of the programming language
 is s-expressions. You will be given a list of variables,
 constants, and operations. Your task is to generate a list
-of terms using the above variables, constants, and operations.
-The terms should be in the s-expression format. These terms
-will be used to generate rewrites for a program synthesis task.
+of interesting terms using the above variables, constants, and operations.
+The operations will be a list of list of strings, where operations[i]
+will be the list of strings representing arity-i operations.
+The terms should be in the s-expression format.
+You should try to generate 50 terms.
 
-Note that you should **not** generate terms that do not include
-at least one variable. You should also avoid generating terms
-with a size greater than the max_size. Most importantly, you should
-not generate terms that include values that are not in the vals list,
-variables that are not in the vars list, or operations that are not
-in the ops list.
-
-Do not include terms with constant terms which
-can be simplified. For example, the expression
-(+ 1 (- x 3)) should not be included,
-but a term like (+ y (- x y)) should be included.
 
 Your response should only be terms, one after another.
 Do not include any other text in your response. Do not
@@ -35,7 +26,7 @@ Example Input:
 max_size: 3,
 vals: ["0", "1"],
 vars: ["x", "y"],
-ops: ["+", "-", "*", "min", "max"],
+ops: [[], ["abs"], ["+", "-", "*", "min", "max"]],
 
 Some example output:
 (+ x y)
@@ -45,6 +36,7 @@ Some example output:
 (min y x)
 (min 0 x)
 (min x 0)
+(abs x)
 ...
 
 Input:
@@ -58,7 +50,7 @@ ops: {ops},
 struct Recipe {
     max_size: usize,
     vars: Vec<String>,
-    ops: Vec<String>,
+    ops: Vec<Vec<String>>,
     vals: Vec<String>,
 }
 
@@ -85,7 +77,8 @@ pub async fn alphabet_soup(r: &Recipe) -> Result<Workload, reqwest::Error> {
                 "content": content,
             },
         ],
-        "seed": 0xbeef,});
+        "seed": 0xbeef,
+    });
 
     println!("SENDING REQUEST TO: {}", url);
 
@@ -100,7 +93,11 @@ pub async fn alphabet_soup(r: &Recipe) -> Result<Workload, reqwest::Error> {
     println!("response status: {}", response.status());
     let response_json: serde_json::Value = response.json().await?;
 
-    println!("the output: {}", response_json["choices"][0]["message"]["content"]);
+    println!("output:");
+    for line in response_json["choices"][0]["message"]["content"].as_str().unwrap().lines() {
+        println!("{}", line);
+    }
+
 
 
     Ok(Workload::empty())
@@ -114,7 +111,7 @@ pub mod tests {
         let recipe = Recipe {
             max_size: 3,
             vars: vec!["x".to_string(), "y".to_string()],
-            ops: vec!["+".to_string(), "-".to_string()],
+            ops: vec![vec![], vec![], vec!["+".to_string(), "-".to_string()]],
             vals: vec!["0".to_string(), "1".to_string()],
         };
         let alphabet_soup = alphabet_soup(&recipe).await;
