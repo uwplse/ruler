@@ -118,7 +118,8 @@ pub fn run_workload<L: SynthLanguage>(
         prior_limits,
         minimize_limits,
         fast_match,
-        false,
+        true,
+        // false,
         conditions,
         propogation_rules,
     )

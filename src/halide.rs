@@ -1,7 +1,8 @@
 use crate::*;
 
-use enumo::Sexp;
+use enumo::{Filter, Metric, Ruleset, Sexp, Workload};
 use num::ToPrimitive;
+use recipe_utils::{recursive_rules_cond, run_workload, Lang};
 use z3::ast::Ast;
 
 type Constant = i64;
@@ -125,6 +126,7 @@ impl SynthLanguage for Pred {
             Some(5.to_i64().unwrap()),
             Some(100.to_i64().unwrap()),
         ];
+
         let cvecs = self_product(&consts, vars.len());
 
         egraph.analysis.cvec_len = cvecs[0].len();
@@ -634,4 +636,29 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
         z3::SatResult::Unknown => ValidationResult::Unknown,
         z3::SatResult::Sat => ValidationResult::Unknown,
     }
+}
+
+/// Incrementally construct a ruleset by running rule inference up to a size bound,
+/// using previously-learned rules at each step.
+/// Importantly, this function is different from `recursive_rules_cond` in that it does not
+/// actually generate the terms that it derives equivalences for.
+pub fn soup_to_rules(soup: &Workload, n: usize) -> Ruleset<Pred> {
+    for t in soup.force() {
+        println!("{:?}", t.to_string());
+    }
+    let mut ruleset = Ruleset::<Pred>::default();
+    for i in 1..n {
+        let workload = soup.clone().filter(Filter::MetricLt(Metric::Atoms, i + 1));
+        let rules = run_workload(
+            workload,
+            ruleset.clone(),
+            Limits::synthesis(),
+            Limits::minimize(),
+            true,
+            None,
+            None,
+        );
+        ruleset.extend(rules);
+    }
+    ruleset
 }

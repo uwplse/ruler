@@ -71,6 +71,7 @@ impl Workload {
         // TODO: why does this order matter?
         let mut vars: Vec<String> = vec![];
         for sexp in sexps.iter() {
+            println!("sexp: {}", sexp.to_string());
             let expr: RecExpr<L> = sexp.to_string().parse().unwrap();
             for node in expr.as_ref() {
                 if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {

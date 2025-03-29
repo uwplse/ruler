@@ -58,11 +58,11 @@ vars: {vars},
 ops: {ops},
 "#;
 
-struct Recipe {
-    max_size: usize,
-    vars: Vec<String>,
-    ops: Vec<Vec<String>>,
-    vals: Vec<String>,
+pub struct Recipe {
+    pub max_size: usize,
+    pub vars: Vec<String>,
+    pub ops: Vec<Vec<String>>,
+    pub vals: Vec<String>,
 }
 
 // asks GPT to generate a list of terms which implement some bigass recipe.
@@ -72,7 +72,6 @@ pub async fn alphabet_soup(r: &Recipe) -> Result<Vec<String>, reqwest::Error> {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
     let client = Client::new();
-
     let content = PROMPT_DE_LA_SOPA_ALFABETO
         .replace("{max_size}", &r.max_size.to_string())
         .replace("{vals}", format!("{:?}", r.vals).as_str())
