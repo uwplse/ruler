@@ -642,10 +642,13 @@ pub fn validate_expression(expr: &Sexp) -> ValidationResult {
 /// using previously-learned rules at each step.
 /// Importantly, this function is different from `recursive_rules_cond` in that it does not
 /// actually generate the terms that it derives equivalences for.
-pub fn soup_to_rules(soup: &Workload, n: usize) -> Ruleset<Pred> {
+pub fn soup_to_rules(soup: &Workload, conditions: &Workload, n: usize) -> Ruleset<Pred> {
     for t in soup.force() {
         println!("{:?}", t.to_string());
     }
+
+    let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures();
+
     let mut ruleset = Ruleset::<Pred>::default();
     for i in 1..n {
         let workload = soup.clone().filter(Filter::MetricLt(Metric::Atoms, i + 1));
