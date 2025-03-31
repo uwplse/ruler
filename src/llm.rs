@@ -251,7 +251,7 @@ pub mod tests {
             vals: vec!["0".to_string()],
         };
 
-        let soup_workloads = generate_alphabet_soup(&recipe, &Some(cond_recipe)).await;
+        let soup_workloads = generate_alphabet_soup(&recipe, Some(cond_recipe).as_ref()).await;
 
         println!("the workload is");
         for t in soup_workloads.0.force() {

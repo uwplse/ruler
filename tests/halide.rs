@@ -4,9 +4,7 @@ mod halide;
 
 #[allow(unused_imports)]
 mod test {
-    use crate::halide::{
-        halide_rules, halide_rules_for_caviar_conditional, halide_rules_for_caviar_total_only,
-    };
+    use crate::halide::halide_rules_for_caviar_total_only;
     use ruler::halide::{egg_to_z3, Pred};
     use std::{
         str::FromStr,
@@ -97,17 +95,5 @@ mod test {
 
         assert!(can.is_empty());
         assert!(cannot.len() == 1);
-    }
-
-    #[test]
-    fn run() {
-        let rule_path = "chompy-rules.txt";
-
-        let start = Instant::now();
-        let all_rules = halide_rules_for_caviar_conditional();
-        let end = Instant::now();
-        println!("finished in {:?}", end.duration_since(start));
-        println!("writing halide rules to: {}", rule_path);
-        all_rules.to_file(rule_path);
     }
 }
