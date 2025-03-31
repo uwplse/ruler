@@ -118,6 +118,7 @@ pub fn run_workload<L: SynthLanguage>(
         prior_limits,
         minimize_limits,
         fast_match,
+        // TODO: @ninehusky -- just checking this.
         true,
         // false,
         conditions,
