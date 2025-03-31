@@ -112,7 +112,7 @@ pub struct Recipe {
 pub async fn generate_alphabet_soup(term_recipe: &Recipe, cond_r: Option<&Recipe>) -> (Workload, Option<Workload>) {
     let client = Client::new();
 
-    let soup = alphabet_soup(&client, &term_recipe).await.unwrap();
+    let soup = alphabet_soup(&client, term_recipe).await.unwrap();
 
     // Convert the generated soup into a workload
     let term_workload = soup_to_workload(soup.clone()).unwrap();
@@ -213,7 +213,7 @@ pub async fn alphabet_soup(client: &Client, r: &Recipe) -> Result<Vec<String>, r
 pub fn soup_to_workload(soup: Vec<String>) -> Result<Workload, Box<dyn std::error::Error>> {
     for r in &soup {
         // TODO: should have check here which asserts that this is a valid expression in Halide.
-        match crate::enumo::Sexp::from_str(&r) {
+        match crate::enumo::Sexp::from_str(r) {
             Ok(_) => {}
             Err(e) => {
                 return Err(format!("Error parsing expression: {}", e).into());
@@ -227,7 +227,8 @@ pub fn soup_to_workload(soup: Vec<String>) -> Result<Workload, Box<dyn std::erro
 }
 
 pub mod tests {
-    use super::{generate_alphabet_soup, Recipe, soup_to_workload};
+    #[allow(unused_imports)]
+    use super::*;
 
     #[tokio::test]
     pub async fn test() {
