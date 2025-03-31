@@ -4,6 +4,8 @@ use ruler::halide;
 use ruler::halide::Pred;
 use ruler::enumo::Ruleset;
 
+use std::str::FromStr;
+
 // Outlines how to perform Halide rule synthesis.
 pub enum ChompyMode {
     HandwrittenRecipes,
@@ -11,13 +13,14 @@ pub enum ChompyMode {
     LLMRecipes,
 }
 
-impl ChompyMode {
-    pub fn from_str(s: &str) -> Self {
+impl FromStr for ChompyMode {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "handwritten" => Self::HandwrittenRecipes,
-            "llm_alphabet_soup" => Self::LLMAlphabetSoup,
-            "llm_recipes" => Self::LLMRecipes,
-            _ => panic!("Invalid ChompyMode: {}", s),
+            "handwritten" => Ok(Self::HandwrittenRecipes),
+            "llm_alphabet_soup" => Ok(Self::LLMAlphabetSoup),
+            "llm_recipes" => Ok(Self::LLMRecipes),
+            _ => Err("Invalid mode.".to_string()),
         }
     }
 }
@@ -28,7 +31,7 @@ pub async fn main() {
     if args.len() != 3 {
         panic!("Usage: chompy <mode> <output_file_path>");
     }
-    let mode = ChompyMode::from_str(&args[1]);
+    let mode = ChompyMode::from_str(&args[1]).unwrap();
     let output_file = &args[2];
     let rules = match mode {
         ChompyMode::HandwrittenRecipes => {
@@ -108,7 +111,7 @@ pub async fn run_gpt_eval() -> Ruleset<Pred> {
             &workload,
             cond_r.as_ref(),
             &prior_ruleset,
-            recipe.max_size as usize
+            recipe.max_size
         );
 
         prior_ruleset.extend(ruleset);
