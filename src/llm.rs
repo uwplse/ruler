@@ -108,7 +108,7 @@ pub struct Recipe {
     pub vals: Vec<String>,
 }
 
-pub async fn generate_alphabet_soup(term_recipe: &Recipe, cond_r: &Option<Recipe>) -> (Workload, Option<Workload>) {
+pub async fn generate_alphabet_soup(term_recipe: &Recipe, cond_r: Option<&Recipe>) -> (Workload, Option<Workload>) {
     let client = Client::new();
 
     let soup = alphabet_soup(&client, &term_recipe).await.unwrap();

@@ -46,8 +46,19 @@ pub async fn main() {
                 ],
                 vals: vec!["0".to_string(), "1".to_string()], // Values to use in the terms
             };
-            let workload = llm::alphabet_soup(&default_recipe).await;
-            let ruleset = halide::soup_to_rules(&llm::soup_to_workload(workload.unwrap()).unwrap(), 5);
+
+            let condition_recipe = Recipe {
+                max_size: 3,
+                vars: default_recipe.vars.clone(), // Use the same variables as the term recipe. You got to.
+                ops: vec![
+                    vec![], // No 0-ary operators
+                    vec![], // No unary operators
+                    vec!["<".to_string(), "<=".to_string(), "!=".to_string()], // Conditional operators
+                ],
+                vals: vec!["0".to_string()], // Values to use in the conditions.
+            };
+            let (workload, cond_workload) = llm::generate_alphabet_soup(&default_recipe, Some(&condition_recipe)).await;
+            let ruleset = halide::soup_to_rules(&workload, &cond_workload.unwrap(), 5);
             println!("the ruleset is:");
             for r in ruleset.iter() {
                 println!("{}", r);

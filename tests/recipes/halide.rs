@@ -1,74 +1,28 @@
 use egg::{EGraph, Pattern, RecExpr, Rewrite};
+use ruler::halide::Pred;
 use ruler::{
     enumo::{Filter, Metric, Rule, Ruleset, Workload},
+    halide::{compute_conditional_structures, Pred},
+    llm::Recipe,
     recipe_utils::{
         base_lang, iter_metric, recursive_rules, recursive_rules_cond, run_workload, Lang,
     },
     HashMap, Limits, SynthAnalysis, SynthLanguage,
 };
 
-use ruler::halide::Pred;
+pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
+    let cond_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
 
-fn compute_conditional_structures() -> (HashMap<Vec<bool>, Vec<Pattern<Pred>>>, Ruleset<Pred>) {
-    // Start by pre-computing a bunch of stuff about conditions.
-    // let condition_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
-    let condition_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
-
-    // chuck em all into an e-graph.
-    let base_lang = if condition_lang.ops.len() == 2 {
-        base_lang(2)
-    } else {
-        base_lang(3)
-    };
-    let mut wkld = iter_metric(base_lang, "EXPR", Metric::Atoms, 3)
+    let mut wkld = iter_metric(cond_lang, "EXPR", Metric::Atoms, 3)
         .filter(Filter::Contains("VAR".parse().unwrap()))
-        .plug("VAR", &Workload::new(condition_lang.vars))
-        .plug("VAL", &Workload::new(condition_lang.vals));
+        .plug("VAR", &Workload::new(lang.vars))
+        .plug("VAL", &Workload::new(lang.vals));
     // let ops = vec![lang.uops, lang.bops, lang.tops];
-    for (i, ops) in condition_lang.ops.iter().enumerate() {
+    for (i, ops) in lang.ops.iter().enumerate() {
         wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
     }
 
-    let egraph: EGraph<Pred, SynthAnalysis> = wkld.to_egraph();
-
-    let mut pvec_to_terms: HashMap<Vec<bool>, Vec<Pattern<Pred>>> = HashMap::default();
-
-    let wkld = wkld.filter(Filter::MetricEq(Metric::Atoms, 3));
-
-    let cond_prop_ruleset = Pred::get_condition_propogation_rules(&wkld);
-
-    println!("cond prop rules: {}", cond_prop_ruleset.len());
-    for rule in &cond_prop_ruleset {
-        println!("{}", rule.0);
-    }
-
-    for cond in wkld.force() {
-        let cond: RecExpr<Pred> = cond.to_string().parse().unwrap();
-        let cond_pat = Pattern::from(&cond);
-
-        let cond_id = egraph
-            .lookup_expr(&cond_pat.to_string().parse().unwrap())
-            .unwrap();
-
-        let pvec = egraph[cond_id]
-            .data
-            .cvec
-            .clone()
-            .iter()
-            .map(|b| *b != Some(0))
-            .collect();
-
-        pvec_to_terms
-            .entry(pvec)
-            .or_default()
-            .push(cond_pat.clone());
-    }
-
-    (pvec_to_terms, cond_prop_ruleset)
-}
-
-pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
-    let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures();
+    let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures(&wkld);
     let mut all_rules = Ruleset::default();
 
     let equality = recursive_rules_cond(
@@ -196,7 +150,18 @@ pub fn halide_rules_for_caviar_total_only() -> Ruleset<Pred> {
 
 #[allow(dead_code)]
 pub fn halide_rules() -> Ruleset<Pred> {
-    let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures();
+    let cond_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
+
+    let mut wkld = iter_metric(cond_lang, "EXPR", Metric::Atoms, 3)
+        .filter(Filter::Contains("VAR".parse().unwrap()))
+        .plug("VAR", &Workload::new(lang.vars))
+        .plug("VAL", &Workload::new(lang.vals));
+    // let ops = vec![lang.uops, lang.bops, lang.tops];
+    for (i, ops) in lang.ops.iter().enumerate() {
+        wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
+    }
+
+    let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures(&wkld);
 
     let mut all_rules = Ruleset::default();
     let bool_only = recursive_rules(
