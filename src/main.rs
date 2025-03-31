@@ -58,7 +58,7 @@ pub async fn main() {
                 vals: vec!["0".to_string()], // Values to use in the conditions.
             };
             let (workload, cond_workload) = llm::generate_alphabet_soup(&default_recipe, Some(&condition_recipe)).await;
-            let ruleset = halide::soup_to_rules(&workload, &cond_workload.unwrap(), 5);
+            let ruleset = halide::soup_to_rules(&workload, Some(&cond_workload.unwrap()), 5);
             println!("the ruleset is:");
             for r in ruleset.iter() {
                 println!("{}", r);
@@ -68,4 +68,9 @@ pub async fn main() {
         ChompyMode::LLMRecipes => {}
     }
     println!("Hello, world!");
+}
+
+
+pub fn run_gpt_eval() {
+
 }

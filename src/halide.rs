@@ -681,28 +681,19 @@ pub fn compute_conditional_structures(
 /// using previously-learned rules at each step.
 /// Importantly, this function is different from `recursive_rules_cond` in that it does not
 /// actually generate the terms that it derives equivalences for.
-pub fn soup_to_rules(soup: &Workload, conditions: &Workload, n: usize) -> Ruleset<Pred> {
+pub fn soup_to_rules(soup: &Workload, conditions: Option<&Workload>, n: usize) -> Ruleset<Pred> {
     for t in soup.force() {
         println!("{:?}", t.to_string());
     }
 
-    // let cond_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
-
-    // let base_lang = if cond_lang.ops.len() == 2 {
-    //     base_lang(2)
-    // } else {
-    //     base_lang(3)
-    // };
-
-    // let mut wkld = iter_metric(base_lang, "EXPR", Metric::Atoms, 3)
-    //     .filter(Filter::Contains("VAR".parse().unwrap()))
-    //     .plug("VAR", &Workload::new(cond_lang.vars))
-    //     .plug("VAL", &Workload::new(cond_lang.vals));
-    // for (i, ops) in cond_lang.ops.iter().enumerate() {
-    //     wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
-    // }
-
-    let (pvec_to_terms, cond_prop_ruleset) = compute_conditional_structures(conditions);
+    let (pvec_to_terms, cond_prop_ruleset) = if let Some(conditions) = conditions {
+        // If we have a workload of conditions, compute the conditional structures
+        // to help with rule inference.
+        let (fst, snd) = compute_conditional_structures(conditions);
+        (Some(fst), Some(snd))
+    } else {
+        (None, None)
+    };
 
     let mut ruleset = Ruleset::<Pred>::default();
     for i in 1..n {
@@ -713,8 +704,8 @@ pub fn soup_to_rules(soup: &Workload, conditions: &Workload, n: usize) -> Rulese
             Limits::synthesis(),
             Limits::minimize(),
             true,
-            Some(pvec_to_terms.clone()), // Use the previously learned terms to help with rule inference
-            Some(cond_prop_ruleset.clone()), // Use the condition propogation rules
+            pvec_to_terms.clone(),
+            cond_prop_ruleset.clone(),
         );
         ruleset.extend(rules);
     }
