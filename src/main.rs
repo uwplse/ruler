@@ -2,7 +2,7 @@ use ruler::llm::Recipe;
 use ruler::llm;
 use ruler::halide;
 use ruler::halide::Pred;
-use ruler::enumo::{Ruleset, Rule};
+use ruler::enumo::Ruleset;
 
 // Outlines how to perform Halide rule synthesis.
 pub enum ChompyMode {
@@ -26,29 +26,26 @@ impl ChompyMode {
 pub async fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {
-        panic!("Usage: chompy <mode> <output>");
+        panic!("Usage: chompy <mode> <output_file_path>");
     }
     let mode = ChompyMode::from_str(&args[1]);
-    match mode {
+    let output_file = &args[2];
+    let rules = match mode {
         ChompyMode::HandwrittenRecipes => {
-            let rules = halide::handwritten_recipes();
-            let output_file = &args[2];
-
-            rules.to_file(output_file);
+            halide::handwritten_recipes()
         }
         ChompyMode::LLMAlphabetSoup => {
-            run_gpt_eval().await; // This will run the GPT evaluation and generate the rules.
-
+            run_gpt_eval().await
         }
         ChompyMode::LLMRecipes => {
             todo!("Not implemented yet.");
         }
-    }
+    };
+    rules.to_file(output_file);
 }
 
 
-// This ports over the recipes from `halide.rs` over to the GPT infrastructure.
-pub async fn run_gpt_eval() {
+pub async fn run_gpt_eval() -> Ruleset<Pred> {
     let equality_recipe = Recipe {
         max_size: 5,
         vals: vec!["-1".to_string(), "0".to_string(), "1".to_string(), "2".to_string()],
@@ -82,18 +79,18 @@ pub async fn run_gpt_eval() {
         ops: vec![
             vec![],
             vec!["abs".to_string()],
-            vec!["+".to_string(), "-".to_string(), "*".to_string(), "/".to_string()], // Binary operators
+            vec!["+".to_string(), "-".to_string(), "*".to_string(), "/".to_string()],
         ],
     };
 
     let rat_cond_recipe = Some(Recipe {
         max_size: 3,
-        vals: vec!["0".to_string()], // Values to use in the conditions.
+        vals: vec!["0".to_string()],
         vars: rat_recipe.vars.clone(),
         ops: vec![
             vec![],
             vec![],
-            vec!["<".to_string(), "<=".to_string(), "!=".to_string()], // Conditional operators
+            vec!["<".to_string(), "<=".to_string(), "!=".to_string()],
         ],
     });
 
@@ -106,21 +103,16 @@ pub async fn run_gpt_eval() {
     let mut prior_ruleset: Ruleset<Pred> = Ruleset::default();
 
     for (recipe, cond_recipe) in recipe_list {
-        // blegh
         let (workload, cond_r) = llm::generate_alphabet_soup(&recipe, cond_recipe.as_ref()).await;
         let ruleset = halide::soup_to_rules(
             &workload,
             cond_r.as_ref(),
             &prior_ruleset,
-            recipe.max_size as usize // The maximum size for the ruleset.
+            recipe.max_size as usize
         );
 
-        // Merge the ruleset into the prior ruleset.
         prior_ruleset.extend(ruleset);
     }
 
-    println!("Final ruleset:");
-    for r in prior_ruleset.iter() {
-        println!("{}", r);
-    }
+    prior_ruleset
 }
