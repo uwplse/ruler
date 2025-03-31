@@ -2,7 +2,7 @@ use ruler::llm::Recipe;
 use ruler::llm;
 use ruler::halide;
 use ruler::halide::Pred;
-use ruler::enumo::Ruleset;
+use ruler::enumo::{Ruleset, Rule};
 
 // Outlines how to perform Halide rule synthesis.
 pub enum ChompyMode {
@@ -30,7 +30,30 @@ pub async fn main() {
     }
     let mode = ChompyMode::from_str(&args[1]);
     match mode {
-        ChompyMode::HandwrittenRecipes => {}
+        ChompyMode::HandwrittenRecipes => {
+            let rules = halide::handwritten_recipes();
+            let output_file = &args[2];
+            // Save the rules to the file
+            let mut strs = vec![];
+            for (name, rule) in &rules.0 {
+                let reverse = Rule::new(&rule.rhs, &rule.lhs);
+                if reverse.is_some() && rules.contains(&reverse.unwrap()) {
+                    let reverse_name = format!("{} <=> {}", rule.rhs, rule.lhs);
+                    if !strs.contains(&reverse_name) {
+                        strs.push(format!("{} <=> {}", rule.lhs, rule.rhs));
+                    }
+                } else {
+                    strs.push(name.to_string());
+                }
+            }
+
+            for s in strs {
+                println!("{s}");
+            }
+
+
+
+        }
         ChompyMode::LLMAlphabetSoup => {
             // let default_recipe = Recipe {
             //     max_size: 5,
@@ -68,9 +91,10 @@ pub async fn main() {
             run_gpt_eval().await; // This will run the GPT evaluation and generate the rules.
 
         }
-        ChompyMode::LLMRecipes => {}
+        ChompyMode::LLMRecipes => {
+            todo!("Not implemented yet.");
+        }
     }
-    println!("Hello, world!");
 }
 
 

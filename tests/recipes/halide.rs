@@ -13,10 +13,16 @@ use ruler::{
 pub fn halide_rules_for_caviar_conditional() -> Ruleset<Pred> {
     let cond_lang = Lang::new(&["0"], &["a", "b", "c"], &[&[], &["<", "<=", "!="]]);
 
-    let mut wkld = iter_metric(cond_lang, "EXPR", Metric::Atoms, 3)
+    let base_lang = if cond_lang.ops.len() == 3 {
+        base_lang(3)
+    } else {
+        base_lang(2)
+    };
+
+    let mut wkld = iter_metric(base_lang, "EXPR", Metric::Atoms, 3)
         .filter(Filter::Contains("VAR".parse().unwrap()))
-        .plug("VAR", &Workload::new(lang.vars))
-        .plug("VAL", &Workload::new(lang.vals));
+        .plug("VAR", &Workload::new(base_lang.vars))
+        .plug("VAL", &Workload::new(base_lang.vals));
     // let ops = vec![lang.uops, lang.bops, lang.tops];
     for (i, ops) in lang.ops.iter().enumerate() {
         wkld = wkld.plug(format!("OP{}", i + 1), &Workload::new(ops));
