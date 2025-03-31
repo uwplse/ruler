@@ -101,6 +101,7 @@ vars: {vars},
 ops: {ops},
 "#;
 
+#[derive(Clone)]
 pub struct Recipe {
     pub max_size: usize,
     pub vars: Vec<String>,

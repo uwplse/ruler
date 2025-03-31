@@ -681,7 +681,12 @@ pub fn compute_conditional_structures(
 /// using previously-learned rules at each step.
 /// Importantly, this function is different from `recursive_rules_cond` in that it does not
 /// actually generate the terms that it derives equivalences for.
-pub fn soup_to_rules(soup: &Workload, conditions: Option<&Workload>, n: usize) -> Ruleset<Pred> {
+pub fn soup_to_rules(
+    soup: &Workload,
+    conditions: Option<&Workload>,
+    prior_rules: &Ruleset<Pred>,
+    n: usize,
+) -> Ruleset<Pred> {
     for t in soup.force() {
         println!("{:?}", t.to_string());
     }
@@ -700,7 +705,7 @@ pub fn soup_to_rules(soup: &Workload, conditions: Option<&Workload>, n: usize) -
         let workload = soup.clone().filter(Filter::MetricLt(Metric::Atoms, i + 1));
         let rules = run_workload(
             workload,
-            ruleset.clone(),
+            prior_rules.clone(),
             Limits::synthesis(),
             Limits::minimize(),
             true,
