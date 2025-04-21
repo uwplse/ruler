@@ -295,6 +295,14 @@ mod test {
     }
 
     #[test]
+    fn parse_invalid_wkld() {
+        let wkld = Workload::from_file("llm/out/bool.wkld");
+        assert!(wkld.force().len() == 278);
+        let valid = wkld.as_lang::<Bool>();
+        assert!(valid.force().len() == 183);
+    }
+
+    #[test]
     fn round_trip_to_file() {
         let rules: Ruleset<Bool> = Ruleset::new(&[
             "(^ ?b ?a) ==> (^ ?a ?b)",

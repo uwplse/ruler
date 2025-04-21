@@ -49,9 +49,25 @@ impl Workload {
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
         for line in std::io::BufRead::lines(reader) {
-            sexps.push(line.unwrap().parse().unwrap());
+            if let Ok(line) = line {
+                if let Ok(sexp) = line.parse() {
+                    sexps.push(sexp);
+                } else {
+                    println!("Skipping invalid s-expression: {}", line);
+                }
+            }
         }
         Self::Set(sexps)
+    }
+
+    pub fn as_lang<L: SynthLanguage>(&self) -> Self {
+        Workload::Set(
+            self.force()
+                .iter()
+                .filter(|sexp| sexp.to_string().parse::<RecExpr<L>>().is_ok())
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Materialize the workload into an e-graph

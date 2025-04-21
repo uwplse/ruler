@@ -14,8 +14,11 @@ impl FromStr for Sexp {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use symbolic_expressions::parser::parse_str;
-        let sexp = parse_str(s).unwrap();
-        Ok(Self::from_symbolic_expr(sexp))
+        if let Ok(sexp) = parse_str(s) {
+            Ok(Self::from_symbolic_expr(sexp))
+        } else {
+            Err(format!("Failed to parse {}", s))
+        }
     }
 }
 
