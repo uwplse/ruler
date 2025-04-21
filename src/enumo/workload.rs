@@ -48,13 +48,11 @@ impl Workload {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
-        for line in std::io::BufRead::lines(reader) {
-            if let Ok(line) = line {
-                if let Ok(sexp) = line.parse() {
-                    sexps.push(sexp);
-                } else {
-                    println!("Skipping invalid s-expression: {}", line);
-                }
+        for line in std::io::BufRead::lines(reader).flatten() {
+            if let Ok(sexp) = line.parse() {
+                sexps.push(sexp);
+            } else {
+                println!("Skipping invalid s-expression: {}", line);
             }
         }
         Self::Set(sexps)
