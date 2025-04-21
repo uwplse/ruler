@@ -21,6 +21,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
+          toolchain: 1.70
           args: --all -- --check
 
   clippy:
@@ -38,6 +39,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
+          toolchain: 1.70
           args: -- -D warnings
 
   unit:
@@ -51,7 +53,7 @@ jobs:
       - name: Install Rust compiler
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.66
+          toolchain: 1.70
           default: true
           override: true
           components: rustfmt, clippy
