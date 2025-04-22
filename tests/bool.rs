@@ -304,6 +304,9 @@ mod test {
 
     #[tokio::test]
     async fn test_llm() {
+        use dotenv::dotenv;
+
+        dotenv().ok();
         let enumo_rules = bool_rules();
         let grammar = r#"
         EXPR :=
@@ -322,6 +325,7 @@ mod test {
         let mut candidates: Ruleset<Bool> = Ruleset::cvec_match(&egraph);
         let (rules, _) =
             candidates.minimize(Ruleset::default(), Scheduler::Compress(Limits::minimize()));
+        println!("Learned {} rules", rules.len());
         let duration = start.elapsed();
         logger::write_baseline(&rules, "bool-LLM-TE", &enumo_rules, "enumo-bool", duration);
     }

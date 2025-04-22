@@ -6,6 +6,7 @@
 /nightly
 /*.terms
 /*.rules
+.env
 
 # Scripts
 scripts/ablation/output/*

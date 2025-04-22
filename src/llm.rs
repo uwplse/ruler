@@ -1,12 +1,15 @@
+use std::env;
+
 use openai_api_rs::v1::{
     api::OpenAIClient,
     chat_completion::{self, ChatCompletionRequest},
 };
 
 pub async fn query(prompt: &str) -> String {
+    let api_key = env::var("OPENROUTER_API_KEY").expect("API_KEY not set");
     let mut client = OpenAIClient::builder()
         .with_endpoint("https://openrouter.ai/api/v1")
-        .with_api_key("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")
+        .with_api_key(api_key)
         .build()
         .unwrap();
     let req = ChatCompletionRequest::new(
