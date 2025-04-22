@@ -59,7 +59,23 @@ impl Workload {
     }
 
     pub async fn from_llm(grammar: &str) -> Self {
-        let res = llm::from_llm(grammar).await;
+        let prompt = format!(
+            r#"
+        Your task is to aid in rule inference for equality saturation.
+        The domain is boolean logic. The grammar is
+        
+        {}
+    
+        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
+        The terms should be generated in a way that they are likely to lead to interesting rewrite rules.
+        The terms may use up to three variables: x, y, and z.
+    
+        Please generate 1000 terms. Each term should be on its own line.
+        Print only the terms, one term per line, no additional text or explanation.
+        "#,
+            grammar
+        );
+        let res = llm::query(&prompt).await;
         let mut valid_sexps = vec![];
         for line in res.lines() {
             if let Ok(sexp) = line.parse() {

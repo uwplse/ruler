@@ -304,6 +304,7 @@ mod test {
 
     #[tokio::test]
     async fn test_llm() {
+        let enumo_rules = bool_rules();
         let grammar = r#"
         EXPR :=
         | VAR
@@ -315,7 +316,14 @@ mod test {
         | (^ EXPR EXPR)
         | (-> EXPR EXPR)
         "#;
-        Workload::from_llm(grammar).await;
+        let start = Instant::now();
+        let wkld = Workload::from_llm(grammar).await.as_lang::<Bool>();
+        let egraph = wkld.to_egraph();
+        let mut candidates: Ruleset<Bool> = Ruleset::cvec_match(&egraph);
+        let (rules, _) =
+            candidates.minimize(Ruleset::default(), Scheduler::Compress(Limits::minimize()));
+        let duration = start.elapsed();
+        logger::write_baseline(&rules, "bool-LLM-TE", &enumo_rules, "enumo-bool", duration);
     }
 
     #[test]
