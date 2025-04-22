@@ -1,7 +1,7 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
-use crate::{SynthAnalysis, SynthLanguage};
+use crate::{llm, SynthAnalysis, SynthLanguage};
 use std::io::Write;
 
 /// Workloads are sets of terms from a domain
@@ -56,6 +56,19 @@ impl Workload {
             }
         }
         Self::Set(sexps)
+    }
+
+    pub async fn from_llm(grammar: &str) -> Self {
+        let res = llm::from_llm(grammar).await;
+        let mut valid_sexps = vec![];
+        for line in res.lines() {
+            if let Ok(sexp) = line.parse() {
+                valid_sexps.push(sexp);
+            } else {
+                println!("Skipping invalid s-expression: {}", line);
+            }
+        }
+        Workload::Set(valid_sexps)
     }
 
     pub fn as_lang<L: SynthLanguage>(&self) -> Self {

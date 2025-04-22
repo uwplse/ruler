@@ -5,6 +5,8 @@ authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washin
 edition = "2018"
 
 [dependencies]
+openai-api-rs = "6.0.3"
+tokio = { version = "1", features = ["full"] }
 clap = { version = "3.0.7", features = ["derive"] }
 log = "0.4"
 env_logger = { version = "0.7", default-features = false }

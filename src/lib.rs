@@ -12,6 +12,7 @@ pub use util::*;
 mod bv;
 pub mod enumo;
 mod language;
+pub mod llm;
 pub mod logger;
 pub mod recipe_utils;
 mod util;

@@ -302,6 +302,22 @@ mod test {
         assert!(valid.force().len() == 183);
     }
 
+    #[tokio::test]
+    async fn test_llm() {
+        let grammar = r#"
+        EXPR :=
+        | VAR
+        | true
+        | false
+        | (~ EXPR)
+        | (& EXPR EXPR)
+        | (| EXPR EXPR)
+        | (^ EXPR EXPR)
+        | (-> EXPR EXPR)
+        "#;
+        Workload::from_llm(grammar).await;
+    }
+
     #[test]
     fn round_trip_to_file() {
         let rules: Ruleset<Bool> = Ruleset::new(&[
