@@ -4,6 +4,7 @@ on: [push]
 
 env:
   RUST_BACKTRACE: full
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER }}
 
 jobs:
   fmt:
@@ -47,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SKIP_RECIPES: 1
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER }}
     steps:
       - uses: actions/checkout@main
 
