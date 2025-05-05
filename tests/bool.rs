@@ -124,7 +124,7 @@ mod test {
     use crate::bool::bool_rules;
     use ruler::{
         enumo::{Filter, Metric, Ruleset, Workload},
-        recipe_utils::{base_lang, iter_metric, run_workload},
+        recipe_utils::{base_lang, iter_metric, recursive_rules, run_workload, Lang},
     };
     use std::time::Instant;
 
@@ -308,7 +308,11 @@ mod test {
 
         dotenv().ok();
         let enumo_rules = bool_rules();
-        let grammar = r#"
+
+        let prompt = "
+        Your task is to aid in rule inference for equality saturation.
+        The domain is boolean logic. The grammar is
+        
         EXPR :=
         | VAR
         | true
@@ -318,9 +322,16 @@ mod test {
         | (| EXPR EXPR)
         | (^ EXPR EXPR)
         | (-> EXPR EXPR)
-        "#;
+    
+        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
+        The terms should be generated in a way that they are likely to lead to interesting rewrite rules.
+        The terms may use up to three variables: x, y, and z.
+    
+        Please generate 1000 terms. Each term should be on its own line.
+        Print only the terms, one term per line, no additional text or explanation.
+        ";
         let start = Instant::now();
-        let wkld = Workload::from_llm(grammar).await.as_lang::<Bool>();
+        let wkld = Workload::from_llm(&prompt).await.as_lang::<Bool>();
         let egraph = wkld.to_egraph();
         let mut candidates: Ruleset<Bool> = Ruleset::cvec_match(&egraph);
         let (rules, _) =
@@ -328,6 +339,94 @@ mod test {
         println!("Learned {} rules", rules.len());
         let duration = start.elapsed();
         logger::write_baseline(&rules, "bool-LLM-TE", &enumo_rules, "enumo", duration);
+    }
+
+    #[tokio::test]
+    async fn test_llm_after_exhaustive() {
+        use dotenv::dotenv;
+
+        dotenv().ok();
+
+        let enumo_rules = bool_rules();
+
+        let start = Instant::now();
+
+        // First, do exhaustive synthesis up to size 5
+        let rules5: Ruleset<Bool> = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["true", "false"],
+                &["x", "y", "z"],
+                &[&["~"], &["&", "|", "^", "->"]],
+            ),
+            Ruleset::default(),
+        );
+        let a5_duration = start.elapsed();
+
+        println!("Rules via exhaustive enumeration: {}", rules5.len());
+
+        // Then, give the LLM the example terms at size 5 and ask it to generate
+        // 1000 terms larger than that
+        let prompt = "
+        Your task is to aid in rule inference for equality saturation.
+        The domain is boolean logic. The grammar is
+        EXPR :=
+        | VAR
+        | true
+        | false
+        | (~ EXPR)
+        | (& EXPR EXPR)
+        | (| EXPR EXPR)
+        | (^ EXPR EXPR)
+        | (-> EXPR EXPR)
+
+        Here are some example terms:
+        (| x y)
+        (& x y)
+        (^ x y)
+        (-> x y)
+        (~ x)
+        (| x false)
+        (& x true)
+        (-> true x)
+        (-> false x)
+        (~ (~ x))
+        (| x (& y z))
+        (& x (| y z))
+        (-> x (| y z))
+        (| x (-> y z))
+        (& x (-> y z))
+        (-> x (& y z))
+        (^ x (| y z))
+        (^ x (& y z))
+        (~ (^ x y))
+    
+        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
+        The terms should be generated in a way that they are likely to lead to interesting rewrite rules.
+        The terms may use up to three variables: x, y, and z.
+    
+        Please generate 5000 terms. Each term should be on its own line.
+        Print only the terms, one term per line, no additional text or explanation.
+        ";
+        let wkld = Workload::from_llm(&prompt).await.as_lang::<Bool>();
+        wkld.to_file("llm/out/bool_from_ex.wkld");
+
+        let egraph = wkld.to_egraph();
+        let mut candidates: Ruleset<Bool> = Ruleset::cvec_match(&egraph);
+        let (llm_rules, _) =
+            candidates.minimize(rules5.clone(), Scheduler::Compress(Limits::minimize()));
+        println!("Rules via LLM workload: {}", llm_rules.len());
+        let all_rules = rules5.clone().union(&llm_rules);
+        let duration = start.elapsed();
+        logger::write_baseline(&rules5, "bool-A5", &enumo_rules, "enumo", a5_duration);
+        logger::write_baseline(
+            &all_rules,
+            "bool-A5-LLM-TE",
+            &enumo_rules,
+            "enumo",
+            duration,
+        );
     }
 
     #[test]
