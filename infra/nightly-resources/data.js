@@ -56,11 +56,11 @@ function getBaseline(name) {
     "Enumo LOC": (row) => row.loc,
     "# Enumo": (row) => row.rules.length,
     "Time (s)": (row) => row.time,
-    "Enumo Derives Baseline (LHS / LHSRHS)": (row) =>
+    "X Derives Baseline (LHS / LHSRHS)": (row) =>
       `${getDerivability(
         row.derivability.enumo_derives_baseline.lhs
       )} / ${getDerivability(row.derivability.enumo_derives_baseline.lhs_rhs)}`,
-    "Enumo derives Baseline Time (s)": (row) => {
+    "X derives Baseline Time (s)": (row) => {
       if (missingDerivability(row.derivability.enumo_derives_baseline)) {
         return "-";
       } else {
@@ -73,11 +73,11 @@ function getBaseline(name) {
         )}`;
       }
     },
-    "Baseline Derives Enumo (LHS / LHSRHS)": (row) =>
+    "Baseline Derives X (LHS / LHSRHS)": (row) =>
       `${getDerivability(
         row.derivability.baseline_derives_enumo.lhs
       )} / ${getDerivability(row.derivability.baseline_derives_enumo.lhs_rhs)}`,
-    "Baseline derives Enumo Time (s)": (row) => {
+    "Baseline derives X Time (s)": (row) => {
       if (missingDerivability(row.derivability.baseline_derives_enumo)) {
         return "-";
       } else {

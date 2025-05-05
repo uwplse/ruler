@@ -327,7 +327,7 @@ mod test {
             candidates.minimize(Ruleset::default(), Scheduler::Compress(Limits::minimize()));
         println!("Learned {} rules", rules.len());
         let duration = start.elapsed();
-        logger::write_baseline(&rules, "bool-LLM-TE", &enumo_rules, "enumo-bool", duration);
+        logger::write_baseline(&rules, "bool-LLM-TE", &enumo_rules, "enumo", duration);
     }
 
     #[test]
