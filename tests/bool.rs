@@ -122,6 +122,7 @@ impl SynthLanguage for Bool {
 mod test {
     use super::*;
     use crate::bool::bool_rules;
+    use dotenv::dotenv;
     use ruler::{
         enumo::{Filter, Metric, Ruleset, Workload},
         recipe_utils::{base_lang, iter_metric, recursive_rules, run_workload, Lang},
@@ -303,54 +304,119 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_llm() {
-        use dotenv::dotenv;
-
+    async fn llm_rules() {
         dotenv().ok();
+
         let enumo_rules = bool_rules();
 
         let prompt = "
-        Your task is to aid in rule inference for equality saturation.
-        The domain is boolean logic. The grammar is
-        
-        EXPR :=
-        | VAR
-        | true
-        | false
-        | (~ EXPR)
-        | (& EXPR EXPR)
-        | (| EXPR EXPR)
-        | (^ EXPR EXPR)
-        | (-> EXPR EXPR)
-    
-        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
-        The terms should be generated in a way that they are likely to lead to interesting rewrite rules.
-        The terms may use up to three variables: x, y, and z.
-    
-        Please generate 1000 terms. Each term should be on its own line.
-        Print only the terms, one term per line, no additional text or explanation.
+        Your task is to perform rule inference for equality saturation.
+        The domain is boolean logic, as follows:
+        Values: true, false
+        Unary Operators: ~
+        Binary Operators: &, |, ^, ->
+
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate sound, useful, and complete rewrite rules for the domain.
+        The set of rewrite rules should be sufficient to decide the equality between any
+        two terms in the domain.
+        A rewrite rule has the form `l => r` where `l` and `r` are valid terms from
+        the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
         ";
-        let start = Instant::now();
-        let wkld = Workload::from_llm(&prompt).await.as_lang::<Bool>();
-        let egraph = wkld.to_egraph();
-        let mut candidates: Ruleset<Bool> = Ruleset::cvec_match(&egraph);
-        let (rules, _) =
-            candidates.minimize(Ruleset::default(), Scheduler::Compress(Limits::minimize()));
-        println!("Learned {} rules", rules.len());
-        let duration = start.elapsed();
-        logger::write_baseline(&rules, "bool-LLM-TE", &enumo_rules, "enumo", duration);
+
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let rules: Ruleset<Bool> = Ruleset::from_llm(&prompt, &model).await;
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            logger::write_baseline(
+                &rules,
+                &format!("{}-ALL", model),
+                &enumo_rules,
+                "enumo",
+                duration,
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn llm_term_enumeration() {
+        dotenv().ok();
+
+        let enumo_rules = bool_rules();
+
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic, as follows:
+        Values: true, false
+        Unary Operators: ~
+        Binary Operators: &, |, ^, ->
+
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Bool>();
+
+            let rules: Ruleset<Bool> = if wkld.force().len() == 0 {
+                // LLM generated no valid terms
+                Ruleset::default()
+            } else {
+                run_workload(
+                    wkld,
+                    Ruleset::default(),
+                    Limits::synthesis(),
+                    Limits::minimize(),
+                    true,
+                )
+            };
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            logger::write_baseline(
+                &rules,
+                &format!("{}-TE", model),
+                &enumo_rules,
+                "enumo",
+                duration,
+            );
+        }
     }
 
     #[tokio::test]
     async fn test_llm_after_exhaustive() {
-        use dotenv::dotenv;
-
         dotenv().ok();
 
         let enumo_rules = bool_rules();
 
-        let start = Instant::now();
-
+        let a5_start = Instant::now();
         // First, do exhaustive synthesis up to size 5
         let rules5: Ruleset<Bool> = recursive_rules(
             Metric::Atoms,
@@ -362,71 +428,56 @@ mod test {
             ),
             Ruleset::default(),
         );
-        let a5_duration = start.elapsed();
+        let a5_duration = a5_start.elapsed();
 
-        println!("Rules via exhaustive enumeration: {}", rules5.len());
-
-        // Then, give the LLM the example terms at size 5 and ask it to generate
-        // 1000 terms larger than that
         let prompt = "
-        Your task is to aid in rule inference for equality saturation.
-        The domain is boolean logic. The grammar is
-        EXPR :=
-        | VAR
-        | true
-        | false
-        | (~ EXPR)
-        | (& EXPR EXPR)
-        | (| EXPR EXPR)
-        | (^ EXPR EXPR)
-        | (-> EXPR EXPR)
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic, as follows:
+        Values: true, false
+        Unary Operators: ~
+        Binary Operators: &, |, ^, ->
 
-        Here are some example terms:
-        (| x y)
-        (& x y)
-        (^ x y)
-        (-> x y)
-        (~ x)
-        (| x false)
-        (& x true)
-        (-> true x)
-        (-> false x)
-        (~ (~ x))
-        (| x (& y z))
-        (& x (| y z))
-        (-> x (| y z))
-        (| x (-> y z))
-        (& x (-> y z))
-        (-> x (& y z))
-        (^ x (| y z))
-        (^ x (& y z))
-        (~ (^ x y))
-    
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
         Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
-        The terms should be generated in a way that they are likely to lead to interesting rewrite rules.
-        The terms may use up to three variables: x, y, and z.
-    
-        Please generate 5000 terms. Each term should be on its own line.
-        Print only the terms, one term per line, no additional text or explanation.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
         ";
-        let wkld = Workload::from_llm(&prompt).await.as_lang::<Bool>();
-        wkld.to_file("llm/out/bool_from_ex.wkld");
 
-        let egraph = wkld.to_egraph();
-        let mut candidates: Ruleset<Bool> = Ruleset::cvec_match(&egraph);
-        let (llm_rules, _) =
-            candidates.minimize(rules5.clone(), Scheduler::Compress(Limits::minimize()));
-        println!("Rules via LLM workload: {}", llm_rules.len());
-        let all_rules = rules5.clone().union(&llm_rules);
-        let duration = start.elapsed();
-        logger::write_baseline(&rules5, "bool-A5", &enumo_rules, "enumo", a5_duration);
-        logger::write_baseline(
-            &all_rules,
-            "bool-A5-LLM-TE",
-            &enumo_rules,
-            "enumo",
-            duration,
-        );
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Bool>();
+            let rules: Ruleset<Bool> = run_workload(
+                wkld,
+                rules5.clone(),
+                Limits::synthesis(),
+                Limits::minimize(),
+                true,
+            );
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            let all = rules.union(&rules5);
+
+            logger::write_baseline(
+                &all,
+                &format!("{}-A5-TE", model),
+                &enumo_rules,
+                "enumo",
+                duration + a5_duration,
+            );
+        }
     }
 
     #[test]

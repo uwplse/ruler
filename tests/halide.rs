@@ -290,42 +290,260 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
+    use dotenv::dotenv;
     use ruler::{
         enumo::{Filter, Metric, Ruleset, Workload},
-        logger,
+        llm, logger,
         recipe_utils::{recursive_rules, run_workload, Lang},
         Limits,
     };
 
+    // #[test]
+    // fn run() {
+    //     // Skip this test in github actions
+    //     if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+    //         return;
+    //     }
+
+    //     let start = Instant::now();
+    //     let all_rules = halide_rules();
+    //     let duration = start.elapsed();
+
+    //     // oopsla-halide-baseline branch
+    //     // Run on nightly 4/12/2023
+    //     // time cargo run --release --bin halide -- synth --iters 1 --use-smt
+    //     // real	0m2.707s
+    //     // user	0m2.681s
+    //     // sys	0m0.028s
+    //     let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+    //     let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
+    //     let oopsla_duration = Duration::from_secs_f32(3.354);
+
+    //     logger::write_baseline(&all_rules, "halide", &baseline, "halide", duration);
+
+    //     logger::write_baseline(
+    //         &oopsla_halide,
+    //         "oopsla halide (1 iter)",
+    //         &baseline,
+    //         "halide",
+    //         oopsla_duration,
+    //     );
+    // }
+
     #[test]
-    fn run() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
+    fn enumo_exhaustive() {
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
 
         let start = Instant::now();
-        let all_rules = halide_rules();
+        let rules5: Ruleset<Pred> = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["0", "1"],
+                &["a", "b", "c"],
+                &[
+                    &["-", "!"],
+                    &[
+                        "<", "<=", "==", "!=", "&&", "||", "^", "+", "-", "*", "/", "min", "max",
+                    ],
+                    &["select"],
+                ],
+            ),
+            Ruleset::default(),
+        );
         let duration = start.elapsed();
 
-        // oopsla-halide-baseline branch
-        // Run on nightly 4/12/2023
-        // time cargo run --release --bin halide -- synth --iters 1 --use-smt
-        // real	0m2.707s
-        // user	0m2.681s
-        // sys	0m0.028s
+        logger::write_baseline(&rules5, "halide-exhaustive", &baseline, "halide", duration);
+    }
+
+    #[tokio::test]
+    async fn llm_rules() {
+        dotenv().ok();
+
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        let oopsla_halide: Ruleset<Pred> = Ruleset::from_file("baseline/oopsla-halide.rules");
-        let oopsla_duration = Duration::from_secs_f32(3.354);
 
-        logger::write_baseline(&all_rules, "halide", &baseline, "halide", duration);
+        let prompt = "
+        Your task is to perform rule inference for equality saturation.
+        The domain is boolean logic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Ternary Operators: select
 
-        logger::write_baseline(
-            &oopsla_halide,
-            "oopsla halide (1 iter)",
-            &baseline,
-            "halide",
-            oopsla_duration,
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate sound, useful, and complete rewrite rules for the domain.
+        The set of rewrite rules should be sufficient to decide the equality between any
+        two terms in the domain.
+        You should generate at least 200 rules.
+        A rewrite rule has the form `l => r` where `l` and `r` are valid terms from
+        the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
+        ";
+
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let rules: Ruleset<Pred> = Ruleset::from_llm(&prompt, &model).await;
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            logger::write_baseline(
+                &rules,
+                &format!("{}-ALL", model),
+                &baseline,
+                "halide",
+                duration,
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn llm_term_enumeration() {
+        dotenv().ok();
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Ternary Operators: select
+        
+        Terms must be written using s-expressions and prefix notation.
+        0 is false and 1 is true
+        Variables are ?x, ?y, and ?z.
+        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        You should only use the constants 0, 1, -1, and 2. Do not use any other constants.
+        Prioritize terms involving variables over terms that just contain constants.
+
+        Do not use any operators or syntax not listed here.
+
+        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
+
+            let rules: Ruleset<Pred> = if wkld.force().len() == 0 {
+                // LLM generated no valid terms
+                Ruleset::default()
+            } else {
+                run_workload(
+                    wkld,
+                    Ruleset::default(),
+                    Limits::synthesis(),
+                    Limits::minimize(),
+                    true,
+                )
+            };
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            logger::write_baseline(
+                &rules,
+                &format!("{}-TE", model),
+                &baseline,
+                "halide",
+                duration,
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_llm_after_exhaustive() {
+        dotenv().ok();
+        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+
+        let a5_start = Instant::now();
+        // First, do exhaustive synthesis up to size 5
+        let rules5: Ruleset<Pred> = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["0", "1"],
+                &["a", "b", "c"],
+                &[
+                    &["-", "!"],
+                    &[
+                        "<", "<=", "==", "!=", "&&", "||", "^", "+", "-", "*", "/", "min", "max",
+                    ],
+                    &["select"],
+                ],
+            ),
+            Ruleset::default(),
         );
+        let a5_duration = a5_start.elapsed();
+
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Ternary Operators: select
+            
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
+            let rules: Ruleset<Pred> = run_workload(
+                wkld,
+                rules5.clone(),
+                Limits::synthesis(),
+                Limits::minimize(),
+                true,
+            );
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            let all = rules.union(&rules5);
+
+            logger::write_baseline(
+                &all,
+                &format!("{}-A5-TE", model),
+                &baseline,
+                "halide",
+                duration + a5_duration,
+            );
+        }
     }
 }

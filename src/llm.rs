@@ -6,6 +6,15 @@ use openai_api_rs::v1::{
     chat_completion::{self, ChatCompletionRequest},
 };
 
+pub fn models() -> Vec<String> {
+    vec![
+        "google/gemini-flash-1.5".to_string(),
+        "anthropic/claude-3.7-sonnet".to_string(),
+        // "google/gemini-2.5-pro-preview".to_string(),
+        "openai/gpt-4o-mini".to_string(),
+    ]
+}
+
 pub async fn query(prompt: &str, model: &str) -> Vec<String> {
     let api_key = env::var("OPENROUTER_API_KEY").expect("API_KEY not set");
     let mut client = OpenAIClient::builder()
@@ -53,15 +62,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_query() {
-        let models: Vec<&str> = vec![
-            "google/gemini-flash-1.5",
-            "anthropic/claude-3.7-sonnet",
-            "google/gemini-2.5-pro-preview",
-            "openai/gpt-4o-mini",
-        ];
+        let models: Vec<String> = models();
         let prompt = "What are the standard Boolean Algebra Axioms?";
         for model in models {
-            let response = query(prompt, model).await;
+            let response = query(prompt, &model).await;
             assert!(!response.is_empty());
         }
     }
