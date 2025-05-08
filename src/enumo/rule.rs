@@ -26,8 +26,13 @@ impl<L: SynthLanguage> Display for Rule<L> {
 impl<L: SynthLanguage> Rule<L> {
     pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
         if let Some((l, r)) = s.split_once("=>") {
-            let l_pat: Pattern<L> = l.parse().unwrap();
-            let r_pat: Pattern<L> = r.parse().unwrap();
+            let l_pat = l.parse();
+            let r_pat = r.parse();
+            if l_pat.is_err() || r_pat.is_err() {
+                return Err(format!("Failed to parse {}", s));
+            }
+            let l_pat: Pattern<L> = l_pat.unwrap();
+            let r_pat: Pattern<L> = r_pat.unwrap();
 
             let forwards = Self {
                 name: format!("{} ==> {}", l_pat, r_pat).into(),
