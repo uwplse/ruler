@@ -58,12 +58,12 @@ impl Workload {
         Self::Set(sexps)
     }
 
-    pub async fn from_llm(prompt: &str) -> Self {
-        let res = llm::query(&prompt).await;
+    pub async fn from_llm(prompt: &str, model: &str) -> Self {
+        let res = llm::query(&prompt, model).await;
         let mut valid_sexps = vec![];
         let mut valid = 0;
         let mut invalid = 0;
-        for line in res.lines() {
+        for line in res {
             if let Ok(sexp) = line.parse() {
                 valid += 1;
                 valid_sexps.push(sexp);
@@ -73,7 +73,7 @@ impl Workload {
             }
         }
         println!(
-            "LLVM workload contained {} valid and {} invalid s-expressions.",
+            "LLM workload contained {} valid and {} invalid s-expressions.",
             valid, invalid
         );
         Workload::Set(valid_sexps)
