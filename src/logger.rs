@@ -38,6 +38,23 @@ fn add_json_to_file(json: Value) {
         .expect("Unable to write to json file");
 }
 
+pub fn skip_derive(a: &str, b: &str) -> bool {
+    // Items in this list will *not* run derivability
+    // Format is (a, b) where a and b are spec/baseline names
+    // and a.derive(b) will *not* run.
+    // Note: b.derive(a) will still be computed unless (b, a)
+    // is also in this list.
+    let pairs = vec![
+        ("herbie", "rational_replicate"),
+        ("herbie", "rational_best"),
+    ];
+
+    // Items in this list will not run derivability a.derive(b) for any b
+    let skip_all = vec!["halide"];
+
+    return skip_all.contains(&a) || pairs.contains(&(a, b));
+}
+
 /**
  * Constructs a JSON object that corresponds to a single row of the baseline
  * derivability table (Tables 2 and 3)
@@ -55,21 +72,11 @@ pub fn write_baseline<L: SynthLanguage>(
     baseline_name: &str,
     time: Duration,
 ) {
-    // Items in this list will *not* run derivability
-    // Format is (a, b) where a and b are spec/baseline names
-    // and a.derive(b) will *not* run.
-    // Note: b.derive(a) will still be computed unless (b, a)
-    // is also in this list.
-    let skip_derive = vec![
-        ("herbie", "rational_replicate"),
-        ("herbie", "rational_best"),
-    ];
-
     let loc = count_lines(spec_name)
         .map(|x| x.to_string())
         .unwrap_or_else(|| "-".to_string());
 
-    let enumo_derives_baseline = if skip_derive.contains(&(spec_name, baseline_name)) {
+    let enumo_derives_baseline = if skip_derive(spec_name, baseline_name) {
         json!({})
     } else {
         json!({
@@ -78,7 +85,7 @@ pub fn write_baseline<L: SynthLanguage>(
         })
     };
 
-    let baseline_derives_enumo = if skip_derive.contains(&(baseline_name, spec_name)) {
+    let baseline_derives_enumo = if skip_derive(baseline_name, spec_name) {
         json!({})
     } else {
         json!({
