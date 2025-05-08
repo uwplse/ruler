@@ -46,3 +46,23 @@ pub async fn query(prompt: &str, model: &str) -> Vec<String> {
         vec![]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_query() {
+        let models: Vec<&str> = vec![
+            "google/gemini-flash-1.5",
+            "anthropic/claude-3.7-sonnet",
+            "google/gemini-2.5-pro-preview",
+            "openai/gpt-4o-mini",
+        ];
+        let prompt = "What are the standard Boolean Algebra Axioms?";
+        for model in models {
+            let response = query(prompt, model).await;
+            assert!(!response.is_empty());
+        }
+    }
+}
