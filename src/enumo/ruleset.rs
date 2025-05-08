@@ -4,7 +4,7 @@ use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{io::Write, sync::Arc};
 
 use crate::{
-    CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
+    llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
     SynthAnalysis, SynthLanguage,
 };
 
@@ -201,6 +201,32 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
         Self(all_rules)
+    }
+
+    pub async fn from_llm(prompt: &str, model: &str) -> Self {
+        let res = llm::query(prompt, model).await;
+        let mut valid_rules = IndexMap::default();
+        let mut valid = 0;
+        let mut invalid = 0;
+        for line in res {
+            if let Ok((forwards, backwards)) = Rule::from_string(&line) {
+                valid += 1;
+                valid_rules.insert(forwards.name.clone(), forwards);
+                if let Some(backwards) = backwards {
+                    valid_rules.insert(backwards.name.clone(), backwards);
+                }
+            } else {
+                invalid += 1;
+                println!("Skipping invalid rule: {}", line);
+            }
+        }
+
+        println!(
+            "LLM response contained {} valid and {} invalid rules",
+            valid, invalid
+        );
+
+        Self(valid_rules)
     }
 
     pub fn pretty_print(&self) {
