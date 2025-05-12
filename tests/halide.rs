@@ -358,6 +358,11 @@ mod test {
 
     #[tokio::test]
     async fn llm_rules() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         dotenv().ok();
 
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
@@ -407,6 +412,11 @@ mod test {
 
     #[tokio::test]
     async fn llm_term_enumeration() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         dotenv().ok();
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
 
@@ -473,6 +483,11 @@ mod test {
 
     #[tokio::test]
     async fn test_llm_after_exhaustive() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         dotenv().ok();
         let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
 

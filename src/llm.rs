@@ -62,6 +62,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_query() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let models: Vec<String> = models();
         let prompt = "What are the standard Boolean Algebra Axioms?";
         for model in models {
