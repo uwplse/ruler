@@ -19,8 +19,8 @@ fn add_json_to_file(json: Value) {
 
     OpenOptions::new()
         .read(true)
-        .write(true)
         .create(true)
+        .append(true)
         .open(path)
         .expect("Unable to open or create file");
 
@@ -60,7 +60,7 @@ pub fn write_baseline<L: SynthLanguage>(
     // and a.derive(b) will *not* run.
     // Note: b.derive(a) will still be computed unless (b, a)
     // is also in this list.
-    let skip_derive = vec![
+    let skip_derive = [
         ("herbie", "rational_replicate"),
         ("herbie", "rational_best"),
     ];
