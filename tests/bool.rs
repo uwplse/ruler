@@ -1,5 +1,6 @@
 use ruler::{enumo::Scheduler, *};
 use std::ops::*;
+use z3::ast::Ast;
 #[path = "./recipes/bool.rs"]
 pub mod bool;
 
@@ -105,8 +106,19 @@ impl SynthLanguage for Bool {
         }
     }
 
-    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
-        ValidationResult::Valid
+    fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
+        let mut cfg = z3::Config::new();
+        cfg.set_timeout_msec(1000);
+        let ctx = z3::Context::new(&cfg);
+        let solver = z3::Solver::new(&ctx);
+        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+        solver.assert(&lexpr._eq(&rexpr).not());
+        match solver.check() {
+            z3::SatResult::Unsat => ValidationResult::Valid,
+            z3::SatResult::Unknown => ValidationResult::Unknown,
+            z3::SatResult::Sat => ValidationResult::Invalid,
+        }
     }
 
     fn is_constant(&self) -> bool {
@@ -116,6 +128,34 @@ impl SynthLanguage for Bool {
     fn mk_constant(c: Self::Constant, _egraph: &mut EGraph<Self, SynthAnalysis>) -> Self {
         Bool::Lit(c)
     }
+}
+
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Bool]) -> z3::ast::Bool<'a> {
+    let mut buf = vec![];
+    for node in expr.as_ref().iter() {
+        match node {
+            Bool::Not(x) => buf.push(z3::ast::Bool::not(&buf[usize::from(*x)])),
+            Bool::And([x, y]) => buf.push(z3::ast::Bool::and(
+                &ctx,
+                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
+            )),
+            Bool::Or([x, y]) => buf.push(z3::ast::Bool::or(
+                &ctx,
+                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
+            )),
+            Bool::Xor([x, y]) => buf.push(z3::ast::Bool::xor(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)],
+            )),
+            Bool::Implies([x, y]) => buf.push(z3::ast::Bool::implies(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)],
+            )),
+            Bool::Lit(c) => buf.push(z3::ast::Bool::from_bool(&ctx, *c)),
+            Bool::Var(sym) => buf.push(z3::ast::Bool::new_const(&ctx, sym.to_string())),
+        }
+    }
+    buf.pop().unwrap()
 }
 
 #[cfg(test)]
@@ -350,6 +390,24 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_validate() {
+        let rules: Ruleset<Bool> = Ruleset::new(&[
+            "(^ ?b ?a) ==> (^ ?a ?b)",
+            "(& ?b ?a) ==> (& ?a ?b)",
+            "(| ?b ?a) ==> (| ?a ?b)",
+            "(^ ?a true) ==> (~ ?a)",
+            "(^ true ?a) ==> (~ ?a)",
+            "(^ ?a (~ ?a)) ==> false", // unsound
+            "(& ?a ?a) ==> ?a",
+            "?a ==> (~ (~ ?a))",
+        ]);
+
+        let (sound, unsound) = rules.partition(|r| r.is_valid());
+        assert!(sound.len() == 7);
+        assert!(unsound.len() == 1);
+    }
+
     #[tokio::test]
     async fn llm_term_enumeration() {
         dotenv().ok();
@@ -364,6 +422,7 @@ mod test {
         Binary Operators: &, |, ^, ->
 
         Terms must be written using s-expressions and prefix notation.
+        For example, instead of (?x & ?y), you should write (& ?x ?y).
         Variables are ?x, ?y, and ?z.
 
         Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
