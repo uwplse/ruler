@@ -81,13 +81,7 @@ impl Pattern {
                     if pats.len() == args.len() {
                         pats.iter()
                             .zip(args.iter())
-                            .fold(Some(subst), |acc, (pat, sexp)| {
-                                if let Some(subst) = acc {
-                                    pat.matches_with(sexp, subst)
-                                } else {
-                                    None
-                                }
-                            })
+                            .try_fold(subst, |acc, (pat, sexp)| pat.matches_with(sexp, acc))
                     } else {
                         None
                     }

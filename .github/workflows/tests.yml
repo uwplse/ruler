@@ -4,7 +4,6 @@ on: [push]
 
 env:
   RUST_BACKTRACE: full
-  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER }}
 
 jobs:
   fmt:
@@ -15,14 +14,13 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.66
+          toolchain: 1.86
           override: true
       - run: rustup component add rustfmt
 
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
-          toolchain: 1.70
           args: --all -- --check
 
   clippy:
@@ -33,14 +31,13 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.66
+          toolchain: 1.86
           override: true
       - run: rustup component add clippy
 
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          toolchain: 1.70
           args: -- -D warnings
 
   unit:
@@ -48,14 +45,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SKIP_RECIPES: 1
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER }}
     steps:
       - uses: actions/checkout@main
 
       - name: Install Rust compiler
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.70
+          toolchain: 1.86
           default: true
           override: true
           components: rustfmt, clippy

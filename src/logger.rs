@@ -19,8 +19,8 @@ fn add_json_to_file(json: Value) {
 
     OpenOptions::new()
         .read(true)
-        .write(true)
         .create(true)
+        .append(true)
         .open(path)
         .expect("Unable to open or create file");
 

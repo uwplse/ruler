@@ -62,7 +62,7 @@ impl<L: SynthLanguage> egg::CostFunction<L> for ExtractableAstSize {
         if enode.is_allowed_op() {
             enode.fold(1, |sum, id| sum.saturating_add(costs(id)))
         } else {
-            usize::max_value()
+            usize::MAX
         }
     }
 }
