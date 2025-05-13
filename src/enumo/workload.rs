@@ -48,7 +48,7 @@ impl Workload {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
-        for line in std::io::BufRead::lines(reader).flatten() {
+        for line in std::io::BufRead::lines(reader).map_while(Result::ok) {
             if let Ok(sexp) = line.parse() {
                 sexps.push(sexp);
             } else {
@@ -59,7 +59,7 @@ impl Workload {
     }
 
     pub async fn from_llm(prompt: &str, model: &str) -> Self {
-        let res = llm::query(&prompt, model).await;
+        let res = llm::query(prompt, model).await;
         let mut valid_sexps = vec![];
         let mut valid = 0;
         let mut invalid = 0;

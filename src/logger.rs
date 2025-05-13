@@ -44,15 +44,15 @@ pub fn skip_derive(a: &str, b: &str) -> bool {
     // and a.derive(b) will *not* run.
     // Note: b.derive(a) will still be computed unless (b, a)
     // is also in this list.
-    let pairs = vec![
+    let pairs = [
         ("herbie", "rational_replicate"),
         ("herbie", "rational_best"),
     ];
 
     // Items in this list will not run derivability a.derive(b) for any b
-    let skip_all = vec!["halide"];
+    let skip_all = ["halide"];
 
-    return skip_all.contains(&a) || pairs.contains(&(a, b));
+    skip_all.contains(&a) || pairs.contains(&(a, b))
 }
 
 /**

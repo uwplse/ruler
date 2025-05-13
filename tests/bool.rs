@@ -336,11 +336,36 @@ mod test {
     }
 
     #[test]
-    fn parse_invalid_wkld() {
-        let wkld = Workload::from_file("llm/out/bool.wkld");
-        assert!(wkld.force().len() == 278);
+    fn test_wkld_as_lang() {
+        let wkld = Workload::new([
+            "((& x y z) false)",
+            "(^ x y (-> z))",
+            "(-> x y (| z false))",
+            "(-> x y (-> z))",
+            "(x (& x y (| z)))",
+            "((& (~ z) x y))",
+            "((| (~ z) x y))",
+            "((^ (~ z) x y))",
+            "((-> (~ z) x y))",
+            "(~ (| y false))",
+            "(~ (| z true))",
+            "(~ (| z false))",
+            "(y (| x y (-> z)))",
+            "(z (^ x y (~ z)))",
+            "(& x (& y (~ (& z true))))",
+            "(| x (| y (~ (| z false))))",
+            "(^ x (^ y (~ (^ z true))))",
+            "(-> x (-> y (~ (-> z false))))",
+            "(~ ((& (~ x) y) z))",
+            "(~ ((| (~ x) y) z))",
+            "(~ ((^ (~ x) y) z))",
+            "(~ ((-> (~ x) y) z))",
+            "true",
+            "false",
+        ]);
+        assert!(wkld.force().len() == 24);
         let valid = wkld.as_lang::<Bool>();
-        assert!(valid.force().len() == 183);
+        assert!(valid.force().len() == 9);
     }
 
     #[tokio::test]
