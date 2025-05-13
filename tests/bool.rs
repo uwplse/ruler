@@ -387,6 +387,7 @@ mod test {
         Binary Operators: &, |, ^, ->
 
         Terms must be written using s-expressions and prefix notation.
+        For example, instead of (?x & ?y), you should write (& ?x ?y).
         Variables are ?x, ?y, and ?z.
 
         Your task is to generate sound, useful, and complete rewrite rules for the domain.
@@ -401,15 +402,8 @@ mod test {
         for model in models {
             let start = Instant::now();
             let rules: Ruleset<Bool> = Ruleset::from_llm(&prompt, &model).await;
-            let (sound, unsound) = rules.partition(|r| r.is_valid());
             let duration = start.elapsed();
 
-            println!(
-                "{} synthesized {} sound and {} unsound rules",
-                &model,
-                sound.len(),
-                unsound.len()
-            );
             logger::write_baseline(
                 &rules,
                 &format!("{}-ALL", model),

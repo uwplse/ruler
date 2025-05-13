@@ -205,15 +205,22 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     pub async fn from_llm(prompt: &str, model: &str) -> Self {
         let res = llm::query(prompt, model).await;
-        let mut valid_rules = IndexMap::default();
-        let mut valid = 0;
+        let mut rules = IndexMap::default();
         let mut invalid = 0;
+        let mut unsound = 0;
         for line in res {
             if let Ok((forwards, backwards)) = Rule::from_string(&line) {
-                valid += 1;
-                valid_rules.insert(forwards.name.clone(), forwards);
+                if forwards.is_valid() {
+                    rules.insert(forwards.name.clone(), forwards);
+                } else {
+                    unsound += 1;
+                }
                 if let Some(backwards) = backwards {
-                    valid_rules.insert(backwards.name.clone(), backwards);
+                    if backwards.is_valid() {
+                        rules.insert(backwards.name.clone(), backwards);
+                    } else {
+                        unsound += 1;
+                    }
                 }
             } else {
                 invalid += 1;
@@ -222,11 +229,11 @@ impl<L: SynthLanguage> Ruleset<L> {
         }
 
         println!(
-            "LLM response contained {} valid and {} invalid rules",
-            valid, invalid
+            "LLM response contained {} malformed rules and {} unsound rules",
+            invalid, unsound
         );
 
-        Self(valid_rules)
+        Self(rules)
     }
 
     pub fn pretty_print(&self) {
