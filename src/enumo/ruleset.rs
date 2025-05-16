@@ -236,7 +236,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(rules)
     }
 
-    pub fn pretty_print(&self) {
+    pub fn to_pretty_string(&self) -> String {
         let mut strs = vec![];
         for (name, rule) in &self.0 {
             let reverse = Rule::new(&rule.rhs, &rule.lhs);
@@ -250,9 +250,11 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
 
-        for s in strs {
-            println!("{s}");
-        }
+        strs.join("\n")
+    }
+
+    pub fn pretty_print(&self) {
+        println!("{}", self.to_pretty_string())
     }
 
     /// Find candidates from two e-graphs

@@ -283,6 +283,370 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
 
 #[cfg(test)]
 #[path = "./recipes/halide.rs"]
+mod llm_test {
+
+    use dotenv::dotenv;
+    use glob::glob;
+    use ruler::enumo::{Scheduler, Workload};
+    use std::io::Write;
+    use std::time::Instant;
+    use std::{fs::OpenOptions, io};
+
+    use ruler::{
+        enumo::{Metric, Ruleset},
+        recipe_utils::{recursive_rules, Lang},
+    };
+    use ruler::{llm, DeriveType, Limits};
+
+    use crate::{halide::halide_rules, Pred};
+
+    fn write(s: &str) -> io::Result<()> {
+        let mut file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("jfp/halide_llm_eval.txt")?;
+
+        writeln!(file, "{}", s)?;
+        Ok(())
+    }
+
+    #[test]
+    fn enumo_baseline() {
+        let start = Instant::now();
+        let rules = halide_rules();
+        let duration = start.elapsed();
+        let _ = write(&format!("Enumo Custom Recipe Time: {:?}", duration));
+        rules.to_file("baseline/halide_enumo.rules");
+    }
+
+    #[test]
+    fn atoms5() {
+        let start = Instant::now();
+        let rules5: Ruleset<Pred> = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["0", "1"],
+                &["a", "b", "c"],
+                &[
+                    &["-", "!"],
+                    &[
+                        "<", "<=", "==", "!=", "&&", "||", "^", "+", "-", "*", "/", "min", "max",
+                    ],
+                    &["select"],
+                ],
+            ),
+            Ruleset::default(),
+        );
+        let duration = start.elapsed();
+        let _ = write(&format!("Atoms 5 Time: {:?}", duration));
+        rules5.to_file("baseline/halide_atoms5.rules");
+    }
+
+    async fn llm_rules() {
+        dotenv().ok();
+        let prompt = "
+        Your task is to perform rule inference for equality saturation.
+        The domain is boolean logic and arithmetic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Ternary Operators: select
+
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate sound, useful, and complete rewrite rules for the domain.
+        The set of rewrite rules should be sufficient to decide the equality between any
+        two terms in the domain.
+        You should generate at least 200 rules.
+        A rewrite rule has the form `l => r` where `l` and `r` are valid terms from
+        the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
+        ";
+        let models = llm::models();
+        for model in models {
+            let model_name = model.replace("/", "-");
+            println!("{}", model_name);
+            let start = Instant::now();
+            let rules: Ruleset<Pred> = Ruleset::from_llm(&prompt, &model).await;
+            let duration = start.elapsed();
+            let _ = write(&format!("LLM {:?} Rules Time: {:?}", model_name, duration));
+            rules.to_file(&format!("jfp/{}-rules.rules", model_name));
+        }
+    }
+
+    async fn llm_term_enumeration() {
+        dotenv().ok();
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic and arithmetic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Ternary Operators: select
+        
+        Terms must be written using s-expressions and prefix notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Use 0 and 1 for constants and x, y, and z for variables.
+        
+        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Do not use any operators or syntax not listed here.
+
+        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+        let models = llm::models();
+        for model in models {
+            let model_name = model.replace("/", "-");
+            println!("{}", model_name);
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
+            let duration = start.elapsed();
+            let _ = write(&format!(
+                "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
+                model_name,
+                duration,
+                wkld.force().len()
+            ));
+            wkld.to_file(&format!("jfp/{}-terms.wkld", model_name));
+        }
+    }
+
+    async fn llm_pattern_enumeration() {
+        dotenv().ok();
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic and arithmetic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Ternary Operators: select
+        
+        Terms must be written using s-expressions and prefix notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Use ?C as a placeholder for all constants and ?V as a placeholder for all variables.
+        For example, (+ ?V ?C) represents any term where a variable is added to a constant.
+        
+        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Do not use any operators or syntax not listed here.
+
+        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+        let models = llm::models();
+        for model in models {
+            let model_name = model.replace("/", "-");
+            println!("{}", model_name);
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
+            let duration = start.elapsed();
+            let _ = write(&format!(
+                "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
+                model_name,
+                duration,
+                wkld.force().len()
+            ));
+            wkld.to_file(&format!("jfp/{}-patterns.wkld", model_name));
+        }
+    }
+
+    #[test]
+    fn rules_from_llm_wklds() {
+        let priors = [
+            ("none", Ruleset::default()),
+            ("A5", Ruleset::from_file("baseline/halide_atoms5.rules")),
+            ("Enumo", Ruleset::from_file("baseline/halide_enumo.rules")),
+        ];
+        let mut wklds = vec![];
+        let models = llm::models();
+        for model in models {
+            let model_name = model.replace("/", "-");
+            wklds.push((
+                format!("{}-terms", model_name),
+                format!("jfp/{}-terms.wkld", model_name),
+            ));
+            wklds.push((
+                format!("{}-patterns", model_name),
+                format!("jfp/{}-patterns.wkld", model_name),
+            ));
+        }
+        for (wkld_name, wkld_file) in wklds {
+            let wkld = Workload::from_file(&wkld_file);
+            for (prior_name, prior_rules) in &priors {
+                println!("{} {}", wkld_name, prior_name);
+                let start = Instant::now();
+                let egraph = wkld.to_egraph::<Pred>();
+                let compressed = Scheduler::Compress(Limits::synthesis()).run(&egraph, prior_rules);
+                let mut candidates = Ruleset::cvec_match(&compressed);
+                let (new_rules, _) = candidates
+                    .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+                let duration = start.elapsed();
+                let _ = write(&format!(
+                    "Rule inference time using {} and {}: {:?}",
+                    wkld_name, prior_name, duration
+                ));
+                new_rules.to_file(&format!("jfp/{}-{}.rules", wkld_name, prior_name));
+            }
+        }
+    }
+
+    fn get_rule_files() -> Vec<String> {
+        let mut res = vec![];
+        for f in glob("jfp/*.rules").expect("Failed to read pattern") {
+            if let Ok(path) = f {
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    res.push(format!("jfp/{}", filename));
+                } else {
+                    println!("Couldn't parse path into string");
+                }
+            } else {
+                println!("Error");
+            }
+        }
+        res
+    }
+
+    #[test]
+    fn halide_enumo_derive() {
+        let halide_enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
+        for f in glob::glob("jfp/*.rules").expect("Failed to read pattern") {
+            if let Ok(path) = f {
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    println!("{}", filename);
+                    let rules: Ruleset<Pred> = Ruleset::from_file(&format!("jfp/{}", filename));
+                    let start = Instant::now();
+                    let (can, cannot) =
+                        halide_enumo.derive(ruler::DeriveType::Lhs, &rules, Limits::deriving());
+                    let duration = start.elapsed();
+                    let derive_pct = (can.len() as f64) / (rules.len() as f64);
+                    let _ = write(&format!(
+                        "Using Enumo Halide to derive {} | Time: {:?} | Derivability: {}",
+                        filename, duration, derive_pct
+                    ));
+                    let _ = write(&cannot.to_pretty_string());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn enumo_derive_llm() {
+        let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
+        for rule_file in get_rule_files() {
+            let rules: Ruleset<Pred> = Ruleset::from_file(&rule_file);
+            println!("{} {}", rule_file, rules.len());
+            let start = Instant::now();
+            let (can, cannot) = enumo.derive(DeriveType::Lhs, &rules, Limits::deriving());
+            let duration = start.elapsed();
+            let derive_pct = (can.len() as f64) / (rules.len() as f64);
+            let _ = write(&format!(
+                "Using Enumo to derive {}: {} in {:?}\nCannot Derive:",
+                rule_file, derive_pct, duration
+            ));
+            let _ = write(&cannot.to_pretty_string());
+        }
+    }
+
+    #[test]
+    fn llm_derive_enumo() {
+        let a5: Ruleset<Pred> = Ruleset::from_file("baseline/halide_atoms5.rules");
+        let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
+        for rule_file in get_rule_files() {
+            if rule_file.contains("Enumo") {
+                // These rules used Enumo rules as prior, so no point in trying to derive them.
+                continue;
+            }
+            let rules: Ruleset<Pred> = Ruleset::from_file(&rule_file);
+            println!("{} {}", rule_file, rules.len());
+            let prior = if rule_file.contains("A5") {
+                a5.clone()
+            } else {
+                Ruleset::default()
+            };
+            let all = prior.union(&rules);
+            let start = Instant::now();
+            let (can, cannot) = all.derive(ruler::DeriveType::Lhs, &enumo, Limits::deriving());
+            let duration = start.elapsed();
+            let derive_pct = (can.len() as f64) / (enumo.len() as f64);
+            let _ = write(&format!(
+                "Using {} to derive Enumo: {} in {:?}\nCannot Derive:",
+                rule_file, derive_pct, duration
+            ));
+            let _ = write(&cannot.to_pretty_string());
+        }
+    }
+
+    #[test]
+    fn llm_derive_halide() {
+        let halide: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        let a5: Ruleset<Pred> = Ruleset::from_file("baseline/halide_atoms5.rules");
+        let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
+        for rule_file in get_rule_files() {
+            let rules: Ruleset<Pred> = Ruleset::from_file(&rule_file);
+            println!("{} {}", rule_file, rules.len(),);
+            let prior = if rule_file.contains("A5") {
+                a5.clone()
+            } else if rule_file.contains("Enumo") {
+                enumo.clone()
+            } else {
+                Ruleset::default()
+            };
+            let all = prior.union(&rules);
+            let start = Instant::now();
+            let (can, cannot) = all.derive(ruler::DeriveType::Lhs, &halide, Limits::deriving());
+            let duration = start.elapsed();
+            let derive_pct = (can.len() as f64) / (halide.len() as f64);
+            let _ = write(&format!(
+                "Using {} to derive Halide: {} in {:?}\nCannot Derive:",
+                rule_file, derive_pct, duration
+            ));
+            let _ = write(&cannot.to_pretty_string());
+        }
+    }
+
+    #[tokio::test]
+    async fn run_eval() {
+        let _ = write("--- A5 Baseline ---");
+        atoms5();
+        let _ = write("--- Enumo Baseline ---");
+        enumo_baseline();
+
+        let _ = write("--- LLM RULES ---");
+        llm_rules().await;
+
+        let _ = write("--- LLM TERM ENUMERATION ---");
+        llm_term_enumeration().await;
+
+        let _ = write("--- LLM PATTERN ENUMERATION ---");
+        llm_pattern_enumeration().await;
+
+        let _ = write("--- RULES FROM WKLDS ---");
+        rules_from_llm_wklds();
+
+        let _ = write("--- STARTING DERIVABILITY ---");
+
+        let _ = write("-- Using LLM to Derive Halide ---");
+        llm_derive_halide();
+
+        let _ = write("--- Using LLM to Derive Enumo ---");
+        llm_derive_enumo();
+
+        let _ = write("-- Using Enumo to Derive LLM ---");
+        enumo_derive_llm();
+    }
+}
+
+#[cfg(test)]
+#[path = "./recipes/halide.rs"]
 mod halide;
 
 mod test {
@@ -290,13 +654,7 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use dotenv::dotenv;
-    use ruler::{
-        enumo::{Filter, Metric, Ruleset, Workload},
-        llm, logger,
-        recipe_utils::{recursive_rules, run_workload, Lang},
-        Limits,
-    };
+    use ruler::{enumo::Ruleset, logger};
 
     #[test]
     fn run() {
@@ -328,237 +686,5 @@ mod test {
             "halide",
             oopsla_duration,
         );
-    }
-
-    #[test]
-    fn enumo_exhaustive() {
-        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-
-        let start = Instant::now();
-        let rules5: Ruleset<Pred> = recursive_rules(
-            Metric::Atoms,
-            5,
-            Lang::new(
-                &["0", "1"],
-                &["a", "b", "c"],
-                &[
-                    &["-", "!"],
-                    &[
-                        "<", "<=", "==", "!=", "&&", "||", "^", "+", "-", "*", "/", "min", "max",
-                    ],
-                    &["select"],
-                ],
-            ),
-            Ruleset::default(),
-        );
-        let duration = start.elapsed();
-
-        logger::write_baseline(&rules5, "halide-exhaustive", &baseline, "halide", duration);
-    }
-
-    #[tokio::test]
-    async fn llm_rules() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-
-        dotenv().ok();
-
-        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-
-        let prompt = "
-        Your task is to perform rule inference for equality saturation.
-        The domain is boolean logic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
-            Ternary Operators: select
-
-        Terms must be written using s-expressions and prefix notation.
-        Variables are ?x, ?y, and ?z.
-
-        Your task is to generate sound, useful, and complete rewrite rules for the domain.
-        The set of rewrite rules should be sufficient to decide the equality between any
-        two terms in the domain.
-        You should generate at least 200 rules.
-        A rewrite rule has the form `l => r` where `l` and `r` are valid terms from
-        the domain that are always equivalent.
-        Print only the rules, one rule per line, with no additional text or explanation.
-        ";
-
-        let models = llm::models();
-        for model in models {
-            let start = Instant::now();
-            let rules: Ruleset<Pred> = Ruleset::from_llm(&prompt, &model).await;
-            let (sound, unsound) = rules.partition(|r| r.is_valid());
-            let duration = start.elapsed();
-
-            println!(
-                "{} synthesized {} sound and {} unsound rules",
-                &model,
-                sound.len(),
-                unsound.len()
-            );
-            logger::write_baseline(
-                &rules,
-                &format!("{}-ALL", model),
-                &baseline,
-                "halide",
-                duration,
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn llm_term_enumeration() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-
-        dotenv().ok();
-        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-
-        let prompt = "
-        Your task is to perform term enumeration for rule inference.
-        The domain is boolean logic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
-            Ternary Operators: select
-        
-        Terms must be written using s-expressions and prefix notation.
-        0 is false and 1 is true
-        Variables are ?x, ?y, and ?z.
-        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
-        You should only use the constants 0, 1, -1, and 2. Do not use any other constants.
-        Prioritize terms involving variables over terms that just contain constants.
-
-        Do not use any operators or syntax not listed here.
-
-        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
-        The generated terms should adequately cover the set of all possible terms.
-        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
-        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
-        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
-        Print only the terms, one term per line, with no additional text or explanation.
-        ";
-
-        let models = llm::models();
-        for model in models {
-            let start = Instant::now();
-            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
-
-            let rules: Ruleset<Pred> = if wkld.force().len() == 0 {
-                // LLM generated no valid terms
-                Ruleset::default()
-            } else {
-                run_workload(
-                    wkld,
-                    Ruleset::default(),
-                    Limits::synthesis(),
-                    Limits::minimize(),
-                    true,
-                )
-            };
-            let (sound, unsound) = rules.partition(|r| r.is_valid());
-            let duration = start.elapsed();
-
-            println!(
-                "{} synthesized {} sound and {} unsound rules",
-                &model,
-                sound.len(),
-                unsound.len()
-            );
-            logger::write_baseline(
-                &rules,
-                &format!("{}-TE", model),
-                &baseline,
-                "halide",
-                duration,
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn test_llm_after_exhaustive() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-
-        dotenv().ok();
-        let baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-
-        let a5_start = Instant::now();
-        // First, do exhaustive synthesis up to size 5
-        let rules5: Ruleset<Pred> = recursive_rules(
-            Metric::Atoms,
-            5,
-            Lang::new(
-                &["0", "1"],
-                &["a", "b", "c"],
-                &[
-                    &["-", "!"],
-                    &[
-                        "<", "<=", "==", "!=", "&&", "||", "^", "+", "-", "*", "/", "min", "max",
-                    ],
-                    &["select"],
-                ],
-            ),
-            Ruleset::default(),
-        );
-        let a5_duration = a5_start.elapsed();
-
-        let prompt = "
-        Your task is to perform term enumeration for rule inference.
-        The domain is boolean logic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
-            Ternary Operators: select
-            
-        Terms must be written using s-expressions and prefix notation.
-        Variables are ?x, ?y, and ?z.
-
-        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
-        The generated terms should adequately cover the set of all possible terms.
-        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
-        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
-        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
-        Print only the terms, one term per line, with no additional text or explanation.
-        ";
-
-        let models = llm::models();
-        for model in models {
-            let start = Instant::now();
-            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
-            let rules: Ruleset<Pred> = run_workload(
-                wkld,
-                rules5.clone(),
-                Limits::synthesis(),
-                Limits::minimize(),
-                true,
-            );
-            let (sound, unsound) = rules.partition(|r| r.is_valid());
-            let duration = start.elapsed();
-
-            println!(
-                "{} synthesized {} sound and {} unsound rules",
-                &model,
-                sound.len(),
-                unsound.len()
-            );
-            let all = rules.union(&rules5);
-
-            logger::write_baseline(
-                &all,
-                &format!("{}-A5-TE", model),
-                &baseline,
-                "halide",
-                duration + a5_duration,
-            );
-        }
     }
 }
