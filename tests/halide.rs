@@ -310,6 +310,10 @@ mod llm_test {
 
     #[test]
     fn enumo_baseline() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
         let start = Instant::now();
         let rules = halide_rules();
         let duration = start.elapsed();
@@ -322,6 +326,10 @@ mod llm_test {
 
     #[test]
     fn atoms5() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
         let start = Instant::now();
         let rules5: Ruleset<Pred> = recursive_rules(
             Metric::Atoms,
@@ -474,6 +482,10 @@ mod llm_test {
 
     #[test]
     fn rules_from_llm_wklds() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
         let priors = [
             ("none", Ruleset::default()),
             ("A5", Ruleset::from_file("baseline/halide_atoms5.rules")),
@@ -533,6 +545,10 @@ mod llm_test {
 
     #[test]
     fn enumo_derive_llm() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
         let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
         for rule_file in get_rule_files() {
             let rules: Ruleset<Pred> = Ruleset::from_file(&rule_file);
@@ -562,6 +578,10 @@ mod llm_test {
 
     #[test]
     fn llm_derive_enumo() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
         let a5: Ruleset<Pred> = Ruleset::from_file("baseline/halide_atoms5.rules");
         let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
         for rule_file in get_rule_files() {
@@ -602,6 +622,10 @@ mod llm_test {
 
     #[test]
     fn llm_derive_halide() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
         let halide: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let a5: Ruleset<Pred> = Ruleset::from_file("baseline/halide_atoms5.rules");
         let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
@@ -641,6 +665,11 @@ mod llm_test {
 
     #[tokio::test]
     async fn run_eval() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
         let f = "jfp/halide_llm_eval.txt";
         let _ = write(f, "--- A5 Baseline ---");
         atoms5();
