@@ -288,6 +288,7 @@ mod llm_test {
     use dotenv::dotenv;
     use glob::glob;
     use ruler::enumo::{Scheduler, Workload};
+    use serde_json::{json, to_string_pretty};
     use std::io::Write;
     use std::time::Instant;
     use std::{fs::OpenOptions, io};
@@ -300,11 +301,8 @@ mod llm_test {
 
     use crate::{halide::halide_rules, Pred};
 
-    fn write(s: &str) -> io::Result<()> {
-        let mut file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open("jfp/halide_llm_eval.txt")?;
+    fn write(f: &str, s: &str) -> io::Result<()> {
+        let mut file = OpenOptions::new().append(true).create(true).open(f)?;
 
         writeln!(file, "{}", s)?;
         Ok(())
@@ -315,7 +313,10 @@ mod llm_test {
         let start = Instant::now();
         let rules = halide_rules();
         let duration = start.elapsed();
-        let _ = write(&format!("Enumo Custom Recipe Time: {:?}", duration));
+        let _ = write(
+            "jfp/halide_llm_eval.txt",
+            &format!("Enumo Custom Recipe Time: {:?}", duration),
+        );
         rules.to_file("baseline/halide_enumo.rules");
     }
 
@@ -339,7 +340,10 @@ mod llm_test {
             Ruleset::default(),
         );
         let duration = start.elapsed();
-        let _ = write(&format!("Atoms 5 Time: {:?}", duration));
+        let _ = write(
+            "jfp/halide_llm_eval.txt",
+            &format!("Atoms 5 Time: {:?}", duration),
+        );
         rules5.to_file("baseline/halide_atoms5.rules");
     }
 
@@ -371,7 +375,10 @@ mod llm_test {
             let start = Instant::now();
             let rules: Ruleset<Pred> = Ruleset::from_llm(&prompt, &model).await;
             let duration = start.elapsed();
-            let _ = write(&format!("LLM {:?} Rules Time: {:?}", model_name, duration));
+            let _ = write(
+                "jfp/halide_llm_eval.txt",
+                &format!("LLM {:?} Rules Time: {:?}", model_name, duration),
+            );
             rules.to_file(&format!("jfp/{}-rules.rules", model_name));
         }
     }
@@ -407,12 +414,15 @@ mod llm_test {
             let start = Instant::now();
             let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
             let duration = start.elapsed();
-            let _ = write(&format!(
-                "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
-                model_name,
-                duration,
-                wkld.force().len()
-            ));
+            let _ = write(
+                "jfp/halide_llm_eval.txt",
+                &format!(
+                    "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
+                    model_name,
+                    duration,
+                    wkld.force().len()
+                ),
+            );
             wkld.to_file(&format!("jfp/{}-terms.wkld", model_name));
         }
     }
@@ -449,12 +459,15 @@ mod llm_test {
             let start = Instant::now();
             let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
             let duration = start.elapsed();
-            let _ = write(&format!(
-                "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
-                model_name,
-                duration,
-                wkld.force().len()
-            ));
+            let _ = write(
+                "jfp/halide_llm_eval.txt",
+                &format!(
+                    "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
+                    model_name,
+                    duration,
+                    wkld.force().len()
+                ),
+            );
             wkld.to_file(&format!("jfp/{}-patterns.wkld", model_name));
         }
     }
@@ -490,10 +503,13 @@ mod llm_test {
                 let (new_rules, _) = candidates
                     .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
                 let duration = start.elapsed();
-                let _ = write(&format!(
-                    "Rule inference time using {} and {}: {:?}",
-                    wkld_name, prior_name, duration
-                ));
+                let _ = write(
+                    "jfp/halide_llm_eval.txt",
+                    &format!(
+                        "Rule inference time using {} and {}: {:?}",
+                        wkld_name, prior_name, duration
+                    ),
+                );
                 new_rules.to_file(&format!("jfp/{}-{}.rules", wkld_name, prior_name));
             }
         }
@@ -516,29 +532,6 @@ mod llm_test {
     }
 
     #[test]
-    fn halide_enumo_derive() {
-        let halide_enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
-        for f in glob::glob("jfp/*.rules").expect("Failed to read pattern") {
-            if let Ok(path) = f {
-                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    println!("{}", filename);
-                    let rules: Ruleset<Pred> = Ruleset::from_file(&format!("jfp/{}", filename));
-                    let start = Instant::now();
-                    let (can, cannot) =
-                        halide_enumo.derive(ruler::DeriveType::Lhs, &rules, Limits::deriving());
-                    let duration = start.elapsed();
-                    let derive_pct = (can.len() as f64) / (rules.len() as f64);
-                    let _ = write(&format!(
-                        "Using Enumo Halide to derive {} | Time: {:?} | Derivability: {}",
-                        filename, duration, derive_pct
-                    ));
-                    let _ = write(&cannot.to_pretty_string());
-                }
-            }
-        }
-    }
-
-    #[test]
     fn enumo_derive_llm() {
         let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
         for rule_file in get_rule_files() {
@@ -548,11 +541,22 @@ mod llm_test {
             let (can, cannot) = enumo.derive(DeriveType::Lhs, &rules, Limits::deriving());
             let duration = start.elapsed();
             let derive_pct = (can.len() as f64) / (rules.len() as f64);
-            let _ = write(&format!(
-                "Using Enumo to derive {}: {} in {:?}\nCannot Derive:",
-                rule_file, derive_pct, duration
-            ));
-            let _ = write(&cannot.to_pretty_string());
+            let _ = write(
+                "jfp/halide_llm_eval.txt",
+                &format!(
+                    "Using Enumo to derive {}: {} in {:?}\nCannot Derive:",
+                    rule_file, derive_pct, duration
+                ),
+            );
+            let v = json!({
+            "description": format!("Using Enumo to derive {}", rule_file),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+            });
+            let _ = write(
+                &format!("jfp/enumo-derive-{}.json", rule_file),
+                &to_string_pretty(&v).unwrap(),
+            );
         }
     }
 
@@ -577,11 +581,22 @@ mod llm_test {
             let (can, cannot) = all.derive(ruler::DeriveType::Lhs, &enumo, Limits::deriving());
             let duration = start.elapsed();
             let derive_pct = (can.len() as f64) / (enumo.len() as f64);
-            let _ = write(&format!(
-                "Using {} to derive Enumo: {} in {:?}\nCannot Derive:",
-                rule_file, derive_pct, duration
-            ));
-            let _ = write(&cannot.to_pretty_string());
+            let _ = write(
+                "jfp/halide_llm_eval.txt",
+                &format!(
+                    "Using {} to derive Enumo: {} in {:?}\nCannot Derive:",
+                    rule_file, derive_pct, duration
+                ),
+            );
+            let v = json!({
+            "description": format!("Using {} to derive Enumo", rule_file),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+            });
+            let _ = write(
+                &format!("jfp/{}-derive-enumo.json", rule_file),
+                &to_string_pretty(&v).unwrap(),
+            );
         }
     }
 
@@ -605,42 +620,54 @@ mod llm_test {
             let (can, cannot) = all.derive(ruler::DeriveType::Lhs, &halide, Limits::deriving());
             let duration = start.elapsed();
             let derive_pct = (can.len() as f64) / (halide.len() as f64);
-            let _ = write(&format!(
-                "Using {} to derive Halide: {} in {:?}\nCannot Derive:",
-                rule_file, derive_pct, duration
-            ));
-            let _ = write(&cannot.to_pretty_string());
+            let _ = write(
+                "jfp/halide_llm_eval.txt",
+                &format!(
+                    "Using {} to derive Halide: {} in {:?}\nCannot Derive:",
+                    rule_file, derive_pct, duration
+                ),
+            );
+            let v = json!({
+            "description": format!("Using {} to derive Halide", rule_file),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+            });
+            let _ = write(
+                &format!("jfp/{}-derive-halide.json", rule_file),
+                &to_string_pretty(&v).unwrap(),
+            );
         }
     }
 
     #[tokio::test]
     async fn run_eval() {
-        let _ = write("--- A5 Baseline ---");
+        let f = "jfp/halide_llm_eval.txt";
+        let _ = write(f, "--- A5 Baseline ---");
         atoms5();
-        let _ = write("--- Enumo Baseline ---");
+        let _ = write(f, "--- Enumo Baseline ---");
         enumo_baseline();
 
-        let _ = write("--- LLM RULES ---");
+        let _ = write(f, "--- LLM RULES ---");
         llm_rules().await;
 
-        let _ = write("--- LLM TERM ENUMERATION ---");
+        let _ = write(f, "--- LLM TERM ENUMERATION ---");
         llm_term_enumeration().await;
 
-        let _ = write("--- LLM PATTERN ENUMERATION ---");
+        let _ = write(f, "--- LLM PATTERN ENUMERATION ---");
         llm_pattern_enumeration().await;
 
-        let _ = write("--- RULES FROM WKLDS ---");
+        let _ = write(f, "--- RULES FROM WKLDS ---");
         rules_from_llm_wklds();
 
-        let _ = write("--- STARTING DERIVABILITY ---");
+        let _ = write(f, "--- STARTING DERIVABILITY ---");
 
-        let _ = write("-- Using LLM to Derive Halide ---");
+        let _ = write(f, "-- Using LLM to Derive Halide ---");
         llm_derive_halide();
 
-        let _ = write("--- Using LLM to Derive Enumo ---");
+        let _ = write(f, "--- Using LLM to Derive Enumo ---");
         llm_derive_enumo();
 
-        let _ = write("-- Using Enumo to Derive LLM ---");
+        let _ = write(f, "-- Using Enumo to Derive LLM ---");
         enumo_derive_llm();
     }
 }
