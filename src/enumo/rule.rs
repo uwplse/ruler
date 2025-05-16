@@ -26,36 +26,55 @@ impl<L: SynthLanguage> Display for Rule<L> {
 impl<L: SynthLanguage> Rule<L> {
     pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
         if let Some((l, r)) = s.split_once("=>") {
-            let l_pat: Pattern<L> = l.parse().unwrap();
-            let r_pat: Pattern<L> = r.parse().unwrap();
+            let l_pat = l.parse();
+            let r_pat = r.parse();
+            if l_pat.is_err() || r_pat.is_err() {
+                return Err(format!("Failed to parse {}", s));
+            }
+            let l_pat: Pattern<L> = l_pat.unwrap();
+            let r_pat: Pattern<L> = r_pat.unwrap();
 
-            let forwards = Self {
-                name: format!("{} ==> {}", l_pat, r_pat).into(),
-                lhs: l_pat.clone(),
-                rhs: r_pat.clone(),
-                rewrite: Rewrite::new(
-                    format!("{} ==> {}", l_pat, r_pat),
-                    l_pat.clone(),
-                    Rhs { rhs: r_pat.clone() },
-                )
-                .unwrap(),
+            let rewrite = Rewrite::new(
+                format!("{} ==> {}", l_pat, r_pat),
+                l_pat.clone(),
+                Rhs { rhs: r_pat.clone() },
+            );
+
+            let forwards = if let Ok(rewrite) = rewrite {
+                Some(Self {
+                    name: format!("{} ==> {}", l_pat, r_pat).into(),
+                    lhs: l_pat.clone(),
+                    rhs: r_pat.clone(),
+                    rewrite,
+                })
+            } else {
+                None
+            };
+            let backwards = if s.contains("<=>") {
+                let rewrite = Rewrite::new(
+                    format!("{} ==> {}", r_pat, l_pat),
+                    r_pat.clone(),
+                    Rhs { rhs: l_pat.clone() },
+                );
+                if let Ok(rewrite) = rewrite {
+                    Some(Self {
+                        name: format!("{} ==> {}", r_pat, l_pat).into(),
+                        lhs: r_pat.clone(),
+                        rhs: l_pat.clone(),
+                        rewrite,
+                    })
+                } else {
+                    None
+                }
+            } else {
+                None
             };
 
-            if s.contains("<=>") {
-                let backwards = Self {
-                    name: format!("{} ==> {}", r_pat, l_pat).into(),
-                    lhs: r_pat.clone(),
-                    rhs: l_pat.clone(),
-                    rewrite: Rewrite::new(
-                        format!("{} ==> {}", r_pat, l_pat),
-                        r_pat,
-                        Rhs { rhs: l_pat },
-                    )
-                    .unwrap(),
-                };
-                Ok((forwards, Some(backwards)))
+            if let Some(forwards) = forwards {
+                Ok((forwards, backwards))
             } else {
-                Ok((forwards, None))
+                println!("Ignoring invalid rule {}", s);
+                Err(format!("Failed to parse {}", s))
             }
         } else {
             Err(format!("Failed to parse {}", s))

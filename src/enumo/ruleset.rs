@@ -4,7 +4,7 @@ use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{io::Write, sync::Arc};
 
 use crate::{
-    CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
+    llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
     SynthAnalysis, SynthLanguage,
 };
 
@@ -203,23 +203,41 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(all_rules)
     }
 
-    pub fn pretty_print(&self) {
-        let mut strs = vec![];
-        for (name, rule) in &self.0 {
-            let reverse = Rule::new(&rule.rhs, &rule.lhs);
-            if reverse.is_some() && self.contains(&reverse.unwrap()) {
-                let reverse_name = format!("{} <=> {}", rule.rhs, rule.lhs);
-                if !strs.contains(&reverse_name) {
-                    strs.push(format!("{} <=> {}", rule.lhs, rule.rhs));
+    pub async fn from_llm(prompt: &str, model: &str) -> Self {
+        let res = llm::query(prompt, model).await;
+        let mut rules = IndexMap::default();
+        let mut invalid = 0;
+        let mut unsound = 0;
+        for line in res {
+            if let Ok((forwards, backwards)) = Rule::from_string(&line) {
+                if forwards.is_valid() {
+                    rules.insert(forwards.name.clone(), forwards);
+                } else {
+                    unsound += 1;
+                }
+                if let Some(backwards) = backwards {
+                    if backwards.is_valid() {
+                        rules.insert(backwards.name.clone(), backwards);
+                    } else {
+                        unsound += 1;
+                    }
                 }
             } else {
-                strs.push(name.to_string());
+                invalid += 1;
+                println!("Skipping invalid rule: {}", line);
             }
         }
 
-        for s in strs {
-            println!("{s}");
-        }
+        println!(
+            "LLM response contained {} malformed rules and {} unsound rules",
+            invalid, unsound
+        );
+
+        Self(rules)
+    }
+
+    pub fn pretty_print(&self) {
+        println!("{}", self.to_str_vec().join("\n"))
     }
 
     /// Find candidates from two e-graphs

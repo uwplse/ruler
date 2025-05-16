@@ -5,6 +5,9 @@ authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washin
 edition = "2018"
 
 [dependencies]
+dotenv = "0.15"
+openai-api-rs = "6.0.3"
+tokio = { version = "1", features = ["full"] }
 clap = { version = "3.0.7", features = ["derive"] }
 log = "0.4"
 env_logger = { version = "0.7", default-features = false }
@@ -27,6 +30,7 @@ rustc-hash = "1"
 symbolic_expressions = "5"
 rayon = "1"
 smallstr = "0.3"
+glob = "0.3"
 [dependencies.egg]
 version = "0.9"
 # git = "https://github.com/egraphs-good/egg"

@@ -1,7 +1,7 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
-use crate::{SynthAnalysis, SynthLanguage};
+use crate::{llm, SynthAnalysis, SynthLanguage};
 use std::io::Write;
 
 /// Workloads are sets of terms from a domain
@@ -48,10 +48,45 @@ impl Workload {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
-        for line in std::io::BufRead::lines(reader) {
-            sexps.push(line.unwrap().parse().unwrap());
+        for line in std::io::BufRead::lines(reader).map_while(Result::ok) {
+            if let Ok(sexp) = line.parse() {
+                sexps.push(sexp);
+            } else {
+                println!("Skipping invalid s-expression: {}", line);
+            }
         }
         Self::Set(sexps)
+    }
+
+    pub async fn from_llm(prompt: &str, model: &str) -> Self {
+        let res = llm::query(prompt, model).await;
+        let mut valid_sexps = vec![];
+        let mut valid = 0;
+        let mut invalid = 0;
+        for line in res {
+            if let Ok(sexp) = line.parse() {
+                valid += 1;
+                valid_sexps.push(sexp);
+            } else {
+                invalid += 1;
+                println!("Skipping invalid s-expression: {}", line);
+            }
+        }
+        println!(
+            "LLM workload contained {} valid and {} invalid s-expressions.",
+            valid, invalid
+        );
+        Workload::Set(valid_sexps)
+    }
+
+    pub fn as_lang<L: SynthLanguage>(&self) -> Self {
+        Workload::Set(
+            self.force()
+                .iter()
+                .filter(|sexp| sexp.to_string().parse::<RecExpr<L>>().is_ok())
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Materialize the workload into an e-graph
