@@ -290,6 +290,7 @@ mod llm_test {
     use ruler::enumo::{Scheduler, Workload};
     use serde_json::{json, to_string_pretty};
     use std::io::Write;
+    use std::path::Path;
     use std::time::Instant;
     use std::{fs::OpenOptions, io};
 
@@ -569,8 +570,11 @@ mod llm_test {
             "can": can.to_str_vec(),
             "cannot": cannot.to_str_vec()
             });
+            let stem = Path::new(&rule_file)
+                .file_stem()
+                .expect("Couldn't parse filename");
             let _ = write(
-                &format!("jfp/enumo-derive-{}.json", rule_file),
+                &format!("jfp/enumo-derive-{}.json", stem.to_str().unwrap()),
                 &to_string_pretty(&v).unwrap(),
             );
         }
@@ -613,8 +617,11 @@ mod llm_test {
             "can": can.to_str_vec(),
             "cannot": cannot.to_str_vec()
             });
+            let stem = Path::new(&rule_file)
+                .file_stem()
+                .expect("Couldn't parse filename");
             let _ = write(
-                &format!("jfp/{}-derive-enumo.json", rule_file),
+                &format!("jfp/{}-derive-enumo.json", stem.to_str().unwrap()),
                 &to_string_pretty(&v).unwrap(),
             );
         }
@@ -656,8 +663,11 @@ mod llm_test {
             "can": can.to_str_vec(),
             "cannot": cannot.to_str_vec()
             });
+            let stem = Path::new(&rule_file)
+                .file_stem()
+                .expect("Couldn't parse filename");
             let _ = write(
-                &format!("jfp/{}-derive-halide.json", rule_file),
+                &format!("jfp/{}-derive-halide.json", stem.to_str().unwrap()),
                 &to_string_pretty(&v).unwrap(),
             );
         }
