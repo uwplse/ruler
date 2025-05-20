@@ -1,0 +1,15 @@
+[alias]
+bool     = ["test", "--release", "--test", "bool", "--", "test::run", "--exact", "--nocapture"]
+# bv-bool =  ["test", "--release", "--test", "bv-bool", "--", "test::run", "--exact", "--nocapture"]
+# bv4      = ["test", "--release", "--test", "bv4", "--", "test::run", "--exact", "--nocapture"]
+# bv8      = ["test", "--release", "--test", "bv8", "--", "test::run", "--exact", "--nocapture"]
+# bv16     = ["test", "--release", "--test", "bv16", "--", "test::run", "--exact", "--nocapture"]
+bv32     = ["test", "--release", "--test", "bv32", "--", "test::run", "--exact", "--nocapture"]
+halide   = ["test", "--release", "--test", "halide", "--", "test::run", "--exact", "--nocapture"]
+# nat      = ["test", "--release", "--test", "nat", "--", "test::run", "--exact", "--nocapture"]
+# pos      = ["test", "--release", "--test", "pos", "--", "test::run", "--exact", "--nocapture"]
+rational = ["test", "--release", "--test", "rational", "--", "test::run", "--exact", "--nocapture"]
+trig     = ["test", "--release", "--test", "trig", "--", "test::run", "--exact", "--nocapture"]
+
+[build]
+rustflags = "-C target-cpu=native"
