@@ -114,6 +114,14 @@ impl Limits {
             match_: 1000,
         }
     }
+
+    pub fn trig_deriving() -> Self {
+        Self {
+            iter: 8,
+            node: 300_000,
+            match_: 200_000,
+        }
+    }
 }
 
 /// Used for interval analysis and constant folding

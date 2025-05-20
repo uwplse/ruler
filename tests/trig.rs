@@ -314,15 +314,20 @@ impl SynthLanguage for Trig {
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
+    use std::io::Write;
+    use std::path::Path;
+    use std::{fs::OpenOptions, io, time::Duration};
 
     use super::*;
     use crate::trig::trig_rules;
+    use dotenv::dotenv;
+    use glob::glob;
     use ruler::{
         enumo::{Filter, Ruleset, Scheduler, Workload},
         recipe_utils::run_fast_forwarding,
         Limits,
     };
+    use serde_json::{json, to_string_pretty};
 
     // Extra rules about `cis` and `I` to "fast-forward" rule synthesis
     pub fn prior_rules() -> Ruleset<Trig> {
@@ -347,6 +352,115 @@ mod test {
             "(/ 1 I) ==> (~ I)",
             "(* I I) ==> -1",
         ])
+    }
+
+    fn write(f: &str, s: &str) -> io::Result<()> {
+        let mut file = OpenOptions::new().append(true).create(true).open(f)?;
+
+        writeln!(file, "{}", s)?;
+        Ok(())
+    }
+
+    fn start_rules() -> Ruleset<Trig> {
+        let mut start_rules: Ruleset<Trig> =
+            Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+        start_rules.extend(prior_rules());
+        start_rules.extend(Trig::get_exploratory_rules());
+        start_rules
+    }
+
+    #[tokio::test]
+    async fn llm_rules() {
+        dotenv().ok();
+
+        let start_rules = start_rules();
+
+        let prompt = "
+        Your task is to perform rule inference for equality saturation.
+        The domain is trigonometric functions, as follows:
+        Values: real numbers, PI
+        Unary operators: ~, sin, cos, tan, sqr
+        Binary operators: +, -, *, /
+
+        Terms must be written using s-expressions and preifx notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Variables are ?x, ?y, and ?z.
+
+        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Do not use any operators or syntax not listed here.
+        Do not use imaginary numbers.
+
+        Your task is to generate sound, useful, and complete rewrite rules for the domain.
+        The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
+        ";
+
+        let models = llm::models();
+        for model in models {
+            let model_name = model.replace("/", "-");
+            println!("Model: {}", model_name);
+            let start = Instant::now();
+            let rules: Ruleset<Trig> = Ruleset::from_llm(&prompt, &model).await;
+            let (sound, _) =
+                start_rules.derive(DeriveType::LhsAndRhs, &rules, Limits::trig_deriving());
+            let duration = start.elapsed();
+            println!("{} sound rules in {:?}", sound.len(), duration);
+            sound.to_file(&format!("jfp/trig/{}-rules.rules", model_name));
+        }
+    }
+
+    fn get_rule_files() -> Vec<String> {
+        let mut res = vec![];
+        for f in glob("jfp/trig/*.rules").expect("Failed to read pattern") {
+            if let Ok(path) = f {
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    res.push(format!("jfp/trig/{}", filename));
+                } else {
+                    println!("Couldn't parse path into string");
+                }
+            } else {
+                println!("Error");
+            }
+        }
+        res
+    }
+
+    #[test]
+    fn derive_llm() {
+        let enumo_trig: Ruleset<Trig> = Ruleset::from_file("baseline/enumo_trig.rules");
+        let arith: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+        let mut enumo_and_arith = enumo_trig.clone();
+        enumo_and_arith.extend(arith.clone());
+
+        for rule_file in get_rule_files() {
+            let llm_rules: Ruleset<Trig> = Ruleset::from_file(&rule_file);
+            println!("{} {}", rule_file, llm_rules.len());
+            let (enumo_can, enumo_cannot) =
+                enumo_and_arith.derive(DeriveType::LhsAndRhs, &llm_rules, Limits::deriving());
+
+            let mut llm_and_arith = llm_rules;
+            llm_and_arith.extend(arith.clone());
+            let (llm_can, llm_cannot) =
+                llm_and_arith.derive(DeriveType::LhsAndRhs, &enumo_trig, Limits::deriving());
+            let v = json!({
+                "desc": rule_file,
+                "enumo_can": enumo_can.to_str_vec(),
+                "enumo_cannot": enumo_cannot.to_str_vec(),
+                "llm_can": llm_can.to_str_vec(),
+                "llm_cannot": llm_cannot.to_str_vec()
+            });
+            let stem = Path::new(&rule_file)
+                .file_stem()
+                .expect("Couldn't parse filename");
+            let _ = write(
+                &format!(
+                    "jfp/trig/arith-enumo-derive-{}.json",
+                    stem.to_str().unwrap()
+                ),
+                &to_string_pretty(&v).unwrap(),
+            );
+        }
     }
 
     #[test]
