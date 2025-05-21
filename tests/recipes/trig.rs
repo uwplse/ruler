@@ -14,9 +14,7 @@ fn workload_consts() -> Workload {
         "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
     ]);
 
-    let invalid = Filter::Contains(
-        "(tan (/ PI 2))".parse().unwrap(),
-    );
+    let invalid = Filter::Contains("(tan (/ PI 2))".parse().unwrap());
 
     Workload::new(["(op v)"])
         .plug("op", &op)
@@ -34,7 +32,9 @@ fn workload_symmetry_periodicity() -> Workload {
     // shift argument to function
     // (and optionally) negate it
     let t_shift = Workload::new(["t", "(~ t)", "(+ PI t)", "(- PI t)", "(+ t t)"]).plug("t", &var);
-    let t_simpl = Workload::new(["(op t)"]).plug("op", &op).plug("t", &t_shift);
+    let t_simpl = Workload::new(["(op t)"])
+        .plug("op", &op)
+        .plug("t", &t_shift);
     let t_neg = Workload::new(["(~ t)"]).plug("t", &t_simpl);
 
     workload_consts().append(t_simpl).append(t_neg)
@@ -68,8 +68,11 @@ fn workload_coangle() -> Workload {
     let var = Workload::new(["a", "b"]);
     let cnst = Workload::new(["-2", "-1", "0", "1", "2"]);
 
-    let t_shift = Workload::new(["t", "(- (/ PI 2) t)", "(+ (/ PI 2) t)", "(* 2 t)"]).plug("t", &var);
-    let t_simpl = Workload::new(["(op t)"]).plug("op", &op).plug("t", &t_shift);
+    let t_shift =
+        Workload::new(["t", "(- (/ PI 2) t)", "(+ (/ PI 2) t)", "(* 2 t)"]).plug("t", &var);
+    let t_simpl = Workload::new(["(op t)"])
+        .plug("op", &op)
+        .plug("t", &t_shift);
 
     t_simpl.append(cnst)
 }
@@ -86,8 +89,11 @@ fn workload_power_reduction() -> Workload {
     let t_sqr = Workload::new(["(sqr t)"]).plug("t", &t_trig);
 
     // trig functions (with possibly shifted arguments, and shifted output)
-    let t_xform = Workload::new(["t", "(- (/ PI 2) t)", "(+ (/ PI 2) t)", "(* 2 t)"]).plug("t", &var);
-    let t_trig_xform = Workload::new(["(op t)"]).plug("op", &op).plug("t", &t_xform);
+    let t_xform =
+        Workload::new(["t", "(- (/ PI 2) t)", "(+ (/ PI 2) t)", "(* 2 t)"]).plug("t", &var);
+    let t_trig_xform = Workload::new(["(op t)"])
+        .plug("op", &op)
+        .plug("t", &t_xform);
     let t_shift = Workload::new(["t", "(- 1 t)", "(+ 1 t)"]).plug("t", &t_trig_xform);
 
     // merge and scale
@@ -113,7 +119,9 @@ fn workload_product_to_sum() -> Workload {
     let t_simpl = Workload::new(["a", "b", "(+ a b)", "(- a b)"]);
 
     // trig functions with variable arguments
-    let t_2var = Workload::new(["(op t)"]).plug("op", &op).plug("t", &t_simpl);
+    let t_2var = Workload::new(["(op t)"])
+        .plug("op", &op)
+        .plug("t", &t_simpl);
 
     // product of trig functions (no squares)
     let t_prod = Workload::new(["(* t1 t2)"])
@@ -164,7 +172,9 @@ fn workload_sum_to_product() -> Workload {
     let t_simpl = Workload::new(["a", "b", "(+ a b)", "(- a b)"]);
 
     // trig functions with variable arguments
-    let t_2var = Workload::new(["(op t)"]).plug("op", &op).plug("t", &t_simpl);
+    let t_2var = Workload::new(["(op t)"])
+        .plug("op", &op)
+        .plug("t", &t_simpl);
 
     // product of trig functions (no squares)
     let t_prod = Workload::new(["(* t1 t2)"])
@@ -182,11 +192,8 @@ fn workload_sum_to_product() -> Workload {
     // remove difference of angles
     let t_2var_no_sub = t_2var.filter(Filter::Invert(Box::new(is_diff)));
 
-    t_2var_no_sub
-        .append(t_sop)
-        .append(cnst)
+    t_2var_no_sub.append(t_sop).append(cnst)
 }
-
 
 pub fn trig_rules() -> Ruleset<Trig> {
     let limits = Limits {
@@ -218,7 +225,7 @@ pub fn trig_rules() -> Ruleset<Trig> {
     let rules = run_fast_forwarding(wkld_sym_per.clone(), all.clone(), limits, limits);
     all.extend(rules.clone());
     new.extend(rules.clone());
-    
+
     /////////////////////////////////////////////////////////////////
     // workload 3: sum of squares
     println!("starting 3: sum of squares");
@@ -258,7 +265,6 @@ pub fn trig_rules() -> Ruleset<Trig> {
     let rules = run_fast_forwarding(wkld_sum_prod, all.clone(), limits, limits);
     all.extend(rules.clone());
     new.extend(rules.clone());
-
 
     new
 }
