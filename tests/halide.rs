@@ -674,6 +674,53 @@ mod llm_test {
     }
 
     #[tokio::test]
+    async fn combo_enum() {
+        dotenv().ok();
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic and arithmetic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Ternary Operators: select
+        
+        Terms must be written using s-expressions and prefix notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Use ?C as a placeholder for all constants and ?V as a placeholder for all variables.
+        For example, (+ ?V ?C) represents any term where a variable is added to a constant.
+        
+        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Do not use any operators or syntax not listed here.
+
+        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+        let mut wkld = Workload::default();
+        let models = llm::models();
+        for model in models {
+            let model_name = model.replace("/", "-");
+            println!("{}", model_name);
+            let start = Instant::now();
+            wkld = wkld.append(Workload::from_llm(&prompt, &model).await.as_lang::<Pred>());
+            let duration = start.elapsed();
+            let _ = write(
+                "jfp/halide_llm_eval.txt",
+                &format!(
+                    "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
+                    model_name,
+                    duration,
+                    wkld.force().len()
+                ),
+            );
+            wkld.to_file(&format!("jfp/combo-terms.wkld"));
+        }
+    }
+
+    #[tokio::test]
     async fn run_eval() {
         // Skip this test in github actions
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
@@ -718,9 +765,79 @@ mod halide;
 mod test {
     use crate::halide::halide_rules;
     use crate::Pred;
-    use std::time::{Duration, Instant};
+    use std::io::Write;
+    use std::{
+        fs::OpenOptions,
+        io,
+        time::{Duration, Instant},
+    };
 
-    use ruler::{enumo::Ruleset, logger};
+    use glob::glob;
+    use ruler::{enumo::Ruleset, logger, Limits};
+    use serde_json::{json, to_string_pretty};
+
+    fn write(f: &str, s: &str) -> io::Result<()> {
+        let mut file = OpenOptions::new().append(true).create(true).open(f)?;
+
+        writeln!(file, "{}", s)?;
+        Ok(())
+    }
+
+    #[test]
+    fn combo_llm() {
+        let mut rules: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
+        for f in glob("jfp-whale/gemini2.5/*.rules").expect("Failed to read") {
+            if let Ok(path) = f {
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    rules.extend(Ruleset::from_file(&format!(
+                        "jfp-whale/gemini2.5/{}",
+                        filename
+                    )));
+                }
+            }
+        }
+        println!("Candidates: {}", rules.len());
+        let (minimized, _) = rules.minimize(
+            Ruleset::default(),
+            ruler::enumo::Scheduler::Compress(Limits::minimize()),
+        );
+        minimized.to_file("jfp-whale/gemini2.5/combo_min.rules");
+
+        let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        let enumo_rules: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
+        println!("Starting derive Enumo->Halide");
+        let (can, cannot) =
+            enumo_rules.derive(ruler::DeriveType::Lhs, &halide_baseline, Limits::deriving());
+        let derive_pct = (can.len() as f64) / (halide_baseline.len() as f64);
+        println!(
+            "Using Original Enumo rules to derive Halide: {}",
+            derive_pct
+        );
+        let v = json!({
+            "description": "Using Original Enumo recipe to derive Halide",
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+        });
+        let _ = write(
+            "baseline/enumo-halide-derive.json",
+            &to_string_pretty(&v).unwrap(),
+        );
+
+        println!("Starting derive Combo->Halide");
+        let (can, cannot) =
+            minimized.derive(ruler::DeriveType::Lhs, &halide_baseline, Limits::deriving());
+        let derive_pct = (can.len() as f64) / (halide_baseline.len() as f64);
+        println!("Using Combo rules to derive Halide: {}", derive_pct);
+        let v = json!({
+            "description": "Using Combo to derive Halide",
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+        });
+        let _ = write(
+            "baseline/combo-halide-derive.json",
+            &to_string_pretty(&v).unwrap(),
+        );
+    }
 
     #[test]
     fn run() {

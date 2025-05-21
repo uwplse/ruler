@@ -1,7 +1,7 @@
 use num::rational::Ratio;
 use num::BigInt;
 use num::{Signed, Zero};
-use ruler::enumo::Ruleset;
+use ruler::enumo::{Ruleset, Scheduler};
 use ruler::*;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -312,6 +312,43 @@ impl SynthLanguage for Trig {
     }
 }
 
+impl Trig {
+    fn validate_all(candidates: &Ruleset<Self>, rules: &Ruleset<Self>) -> Ruleset<Self> {
+        let scheduler = Scheduler::Saturating(Limits {
+            iter: 8,
+            node: 1_000_000,
+            match_: 100_000,
+        });
+        let mut egraph: EGraph<Self, SynthAnalysis> = Default::default();
+        for (_, candidate) in candidates {
+            egraph.add_expr(&Self::instantiate(&candidate.lhs));
+            egraph.add_expr(&Self::instantiate(&candidate.rhs));
+        }
+        let out_egraph = scheduler.run(&egraph, rules);
+
+        let mut valid: Ruleset<Self> = Ruleset::default();
+        for (_, candidate) in candidates {
+            let l_id = out_egraph
+                .lookup_expr(&Self::instantiate(&candidate.lhs))
+                .expect("Did not find lhs");
+            let r_id = out_egraph
+                .lookup_expr(&Self::instantiate(&candidate.rhs))
+                .expect("Did not find rhs");
+            if l_id == r_id {
+                valid.add(candidate.clone());
+            } else {
+                println!("Unable to verify {}", candidate);
+            }
+        }
+        println!(
+            "Validated {} out of {} rules",
+            valid.len(),
+            candidates.len()
+        );
+        valid
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::io::Write;
@@ -370,6 +407,73 @@ mod test {
     }
 
     #[tokio::test]
+    async fn candidate_gen() {
+        dotenv().ok();
+        let prompt = "
+        Your task is to perform rule inference for equality saturation.
+        The domain is trigonometric functions, as follows:
+        Values: real numbers, PI
+        Unary operators: ~, sin, cos, tan, sqr
+        Binary operators: +, -, *, /
+
+        Terms must be written using s-expressions and prefix notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Variables are ?x, ?y, and ?z.
+
+        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Do not use any operators or syntax not listed here.
+        Do not use imaginary numbers.
+        All of the rules should use `sin`, `cos`, or `tan`.
+        You may assume there is already a good set of rewrite rules for `~`, `-`, `+`, `/`, and `sqr`.
+
+        Your task is to generate sound, useful, and complete rewrite rules for the domain.
+        The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.";
+
+        let mut candidates: Ruleset<Trig> = Ruleset::default();
+        for model in llm::models() {
+            let model_name = model.replace("/", "-");
+            println!("Model: {}", model_name);
+            let p1_rules = Ruleset::from_llm(&prompt, &model).await;
+            println!("Phase 1");
+            p1_rules.pretty_print();
+            candidates.extend(p1_rules.clone());
+
+            let reprompt = format!(
+                "
+            The following are rewrite rules for trig functions:
+            {}
+            
+            These rules will be used for equality saturation.
+            Are there any rules missing? Please generate the missing rules.
+            A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+            Print only the rules, one rule per line, with no additional text or explanation.
+            ",
+                p1_rules.to_str_vec().join("\n")
+            );
+            let p2_rules = Ruleset::from_llm(&reprompt, &model).await;
+            println!("Phase 2");
+            p2_rules.pretty_print();
+            candidates.extend(p2_rules);
+        }
+        candidates.to_file("jfp/trig/combo-reprompt-candidates.rules");
+    }
+
+    #[test]
+    fn validate_candidates() {
+        let rules = Ruleset::from_file("jfp/trig/combo-reprompt-candidates.rules");
+        let sound = Trig::validate_all(&rules, &start_rules());
+        sound.to_file("jfp/trig/combo-reprompt-sound.rules");
+    }
+
+    #[test]
+    fn derive() {
+        let llm_rules = Ruleset::from_file("jfp/trig/combo-reprompt-sound.rules");
+        let enumo_rules = Ruleset::from_file("baseline/enumo_trig.rules");
+    }
+
+    #[tokio::test]
     async fn llm_rules() {
         dotenv().ok();
 
@@ -382,7 +486,7 @@ mod test {
         Unary operators: ~, sin, cos, tan, sqr
         Binary operators: +, -, *, /
 
-        Terms must be written using s-expressions and preifx notation.
+        Terms must be written using s-expressions and prefix notation.
         For example, (a + b) is not a valid term, but (+ a b) is a valid term.
         Variables are ?x, ?y, and ?z.
 
