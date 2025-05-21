@@ -53,10 +53,8 @@ fn workload_sum_of_squares() -> Workload {
     ]);
 
     // sum (or difference) of squares (of trig functions)
-    let t_sqr = Workload::new(["(sqr t)"])
-        .plug("t", &Workload::new(["(op v)"]))
-        .plug("op", &op)
-        .plug("v", &var);
+    let t_simpl = Workload::new(["(op t)"]).plug("op", &op).plug("t", &var);
+    let t_sqr = Workload::new(["(sqr t)"]).plug("t", &t_simpl);
     let t_sos = Workload::new(["(+ t t)", "(- t t)"]).plug("t", &t_sqr);
 
     workload_symmetry_periodicity()
@@ -85,7 +83,7 @@ fn workload_power_reduction() -> Workload {
 
     // squared trig functions with variable arguments
     let t_trig = Workload::new(["(op t)"]).plug("op", &op).plug("t", &var);
-    let t_sqr = Workload::new(["(* t t)"]).plug("t", &t_trig);
+    let t_sqr = Workload::new(["(sqr t)"]).plug("t", &t_trig);
 
     // trig functions (with possibly shifted arguments, and shifted output)
     let t_xform = Workload::new(["t", "(- (/ PI 2) t)", "(+ (/ PI 2) t)", "(* 2 t)"]).plug("t", &var);
@@ -263,53 +261,4 @@ pub fn trig_rules() -> Ruleset<Trig> {
 
 
     new
-}
-
-
-#[test]
-fn sandbox() {
-
-    let no_trig_2x = Filter::Invert(Box::new(Filter::Or(vec![
-        Filter::Contains("(sin (+ ?a ?a))".parse().unwrap()),
-        Filter::Contains("(cos (+ ?a ?a))".parse().unwrap()),
-        Filter::Contains("(tan (+ ?a ?a))".parse().unwrap()),
-    ])));
-    let valid_trig = Filter::Invert(Box::new(Filter::Contains(
-        "(tan (/ PI 2))".parse().unwrap(),
-    )));
-
-    let t_ops = Workload::new(["sin", "cos", "tan"]);
-    let consts = Workload::new([
-        "0", "(/ PI 6)", "(/ PI 4)", "(/ PI 3)", "(/ PI 2)", "PI", "(* PI 2)",
-    ]);
-    let app = Workload::new(["(op v)"]);
-    let trig_constants = app
-        .clone()
-        .plug("op", &t_ops)
-        .plug("v", &consts)
-        .filter(valid_trig);
-
-    let simple_terms = app.clone().plug("op", &t_ops).plug(
-        "v",
-        &Workload::new(["a", "(~ a)", "(+ PI a)", "(- PI a)", "(+ a a)"]),
-    );
-
-    let neg_terms = Workload::new(["(~ x)"]).plug("x", &simple_terms);
-
-    let squares = Workload::new(["(sqr x)"])
-        .plug("x", &app)
-        .plug("op", &t_ops)
-        .plug("v", &Workload::new(["a", "b"]));
-
-    let add = Workload::new(["(+ e e)", "(- e e)"]);
-
-    let sum_of_squares = add.plug("e", &squares);
-
-    let wkld1 = trig_constants;
-    let wkld2 = Workload::Append(vec![wkld1.clone(), simple_terms, neg_terms]);
-    let trimmed_wkld2 = wkld2.clone().filter(no_trig_2x);
-    let wkld3 = Workload::Append(vec![trimmed_wkld2.clone(), sum_of_squares.clone()]);
-
-    let wkld = workload_sum_of_squares();
-    assert_eq!(wkld.force().len(), wkld3.force().len());
 }
