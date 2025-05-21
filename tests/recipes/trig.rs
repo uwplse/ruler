@@ -168,14 +168,14 @@ fn workload_sum_to_product() -> Workload {
 
     // product of trig functions (no squares)
     let t_prod = Workload::new(["(* t1 t2)"])
-        .plug("t", &t_2var)
         .plug("t1", &t_2var)
+        .plug("t2", &t_2var)
         .filter(Filter::Invert(Box::new(is_square)));
 
     // sum-of-product terms
     let t_sop = Workload::new(["(+ t1 t2)", "(- t1 t2)"])
         .plug("t1", &t_prod)
-        .plug("t2", &t_2var)
+        .plug("t2", &t_prod)
         .filter(Filter::Invert(Box::new(is_double)))
         .filter(Filter::Invert(Box::new(is_nontrivial)));
 
