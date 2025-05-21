@@ -2,7 +2,7 @@ use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
 use crate::{SynthAnalysis, SynthLanguage};
-use std::io::Write;
+use std::{collections::HashSet, io::Write};
 
 /// Workloads are sets of terms from a domain
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -108,11 +108,11 @@ impl Workload {
                 set
             }
             Workload::Append(workloads) => {
-                let mut set = vec![];
+                let mut set = HashSet::new();
                 for w in workloads {
                     set.extend(w.force());
                 }
-                set
+                set.into_iter().collect()
             }
         }
     }
@@ -137,10 +137,10 @@ impl Workload {
         let into: Workload = workload.into();
         match (self, into) {
             (Workload::Set(xs), Workload::Set(ys)) => {
-                let mut all = vec![];
+                let mut all = HashSet::new();
                 all.extend(xs);
                 all.extend(ys);
-                Workload::Set(all)
+                Workload::Set(all.into_iter().collect())
             }
             (Workload::Append(xs), Workload::Append(ys)) => {
                 let mut all = vec![];
@@ -263,6 +263,13 @@ mod test {
         for t in expected.force() {
             assert!(actual.contains(&t));
         }
+    }
+
+    #[test]
+    fn append_dups() {
+        let w1 = Workload::new(["a", "b", "x"]);
+        let w2 = Workload::new(["c", "x", "d", "d"]);
+        assert!(w1.append(w2).force().len() == 5)
     }
 
     #[test]
