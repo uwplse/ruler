@@ -93,7 +93,7 @@ impl Workload {
                         if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
                             let mut v = v.to_string();
                             v.remove(0);
-                            let r = expected_vars.len() > 0 && expected_vars.contains(&v);
+                            let r = !expected_vars.is_empty() && expected_vars.contains(&v);
                             if !r {
                                 println!("Contains unexpected vars: {}", sexp);
                             }
