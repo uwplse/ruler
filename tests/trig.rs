@@ -314,11 +314,7 @@ impl SynthLanguage for Trig {
 
 impl Trig {
     fn validate_all(candidates: &Ruleset<Self>, rules: &Ruleset<Self>) -> Ruleset<Self> {
-        let scheduler = Scheduler::Saturating(Limits {
-            iter: 8,
-            node: 1_000_000,
-            match_: 100_000,
-        });
+        let scheduler = Scheduler::Saturating(Limits::deriving());
         let mut egraph: EGraph<Self, SynthAnalysis> = Default::default();
         for (_, candidate) in candidates {
             egraph.add_expr(&Self::instantiate(&candidate.lhs));
@@ -352,19 +348,16 @@ impl Trig {
 #[cfg(test)]
 mod test {
     use std::io::Write;
-    use std::path::Path;
     use std::{fs::OpenOptions, io, time::Duration};
 
     use super::*;
     use crate::trig::trig_rules;
     use dotenv::dotenv;
-    use glob::glob;
     use ruler::{
         enumo::{Filter, Ruleset, Scheduler, Workload},
         recipe_utils::run_fast_forwarding,
         Limits,
     };
-    use serde_json::{json, to_string_pretty};
 
     // Extra rules about `cis` and `I` to "fast-forward" rule synthesis
     pub fn prior_rules() -> Ruleset<Trig> {
@@ -406,9 +399,24 @@ mod test {
         start_rules
     }
 
+    fn establish_baseline() {
+        let rules_t = Instant::now();
+        let rules = trig_rules();
+        let duration = rules_t.elapsed();
+        let _ = write(
+            "jfp/trig/log.txt",
+            &format!("ENUMO | {} rules | {:?}", rules.len(), duration),
+        );
+        rules.to_file("jfp/trig/enumo.rules");
+    }
+
     #[tokio::test]
-    async fn candidate_gen() {
+    async fn case_study2() {
         dotenv().ok();
+
+        // Run OOPSLA23 Enumo recipe
+        establish_baseline();
+
         let prompt = "
         Your task is to perform rule inference for equality saturation.
         The domain is trigonometric functions, as follows:
@@ -429,136 +437,66 @@ mod test {
         Your task is to generate sound, useful, and complete rewrite rules for the domain.
         The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
         A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
-        Print only the rules, one rule per line, with no additional text or explanation.";
-
-        let mut candidates: Ruleset<Trig> = Ruleset::default();
-        for model in llm::models() {
-            let model_name = model.replace("/", "-");
-            println!("Model: {}", model_name);
-            let p1_rules = Ruleset::from_llm(&prompt, &model).await;
-            println!("Phase 1");
-            p1_rules.pretty_print();
-            candidates.extend(p1_rules.clone());
-
-            let reprompt = format!(
-                "
-            The following are rewrite rules for trig functions:
-            {}
-            
-            These rules will be used for equality saturation.
-            Are there any rules missing? Please generate the missing rules.
-            A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
-            Print only the rules, one rule per line, with no additional text or explanation.
-            ",
-                p1_rules.to_str_vec().join("\n")
-            );
-            let p2_rules = Ruleset::from_llm(&reprompt, &model).await;
-            println!("Phase 2");
-            p2_rules.pretty_print();
-            candidates.extend(p2_rules);
-        }
-        candidates.to_file("jfp/trig/combo-reprompt-candidates.rules");
-    }
-
-    #[test]
-    fn validate_candidates() {
-        let rules = Ruleset::from_file("jfp/trig/combo-reprompt-candidates.rules");
-        let sound = Trig::validate_all(&rules, &start_rules());
-        sound.to_file("jfp/trig/combo-reprompt-sound.rules");
-    }
-
-    #[tokio::test]
-    async fn llm_rules() {
-        dotenv().ok();
-
-        let start_rules = start_rules();
-
-        let prompt = "
-        Your task is to perform rule inference for equality saturation.
-        The domain is trigonometric functions, as follows:
-        Values: real numbers, PI
-        Unary operators: ~, sin, cos, tan, sqr
-        Binary operators: +, -, *, /
-
-        Terms must be written using s-expressions and prefix notation.
-        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
-        Variables are ?x, ?y, and ?z.
-
-        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
-        Do not use any operators or syntax not listed here.
-        Do not use imaginary numbers.
-
-        Your task is to generate sound, useful, and complete rewrite rules for the domain.
-        The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
-        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
         Print only the rules, one rule per line, with no additional text or explanation.
         ";
+        let rules_t = Instant::now();
+        let candidates = Ruleset::from_llm(&prompt).await;
+        let _ = write(
+            "jfp/trig/log.txt",
+            &format!(
+                "{} rule candidates in {:?}",
+                candidates.len(),
+                rules_t.elapsed()
+            ),
+        );
+        candidates.to_file("jfp/trig/candidates.rules");
+        let sound_t = Instant::now();
+        let sound = Trig::validate_all(&candidates, &start_rules());
+        let _ = write(
+            "jfp/trig/log.txt",
+            &format!("{} sound rules in {:?}", sound.len(), sound_t.elapsed()),
+        );
+        sound.to_file("jfp/trig/sound.rules");
 
-        let models = llm::models();
-        for model in models {
-            let model_name = model.replace("/", "-");
-            println!("Model: {}", model_name);
-            let start = Instant::now();
-            let rules: Ruleset<Trig> = Ruleset::from_llm(&prompt, &model).await;
-            let (sound, _) =
-                start_rules.derive(DeriveType::LhsAndRhs, &rules, Limits::trig_deriving());
-            let duration = start.elapsed();
-            println!("{} sound rules in {:?}", sound.len(), duration);
-            sound.to_file(&format!("jfp/trig/{}-rules.rules", model_name));
-        }
-    }
+        // not denotation or prior
+        // sound
+        //     .union(complex)
+        //     .derive(DeriveType::Lhs, &enumo_trig, limits);
+        // and vice versa
 
-    fn get_rule_files() -> Vec<String> {
-        let mut res = vec![];
-        for f in glob("jfp/trig/*.rules").expect("Failed to read pattern") {
-            if let Ok(path) = f {
-                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    res.push(format!("jfp/trig/{}", filename));
-                } else {
-                    println!("Couldn't parse path into string");
-                }
-            } else {
-                println!("Error");
-            }
-        }
-        res
-    }
-
-    #[test]
-    fn derive_llm() {
-        let enumo_trig: Ruleset<Trig> = Ruleset::from_file("baseline/enumo_trig.rules");
-        let arith: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
-        let mut enumo_and_arith = enumo_trig.clone();
-        enumo_and_arith.extend(arith.clone());
-
-        for rule_file in get_rule_files() {
-            let llm_rules: Ruleset<Trig> = Ruleset::from_file(&rule_file);
-            println!("{} {}", rule_file, llm_rules.len());
-            let (enumo_can, enumo_cannot) =
-                enumo_and_arith.derive(DeriveType::LhsAndRhs, &llm_rules, Limits::deriving());
-
-            let mut llm_and_arith = llm_rules;
-            llm_and_arith.extend(arith.clone());
-            let (llm_can, llm_cannot) =
-                llm_and_arith.derive(DeriveType::LhsAndRhs, &enumo_trig, Limits::deriving());
-            let v = json!({
-                "desc": rule_file,
-                "enumo_can": enumo_can.to_str_vec(),
-                "enumo_cannot": enumo_cannot.to_str_vec(),
-                "llm_can": llm_can.to_str_vec(),
-                "llm_cannot": llm_cannot.to_str_vec()
-            });
-            let stem = Path::new(&rule_file)
-                .file_stem()
-                .expect("Couldn't parse filename");
-            let _ = write(
-                &format!(
-                    "jfp/trig/arith-enumo-derive-{}.json",
-                    stem.to_str().unwrap()
-                ),
-                &to_string_pretty(&v).unwrap(),
-            );
-        }
+        let reprompt = format!(
+            "
+        The following are rewrite rules for exponential functions:
+        {}
+        
+        These rules will be used for equality saturation.
+        Are there any rules missing? Please generate the missing rules.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
+        ",
+            sound.to_str_vec().join("\n")
+        );
+        let repromped_candidates = Ruleset::from_llm(&reprompt).await;
+        let _ = write(
+            "jfp/trig/log.txt",
+            &format!(
+                "{} rule candidates (reprompted) in {:?}",
+                candidates.len(),
+                rules_t.elapsed()
+            ),
+        );
+        repromped_candidates.to_file("jfp/trig/reprompted-candidates.rules");
+        let sound_t = Instant::now();
+        let sound = Trig::validate_all(&repromped_candidates, &start_rules());
+        sound.to_file("jfp/trig/reprompted-sound.rules");
+        let _ = write(
+            "jfp/trig/log.txt",
+            &format!(
+                "{} sound rules (reprompted) in {:?}",
+                sound.len(),
+                sound_t.elapsed()
+            ),
+        );
     }
 
     #[test]

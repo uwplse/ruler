@@ -368,52 +368,6 @@ mod test {
         assert!(valid.force().len() == 9);
     }
 
-    #[tokio::test]
-    async fn llm_rules() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-
-        dotenv().ok();
-
-        let enumo_rules = bool_rules();
-
-        let prompt = "
-        Your task is to perform rule inference for equality saturation.
-        The domain is boolean logic, as follows:
-        Values: true, false
-        Unary Operators: ~
-        Binary Operators: &, |, ^, ->
-
-        Terms must be written using s-expressions and prefix notation.
-        For example, instead of (?x & ?y), you should write (& ?x ?y).
-        Variables are ?x, ?y, and ?z.
-
-        Your task is to generate sound, useful, and complete rewrite rules for the domain.
-        The set of rewrite rules should be sufficient to decide the equality between any
-        two terms in the domain.
-        A rewrite rule has the form `l => r` where `l` and `r` are valid terms from
-        the domain that are always equivalent.
-        Print only the rules, one rule per line, with no additional text or explanation.
-        ";
-
-        let models = llm::models();
-        for model in models {
-            let start = Instant::now();
-            let rules: Ruleset<Bool> = Ruleset::from_llm(&prompt, &model).await;
-            let duration = start.elapsed();
-
-            logger::write_baseline(
-                &rules,
-                &format!("{}-ALL", model),
-                &enumo_rules,
-                "enumo",
-                duration,
-            );
-        }
-    }
-
     #[test]
     fn test_validate() {
         let rules: Ruleset<Bool> = Ruleset::new(&[

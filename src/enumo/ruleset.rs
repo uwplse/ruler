@@ -204,23 +204,30 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(all_rules)
     }
 
-    pub async fn from_llm(prompt: &str, model: &str) -> Self {
-        let res = llm::query(prompt, model).await;
+    pub async fn from_llm(prompt: &str) -> Self {
         let mut rules = IndexMap::default();
-        let mut invalid = 0;
-        for line in res {
-            if let Ok((forwards, backwards)) = Rule::from_string(&line) {
-                rules.insert(forwards.name.clone(), forwards);
-                if let Some(backwards) = backwards {
-                    rules.insert(backwards.name.clone(), backwards);
+
+        for model in llm::models() {
+            let mut num_rules = 0;
+            let mut invalid = 0;
+            let res = llm::query(prompt, &model).await;
+            for line in res {
+                if let Ok((forwards, backwards)) = Rule::from_string(&line) {
+                    num_rules += 1;
+                    rules.insert(forwards.name.clone(), forwards);
+                    if let Some(backwards) = backwards {
+                        num_rules += 1;
+                        rules.insert(backwards.name.clone(), backwards);
+                    }
+                } else {
+                    invalid += 1;
+                    println!("Skipping invalid rule: {}", line);
                 }
-            } else {
-                invalid += 1;
-                println!("Skipping invalid rule: {}", line);
             }
+            println!("{model} | {num_rules} ({invalid} invalid)");
         }
 
-        println!("LLM response contained {} malformed rules", invalid);
+        println!("Combined LLM Ruleset | {}", rules.len());
 
         Self(rules)
     }

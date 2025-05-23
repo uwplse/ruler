@@ -283,24 +283,23 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
 
 #[cfg(test)]
 #[path = "./recipes/halide.rs"]
-mod llm_test {
+mod halide;
 
+mod test {
+    use crate::halide::halide_rules;
+    use crate::Pred;
     use dotenv::dotenv;
-    use glob::glob;
-    use ruler::enumo::{Scheduler, Workload};
-    use serde_json::{json, to_string_pretty};
     use std::io::Write;
-    use std::path::Path;
-    use std::time::Instant;
-    use std::{fs::OpenOptions, io};
-
-    use ruler::{
-        enumo::{Metric, Ruleset},
-        recipe_utils::{recursive_rules, Lang},
+    use std::{
+        fs::OpenOptions,
+        io,
+        time::{Duration, Instant},
     };
-    use ruler::{llm, DeriveType, Limits};
 
-    use crate::{halide::halide_rules, Pred};
+    use ruler::enumo::Scheduler;
+    use ruler::recipe_utils::{recursive_rules, Lang};
+    use ruler::{enumo::Ruleset, logger, Limits};
+    use serde_json::{json, to_string_pretty};
 
     fn write(f: &str, s: &str) -> io::Result<()> {
         let mut file = OpenOptions::new().append(true).create(true).open(f)?;
@@ -309,31 +308,37 @@ mod llm_test {
         Ok(())
     }
 
-    #[test]
-    fn enumo_baseline() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-        let start = Instant::now();
-        let rules = halide_rules();
-        let duration = start.elapsed();
+    fn write_derivability(
+        rules: Ruleset<Pred>,
+        rules_name: &str,
+        against: &Ruleset<Pred>,
+        against_name: &str,
+    ) {
+        let derive_t = Instant::now();
+        let (can, cannot) = rules.derive(ruler::DeriveType::Lhs, against, Limits::deriving());
+        let v = json!({
+            "duration": derive_t.elapsed(),
+            "num_rules": rules.len(),
+            "num_against": against.len(),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+        });
         let _ = write(
-            "jfp/halide_llm_eval.txt",
-            &format!("Enumo Custom Recipe Time: {:?}", duration),
+            "jfp/halide/log.txt",
+            &format!(
+                "{rules_name}->{against_name} {} Derivability",
+                can.len() as f64 / against.len() as f64
+            ),
         );
-        rules.to_file("baseline/halide_enumo.rules");
+        let filename = format!("jfp/halide/{rules_name}-{against_name}-derive.json");
+        let _ = write(&filename, &to_string_pretty(&v).unwrap());
     }
 
-    #[test]
-    fn atoms5() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-        let start = Instant::now();
-        let rules5: Ruleset<Pred> = recursive_rules(
-            Metric::Atoms,
+    fn establish_baseline() {
+        let halide_baseline = Ruleset::from_file("baseline/halide.rules");
+        let rules_t = Instant::now();
+        let rules: Ruleset<Pred> = recursive_rules(
+            ruler::enumo::Metric::Atoms,
             5,
             Lang::new(
                 &["0", "1"],
@@ -341,29 +346,54 @@ mod llm_test {
                 &[
                     &["-", "!"],
                     &[
-                        "<", "<=", "==", "!=", "&&", "||", "^", "+", "-", "*", "/", "min", "max",
+                        "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
                     ],
                     &["select"],
                 ],
             ),
             Ruleset::default(),
         );
-        let duration = start.elapsed();
+        let duration = rules_t.elapsed();
         let _ = write(
-            "jfp/halide_llm_eval.txt",
-            &format!("Atoms 5 Time: {:?}", duration),
+            "jfp/halide/log.txt",
+            &format!("ATOMS5 | {} rules | {:?}", rules.len(), duration),
         );
-        rules5.to_file("baseline/halide_atoms5.rules");
+        rules.to_file("jfp/halide/atoms5.rules");
+        write_derivability(rules, "A5", &halide_baseline, "Halide");
+
+        let rules_t = Instant::now();
+        let rules = halide_rules();
+        let duration = rules_t.elapsed();
+        let _ = write(
+            "jfp/halide/log.txt",
+            &format!("ENUMO | {} rules | {:?}", rules.len(), duration),
+        );
+        rules.to_file("jfp/halide/enumo.rules");
+        write_derivability(rules, "Enumo", &halide_baseline, "Halide");
     }
 
-    async fn llm_rules() {
+    fn priors() -> Vec<(String, Ruleset<Pred>)> {
+        vec![
+            ("none".into(), Ruleset::default()),
+            ("A5".into(), Ruleset::from_file("jfp/halide/atoms5.rules")),
+            ("Enumo".into(), Ruleset::from_file("jfp/halide/enumo.rules")),
+        ]
+    }
+
+    #[tokio::test]
+    async fn case_study2() {
         dotenv().ok();
+
+        establish_baseline();
+
+        let halide_baseline = Ruleset::from_file("baseline/halide.rules");
+
         let prompt = "
         Your task is to perform rule inference for equality saturation.
         The domain is boolean logic and arithmetic, as follows:
             Values: integers
             Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, min, max
             Ternary Operators: select
 
         Terms must be written using s-expressions and prefix notation.
@@ -377,466 +407,93 @@ mod llm_test {
         the domain that are always equivalent.
         Print only the rules, one rule per line, with no additional text or explanation.
         ";
-        let models = llm::models();
-        for model in models {
-            let model_name = model.replace("/", "-");
-            println!("{}", model_name);
-            let start = Instant::now();
-            let rules: Ruleset<Pred> = Ruleset::from_llm(&prompt, &model).await;
-            let duration = start.elapsed();
-            let _ = write(
-                "jfp/halide_llm_eval.txt",
-                &format!("LLM {:?} Rules Time: {:?}", model_name, duration),
-            );
-            rules.to_file(&format!("jfp/{}-rules.rules", model_name));
-        }
-    }
-
-    async fn llm_term_enumeration() {
-        dotenv().ok();
-        let prompt = "
-        Your task is to perform term enumeration for rule inference.
-        The domain is boolean logic and arithmetic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
-            Ternary Operators: select
-        
-        Terms must be written using s-expressions and prefix notation.
-        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
-        Use 0 and 1 for constants and x, y, and z for variables.
-        
-        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
-        Do not use any operators or syntax not listed here.
-
-        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
-        The generated terms should adequately cover the set of all possible terms.
-        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
-        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
-        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
-        Print only the terms, one term per line, with no additional text or explanation.
-        ";
-        let models = llm::models();
-        for model in models {
-            let model_name = model.replace("/", "-");
-            println!("{}", model_name);
-            let start = Instant::now();
-            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
-            let duration = start.elapsed();
-            let _ = write(
-                "jfp/halide_llm_eval.txt",
-                &format!(
-                    "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
-                    model_name,
-                    duration,
-                    wkld.force().len()
-                ),
-            );
-            wkld.to_file(&format!("jfp/{}-terms.wkld", model_name));
-        }
-    }
-
-    async fn llm_pattern_enumeration() {
-        dotenv().ok();
-        let prompt = "
-        Your task is to perform term enumeration for rule inference.
-        The domain is boolean logic and arithmetic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
-            Ternary Operators: select
-        
-        Terms must be written using s-expressions and prefix notation.
-        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
-        Use ?C as a placeholder for all constants and ?V as a placeholder for all variables.
-        For example, (+ ?V ?C) represents any term where a variable is added to a constant.
-        
-        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
-        Do not use any operators or syntax not listed here.
-
-        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
-        The generated terms should adequately cover the set of all possible terms.
-        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
-        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
-        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
-        Print only the terms, one term per line, with no additional text or explanation.
-        ";
-        let models = llm::models();
-        for model in models {
-            let model_name = model.replace("/", "-");
-            println!("{}", model_name);
-            let start = Instant::now();
-            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Pred>();
-            let duration = start.elapsed();
-            let _ = write(
-                "jfp/halide_llm_eval.txt",
-                &format!(
-                    "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
-                    model_name,
-                    duration,
-                    wkld.force().len()
-                ),
-            );
-            wkld.to_file(&format!("jfp/{}-patterns.wkld", model_name));
-        }
-    }
-
-    #[test]
-    fn rules_from_llm_wklds() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-        let priors = [
-            ("none", Ruleset::default()),
-            ("A5", Ruleset::from_file("baseline/halide_atoms5.rules")),
-            ("Enumo", Ruleset::from_file("baseline/halide_enumo.rules")),
-        ];
-        let mut wklds = vec![];
-        let models = llm::models();
-        for model in models {
-            let model_name = model.replace("/", "-");
-            wklds.push((
-                format!("{}-terms", model_name),
-                format!("jfp/{}-terms.wkld", model_name),
-            ));
-            wklds.push((
-                format!("{}-patterns", model_name),
-                format!("jfp/{}-patterns.wkld", model_name),
-            ));
-        }
-        for (wkld_name, wkld_file) in wklds {
-            let wkld = Workload::from_file(&wkld_file);
-            for (prior_name, prior_rules) in &priors {
-                println!("{} {}", wkld_name, prior_name);
-                let start = Instant::now();
-                let egraph = wkld.to_egraph::<Pred>();
-                let compressed = Scheduler::Compress(Limits::synthesis()).run(&egraph, prior_rules);
-                let mut candidates = Ruleset::cvec_match(&compressed);
-                let (new_rules, _) = candidates
-                    .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
-                let duration = start.elapsed();
-                let _ = write(
-                    "jfp/halide_llm_eval.txt",
-                    &format!(
-                        "Rule inference time using {} and {}: {:?}",
-                        wkld_name, prior_name, duration
-                    ),
-                );
-                new_rules.to_file(&format!("jfp/{}-{}.rules", wkld_name, prior_name));
-            }
-        }
-    }
-
-    fn get_rule_files() -> Vec<String> {
-        let mut res = vec![];
-        for f in glob("jfp/*.rules").expect("Failed to read pattern") {
-            if let Ok(path) = f {
-                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    res.push(format!("jfp/{}", filename));
-                } else {
-                    println!("Couldn't parse path into string");
-                }
-            } else {
-                println!("Error");
-            }
-        }
-        res
-    }
-
-    #[test]
-    fn enumo_derive_llm() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-        let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
-        for rule_file in get_rule_files() {
-            let rules: Ruleset<Pred> = Ruleset::from_file(&rule_file);
-            println!("{} {}", rule_file, rules.len());
-            let start = Instant::now();
-            let (can, cannot) = enumo.derive(DeriveType::Lhs, &rules, Limits::deriving());
-            let duration = start.elapsed();
-            let derive_pct = (can.len() as f64) / (rules.len() as f64);
-            let _ = write(
-                "jfp/halide_llm_eval.txt",
-                &format!(
-                    "Using Enumo to derive {}: {} in {:?}\nCannot Derive:",
-                    rule_file, derive_pct, duration
-                ),
-            );
-            let v = json!({
-            "description": format!("Using Enumo to derive {}", rule_file),
-            "can": can.to_str_vec(),
-            "cannot": cannot.to_str_vec()
-            });
-            let stem = Path::new(&rule_file)
-                .file_stem()
-                .expect("Couldn't parse filename");
-            let _ = write(
-                &format!("jfp/enumo-derive-{}.json", stem.to_str().unwrap()),
-                &to_string_pretty(&v).unwrap(),
-            );
-        }
-    }
-
-    #[test]
-    fn llm_derive_enumo() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-        let a5: Ruleset<Pred> = Ruleset::from_file("baseline/halide_atoms5.rules");
-        let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
-        for rule_file in get_rule_files() {
-            if rule_file.contains("Enumo") {
-                // These rules used Enumo rules as prior, so no point in trying to derive them.
-                continue;
-            }
-            let rules: Ruleset<Pred> = Ruleset::from_file(&rule_file);
-            println!("{} {}", rule_file, rules.len());
-            let prior = if rule_file.contains("A5") {
-                a5.clone()
-            } else {
-                Ruleset::default()
-            };
-            let all = prior.union(&rules);
-            let start = Instant::now();
-            let (can, cannot) = all.derive(ruler::DeriveType::Lhs, &enumo, Limits::deriving());
-            let duration = start.elapsed();
-            let derive_pct = (can.len() as f64) / (enumo.len() as f64);
-            let _ = write(
-                "jfp/halide_llm_eval.txt",
-                &format!(
-                    "Using {} to derive Enumo: {} in {:?}\nCannot Derive:",
-                    rule_file, derive_pct, duration
-                ),
-            );
-            let v = json!({
-            "description": format!("Using {} to derive Enumo", rule_file),
-            "can": can.to_str_vec(),
-            "cannot": cannot.to_str_vec()
-            });
-            let stem = Path::new(&rule_file)
-                .file_stem()
-                .expect("Couldn't parse filename");
-            let _ = write(
-                &format!("jfp/{}-derive-enumo.json", stem.to_str().unwrap()),
-                &to_string_pretty(&v).unwrap(),
-            );
-        }
-    }
-
-    #[test]
-    fn llm_derive_halide() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-        let halide: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        let a5: Ruleset<Pred> = Ruleset::from_file("baseline/halide_atoms5.rules");
-        let enumo: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
-        for rule_file in get_rule_files() {
-            let rules: Ruleset<Pred> = Ruleset::from_file(&rule_file);
-            println!("{} {}", rule_file, rules.len(),);
-            let prior = if rule_file.contains("A5") {
-                a5.clone()
-            } else if rule_file.contains("Enumo") {
-                enumo.clone()
-            } else {
-                Ruleset::default()
-            };
-            let all = prior.union(&rules);
-            let start = Instant::now();
-            let (can, cannot) = all.derive(ruler::DeriveType::Lhs, &halide, Limits::deriving());
-            let duration = start.elapsed();
-            let derive_pct = (can.len() as f64) / (halide.len() as f64);
-            let _ = write(
-                "jfp/halide_llm_eval.txt",
-                &format!(
-                    "Using {} to derive Halide: {} in {:?}\nCannot Derive:",
-                    rule_file, derive_pct, duration
-                ),
-            );
-            let v = json!({
-            "description": format!("Using {} to derive Halide", rule_file),
-            "can": can.to_str_vec(),
-            "cannot": cannot.to_str_vec()
-            });
-            let stem = Path::new(&rule_file)
-                .file_stem()
-                .expect("Couldn't parse filename");
-            let _ = write(
-                &format!("jfp/{}-derive-halide.json", stem.to_str().unwrap()),
-                &to_string_pretty(&v).unwrap(),
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn combo_enum() {
-        dotenv().ok();
-        let prompt = "
-        Your task is to perform term enumeration for rule inference.
-        The domain is boolean logic and arithmetic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, /, min, max
-            Ternary Operators: select
-        
-        Terms must be written using s-expressions and prefix notation.
-        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
-        Use ?C as a placeholder for all constants and ?V as a placeholder for all variables.
-        For example, (+ ?V ?C) represents any term where a variable is added to a constant.
-        
-        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
-        Do not use any operators or syntax not listed here.
-
-        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
-        The generated terms should adequately cover the set of all possible terms.
-        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
-        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
-        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
-        Print only the terms, one term per line, with no additional text or explanation.
-        ";
-        let mut wkld = Workload::default();
-        let models = llm::models();
-        for model in models {
-            let model_name = model.replace("/", "-");
-            println!("{}", model_name);
-            let start = Instant::now();
-            wkld = wkld.append(Workload::from_llm(&prompt, &model).await.as_lang::<Pred>());
-            let duration = start.elapsed();
-            let _ = write(
-                "jfp/halide_llm_eval.txt",
-                &format!(
-                    "LLM {:?} Pattern Workload Generation Time: {:?} | Size: {}",
-                    model_name,
-                    duration,
-                    wkld.force().len()
-                ),
-            );
-            wkld.to_file(&format!("jfp/combo-terms.wkld"));
-        }
-    }
-
-    #[tokio::test]
-    async fn run_eval() {
-        // Skip this test in github actions
-        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
-            return;
-        }
-
-        let f = "jfp/halide_llm_eval.txt";
-        let _ = write(f, "--- A5 Baseline ---");
-        atoms5();
-        let _ = write(f, "--- Enumo Baseline ---");
-        enumo_baseline();
-
-        let _ = write(f, "--- LLM RULES ---");
-        llm_rules().await;
-
-        let _ = write(f, "--- LLM TERM ENUMERATION ---");
-        llm_term_enumeration().await;
-
-        let _ = write(f, "--- LLM PATTERN ENUMERATION ---");
-        llm_pattern_enumeration().await;
-
-        let _ = write(f, "--- RULES FROM WKLDS ---");
-        rules_from_llm_wklds();
-
-        let _ = write(f, "--- STARTING DERIVABILITY ---");
-
-        let _ = write(f, "-- Using LLM to Derive Halide ---");
-        llm_derive_halide();
-
-        let _ = write(f, "--- Using LLM to Derive Enumo ---");
-        llm_derive_enumo();
-
-        let _ = write(f, "-- Using Enumo to Derive LLM ---");
-        enumo_derive_llm();
-    }
-}
-
-#[cfg(test)]
-#[path = "./recipes/halide.rs"]
-mod halide;
-
-mod test {
-    use crate::halide::halide_rules;
-    use crate::Pred;
-    use std::io::Write;
-    use std::{
-        fs::OpenOptions,
-        io,
-        time::{Duration, Instant},
-    };
-
-    use glob::glob;
-    use ruler::{enumo::Ruleset, logger, Limits};
-    use serde_json::{json, to_string_pretty};
-
-    fn write(f: &str, s: &str) -> io::Result<()> {
-        let mut file = OpenOptions::new().append(true).create(true).open(f)?;
-
-        writeln!(file, "{}", s)?;
-        Ok(())
-    }
-
-    #[test]
-    fn combo_llm() {
-        let mut rules: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
-        for f in glob("jfp-whale/gemini2.5/*.rules").expect("Failed to read") {
-            if let Ok(path) = f {
-                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    rules.extend(Ruleset::from_file(&format!(
-                        "jfp-whale/gemini2.5/{}",
-                        filename
-                    )));
-                }
-            }
-        }
-        println!("Candidates: {}", rules.len());
-        let (minimized, _) = rules.minimize(
-            Ruleset::default(),
-            ruler::enumo::Scheduler::Compress(Limits::minimize()),
-        );
-        minimized.to_file("jfp-whale/gemini2.5/combo_min.rules");
-
-        let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
-        let enumo_rules: Ruleset<Pred> = Ruleset::from_file("baseline/halide_enumo.rules");
-        println!("Starting derive Enumo->Halide");
-        let (can, cannot) =
-            enumo_rules.derive(ruler::DeriveType::Lhs, &halide_baseline, Limits::deriving());
-        let derive_pct = (can.len() as f64) / (halide_baseline.len() as f64);
-        println!(
-            "Using Original Enumo rules to derive Halide: {}",
-            derive_pct
-        );
-        let v = json!({
-            "description": "Using Original Enumo recipe to derive Halide",
-            "can": can.to_str_vec(),
-            "cannot": cannot.to_str_vec()
-        });
+        let rules_t = Instant::now();
+        let candidates: Ruleset<Pred> = Ruleset::from_llm(&prompt).await;
         let _ = write(
-            "baseline/enumo-halide-derive.json",
-            &to_string_pretty(&v).unwrap(),
+            "jfp/halide/log.txt",
+            &format!(
+                "{} rule candidates | {:?}",
+                candidates.len(),
+                rules_t.elapsed()
+            ),
         );
+        candidates.to_file("jfp/halide/candidates.rules");
 
-        println!("Starting derive Combo->Halide");
-        let (can, cannot) =
-            minimized.derive(ruler::DeriveType::Lhs, &halide_baseline, Limits::deriving());
-        let derive_pct = (can.len() as f64) / (halide_baseline.len() as f64);
-        println!("Using Combo rules to derive Halide: {}", derive_pct);
-        let v = json!({
-            "description": "Using Combo to derive Halide",
-            "can": can.to_str_vec(),
-            "cannot": cannot.to_str_vec()
-        });
-        let _ = write(
-            "baseline/combo-halide-derive.json",
-            &to_string_pretty(&v).unwrap(),
-        );
+        for (prior_name, prior_rules) in priors() {
+            let mut candidates_copy = candidates.clone();
+            let minimize_t = Instant::now();
+            let (sound, invalid) = candidates_copy
+                .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+            let _ = write(
+                "jfp/halide/log.txt",
+                &format!(
+                    "{} | {} selected rules ({} invalid) | {:?}",
+                    prior_name,
+                    sound.len(),
+                    invalid.len(),
+                    minimize_t.elapsed(),
+                ),
+            );
+            sound.to_file(&format!("jfp/halide/{}-rules.rules", prior_name));
+
+            write_derivability(
+                sound.union(&prior_rules),
+                &format!("llm_and_{prior_name}"),
+                &halide_baseline,
+                "Halide",
+            );
+
+            // Reprompt for missing rules
+            let reprompt = &format!("
+            The following are rewrite rules for the domain of boolean logic and arithmetic:
+            {}
+            {}
+
+            These rules will be used for equality saturation.
+            Are there any rules missing? Please generate the missing rules.
+            A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+            Print only the rules, one rule per line, with no additional text or explanation.
+            ", sound.to_str_vec().join("\n"), prior_rules.to_str_vec().join("\n"));
+            let reprompted_rules_t = Instant::now();
+            let mut reprompted_candidates: Ruleset<Pred> = Ruleset::from_llm(&reprompt).await;
+            let _ = write(
+                "jfp/halide/log.txt",
+                &format!(
+                    "{} rule candidates (reprompted) | {:?}",
+                    reprompted_candidates.len(),
+                    reprompted_rules_t.elapsed()
+                ),
+            );
+            reprompted_candidates.to_file(&format!(
+                "jfp/halide/reprompted-candidates-{}.rules",
+                prior_name
+            ));
+
+            // Minimize reprompted
+            let reprompt_minimize_t = Instant::now();
+            let (reprompted_sound, invalid) = reprompted_candidates.minimize(
+                sound.union(&prior_rules),
+                Scheduler::Compress(Limits::minimize()),
+            );
+            let _ = write(
+                "jfp/halide/log.txt",
+                &format!(
+                    "{} | Reprompt | {} selected rules ({} invalid) | {:?}",
+                    prior_name,
+                    reprompted_sound.len(),
+                    invalid.len(),
+                    reprompt_minimize_t.elapsed(),
+                ),
+            );
+            reprompted_sound.to_file(&format!("jfp/halide/{}-reprompted-rules.rules", prior_name));
+
+            write_derivability(
+                reprompted_sound.union(&sound).union(&prior_rules),
+                &format!("llm_and_{prior_name}_reprompt"),
+                &halide_baseline,
+                "Halide",
+            );
+        }
     }
 
     #[test]
