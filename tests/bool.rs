@@ -1,5 +1,6 @@
 use ruler::{enumo::Scheduler, *};
 use std::ops::*;
+use z3::ast::Ast;
 #[path = "./recipes/bool.rs"]
 pub mod bool;
 
@@ -105,8 +106,19 @@ impl SynthLanguage for Bool {
         }
     }
 
-    fn validate(_lhs: &Pattern<Self>, _rhs: &Pattern<Self>) -> ValidationResult {
-        ValidationResult::Valid
+    fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
+        let mut cfg = z3::Config::new();
+        cfg.set_timeout_msec(1000);
+        let ctx = z3::Context::new(&cfg);
+        let solver = z3::Solver::new(&ctx);
+        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
+        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
+        solver.assert(&lexpr._eq(&rexpr).not());
+        match solver.check() {
+            z3::SatResult::Unsat => ValidationResult::Valid,
+            z3::SatResult::Unknown => ValidationResult::Unknown,
+            z3::SatResult::Sat => ValidationResult::Invalid,
+        }
     }
 
     fn is_constant(&self) -> bool {
@@ -118,13 +130,42 @@ impl SynthLanguage for Bool {
     }
 }
 
+fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Bool]) -> z3::ast::Bool<'a> {
+    let mut buf = vec![];
+    for node in expr.as_ref().iter() {
+        match node {
+            Bool::Not(x) => buf.push(z3::ast::Bool::not(&buf[usize::from(*x)])),
+            Bool::And([x, y]) => buf.push(z3::ast::Bool::and(
+                &ctx,
+                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
+            )),
+            Bool::Or([x, y]) => buf.push(z3::ast::Bool::or(
+                &ctx,
+                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
+            )),
+            Bool::Xor([x, y]) => buf.push(z3::ast::Bool::xor(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)],
+            )),
+            Bool::Implies([x, y]) => buf.push(z3::ast::Bool::implies(
+                &buf[usize::from(*x)],
+                &buf[usize::from(*y)],
+            )),
+            Bool::Lit(c) => buf.push(z3::ast::Bool::from_bool(&ctx, *c)),
+            Bool::Var(sym) => buf.push(z3::ast::Bool::new_const(&ctx, sym.to_string())),
+        }
+    }
+    buf.pop().unwrap()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::bool::bool_rules;
+    use dotenv::dotenv;
     use ruler::{
         enumo::{Filter, Metric, Ruleset, Workload},
-        recipe_utils::{base_lang, iter_metric, run_workload},
+        recipe_utils::{base_lang, iter_metric, recursive_rules, run_workload, Lang},
     };
     use std::time::Instant;
 
@@ -292,6 +333,198 @@ mod test {
         let baseline = Ruleset::<_>::from_file("baseline/bool.rules");
 
         logger::write_baseline(&rules, "bool", &baseline, "oopsla", duration);
+    }
+
+    #[test]
+    fn test_wkld_as_lang() {
+        let wkld = Workload::new([
+            "((& x y z) false)",
+            "(^ x y (-> z))",
+            "(-> x y (| z false))",
+            "(-> x y (-> z))",
+            "(x (& x y (| z)))",
+            "((& (~ z) x y))",
+            "((| (~ z) x y))",
+            "((^ (~ z) x y))",
+            "((-> (~ z) x y))",
+            "(~ (| y false))",
+            "(~ (| z true))",
+            "(~ (| z false))",
+            "(y (| x y (-> z)))",
+            "(z (^ x y (~ z)))",
+            "(& x (& y (~ (& z true))))",
+            "(| x (| y (~ (| z false))))",
+            "(^ x (^ y (~ (^ z true))))",
+            "(-> x (-> y (~ (-> z false))))",
+            "(~ ((& (~ x) y) z))",
+            "(~ ((| (~ x) y) z))",
+            "(~ ((^ (~ x) y) z))",
+            "(~ ((-> (~ x) y) z))",
+            "true",
+            "false",
+        ]);
+        assert!(wkld.force().len() == 24);
+        let valid = wkld.as_lang::<Bool>();
+        assert!(valid.force().len() == 9);
+    }
+
+    #[test]
+    fn test_validate() {
+        let rules: Ruleset<Bool> = Ruleset::new(&[
+            "(^ ?b ?a) ==> (^ ?a ?b)",
+            "(& ?b ?a) ==> (& ?a ?b)",
+            "(| ?b ?a) ==> (| ?a ?b)",
+            "(^ ?a true) ==> (~ ?a)",
+            "(^ true ?a) ==> (~ ?a)",
+            "(^ ?a (~ ?a)) ==> false", // unsound
+            "(& ?a ?a) ==> ?a",
+            "?a ==> (~ (~ ?a))",
+        ]);
+
+        let (sound, unsound) = rules.partition(|_, r| r.is_valid());
+        assert!(sound.len() == 7);
+        assert!(unsound.len() == 1);
+    }
+
+    #[tokio::test]
+    async fn llm_term_enumeration() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        dotenv().ok();
+
+        let enumo_rules = bool_rules();
+
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic, as follows:
+        Values: true, false
+        Unary Operators: ~
+        Binary Operators: &, |, ^, ->
+
+        Terms must be written using s-expressions and prefix notation.
+        For example, instead of (?x & ?y), you should write (& ?x ?y).
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Bool>();
+
+            let rules: Ruleset<Bool> = if wkld.force().len() == 0 {
+                // LLM generated no valid terms
+                Ruleset::default()
+            } else {
+                run_workload(
+                    wkld,
+                    Ruleset::default(),
+                    Limits::synthesis(),
+                    Limits::minimize(),
+                    true,
+                )
+            };
+            let (sound, unsound) = rules.partition(|_, r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            logger::write_baseline(
+                &rules,
+                &format!("{}-TE", model),
+                &enumo_rules,
+                "enumo",
+                duration,
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_llm_after_exhaustive() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        dotenv().ok();
+
+        let enumo_rules = bool_rules();
+
+        let a5_start = Instant::now();
+        // First, do exhaustive synthesis up to size 5
+        let rules5: Ruleset<Bool> = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["true", "false"],
+                &["x", "y", "z"],
+                &[&["~"], &["&", "|", "^", "->"]],
+            ),
+            Ruleset::default(),
+        );
+        let a5_duration = a5_start.elapsed();
+
+        let prompt = "
+        Your task is to perform term enumeration for rule inference.
+        The domain is boolean logic, as follows:
+        Values: true, false
+        Unary Operators: ~
+        Binary Operators: &, |, ^, ->
+
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate terms from the grammar, from which a set of rewrite rules can be inferred.
+        The generated terms should adequately cover the set of all possible terms.
+        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
+        Generate at least 1000 terms. Do not stop before you have generated 1000 terms.
+        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+
+        let models = llm::models();
+        for model in models {
+            let start = Instant::now();
+            let wkld = Workload::from_llm(&prompt, &model).await.as_lang::<Bool>();
+            let rules: Ruleset<Bool> = run_workload(
+                wkld,
+                rules5.clone(),
+                Limits::synthesis(),
+                Limits::minimize(),
+                true,
+            );
+            let (sound, unsound) = rules.partition(|_, r| r.is_valid());
+            let duration = start.elapsed();
+
+            println!(
+                "{} synthesized {} sound and {} unsound rules",
+                &model,
+                sound.len(),
+                unsound.len()
+            );
+            let all = rules.union(&rules5);
+
+            logger::write_baseline(
+                &all,
+                &format!("{}-A5-TE", model),
+                &enumo_rules,
+                "enumo",
+                duration + a5_duration,
+            );
+        }
     }
 
     #[test]

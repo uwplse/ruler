@@ -1,8 +1,9 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
+use itertools::all;
 
 use super::*;
-use crate::{SynthAnalysis, SynthLanguage};
-use std::io::Write;
+use crate::{llm, SynthAnalysis, SynthLanguage};
+use std::{collections::HashSet, io::Write};
 
 /// Workloads are sets of terms from a domain
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -48,10 +49,64 @@ impl Workload {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
-        for line in std::io::BufRead::lines(reader) {
-            sexps.push(line.unwrap().parse().unwrap());
+        for line in std::io::BufRead::lines(reader).map_while(Result::ok) {
+            if let Ok(sexp) = line.parse() {
+                sexps.push(sexp);
+            } else {
+                println!("Skipping invalid s-expression: {}", line);
+            }
         }
         Self::Set(sexps)
+    }
+
+    pub async fn from_llm(prompt: &str, model: &str) -> Self {
+        let res = llm::query(prompt, model).await;
+        let mut valid_sexps = vec![];
+        let mut valid = 0;
+        let mut invalid = 0;
+        for line in res {
+            if let Ok(sexp) = line.parse() {
+                valid += 1;
+                valid_sexps.push(sexp);
+            } else {
+                invalid += 1;
+                println!("Skipping invalid s-expression: {}", line);
+            }
+        }
+        println!(
+            "LLM workload contained {} valid and {} invalid s-expressions.",
+            valid, invalid
+        );
+        Workload::Set(valid_sexps)
+    }
+
+    pub fn as_lang<L: SynthLanguage>(&self) -> Self {
+        self.as_lang_with_vars::<L>(vec![])
+    }
+
+    pub fn as_lang_with_vars<L: SynthLanguage>(&self, expected_vars: Vec<String>) -> Self {
+        Workload::Set(
+            self.force()
+                .iter()
+                .filter(|sexp| match sexp.to_string().parse::<RecExpr<L>>() {
+                    Ok(expr) => all(expr.as_ref(), |node| {
+                        if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
+                            let mut v = v.to_string();
+                            v.remove(0);
+                            let r = !expected_vars.is_empty() && expected_vars.contains(&v);
+                            if !r {
+                                println!("Contains unexpected vars: {}", sexp);
+                            }
+                            r
+                        } else {
+                            true
+                        }
+                    }),
+                    Err(_) => false,
+                })
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Materialize the workload into an e-graph
@@ -59,6 +114,7 @@ impl Workload {
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {
         let mut egraph = EGraph::default();
         let sexps = self.force();
+        println!("Sexps: {}", sexps.len());
 
         // Have to find all the variables first so that we can initialize
         // their cvecs, which might require doing a multi-way cross product
@@ -87,6 +143,7 @@ impl Workload {
         for sexp in sexps.iter() {
             egraph.add_expr(&sexp.to_string().parse::<RecExpr<L>>().unwrap());
         }
+        println!("Egraph: {}", egraph.number_of_classes());
         egraph
     }
 
@@ -108,11 +165,11 @@ impl Workload {
                 set
             }
             Workload::Append(workloads) => {
-                let mut set = vec![];
+                let mut set = HashSet::new();
                 for w in workloads {
                     set.extend(w.force());
                 }
-                set
+                set.into_iter().collect()
             }
         }
     }
@@ -137,10 +194,10 @@ impl Workload {
         let into: Workload = workload.into();
         match (self, into) {
             (Workload::Set(xs), Workload::Set(ys)) => {
-                let mut all = vec![];
+                let mut all = HashSet::new();
                 all.extend(xs);
                 all.extend(ys);
-                Workload::Set(all)
+                Workload::Set(all.into_iter().collect())
             }
             (Workload::Append(xs), Workload::Append(ys)) => {
                 let mut all = vec![];
@@ -263,6 +320,13 @@ mod test {
         for t in expected.force() {
             assert!(actual.contains(&t));
         }
+    }
+
+    #[test]
+    fn append_dups() {
+        let w1 = Workload::new(["a", "b", "x"]);
+        let w2 = Workload::new(["c", "x", "d", "d"]);
+        assert!(w1.append(w2).force().len() == 5)
     }
 
     #[test]

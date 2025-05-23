@@ -4,7 +4,7 @@ use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{io::Write, sync::Arc};
 
 use crate::{
-    CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
+    llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
     SynthAnalysis, SynthLanguage,
 };
 
@@ -168,14 +168,15 @@ impl<L: SynthLanguage> Ruleset<L> {
     /// Partition a ruleset by applying a predicate function to each rule in the ruleset
     pub fn partition<F>(&self, f: F) -> (Self, Self)
     where
-        F: Fn(&Rule<L>) -> bool + std::marker::Sync,
+        F: Fn(usize, &Rule<L>) -> bool + std::marker::Sync,
     {
-        let rules: Vec<&Rule<L>> = self.0.values().collect();
-        let (yeses, nos): (Vec<_>, Vec<_>) = rules.into_par_iter().partition(|rule| f(rule));
+        let rules: Vec<(usize, &Rule<L>)> = self.0.values().enumerate().collect();
+        let (yeses, nos): (Vec<_>, Vec<_>) =
+            rules.into_par_iter().partition(|(i, rule)| f(*i, rule));
         let mut yes = Ruleset::default();
         let mut no = Ruleset::default();
-        yes.add_all(yeses);
-        no.add_all(nos);
+        yes.add_all(yeses.into_iter().map(|(_, r)| r).collect());
+        no.add_all(nos.into_iter().map(|(_, r)| r).collect());
         (yes, no)
     }
 
@@ -203,23 +204,36 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(all_rules)
     }
 
-    pub fn pretty_print(&self) {
-        let mut strs = vec![];
-        for (name, rule) in &self.0 {
-            let reverse = Rule::new(&rule.rhs, &rule.lhs);
-            if reverse.is_some() && self.contains(&reverse.unwrap()) {
-                let reverse_name = format!("{} <=> {}", rule.rhs, rule.lhs);
-                if !strs.contains(&reverse_name) {
-                    strs.push(format!("{} <=> {}", rule.lhs, rule.rhs));
+    pub async fn from_llm(prompt: &str) -> Self {
+        let mut rules = IndexMap::default();
+
+        for model in llm::models() {
+            let mut num_rules = 0;
+            let mut invalid = 0;
+            let res = llm::query(prompt, &model).await;
+            for line in res {
+                if let Ok((forwards, backwards)) = Rule::from_string(&line) {
+                    num_rules += 1;
+                    rules.insert(forwards.name.clone(), forwards);
+                    if let Some(backwards) = backwards {
+                        num_rules += 1;
+                        rules.insert(backwards.name.clone(), backwards);
+                    }
+                } else {
+                    invalid += 1;
+                    println!("Skipping invalid rule: {}", line);
                 }
-            } else {
-                strs.push(name.to_string());
             }
+            println!("{model} | {num_rules} ({invalid} invalid)");
         }
 
-        for s in strs {
-            println!("{s}");
-        }
+        println!("Combined LLM Ruleset | {}", rules.len());
+
+        Self(rules)
+    }
+
+    pub fn pretty_print(&self) {
+        println!("{}", self.to_str_vec().join("\n"))
     }
 
     /// Find candidates from two e-graphs
@@ -409,14 +423,17 @@ impl<L: SynthLanguage> Ruleset<L> {
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
         self.0 = Default::default();
+        let mut redundant = 0;
         for (l_id, r_id, rule) in initial {
             if egraph.find(l_id) == egraph.find(r_id) {
                 // candidate has merged (derivable from other rewrites)
+                redundant += 1;
                 continue;
             } else {
                 self.add(rule);
             }
         }
+        println!("{} elim / {} remain", redundant, self.len());
     }
 
     /// Minimization algorithm for rule selection
@@ -444,7 +461,13 @@ impl<L: SynthLanguage> Ruleset<L> {
     ///         If derive_type is LhsAndRhs, the e-graph is initialized with lhs and rhs
     ///     2. Run the ruleset
     ///     3. Return true if the lhs and rhs are equivalent, false otherwise.
-    pub fn can_derive(&self, derive_type: DeriveType, rule: &Rule<L>, limits: Limits) -> bool {
+    pub fn can_derive(
+        &self,
+        derive_type: DeriveType,
+        rule: &Rule<L>,
+        limits: Limits,
+        i: usize,
+    ) -> bool {
         let scheduler = Scheduler::Saturating(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
@@ -466,16 +489,18 @@ impl<L: SynthLanguage> Ruleset<L> {
             .lookup_expr(lexpr)
             .unwrap_or_else(|| panic!("Did not find {}", lexpr));
         let r_id = out_egraph.lookup_expr(rexpr);
-        if let Some(r_id) = r_id {
+        let res = if let Some(r_id) = r_id {
             l_id == r_id
         } else {
             false
-        }
+        };
+        println!("({}) {} | {}", i, rule, res);
+        res
     }
 
     /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|rule| self.can_derive(derive_type, rule, limits))
+        against.partition(|i, rule| self.can_derive(derive_type, rule, limits, i))
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {

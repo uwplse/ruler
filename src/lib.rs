@@ -12,6 +12,7 @@ pub use util::*;
 mod bv;
 pub mod enumo;
 mod language;
+pub mod llm;
 pub mod logger;
 pub mod recipe_utils;
 mod util;
@@ -111,6 +112,14 @@ impl Limits {
             iter: 5,
             node: 100_000,
             match_: 1000,
+        }
+    }
+
+    pub fn trig_deriving() -> Self {
+        Self {
+            iter: 8,
+            node: 300_000,
+            match_: 200_000,
         }
     }
 }

@@ -288,14 +288,213 @@ mod halide;
 mod test {
     use crate::halide::halide_rules;
     use crate::Pred;
-    use std::time::{Duration, Instant};
-
-    use ruler::{
-        enumo::{Filter, Metric, Ruleset, Workload},
-        logger,
-        recipe_utils::{recursive_rules, run_workload, Lang},
-        Limits,
+    use dotenv::dotenv;
+    use std::io::Write;
+    use std::{
+        fs::OpenOptions,
+        io,
+        time::{Duration, Instant},
     };
+
+    use ruler::enumo::Scheduler;
+    use ruler::recipe_utils::{recursive_rules, Lang};
+    use ruler::{enumo::Ruleset, logger, Limits};
+    use serde_json::{json, to_string_pretty};
+
+    fn write(f: &str, s: &str) -> io::Result<()> {
+        let mut file = OpenOptions::new().append(true).create(true).open(f)?;
+
+        writeln!(file, "{}", s)?;
+        Ok(())
+    }
+
+    fn write_derivability(
+        rules: Ruleset<Pred>,
+        rules_name: &str,
+        against: &Ruleset<Pred>,
+        against_name: &str,
+    ) {
+        let derive_t = Instant::now();
+        let (can, cannot) = rules.derive(ruler::DeriveType::Lhs, against, Limits::deriving());
+        let v = json!({
+            "duration": derive_t.elapsed(),
+            "num_rules": rules.len(),
+            "num_against": against.len(),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+        });
+        let _ = write(
+            "jfp/halide/log.txt",
+            &format!(
+                "{rules_name}->{against_name} {} Derivability",
+                can.len() as f64 / against.len() as f64
+            ),
+        );
+        let filename = format!("jfp/halide/{rules_name}-{against_name}-derive.json");
+        let _ = write(&filename, &to_string_pretty(&v).unwrap());
+    }
+
+    fn establish_baseline() {
+        let halide_baseline = Ruleset::from_file("baseline/halide.rules");
+        let rules_t = Instant::now();
+        let rules: Ruleset<Pred> = recursive_rules(
+            ruler::enumo::Metric::Atoms,
+            5,
+            Lang::new(
+                &["0", "1"],
+                &["a", "b", "c"],
+                &[
+                    &["-", "!"],
+                    &[
+                        "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                    ],
+                    &["select"],
+                ],
+            ),
+            Ruleset::default(),
+        );
+        let duration = rules_t.elapsed();
+        let _ = write(
+            "jfp/halide/log.txt",
+            &format!("ATOMS5 | {} rules | {:?}", rules.len(), duration),
+        );
+        rules.to_file("jfp/halide/atoms5.rules");
+        write_derivability(rules, "A5", &halide_baseline, "Halide");
+
+        let rules_t = Instant::now();
+        let rules = halide_rules();
+        let duration = rules_t.elapsed();
+        let _ = write(
+            "jfp/halide/log.txt",
+            &format!("ENUMO | {} rules | {:?}", rules.len(), duration),
+        );
+        rules.to_file("jfp/halide/enumo.rules");
+        write_derivability(rules, "Enumo", &halide_baseline, "Halide");
+    }
+
+    fn priors() -> Vec<(String, Ruleset<Pred>)> {
+        vec![
+            ("none".into(), Ruleset::default()),
+            ("A5".into(), Ruleset::from_file("jfp/halide/atoms5.rules")),
+            ("Enumo".into(), Ruleset::from_file("jfp/halide/enumo.rules")),
+        ]
+    }
+
+    #[tokio::test]
+    async fn case_study2() {
+        dotenv().ok();
+
+        establish_baseline();
+
+        let halide_baseline = Ruleset::from_file("baseline/halide.rules");
+
+        let prompt = "
+        Your task is to perform rule inference for equality saturation.
+        The domain is boolean logic and arithmetic, as follows:
+            Values: integers
+            Unary Operators: -, !
+            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, min, max
+            Ternary Operators: select
+
+        Terms must be written using s-expressions and prefix notation.
+        Variables are ?x, ?y, and ?z.
+
+        Your task is to generate sound, useful, and complete rewrite rules for the domain.
+        The set of rewrite rules should be sufficient to decide the equality between any
+        two terms in the domain.
+        You should generate at least 200 rules.
+        A rewrite rule has the form `l => r` where `l` and `r` are valid terms from
+        the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
+        ";
+        let rules_t = Instant::now();
+        let candidates: Ruleset<Pred> = Ruleset::from_llm(&prompt).await;
+        let _ = write(
+            "jfp/halide/log.txt",
+            &format!(
+                "{} rule candidates | {:?}",
+                candidates.len(),
+                rules_t.elapsed()
+            ),
+        );
+        candidates.to_file("jfp/halide/candidates.rules");
+
+        for (prior_name, prior_rules) in priors() {
+            let mut candidates_copy = candidates.clone();
+            let minimize_t = Instant::now();
+            let (sound, invalid) = candidates_copy
+                .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+            let _ = write(
+                "jfp/halide/log.txt",
+                &format!(
+                    "{} | {} selected rules ({} invalid) | {:?}",
+                    prior_name,
+                    sound.len(),
+                    invalid.len(),
+                    minimize_t.elapsed(),
+                ),
+            );
+            sound.to_file(&format!("jfp/halide/{}-rules.rules", prior_name));
+
+            write_derivability(
+                sound.union(&prior_rules),
+                &format!("llm_and_{prior_name}"),
+                &halide_baseline,
+                "Halide",
+            );
+
+            // Reprompt for missing rules
+            let reprompt = &format!("
+            The following are rewrite rules for the domain of boolean logic and arithmetic:
+            {}
+            {}
+
+            These rules will be used for equality saturation.
+            Are there any rules missing? Please generate the missing rules.
+            A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+            Print only the rules, one rule per line, with no additional text or explanation.
+            ", sound.to_str_vec().join("\n"), prior_rules.to_str_vec().join("\n"));
+            let reprompted_rules_t = Instant::now();
+            let mut reprompted_candidates: Ruleset<Pred> = Ruleset::from_llm(&reprompt).await;
+            let _ = write(
+                "jfp/halide/log.txt",
+                &format!(
+                    "{} rule candidates (reprompted) | {:?}",
+                    reprompted_candidates.len(),
+                    reprompted_rules_t.elapsed()
+                ),
+            );
+            reprompted_candidates.to_file(&format!(
+                "jfp/halide/reprompted-candidates-{}.rules",
+                prior_name
+            ));
+
+            // Minimize reprompted
+            let reprompt_minimize_t = Instant::now();
+            let (reprompted_sound, invalid) = reprompted_candidates.minimize(
+                sound.union(&prior_rules),
+                Scheduler::Compress(Limits::minimize()),
+            );
+            let _ = write(
+                "jfp/halide/log.txt",
+                &format!(
+                    "{} | Reprompt | {} selected rules ({} invalid) | {:?}",
+                    prior_name,
+                    reprompted_sound.len(),
+                    invalid.len(),
+                    reprompt_minimize_t.elapsed(),
+                ),
+            );
+            reprompted_sound.to_file(&format!("jfp/halide/{}-reprompted-rules.rules", prior_name));
+
+            write_derivability(
+                reprompted_sound.union(&sound).union(&prior_rules),
+                &format!("llm_and_{prior_name}_reprompt"),
+                &halide_baseline,
+                "Halide",
+            );
+        }
+    }
 
     #[test]
     fn run() {

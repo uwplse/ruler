@@ -6,6 +6,7 @@
 /nightly
 /*.terms
 /*.rules
+.env
 
 # Scripts
 scripts/ablation/output/*
@@ -34,3 +35,5 @@ out/
 # Exceptions
 !scripts/oopsla21/ablation/submitted-plots/**/*.pdf
 !scripts/oopsla21/ablation/submitted-plots/**/*.json
+
+jfp*/

@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use num::rational::Ratio;
 use num::BigInt;
+use ruler::enumo::{Ruleset, Scheduler};
 use ruler::*;
 #[path = "./recipes/exponential.rs"]
 pub mod exponential;
@@ -19,6 +20,7 @@ egg::define_language! {
         "exp" = Exp(Id),
         "log" = Log(Id),
         "pow" = Pow([Id; 2]),
+        "^" = Pow2([Id; 2]),
         "sqrt" = Sqrt(Id),
         "cbrt" = Cbrt(Id),
 
@@ -31,6 +33,7 @@ egg::define_language! {
         "if" = If([Id; 3]),
         // (for compatibility with rationals)
         "fabs" = Abs(Id),
+        "abs"  = Abs2(Id),
 
         // constants
         Num(Rational),
@@ -112,10 +115,43 @@ impl SynthLanguage for Exponential {
     }
 }
 
+impl Exponential {
+    fn validate_all(candidates: &Ruleset<Self>, rules: &Ruleset<Self>) -> Ruleset<Self> {
+        let scheduler = Scheduler::Saturating(Limits::deriving());
+        let mut egraph: EGraph<Self, SynthAnalysis> = Default::default();
+        for (_, candidate) in candidates {
+            egraph.add_expr(&Self::instantiate(&candidate.lhs));
+            egraph.add_expr(&Self::instantiate(&candidate.rhs));
+        }
+        let out_egraph = scheduler.run(&egraph, rules);
+
+        let mut valid: Ruleset<Self> = Ruleset::default();
+        for (_, candidate) in candidates {
+            let l_id = out_egraph
+                .lookup_expr(&Self::instantiate(&candidate.lhs))
+                .expect("Did not find lhs");
+            let r_id = out_egraph
+                .lookup_expr(&Self::instantiate(&candidate.rhs))
+                .expect("Did not find rhs");
+            if l_id == r_id {
+                valid.add(candidate.clone());
+            } else {
+                println!("Unable to verify {}", candidate);
+            }
+        }
+
+        valid
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use std::io::Write;
+    use std::{fs::OpenOptions, io};
+
     use super::*;
     use crate::exponential::make_rules;
+    use dotenv::dotenv;
     use ruler::enumo;
 
     type Ruleset = enumo::Ruleset<Exponential>;
@@ -295,5 +331,116 @@ mod test {
         let duration = start.elapsed();
 
         logger::write_baseline(&rules, "exponential", &herbie, "herbie", duration);
+    }
+
+    fn write(f: &str, s: &str) -> io::Result<()> {
+        let mut file = OpenOptions::new().append(true).create(true).open(f)?;
+
+        writeln!(file, "{}", s)?;
+        Ok(())
+    }
+
+    fn establish_baseline() {
+        let rules_t = Instant::now();
+        let rules = make_rules();
+        let duration = rules_t.elapsed();
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!("ENUMO | {} rules | {:?}", rules.len(), duration),
+        );
+        rules.to_file("jfp/exp/enumo.rules");
+    }
+
+    fn start_rules() -> Ruleset {
+        let syntax_rules =
+            Ruleset::new(["(pow ?x ?y) <=> (^ ?x ?y", "(abs ?x ?y) <=> (fabs ?x ?y)"]);
+        let mut rules = Exponential::get_exploratory_rules();
+        rules.extend(rational_rules());
+        rules.extend(starting_exponential_rules());
+        rules.extend(syntax_rules);
+        rules
+    }
+
+    #[tokio::test]
+    async fn case_study2() {
+        dotenv().ok();
+
+        // Run OOPSLA23 Enumo recipe
+        establish_baseline();
+
+        let prompt = "
+        Your task is to perform rule inference for equality saturation.
+        The domain is exponential functions, as follows:
+        Values: real numbers
+        Unary operators: ~, exp, log, sqrt, cbrt
+        Binary operators: +, -, *, /, pow
+
+        Terms must be written using s-expressions and prefix notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Variables are ?x, ?y, and ?z.
+
+        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Do not use any operators or syntax not listed here.
+        Do not use imaginary numbers.
+        All of the rules should use `exp`, `log`, `sqrt`, `cbrt`, or `pow`.
+        You may assume there is already a good set of rewrite rules for `~`, `-`, `+`, and `/`.
+
+        Your task is to generate sound, useful, and complete rewrite rules for the domain.
+        The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
+        ";
+        let rules_t = Instant::now();
+        let candidates = Ruleset::from_llm(&prompt).await;
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!(
+                "{} rule candidates in {:?}",
+                candidates.len(),
+                rules_t.elapsed()
+            ),
+        );
+        candidates.to_file("jfp/exp/candidates.rules");
+        let sound_t = Instant::now();
+        let sound = Exponential::validate_all(&candidates, &start_rules());
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!("{} sound rules in {:?}", sound.len(), sound_t.elapsed()),
+        );
+        sound.to_file("jfp/exp/sound.rules");
+
+        let reprompt = format!(
+            "
+        The following are rewrite rules for exponential functions:
+        {}
+        
+        These rules will be used for equality saturation.
+        Are there any rules missing? Please generate the missing rules.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
+        Print only the rules, one rule per line, with no additional text or explanation.
+        ",
+            sound.to_str_vec().join("\n")
+        );
+        let repromped_candidates = Ruleset::from_llm(&reprompt).await;
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!(
+                "{} rule candidates (reprompted) in {:?}",
+                candidates.len(),
+                rules_t.elapsed()
+            ),
+        );
+        repromped_candidates.to_file("jfp/exp/reprompted-candidates.rules");
+        let sound_t = Instant::now();
+        let sound = Exponential::validate_all(&repromped_candidates, &start_rules());
+        sound.to_file("jfp/exp/reprompted-sound.rules");
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!(
+                "{} sound rules (reprompted) in {:?}",
+                sound.len(),
+                sound_t.elapsed()
+            ),
+        );
     }
 }

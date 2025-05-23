@@ -483,7 +483,8 @@ mod tests {
 
         let eg_init = atoms3.to_egraph();
         // Allowed rules: run on clone, apply unions, no candidates
-        let (allowed, _) = prior.partition(|eq| CaddyAndFRep::is_allowed_rewrite(&eq.lhs, &eq.rhs));
+        let (allowed, _) =
+            prior.partition(|_, eq| CaddyAndFRep::is_allowed_rewrite(&eq.lhs, &eq.rhs));
         let eg_allowed = Scheduler::Compress(limits).run(&eg_init, &allowed);
 
         // Translation rules: grow egraph, extract candidates, assert!(saturated)

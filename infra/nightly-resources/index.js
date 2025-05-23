@@ -2,6 +2,10 @@
 // Populates the oopsla, herbie, and halide tables with data from the
 // global data object
 function load() {
+  document.getElementById("enumo_table").innerHTML = ConvertJsonToTable(
+    getBaseline("enumo")
+  );
+
   document.getElementById("baseline_table").innerHTML = ConvertJsonToTable(
     getBaseline("oopsla")
   );
@@ -66,16 +70,16 @@ function loadDeriveDetail() {
 
     let tableData = [
       {
-        "Enumo->Baseline (derivable)": formatRules(
+        "X->Baseline (derivable)": formatRules(
           derivability.enumo_derives_baseline[deriveType]?.can
         ),
-        "Enumo->Baseline (not derivable)": formatRules(
+        "X->Baseline (not derivable)": formatRules(
           derivability.enumo_derives_baseline[deriveType]?.cannot
         ),
-        "Baseline->Enumo (derivable)": formatRules(
+        "Baseline->X (derivable)": formatRules(
           derivability.baseline_derives_enumo[deriveType]?.can
         ),
-        "Baseline->Enumo (not derivable)": formatRules(
+        "Baseline->X (not derivable)": formatRules(
           derivability.baseline_derives_enumo[deriveType]?.cannot
         ),
       },
