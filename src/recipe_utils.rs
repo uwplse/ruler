@@ -46,7 +46,15 @@ fn run_workload_internal<L: SynthLanguage>(
     };
 
     let num_prior = prior.len();
+    println!("Starting minimize with {} candidates", candidates.len());
+    let start = Instant::now();
     let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
+    let duration = start.elapsed();
+    println!(
+        "Finished minimize with {} rules, {:?}",
+        chosen.len(),
+        duration
+    );
     let time = t.elapsed().as_secs_f64();
 
     if chosen.is_empty() && !allow_empty {
@@ -109,7 +117,7 @@ pub fn run_fast_forwarding<L: SynthLanguage>(
     let num_prior = prior.len();
 
     // Allowed rules: compress e-graph, no candidates
-    let (allowed, _) = prior.partition(|rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
+    let (allowed, _) = prior.partition(|_, rule| L::is_allowed_rewrite(&rule.lhs, &rule.rhs));
     let eg_allowed = Scheduler::Compress(prior_limits).run(&eg_init, &allowed);
 
     // Translation rules: grow egraph, extract candidates, assert!(saturated)

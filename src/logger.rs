@@ -126,7 +126,7 @@ pub fn write_bv_derivability<L: SynthLanguage>(
 ) {
     // Validate bv4 rules for this domain
     let start = Instant::now();
-    let (sound_bv4, _) = ported_bv4_rules.partition(|rule| rule.is_valid());
+    let (sound_bv4, _) = ported_bv4_rules.partition(|_, rule| rule.is_valid());
     let validate_time = start.elapsed();
 
     // Compute derivability

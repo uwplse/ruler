@@ -82,7 +82,7 @@ impl Scheduler {
                 runner.egraph
             }
             Scheduler::Saturating(limits) => {
-                let (sat, other) = ruleset.partition(|rule| rule.is_saturating());
+                let (sat, other) = ruleset.partition(|_, rule| rule.is_saturating());
                 let (sat, other): (Vec<Rewrite<_, _>>, Vec<Rewrite<_, _>>) = (
                     (sat.0.iter().map(|(_, rule)| rule.rewrite.clone()).collect()),
                     (other

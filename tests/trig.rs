@@ -467,12 +467,6 @@ mod test {
         sound.to_file("jfp/trig/combo-reprompt-sound.rules");
     }
 
-    #[test]
-    fn derive() {
-        let llm_rules = Ruleset::from_file("jfp/trig/combo-reprompt-sound.rules");
-        let enumo_rules = Ruleset::from_file("baseline/enumo_trig.rules");
-    }
-
     #[tokio::test]
     async fn llm_rules() {
         dotenv().ok();
@@ -674,7 +668,7 @@ mod test {
         all.extend(Trig::get_exploratory_rules());
         let mut all_but_exploratory = all.clone();
         all_but_exploratory.remove_all(Trig::get_exploratory_rules());
-        let (allowed, _) = all.partition(|r| Trig::is_allowed_rewrite(&r.lhs, &r.rhs));
+        let (allowed, _) = all.partition(|_, r| Trig::is_allowed_rewrite(&r.lhs, &r.rhs));
         let exploratory = Trig::get_exploratory_rules();
 
         let lits = Workload::new([
