@@ -59,25 +59,24 @@ impl Workload {
         Self::Set(sexps)
     }
 
-    pub async fn from_llm(prompt: &str, model: &str) -> Self {
-        let res = llm::query(prompt, model).await;
-        let mut valid_sexps = vec![];
-        let mut valid = 0;
-        let mut invalid = 0;
-        for line in res {
-            if let Ok(sexp) = line.parse() {
-                valid += 1;
-                valid_sexps.push(sexp);
-            } else {
-                invalid += 1;
-                println!("Skipping invalid s-expression: {}", line);
+    pub async fn from_llm(prompt: &str) -> Self {
+        let mut valid_sexps = HashSet::new();
+        for model in llm::models() {
+            let mut valid = 0;
+            let mut invalid = 0;
+            let res = llm::query(prompt, &model).await;
+            for line in res {
+                if let Ok(sexp) = line.parse() {
+                    valid += 1;
+                    valid_sexps.insert(sexp);
+                } else {
+                    invalid += 1;
+                    println!("Skipping invalid s-expression: {}", line);
+                }
             }
+            println!("{} | {} valid / {} invalid", model, valid, invalid);
         }
-        println!(
-            "LLM workload contained {} valid and {} invalid s-expressions.",
-            valid, invalid
-        );
-        Workload::Set(valid_sexps)
+        Workload::Set(valid_sexps.into_iter().collect())
     }
 
     pub fn as_lang<L: SynthLanguage>(&self) -> Self {
