@@ -381,7 +381,7 @@ mod test {
             "?a ==> (~ (~ ?a))",
         ]);
 
-        let (sound, unsound) = rules.partition(|_, r| r.is_valid());
+        let (sound, unsound) = rules.partition(|r| r.is_valid());
         assert!(sound.len() == 7);
         assert!(unsound.len() == 1);
     }
@@ -433,7 +433,7 @@ mod test {
                     true,
                 )
             };
-            let (sound, unsound) = rules.partition(|_, r| r.is_valid());
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
             let duration = start.elapsed();
 
             println!(
@@ -506,7 +506,7 @@ mod test {
                 Limits::minimize(),
                 true,
             );
-            let (sound, unsound) = rules.partition(|_, r| r.is_valid());
+            let (sound, unsound) = rules.partition(|r| r.is_valid());
             let duration = start.elapsed();
 
             println!(

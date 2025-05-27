@@ -1,7 +1,16 @@
 use egg::{AstSize, EClass, Extractor, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{io::Write, sync::Arc};
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
+use std::{
+    io::Write,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 use crate::{
     llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Pattern,
@@ -168,15 +177,16 @@ impl<L: SynthLanguage> Ruleset<L> {
     /// Partition a ruleset by applying a predicate function to each rule in the ruleset
     pub fn partition<F>(&self, f: F) -> (Self, Self)
     where
-        F: Fn(usize, &Rule<L>) -> bool + std::marker::Sync,
+        F: Fn(&Rule<L>) -> bool + std::marker::Sync,
     {
-        let rules: Vec<(usize, &Rule<L>)> = self.0.values().enumerate().collect();
-        let (yeses, nos): (Vec<_>, Vec<_>) =
-            rules.into_par_iter().partition(|(i, rule)| f(*i, rule));
+        let rules: Vec<&Rule<L>> = self.0.values().collect();
+
+        let (yeses, nos): (Vec<_>, Vec<_>) = rules.into_par_iter().partition(|rule| f(rule));
+
         let mut yes = Ruleset::default();
         let mut no = Ruleset::default();
-        yes.add_all(yeses.into_iter().map(|(_, r)| r).collect());
-        no.add_all(nos.into_iter().map(|(_, r)| r).collect());
+        yes.add_all(yeses.into_iter().map(|r| r).collect());
+        no.add_all(nos.into_iter().map(|r| r).collect());
         (yes, no)
     }
 
@@ -474,14 +484,8 @@ impl<L: SynthLanguage> Ruleset<L> {
     ///         If derive_type is LhsAndRhs, the e-graph is initialized with lhs and rhs
     ///     2. Run the ruleset
     ///     3. Return true if the lhs and rhs are equivalent, false otherwise.
-    pub fn can_derive(
-        &self,
-        derive_type: DeriveType,
-        rule: &Rule<L>,
-        limits: Limits,
-        i: usize,
-    ) -> bool {
-        let scheduler = Scheduler::Saturating(limits);
+    pub fn can_derive(&self, derive_type: DeriveType, rule: &Rule<L>, limits: Limits) -> bool {
+        let scheduler = Scheduler::Simple(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
         let rexpr = &L::instantiate(&rule.rhs);
@@ -507,13 +511,49 @@ impl<L: SynthLanguage> Ruleset<L> {
         } else {
             false
         };
-        println!("({}) {} | {}", i, rule, res);
         res
     }
 
     /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|i, rule| self.can_derive(derive_type, rule, limits, i))
+        let against: Vec<&Rule<L>> = against.0.values().collect();
+        let total = against.len();
+
+        let counter = Arc::new(AtomicUsize::new(0));
+        let pb = ProgressBar::new(total as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("##-"),
+        );
+        let counter_clone = Arc::clone(&counter);
+        let pb_clone = pb.clone();
+
+        let handle = thread::spawn(move || {
+            loop {
+                let processed = counter_clone.load(Ordering::Relaxed);
+                pb_clone.set_position(processed as u64);
+                if processed >= total {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+            pb_clone.finish();
+        });
+
+        let (yeses, nos): (Vec<_>, Vec<_>) = against.into_par_iter().partition(|rule| {
+            counter.fetch_add(1, Ordering::Relaxed);
+            self.can_derive(derive_type, rule, limits)
+        });
+
+        handle.join().unwrap();
+
+        let mut yes = Ruleset::default();
+        let mut no = Ruleset::default();
+        yes.add_all(yeses.into_iter().map(|r| r).collect());
+        no.add_all(nos.into_iter().map(|r| r).collect());
+        (yes, no)
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {
