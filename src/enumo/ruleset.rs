@@ -446,17 +446,14 @@ impl<L: SynthLanguage> Ruleset<L> {
         // 4. go through candidates and if they have merged, then
         // they are no longer candidates
         self.0 = Default::default();
-        let mut redundant = 0;
         for (l_id, r_id, rule) in initial {
             if egraph.find(l_id) == egraph.find(r_id) {
                 // candidate has merged (derivable from other rewrites)
-                redundant += 1;
                 continue;
             } else {
                 self.add(rule);
             }
         }
-        println!("{} elim / {} remain", redundant, self.len());
     }
 
     /// Minimization algorithm for rule selection
@@ -467,10 +464,24 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
+
+        let total = self.len() as u64;
+        let pb = ProgressBar::new(total);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("##-"),
+        );
+
         while !self.is_empty() {
+            let before = self.len();
             let selected = self.select(step_size, &mut invalid);
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
+            let after = self.len();
+            let processed = before.saturating_sub(after);
+            pb.inc(processed as u64);
         }
         // Return only the new rules
         chosen.remove_all(prior);
