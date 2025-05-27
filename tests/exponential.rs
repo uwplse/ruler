@@ -25,7 +25,7 @@ egg::define_language! {
         "cbrt" = Cbrt(Id),
 
         // arithmetic operators
-        "~" = Neg(Id),
+        "-" = Neg(Id),
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
@@ -153,6 +153,7 @@ mod test {
     use crate::exponential::make_rules;
     use dotenv::dotenv;
     use ruler::enumo;
+    use serde_json::{json, to_string_pretty};
 
     type Ruleset = enumo::Ruleset<Exponential>;
 
@@ -160,10 +161,10 @@ mod test {
         Ruleset::new(&[
             // exponential properties (expand)
             "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
-            "(exp (~ ?a)) ==> (/ 1 (exp ?a))",
+            "(exp (- ?a)) ==> (/ 1 (exp ?a))",
             // exponential properties (simplify)
             "(* (exp ?a) (exp ?b)) ==> (exp (+ ?a ?b))",
-            "(/ 1 (exp ?a)) ==> (exp (~ ?a))",
+            "(/ 1 (exp ?a)) ==> (exp (- ?a))",
             "(exp 0) ==> 1",
             // inverse properties
             "(log (exp ?a)) ==> ?a",
@@ -184,12 +185,12 @@ mod test {
             "?a ==> (- ?a 0)",
             "(/ ?a 1) ==> ?a",
             "?a ==> (/ ?a 1)",
-            "(/ ?a -1) ==> (~ ?a)",
-            "(~ ?a) ==> (/ ?a -1)",
-            "(- 0 ?a) ==> (~ ?a)",
-            "(~ ?a) ==> (- 0 ?a)",
-            "(* ?a -1) ==> (~ ?a)",
-            "(~ ?a) ==> (* ?a -1)",
+            "(/ ?a -1) ==> (- ?a)",
+            "(- ?a) ==> (/ ?a -1)",
+            "(- 0 ?a) ==> (- ?a)",
+            "(- ?a) ==> (- 0 ?a)",
+            "(* ?a -1) ==> (- ?a)",
+            "(- ?a) ==> (* ?a -1)",
             "(- ?a ?a) ==> (* ?a 0)",
             "(* ?a 0) ==> (- ?a ?a)",
             "(+ ?a 1) ==> (- ?a -1)",
@@ -200,8 +201,8 @@ mod test {
             "(/ (- -1 ?a) ?a) ==> (* (+ ?a 1) (/ -1 ?a))",
             "(* (/ -1 ?a) (- 1 ?a)) ==> (/ (- ?a 1) ?a)",
             "(/ (- ?a 1) ?a) ==> (* (/ -1 ?a) (- 1 ?a))",
-            "(- (/ ?a ?a) (/ 0 ?a)) ==> (* (~ ?a) (/ -1 ?a))",
-            "(* (~ ?a) (/ -1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",
+            "(- (/ ?a ?a) (/ 0 ?a)) ==> (* (- ?a) (/ -1 ?a))",
+            "(* (- ?a) (/ -1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",
             "(* (- 1 ?a) (/ 1 ?a)) ==> (/ (- 1 ?a) ?a)",
             "(/ (- 1 ?a) ?a) ==> (* (- 1 ?a) (/ 1 ?a))",
             "(* ?a (/ 1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",
@@ -351,6 +352,27 @@ mod test {
         rules.to_file("jfp/exp/enumo.rules");
     }
 
+    fn write_derivability(rules: Ruleset, rules_name: &str, against: &Ruleset, against_name: &str) {
+        let derive_t = Instant::now();
+        let (can, cannot) = rules.derive(ruler::DeriveType::LhsAndRhs, against, Limits::deriving());
+        let v = json!({
+            "duration": derive_t.elapsed(),
+            "num_rules": rules.len(),
+            "num_against": against.len(),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+        });
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!(
+                "{rules_name}->{against_name} {} Derivability",
+                can.len() as f64 / against.len() as f64
+            ),
+        );
+        let filename = format!("jfp/exp/{rules_name}-{against_name}-derive.json");
+        let _ = write(&filename, &to_string_pretty(&v).unwrap());
+    }
+
     fn start_rules() -> Ruleset {
         let syntax_rules =
             Ruleset::new(["(pow ?x ?y) <=> (^ ?x ?y", "(abs ?x ?y) <=> (fabs ?x ?y)"]);
@@ -368,11 +390,22 @@ mod test {
         // Run OOPSLA23 Enumo recipe
         establish_baseline();
 
+        let rational_rules = rational_rules();
+        let herbie_baseline = Ruleset::from_file("baseline/herbie-exp.rules");
+        let enumo_baseline = Ruleset::from_file("jfp/exp/enumo.rules");
+
+        write_derivability(
+            enumo_baseline.union(&rational_rules),
+            "enumo-rational",
+            &herbie_baseline,
+            "Herbie",
+        );
+
         let prompt = "
         Your task is to perform rule inference for equality saturation.
         The domain is exponential functions, as follows:
         Values: real numbers
-        Unary operators: ~, exp, log, sqrt, cbrt
+        Unary operators: -, exp, log, sqrt, cbrt
         Binary operators: +, -, *, /, pow
 
         Terms must be written using s-expressions and prefix notation.
@@ -383,7 +416,7 @@ mod test {
         Do not use any operators or syntax not listed here.
         Do not use imaginary numbers.
         All of the rules should use `exp`, `log`, `sqrt`, `cbrt`, or `pow`.
-        You may assume there is already a good set of rewrite rules for `~`, `-`, `+`, and `/`.
+        You may assume there is already a good set of rewrite rules for `-`, `-`, `+`, and `/`.
 
         Your task is to generate sound, useful, and complete rewrite rules for the domain.
         The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
@@ -409,6 +442,27 @@ mod test {
         );
         sound.to_file("jfp/exp/sound.rules");
 
+        write_derivability(
+            sound.union(&rational_rules),
+            "llm-sound-rational",
+            &enumo_baseline,
+            "Enumo",
+        );
+
+        write_derivability(
+            sound.union(&rational_rules),
+            "llm-sound-rational",
+            &herbie_baseline,
+            "Herbie",
+        );
+
+        write_derivability(
+            enumo_baseline.union(&rational_rules),
+            "Enumo",
+            &sound,
+            "llm-sound",
+        );
+
         let reprompt = format!(
             "
         The following are rewrite rules for exponential functions:
@@ -432,15 +486,46 @@ mod test {
         );
         repromped_candidates.to_file("jfp/exp/reprompted-candidates.rules");
         let sound_t = Instant::now();
-        let sound = Exponential::validate_all(&repromped_candidates, &start_rules());
-        sound.to_file("jfp/exp/reprompted-sound.rules");
+        let reprompted_sound = Exponential::validate_all(&repromped_candidates, &start_rules());
+        reprompted_sound.to_file("jfp/exp/reprompted-sound.rules");
         let _ = write(
             "jfp/exp/log.txt",
             &format!(
                 "{} sound rules (reprompted) in {:?}",
-                sound.len(),
+                reprompted_sound.len(),
                 sound_t.elapsed()
             ),
+        );
+
+        write_derivability(
+            reprompted_sound.union(&sound).union(&rational_rules),
+            "llm-sound-reprompted-rational",
+            &enumo_baseline,
+            "Enumo",
+        );
+
+        write_derivability(
+            reprompted_sound.union(&sound).union(&rational_rules),
+            "llm-sound-reprompted-rational",
+            &herbie_baseline,
+            "Herbie",
+        );
+
+        write_derivability(
+            enumo_baseline.union(&rational_rules),
+            "Enumo",
+            &reprompted_sound.union(&sound),
+            "llm-sound-reprompted",
+        );
+
+        write_derivability(
+            enumo_baseline
+                .union(&sound)
+                .union(&reprompted_sound)
+                .union(&rational_rules),
+            "enumo-llm-rational",
+            &herbie_baseline,
+            "Herbie",
         );
     }
 }

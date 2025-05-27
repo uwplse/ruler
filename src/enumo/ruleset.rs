@@ -4,8 +4,8 @@ use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{io::Write, sync::Arc};
 
 use crate::{
-    llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
-    SynthAnalysis, SynthLanguage,
+    llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Pattern,
+    Signature, SynthAnalysis, SynthLanguage,
 };
 
 use super::{Rule, Scheduler};
@@ -212,18 +212,31 @@ impl<L: SynthLanguage> Ruleset<L> {
             let mut invalid = 0;
             let res = llm::query(prompt, &model).await;
             for line in res {
-                if let Ok((forwards, backwards)) = Rule::from_string(&line) {
-                    num_rules += 1;
-                    rules.insert(forwards.name.clone(), forwards);
-                    if let Some(backwards) = backwards {
-                        num_rules += 1;
-                        rules.insert(backwards.name.clone(), backwards);
+                if let Some((l, r)) = line.split_once("=>") {
+                    if let Ok(l_pat) = l.parse::<Pattern<L>>() {
+                        if let Ok(r_pat) = r.parse::<Pattern<L>>() {
+                            if let Some(forwards) = Rule::new(&l_pat, &r_pat) {
+                                num_rules += 1;
+                                rules.insert(forwards.name.clone(), forwards);
+                            } else {
+                                invalid += 1;
+                                println!("Invalid rule: {}", line);
+                            }
+                            if let Some(backwards) = Rule::new(&r_pat, &l_pat) {
+                                num_rules += 1;
+                                rules.insert(backwards.name.clone(), backwards);
+                            }
+                        } else {
+                            invalid += 1;
+                            println!("Invalid rule: {}", line);
+                        }
+                    } else {
+                        invalid += 1;
+                        println!("Invalid rule: {}", line);
                     }
-                } else {
-                    invalid += 1;
-                    println!("Skipping invalid rule: {}", line);
                 }
             }
+
             println!("{model} | {num_rules} ({invalid} invalid)");
         }
 

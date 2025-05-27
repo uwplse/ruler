@@ -130,7 +130,7 @@ egg::define_language! {
     "cis" = Cis(Id),
 
     // arithmetic operators
-    "~" = Neg(Id),
+    "-" = Neg(Id),
     "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
@@ -156,38 +156,38 @@ impl SynthLanguage for Trig {
         Ruleset::new(&[
             // definition of sine, cosine, tangent
             // (sine)
-            "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",
-            "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)",
+            "(sin ?a) ==> (/ (- (cis ?a) (cis (- ?a))) (* 2 I))",
+            "(/ (- (cis ?a) (cis (- ?a))) (* 2 I)) ==> (sin ?a)",
             // (cosine)
-            "(cos ?a) ==> (/ (+ (cis ?a) (cis (~ ?a))) 2)",
-            "(/ (+ (cis ?a) (cis (~ ?a))) 2) ==> (cos ?a)",
+            "(cos ?a) ==> (/ (+ (cis ?a) (cis (- ?a))) 2)",
+            "(/ (+ (cis ?a) (cis (- ?a))) 2) ==> (cos ?a)",
             // (tangent)
-            "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
-            "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
+            "(tan ?a) ==> (* I (/ (- (cis (- ?a)) (cis ?a)) (+ (cis (- ?a)) (cis ?a))))",
+            "(* I (/ (- (cis (- ?a)) (cis ?a)) (+ (cis (- ?a)) (cis ?a)))) ==> (tan ?a)",
             // (sine, alternatively)
-            "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)",
-            "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) => (sin ?a)",
+            "(sin ?a) ==> (/ (- (* I (cis (- ?a))) (* I (cis ?a))) 2)",
+            "(/ (- (* I (cis (- ?a))) (* I (cis ?a))) 2) => (sin ?a)",
             // (cosine, alternatively)
-            "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))",
-            "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)",
+            "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (- ?a)))) (* 2 I))",
+            "(/ (+ (* I (cis ?a)) (* I (cis (- ?a)))) (* 2 I)) ==> (cos ?a)",
             // relating tangent to sine and cosine
             "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
             "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
             // definition of cos(a)*cos(b) and sin(a)*sin(b)
-            "(* (cos ?a) (cos ?b)) ==> (/ (+ (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)",
-            "(* (sin ?a) (sin ?b)) ==> (/ (- (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)",
+            "(* (cos ?a) (cos ?b)) ==> (/ (+ (+ (cis (- ?a ?b)) (cis (- (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (- (+ ?a ?b))))) 4)",
+            "(* (sin ?a) (sin ?b)) ==> (/ (- (+ (cis (- ?a ?b)) (cis (- (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (- (+ ?a ?b))))) 4)",
             // definition of cos(a)*sin(b) and sin(a)*cos(b)
-            "(* (cos ?a) (sin ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?b ?a)) (cis (~ (- ?b ?a))))) (* 4 I))",
-            "(* (sin ?a) (cos ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?a ?b)) (cis (~ (- ?a ?b))))) (* 4 I))",
+            "(* (cos ?a) (sin ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (- (+ ?a ?b)))) (- (cis (- ?b ?a)) (cis (- (- ?b ?a))))) (* 4 I))",
+            "(* (sin ?a) (cos ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (- (+ ?a ?b)))) (- (cis (- ?a ?b)) (cis (- (- ?a ?b))))) (* 4 I))",
             // definition of square
             "(sqr ?a) ==> (* ?a ?a)",
             "(* ?a ?a) ==> (sqr ?a)",
             // [Redundant, but left here so we don't have to compute them again]
             // definition of cos^2(a) and sin^2(a)
-            // "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)",
-            // "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
-            // "(* (sin ?a) (sin ?a)) ==> (~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))",
-            // "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
+            // "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4)",
+            // "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
+            // "(* (sin ?a) (sin ?a)) ==> (- (/ (- (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4))",
+            // "(- (/ (- (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
         ])
     }
 
@@ -288,7 +288,7 @@ impl SynthLanguage for Trig {
         }
 
         if let Some(v) = to_add {
-            // add (~ v) if v is negative or v is zero
+            // add (- v) if v is negative or v is zero
             if let Trig::RealConst(n) = v {
                 if let Ok(x) = n.as_str().parse::<Rational>() {
                     if x.is_negative() || x.is_zero() {
@@ -358,6 +358,7 @@ mod test {
         recipe_utils::run_fast_forwarding,
         Limits,
     };
+    use serde_json::{json, to_string_pretty};
 
     // Extra rules about `cis` and `I` to "fast-forward" rule synthesis
     pub fn prior_rules() -> Ruleset<Trig> {
@@ -368,18 +369,18 @@ mod test {
             // constant folding for cis
             "(cis 0) ==> 1",
             "(cis (/ PI 2)) ==> I",
-            "(cis (~ (/ PI 2))) ==> (~ I)",
+            "(cis (- (/ PI 2))) ==> (- I)",
             "(cis PI) ==> -1",
             // cis identities
             "(cis (+ ?a ?b)) ==> (* (cis ?a) (cis ?b))",
             "(* (cis ?a) (cis ?b)) ==> (cis (+ ?a ?b))",
-            "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (~ ?b)))",
-            "(* (cis ?a) (cis (~ ?b))) ==> (cis (- ?a ?b))",
-            "(cis (~ ?a)) ==> (/ 1 (cis ?a))",
-            "(/ 1 (cis ?a)) ==> (cis (~ ?a))",
-            "(* (cis ?a) (cis (~ ?a))) ==> 1",
+            "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (- ?b)))",
+            "(* (cis ?a) (cis (- ?b))) ==> (cis (- ?a ?b))",
+            "(cis (- ?a)) ==> (/ 1 (cis ?a))",
+            "(/ 1 (cis ?a)) ==> (cis (- ?a))",
+            "(* (cis ?a) (cis (- ?a))) ==> 1",
             // constant folding I
-            "(/ 1 I) ==> (~ I)",
+            "(/ 1 I) ==> (- I)",
             "(* I I) ==> -1",
         ])
     }
@@ -410,6 +411,32 @@ mod test {
         rules.to_file("jfp/trig/enumo.rules");
     }
 
+    fn write_derivability(
+        rules: Ruleset<Trig>,
+        rules_name: &str,
+        against: &Ruleset<Trig>,
+        against_name: &str,
+    ) {
+        let derive_t = Instant::now();
+        let (can, cannot) = rules.derive(ruler::DeriveType::Lhs, against, Limits::deriving());
+        let v = json!({
+            "duration": derive_t.elapsed(),
+            "num_rules": rules.len(),
+            "num_against": against.len(),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+        });
+        let _ = write(
+            "jfp/trig/log.txt",
+            &format!(
+                "{rules_name}->{against_name} {} Derivability",
+                can.len() as f64 / against.len() as f64
+            ),
+        );
+        let filename = format!("jfp/trig/{rules_name}-{against_name}-derive.json");
+        let _ = write(&filename, &to_string_pretty(&v).unwrap());
+    }
+
     #[tokio::test]
     async fn case_study2() {
         dotenv().ok();
@@ -417,11 +444,23 @@ mod test {
         // Run OOPSLA23 Enumo recipe
         establish_baseline();
 
+        let complex_rules: Ruleset<Trig> =
+            Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+        let herbie_baseline: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
+        let enumo_baseline: Ruleset<Trig> = Ruleset::from_file("jfp/trig/enumo.rules");
+
+        write_derivability(
+            enumo_baseline.union(&complex_rules),
+            "enumo-complex",
+            &herbie_baseline,
+            "Herbie",
+        );
+
         let prompt = "
         Your task is to perform rule inference for equality saturation.
         The domain is trigonometric functions, as follows:
         Values: real numbers, PI
-        Unary operators: ~, sin, cos, tan, sqr
+        Unary operators: -, sin, cos, tan, sqr
         Binary operators: +, -, *, /
 
         Terms must be written using s-expressions and prefix notation.
@@ -432,7 +471,7 @@ mod test {
         Do not use any operators or syntax not listed here.
         Do not use imaginary numbers.
         All of the rules should use `sin`, `cos`, or `tan`.
-        You may assume there is already a good set of rewrite rules for `~`, `-`, `+`, `/`, and `sqr`.
+        You may assume there is already a good set of rewrite rules for `-`, `-`, `+`, `/`, and `sqr`.
 
         Your task is to generate sound, useful, and complete rewrite rules for the domain.
         The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
@@ -450,6 +489,7 @@ mod test {
             ),
         );
         candidates.to_file("jfp/trig/candidates.rules");
+
         let sound_t = Instant::now();
         let sound = Trig::validate_all(&candidates, &start_rules());
         let _ = write(
@@ -458,11 +498,26 @@ mod test {
         );
         sound.to_file("jfp/trig/sound.rules");
 
-        // not denotation or prior
-        // sound
-        //     .union(complex)
-        //     .derive(DeriveType::Lhs, &enumo_trig, limits);
-        // and vice versa
+        write_derivability(
+            sound.union(&complex_rules),
+            "llm-sound-complex",
+            &enumo_baseline,
+            "Enumo",
+        );
+
+        write_derivability(
+            sound.union(&complex_rules),
+            "llm-sound-complex",
+            &herbie_baseline,
+            "Herbie",
+        );
+
+        write_derivability(
+            enumo_baseline.union(&complex_rules),
+            "Enumo",
+            &sound,
+            "llm-sound",
+        );
 
         let reprompt = format!(
             "
@@ -487,15 +542,46 @@ mod test {
         );
         repromped_candidates.to_file("jfp/trig/reprompted-candidates.rules");
         let sound_t = Instant::now();
-        let sound = Trig::validate_all(&repromped_candidates, &start_rules());
-        sound.to_file("jfp/trig/reprompted-sound.rules");
+        let reprompted_sound = Trig::validate_all(&repromped_candidates, &start_rules());
+        reprompted_sound.to_file("jfp/trig/reprompted-sound.rules");
         let _ = write(
             "jfp/trig/log.txt",
             &format!(
                 "{} sound rules (reprompted) in {:?}",
-                sound.len(),
+                reprompted_sound.len(),
                 sound_t.elapsed()
             ),
+        );
+
+        write_derivability(
+            reprompted_sound.union(&sound).union(&complex_rules),
+            "llm-sound-reprompted-complex",
+            &enumo_baseline,
+            "Enumo",
+        );
+
+        write_derivability(
+            reprompted_sound.union(&sound).union(&complex_rules),
+            "llm-sound-reprompted-complex",
+            &herbie_baseline,
+            "Herbie",
+        );
+
+        write_derivability(
+            enumo_baseline.union(&complex_rules),
+            "Enumo",
+            &reprompted_sound.union(&sound),
+            "llm-sound-reprompted",
+        );
+
+        write_derivability(
+            enumo_baseline
+                .union(&sound)
+                .union(&reprompted_sound)
+                .union(&complex_rules),
+            "enumo-llm-complex",
+            &herbie_baseline,
+            "Herbie",
         );
     }
 
