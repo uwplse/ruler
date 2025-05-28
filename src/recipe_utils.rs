@@ -69,7 +69,7 @@ fn run_workload_internal<L: SynthLanguage>(
         num_prior
     );
 
-    chosen.pretty_print();
+    // chosen.pretty_print();
 
     chosen
 }
