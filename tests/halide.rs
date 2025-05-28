@@ -486,7 +486,7 @@ mod test {
         );
     }
 
-    fn priors() -> Vec<(String, Ruleset<Pred>)> {
+    fn cs2_priors() -> Vec<(String, Ruleset<Pred>)> {
         vec![
             ("None".into(), Ruleset::default()),
             (
@@ -537,7 +537,7 @@ mod test {
         );
         candidates.to_file("jfp/halide/case_study2/candidates.rules");
 
-        for (prior_name, prior_rules) in priors() {
+        for (prior_name, prior_rules) in cs2_priors() {
             let mut candidates_copy = candidates.clone();
             let minimize_t = Instant::now();
             let (sound, invalid) = candidates_copy
@@ -568,7 +568,7 @@ mod test {
             );
             // Don't do Halide->X because Halide rules aren't designed for eqsat
 
-            for (prior_name1, prior_rules1) in priors() {
+            for (prior_name1, prior_rules1) in cs2_priors() {
                 if prior_rules1.is_empty() {
                     continue;
                 }
@@ -642,7 +642,7 @@ mod test {
             );
             // Don't do Halide->X because Halide rules aren't designed for eqsat
 
-            for (prior_name1, prior_rules1) in priors() {
+            for (prior_name1, prior_rules1) in cs2_priors() {
                 if prior_rules1.is_empty() {
                     continue;
                 }
@@ -665,6 +665,25 @@ mod test {
                 );
             }
         }
+    }
+
+    fn cs1_priors() -> Vec<(String, Ruleset<Pred>)> {
+        vec![
+            (
+                "A5".into(),
+                Ruleset::from_file("jfp/halide/baseline/atoms5.rules"),
+            ),
+            (
+                "Enumo".into(),
+                Ruleset::from_file("jfp/halide/baseline/enumo.rules"),
+            ),
+            (
+                "LLM-2".into(),
+                Ruleset::from_file("jfp/halide/case_study2/None-rules.rules").union(
+                    &Ruleset::from_file("jfp/halide/case_study2/None-reprompted-rules.rules"),
+                ),
+            ),
+        ]
     }
 
     async fn case_study1() {
@@ -743,7 +762,7 @@ mod test {
             );
             wkld.to_file(&format!("jfp/halide/case_study1/{}.terms", ty));
 
-            for (prior_name, prior_rules) in priors() {
+            for (prior_name, prior_rules) in cs1_priors() {
                 let _ = write(
                     "jfp/halide/case_study1/log.txt",
                     &format!("--- {} | {} ---", ty, prior_name),

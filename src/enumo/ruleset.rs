@@ -463,7 +463,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
-        let step_size = 1;
+        let step_size = 2;
 
         let total = self.len() as u64;
         let pb = ProgressBar::new(total);
