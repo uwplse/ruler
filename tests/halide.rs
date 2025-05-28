@@ -842,13 +842,16 @@ mod test {
     }
 
     #[tokio::test]
-    async fn run_llm_case_studies() {
+    async fn case_study2_test() {
         println!("--- STARTING BASELINE ---");
         establish_baseline();
 
         println!("--- STARTING CASE STUDY 2 ---");
         case_study2().await;
+    }
 
+    #[tokio::test]
+    async fn case_study1_test() {
         println!("--- STARTING CASE STUDY 1 ---");
         case_study1().await;
     }
