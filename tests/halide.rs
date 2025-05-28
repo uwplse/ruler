@@ -662,7 +662,7 @@ mod test {
                 let egraph = wkld.to_egraph::<Pred>();
                 let _ = write(
                     "jfp/halide/case_study1/log.txt",
-                    &format!("{}", egraph.number_of_classes()),
+                    &format!("{} eclasses", egraph.number_of_classes()),
                 );
 
                 // Run prior rules
