@@ -355,18 +355,21 @@ mod test {
     fn write_derivability(rules: Ruleset, rules_name: &str, against: &Ruleset, against_name: &str) {
         let derive_t = Instant::now();
         let (can, cannot) = rules.derive(ruler::DeriveType::LhsAndRhs, against, Limits::deriving());
+        let derive_t_elapsed = derive_t.elapsed();
         let v = json!({
-            "duration": derive_t.elapsed(),
+            "duration": derive_t_elapsed,
             "num_rules": rules.len(),
             "num_against": against.len(),
             "can": can.to_str_vec(),
             "cannot": cannot.to_str_vec()
         });
+
         let _ = write(
             "jfp/exp/log.txt",
             &format!(
-                "{rules_name}->{against_name} {} Derivability",
-                can.len() as f64 / against.len() as f64
+                "{rules_name}->{against_name} | {:.3} ({:.1?})",
+                can.len() as f64 / against.len() as f64,
+                derive_t_elapsed
             ),
         );
         let filename = format!("jfp/exp/{rules_name}-{against_name}-derive.json");
@@ -396,7 +399,7 @@ mod test {
 
         write_derivability(
             enumo_baseline.union(&rational_rules),
-            "enumo-rational",
+            "ENUMO-RAT",
             &herbie_baseline,
             "Herbie",
         );
@@ -444,14 +447,14 @@ mod test {
 
         write_derivability(
             sound.union(&rational_rules),
-            "llm-sound-rational",
+            "LLM-1-RAT",
             &enumo_baseline,
             "Enumo",
         );
 
         write_derivability(
             sound.union(&rational_rules),
-            "llm-sound-rational",
+            "LLM-1-RAT",
             &herbie_baseline,
             "Herbie",
         );
@@ -460,7 +463,7 @@ mod test {
             enumo_baseline.union(&rational_rules),
             "Enumo",
             &sound,
-            "llm-sound",
+            "LLM-1",
         );
 
         let reprompt = format!(
@@ -499,14 +502,14 @@ mod test {
 
         write_derivability(
             reprompted_sound.union(&sound).union(&rational_rules),
-            "llm-sound-reprompted-rational",
+            "LLM-2-RAT",
             &enumo_baseline,
             "Enumo",
         );
 
         write_derivability(
             reprompted_sound.union(&sound).union(&rational_rules),
-            "llm-sound-reprompted-rational",
+            "LLM-2-RAT",
             &herbie_baseline,
             "Herbie",
         );
@@ -515,7 +518,7 @@ mod test {
             enumo_baseline.union(&rational_rules),
             "Enumo",
             &reprompted_sound.union(&sound),
-            "llm-sound-reprompted",
+            "LLM-2",
         );
 
         write_derivability(
@@ -523,7 +526,7 @@ mod test {
                 .union(&sound)
                 .union(&reprompted_sound)
                 .union(&rational_rules),
-            "enumo-llm-rational",
+            "ENUMO-LLM-2-RAT",
             &herbie_baseline,
             "Herbie",
         );

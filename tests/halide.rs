@@ -329,7 +329,7 @@ mod test {
         let _ = write(
             &format!("jfp/halide/{subdir}/log.txt"),
             &format!(
-                "{rules_name}->{against_name} {} Derivability | {:?}",
+                "{rules_name}->{against_name} | {:.3} ({:.1?})",
                 can.len() as f64 / against.len() as f64,
                 derive_t_elapsed
             ),
@@ -366,6 +366,8 @@ mod test {
         a5.to_file("jfp/halide/baseline/atoms5.rules");
         write_derivability(a5.clone(), "A5", &halide_baseline, "Halide", "baseline");
 
+        write_derivability(a5.clone(), "A5", &a5, "A5", "baseline");
+
         let enumo_t = Instant::now();
         let enumo_rules = halide_rules();
         let duration = enumo_t.elapsed();
@@ -374,6 +376,8 @@ mod test {
             &format!("ENUMO | {} rules | {:?}", enumo_rules.len(), duration),
         );
         enumo_rules.to_file("jfp/halide/baseline/enumo.rules");
+
+        write_derivability(a5.clone(), "A5", &enumo_rules, "Enumo", "baseline");
         write_derivability(
             enumo_rules.clone(),
             "Enumo",
@@ -382,7 +386,13 @@ mod test {
             "baseline",
         );
         write_derivability(enumo_rules.clone(), "Enumo", &a5, "A5", "baseline");
-        write_derivability(a5, "A5", &enumo_rules, "Enumo", "baseline");
+        write_derivability(
+            enumo_rules.clone(),
+            "Enumo",
+            &enumo_rules,
+            "Enumo",
+            "baseline",
+        );
     }
 
     fn priors() -> Vec<(String, Ruleset<Pred>)> {
@@ -465,7 +475,13 @@ mod test {
                 "Halide",
                 "case_study2",
             );
+            // Don't do Halide->X because Halide rules aren't designed for eqsat
+
             for (prior_name1, prior_rules1) in priors() {
+                if prior_rules1.is_empty() {
+                    continue;
+                }
+                // LLM-1->X
                 write_derivability(
                     sound.union(&prior_rules),
                     &name,
@@ -473,6 +489,8 @@ mod test {
                     &prior_name1,
                     "case_study2",
                 );
+                // X->LLM-1
+                write_derivability(prior_rules1, &prior_name1, &sound, &name, "case_study2");
             }
 
             // Reprompt for missing rules
@@ -531,12 +549,27 @@ mod test {
                 "Halide",
                 "case_study2",
             );
+            // Don't do Halide->X because Halide rules aren't designed for eqsat
+
             for (prior_name1, prior_rules1) in priors() {
+                if prior_rules1.is_empty() {
+                    continue;
+                }
+                // LLM-2->X
                 write_derivability(
-                    reprompted_sound.union(&prior_rules),
+                    reprompted_sound.union(&sound).union(&prior_rules),
                     &reprompted_name,
                     &prior_rules1,
                     &prior_name1,
+                    "case_study2",
+                );
+
+                // X->LLM-2
+                write_derivability(
+                    prior_rules1,
+                    &prior_name1,
+                    &reprompted_sound.union(&sound),
+                    &reprompted_name,
                     "case_study2",
                 );
             }

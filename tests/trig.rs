@@ -419,8 +419,9 @@ mod test {
     ) {
         let derive_t = Instant::now();
         let (can, cannot) = rules.derive(ruler::DeriveType::Lhs, against, Limits::deriving());
+        let derive_t_elapsed = derive_t.elapsed();
         let v = json!({
-            "duration": derive_t.elapsed(),
+            "duration": derive_t_elapsed,
             "num_rules": rules.len(),
             "num_against": against.len(),
             "can": can.to_str_vec(),
@@ -429,8 +430,9 @@ mod test {
         let _ = write(
             "jfp/trig/log.txt",
             &format!(
-                "{rules_name}->{against_name} {} Derivability",
-                can.len() as f64 / against.len() as f64
+                "{rules_name}->{against_name} | {:.3} ({:.1?})",
+                can.len() as f64 / against.len() as f64,
+                derive_t_elapsed
             ),
         );
         let filename = format!("jfp/trig/{rules_name}-{against_name}-derive.json");
@@ -451,7 +453,7 @@ mod test {
 
         write_derivability(
             enumo_baseline.union(&complex_rules),
-            "enumo-complex",
+            "ENUMO-C",
             &herbie_baseline,
             "Herbie",
         );
@@ -500,14 +502,14 @@ mod test {
 
         write_derivability(
             sound.union(&complex_rules),
-            "llm-sound-complex",
+            "LLM-1-C",
             &enumo_baseline,
             "Enumo",
         );
 
         write_derivability(
             sound.union(&complex_rules),
-            "llm-sound-complex",
+            "LLM-1-C",
             &herbie_baseline,
             "Herbie",
         );
@@ -516,7 +518,7 @@ mod test {
             enumo_baseline.union(&complex_rules),
             "Enumo",
             &sound,
-            "llm-sound",
+            "LLM-1",
         );
 
         let reprompt = format!(
@@ -555,14 +557,14 @@ mod test {
 
         write_derivability(
             reprompted_sound.union(&sound).union(&complex_rules),
-            "llm-sound-reprompted-complex",
+            "LLM-2-C",
             &enumo_baseline,
             "Enumo",
         );
 
         write_derivability(
             reprompted_sound.union(&sound).union(&complex_rules),
-            "llm-sound-reprompted-complex",
+            "LLM-2-C",
             &herbie_baseline,
             "Herbie",
         );
@@ -571,7 +573,7 @@ mod test {
             enumo_baseline.union(&complex_rules),
             "Enumo",
             &reprompted_sound.union(&sound),
-            "llm-sound-reprompted",
+            "LLM-2",
         );
 
         write_derivability(
@@ -579,7 +581,7 @@ mod test {
                 .union(&sound)
                 .union(&reprompted_sound)
                 .union(&complex_rules),
-            "enumo-llm-complex",
+            "ENUMO-LLM-2-C",
             &herbie_baseline,
             "Herbie",
         );
