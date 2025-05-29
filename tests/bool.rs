@@ -187,7 +187,7 @@ mod test {
 
         let egraph = scheduler.run(&atoms3.to_egraph(), &all_rules);
         let mut candidates = Ruleset::cvec_match(&egraph);
-        let rules3 = candidates.minimize(all_rules.clone(), scheduler).0;
+        let rules3 = candidates.minimize(all_rules.clone(), scheduler, 1).0;
         all_rules.extend(rules3);
 
         let atoms4 = iter_bool(4);
@@ -195,7 +195,7 @@ mod test {
 
         let egraph = scheduler.run(&atoms4.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
-        let rules4 = candidates.minimize(all_rules.clone(), scheduler).0;
+        let rules4 = candidates.minimize(all_rules.clone(), scheduler, 1).0;
         all_rules.extend(rules4);
 
         let atoms5 = iter_bool(5);
@@ -203,7 +203,7 @@ mod test {
 
         let egraph = scheduler.run(&atoms5.to_egraph(), &all_rules);
         candidates = Ruleset::cvec_match(&egraph);
-        let rules5 = candidates.minimize(all_rules.clone(), scheduler).0;
+        let rules5 = candidates.minimize(all_rules.clone(), scheduler, 1).0;
         all_rules.extend(rules5);
 
         let expected: Ruleset<Bool> = Ruleset::new(&[

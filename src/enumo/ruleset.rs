@@ -460,10 +460,14 @@ impl<L: SynthLanguage> Ruleset<L> {
     ///     while there are still candidates to choose:
     ///         1. select the best rule candidate
     ///         2. filter out candidates that are redundant given the addition of the selected rule
-    pub fn minimize(&mut self, prior: Ruleset<L>, scheduler: Scheduler) -> (Self, Self) {
+    pub fn minimize(
+        &mut self,
+        prior: Ruleset<L>,
+        scheduler: Scheduler,
+        step_size: usize,
+    ) -> (Self, Self) {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
-        let step_size = 2;
 
         let total = self.len() as u64;
         let pb = ProgressBar::new(total);

@@ -540,8 +540,11 @@ mod test {
         for (prior_name, prior_rules) in cs2_priors() {
             let mut candidates_copy = candidates.clone();
             let minimize_t = Instant::now();
-            let (sound, invalid) = candidates_copy
-                .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+            let (sound, invalid) = candidates_copy.minimize(
+                prior_rules.clone(),
+                Scheduler::Compress(Limits::minimize()),
+                1,
+            );
             let _ = write(
                 "jfp/halide/case_study2/log.txt",
                 &format!(
@@ -615,6 +618,7 @@ mod test {
             let (reprompted_sound, invalid) = reprompted_candidates.minimize(
                 sound.union(&prior_rules),
                 Scheduler::Compress(Limits::minimize()),
+                1,
             );
             let _ = write(
                 "jfp/halide/case_study2/log.txt",
@@ -803,8 +807,14 @@ mod test {
 
                 // Minimize
                 let minimize_t = Instant::now();
-                let (rules, _) = candidates
-                    .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+                let (rules, _) = candidates.minimize(
+                    prior_rules.clone(),
+                    Scheduler::Compress(Limits::minimize()),
+                    match ty {
+                        WkldType::Term => 1,
+                        WkldType::Pat => 5,
+                    },
+                );
                 let _ = write(
                     "jfp/halide/case_study1/log.txt",
                     &format!(

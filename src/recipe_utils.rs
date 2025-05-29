@@ -48,7 +48,7 @@ fn run_workload_internal<L: SynthLanguage>(
     let num_prior = prior.len();
     println!("Starting minimize with {} candidates", candidates.len());
     let start = Instant::now();
-    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits));
+    let (chosen, _) = candidates.minimize(prior, Scheduler::Compress(minimize_limits), 1);
     let duration = start.elapsed();
     println!(
         "Finished minimize with {} rules, {:?}",
@@ -132,7 +132,7 @@ pub fn run_fast_forwarding<L: SynthLanguage>(
     candidates.extend(Ruleset::extract_candidates(&eg_denote, &eg_final));
 
     let chosen = candidates
-        .minimize(prior, Scheduler::Compress(minimize_limits))
+        .minimize(prior, Scheduler::Compress(minimize_limits), 1)
         .0;
     let time = t.elapsed().as_secs_f64();
 

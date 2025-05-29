@@ -670,7 +670,7 @@ mod test {
         candidates.extend(Ruleset::extract_candidates(&g2, &g3));
 
         // let (sound, _) = candidates.partition(|r| r.is_valid());
-        let (sound, _) = candidates.minimize(minimize.rules, minimize.scheduler);
+        let (sound, _) = candidates.minimize(minimize.rules, minimize.scheduler, 1);
 
         logger::write_ff_phase(phase1, phase2, phase3, start.elapsed(), &sound);
 

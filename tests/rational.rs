@@ -389,7 +389,7 @@ impl Math {
         };
 
         let num_prior = prior.len();
-        let (chosen, invalid) = candidates.minimize(prior.clone(), Scheduler::Compress(limits));
+        let (chosen, invalid) = candidates.minimize(prior.clone(), Scheduler::Compress(limits), 1);
 
         println!(
             "Found {} valid and {} invalid rules",
@@ -417,7 +417,7 @@ impl Math {
         );
 
         let chosen_conditional = with_condition
-            .minimize(prior.union(&chosen), Scheduler::Compress(limits))
+            .minimize(prior.union(&chosen), Scheduler::Compress(limits), 1)
             .0;
 
         let result = chosen.union(&chosen_conditional);
