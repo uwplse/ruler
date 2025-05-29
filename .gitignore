@@ -36,4 +36,4 @@ out/
 !scripts/oopsla21/ablation/submitted-plots/**/*.pdf
 !scripts/oopsla21/ablation/submitted-plots/**/*.json
 
-jfp*/
+stash

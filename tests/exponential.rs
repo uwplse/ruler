@@ -341,15 +341,16 @@ mod test {
         Ok(())
     }
 
+    #[test]
     fn establish_baseline() {
         let rules_t = Instant::now();
         let rules = make_rules();
         let duration = rules_t.elapsed();
         let _ = write(
-            "jfp/exp/log.txt",
-            &format!("ENUMO | {} rules | {:?}", rules.len(), duration),
+            "jfp/baseline/log.txt",
+            &format!("ENUMO EXP | {} rules | {:?}", rules.len(), duration),
         );
-        rules.to_file("jfp/exp/enumo.rules");
+        rules.to_file("jfp/baseline/enumo_exp.rules");
     }
 
     fn write_derivability(rules: Ruleset, rules_name: &str, against: &Ruleset, against_name: &str) {
@@ -389,9 +390,6 @@ mod test {
     #[tokio::test]
     async fn case_study2() {
         dotenv().ok();
-
-        // Run OOPSLA23 Enumo recipe
-        establish_baseline();
 
         let rational_rules = rational_rules();
         let herbie_baseline = Ruleset::from_file("baseline/herbie-exp.rules");

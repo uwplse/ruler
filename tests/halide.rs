@@ -425,12 +425,12 @@ mod test {
                 derive_t_elapsed
             ),
         );
-        let filename = format!("jfp/halide/{subdir}/{rules_name}-{against_name}-derive.json");
+        let filename = format!("jfp/{subdir}/{rules_name}-{against_name}-derive.json");
         let _ = write(&filename, &to_string_pretty(&v).unwrap());
     }
 
+    #[test]
     fn establish_baseline() {
-        let _ = write("jfp/halide/baseline/log.txt", "Starting baseline");
         let halide_baseline = Ruleset::from_file("baseline/halide.rules");
         let a5_t = Instant::now();
         let a5: Ruleset<Pred> = recursive_rules(
@@ -451,10 +451,10 @@ mod test {
         );
         let duration = a5_t.elapsed();
         let _ = write(
-            "jfp/halide/baseline/log.txt",
-            &format!("ATOMS5 | {} rules | {:?}", a5.len(), duration),
+            "jfp/baseline/log.txt",
+            &format!("ATOMS5 HALIDE | {} rules | {:?}", a5.len(), duration),
         );
-        a5.to_file("jfp/halide/baseline/atoms5.rules");
+        a5.to_file("jfp/baseline/atoms5_halide.rules");
         write_derivability(a5.clone(), "A5", &halide_baseline, "Halide", "baseline");
 
         write_derivability(a5.clone(), "A5", &a5, "A5", "baseline");
@@ -463,10 +463,14 @@ mod test {
         let enumo_rules = halide_rules();
         let duration = enumo_t.elapsed();
         let _ = write(
-            "jfp/halide/baseline/log.txt",
-            &format!("ENUMO | {} rules | {:?}", enumo_rules.len(), duration),
+            "jfp/baseline/log.txt",
+            &format!(
+                "ENUMO HALIDE | {} rules | {:?}",
+                enumo_rules.len(),
+                duration
+            ),
         );
-        enumo_rules.to_file("jfp/halide/baseline/enumo.rules");
+        enumo_rules.to_file("jfp/baseline/enumo_halide.rules");
 
         write_derivability(a5.clone(), "A5", &enumo_rules, "Enumo", "baseline");
         write_derivability(
@@ -853,9 +857,6 @@ mod test {
 
     #[tokio::test]
     async fn case_study2_test() {
-        println!("--- STARTING BASELINE ---");
-        establish_baseline();
-
         println!("--- STARTING CASE STUDY 2 ---");
         case_study2().await;
     }

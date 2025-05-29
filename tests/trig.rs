@@ -400,15 +400,16 @@ mod test {
         start_rules
     }
 
+    #[test]
     fn establish_baseline() {
         let rules_t = Instant::now();
         let rules = trig_rules();
         let duration = rules_t.elapsed();
         let _ = write(
-            "jfp/trig/log.txt",
-            &format!("ENUMO | {} rules | {:?}", rules.len(), duration),
+            "jfp/baseline/log.txt",
+            &format!("ENUMO TRIG | {} rules | {:?}", rules.len(), duration),
         );
-        rules.to_file("jfp/trig/enumo.rules");
+        rules.to_file("jfp/baseline/enumo_trig.rules");
     }
 
     fn write_derivability(
@@ -442,9 +443,6 @@ mod test {
     #[tokio::test]
     async fn case_study2() {
         dotenv().ok();
-
-        // Run OOPSLA23 Enumo recipe
-        establish_baseline();
 
         let complex_rules: Ruleset<Trig> =
             Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
