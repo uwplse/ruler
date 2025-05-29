@@ -422,8 +422,8 @@ mod test {
         let _ = write(
             &format!("jfp/{subdir}/halide/log.txt"),
             &format!(
-                "{rules_name}->{against_name} | {:.3} ({:.1?})",
-                can.len() as f64 / against.len() as f64,
+                "{rules_name}->{against_name} | {:.1} ({:.1?})",
+                (can.len() as f64 / against.len() as f64) * 100.0,
                 derive_t_elapsed
             ),
         );
@@ -559,7 +559,7 @@ mod test {
             );
             let name = format!("LLM-{prior_name}-1");
 
-            sound.to_file(&format!("{name}.rules"));
+            sound.to_file(&format!("jfp/cs1/halide/{name}.rules"));
 
             write_derivability(
                 sound.union(&prior_rules),
@@ -632,7 +632,7 @@ mod test {
             );
             let reprompted_name = format!("LLM-{prior_name}-2");
 
-            reprompted_sound.to_file(&format!("{reprompted_name}.rules"));
+            reprompted_sound.to_file(&format!("jfp/cs1/halide/{reprompted_name}.rules"));
 
             write_derivability(
                 reprompted_sound.union(&sound).union(&prior_rules),
