@@ -185,8 +185,8 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         let mut yes = Ruleset::default();
         let mut no = Ruleset::default();
-        yes.add_all(yeses.into_iter().map(|r| r).collect());
-        no.add_all(nos.into_iter().map(|r| r).collect());
+        yes.add_all(yeses);
+        no.add_all(nos);
         (yes, no)
     }
 
@@ -525,12 +525,11 @@ impl<L: SynthLanguage> Ruleset<L> {
             .lookup_expr(lexpr)
             .unwrap_or_else(|| panic!("Did not find {}", lexpr));
         let r_id = out_egraph.lookup_expr(rexpr);
-        let res = if let Some(r_id) = r_id {
+        if let Some(r_id) = r_id {
             l_id == r_id
         } else {
             false
-        };
-        res
+        }
     }
 
     /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
@@ -570,8 +569,8 @@ impl<L: SynthLanguage> Ruleset<L> {
 
         let mut yes = Ruleset::default();
         let mut no = Ruleset::default();
-        yes.add_all(yeses.into_iter().map(|r| r).collect());
-        no.add_all(nos.into_iter().map(|r| r).collect());
+        yes.add_all(yeses);
+        no.add_all(nos);
         (yes, no)
     }
 
