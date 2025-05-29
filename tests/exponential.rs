@@ -366,14 +366,14 @@ mod test {
         });
 
         let _ = write(
-            "jfp/exp/log.txt",
+            "jfp/cs1/exp/log.txt",
             &format!(
                 "{rules_name}->{against_name} | {:.3} ({:.1?})",
                 can.len() as f64 / against.len() as f64,
                 derive_t_elapsed
             ),
         );
-        let filename = format!("jfp/exp/{rules_name}-{against_name}-derive.json");
+        let filename = format!("jfp/cs1/exp/{rules_name}-{against_name}-derive.json");
         let _ = write(&filename, &to_string_pretty(&v).unwrap());
     }
 
@@ -420,21 +420,21 @@ mod test {
         let rules_t = Instant::now();
         let candidates = Ruleset::from_llm(&prompt).await;
         let _ = write(
-            "jfp/exp/log.txt",
+            "jfp/cs1/exp/log.txt",
             &format!(
                 "{} rule candidates in {:?}",
                 candidates.len(),
                 rules_t.elapsed()
             ),
         );
-        candidates.to_file("jfp/exp/candidates.rules");
+        candidates.to_file("jfp/cs1/exp/candidates.rules");
         let sound_t = Instant::now();
         let mut sound = Exponential::validate_all(&candidates, &start_rules());
         let _ = write(
-            "jfp/exp/log.txt",
+            "jfp/cs1/exp/log.txt",
             &format!("{} sound rules in {:?}", sound.len(), sound_t.elapsed()),
         );
-        sound.to_file("jfp/exp/sound.rules");
+        sound.to_file("jfp/cs1/exp/sound.rules");
         let minimize_t = Instant::now();
         let (minimized_sound, _) = sound.minimize(
             rational_rules.clone(),
@@ -442,14 +442,14 @@ mod test {
             1,
         );
         let _ = write(
-            "jfp/exp/log.txt",
+            "jfp/cs1/exp/log.txt",
             &format!(
                 "{} minimized sound rules in {:?}",
                 minimized_sound.len(),
                 minimize_t.elapsed()
             ),
         );
-        minimized_sound.to_file("jfp/exp/LLM-1.rules");
+        minimized_sound.to_file("jfp/cs1/exp/LLM-1.rules");
 
         write_derivability(
             minimized_sound.union(&rational_rules),
@@ -486,19 +486,19 @@ mod test {
         );
         let repromped_candidates = Ruleset::from_llm(&reprompt).await;
         let _ = write(
-            "jfp/exp/log.txt",
+            "jfp/cs1/exp/log.txt",
             &format!(
                 "{} rule candidates (reprompted) in {:?}",
                 candidates.len(),
                 rules_t.elapsed()
             ),
         );
-        repromped_candidates.to_file("jfp/exp/reprompted-candidates.rules");
+        repromped_candidates.to_file("jfp/cs1/exp/reprompted-candidates.rules");
         let sound_t = Instant::now();
         let mut reprompted_sound = Exponential::validate_all(&repromped_candidates, &start_rules());
-        reprompted_sound.to_file("jfp/exp/reprompted-sound.rules");
+        reprompted_sound.to_file("jfp/cs1/exp/reprompted-sound.rules");
         let _ = write(
-            "jfp/exp/log.txt",
+            "jfp/cs1/exp/log.txt",
             &format!(
                 "{} sound rules (reprompted) in {:?}",
                 reprompted_sound.len(),
@@ -513,7 +513,7 @@ mod test {
             1,
         );
         let _ = write(
-            "jfp/exp/log.txt",
+            "jfp/cs1/exp/log.txt",
             &format!(
                 "{} minimized sound rules in {:?}",
                 min_reprompted_sound.len(),
@@ -522,7 +522,7 @@ mod test {
         );
         minimized_sound
             .union(&min_reprompted_sound)
-            .to_file("jfp/exp/LLM-2.rules");
+            .to_file("jfp/cs1/exp/LLM-2.rules");
 
         write_derivability(
             min_reprompted_sound

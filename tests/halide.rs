@@ -383,7 +383,6 @@ mod test {
     use crate::halide::halide_rules;
     use crate::Pred;
     use dotenv::dotenv;
-    use std::fmt;
     use std::io::Write;
     use std::{
         fs::OpenOptions,
@@ -421,14 +420,14 @@ mod test {
             "cannot": cannot.to_str_vec()
         });
         let _ = write(
-            &format!("jfp/halide/{subdir}/log.txt"),
+            &format!("jfp/{subdir}/halide/log.txt"),
             &format!(
                 "{rules_name}->{against_name} | {:.3} ({:.1?})",
                 can.len() as f64 / against.len() as f64,
                 derive_t_elapsed
             ),
         );
-        let filename = format!("jfp/{subdir}/{rules_name}-{against_name}-derive.json");
+        let filename = format!("jfp/{subdir}/halide/{rules_name}-{against_name}-derive.json");
         let _ = write(&filename, &to_string_pretty(&v).unwrap());
     }
 
@@ -495,7 +494,7 @@ mod test {
 
     #[tokio::test]
     async fn case_study1() {
-        let _ = write("jfp/halide/case_study1/log.txt", "Starting Case Study 1");
+        let _ = write("jfp/cs1/halide/log.txt", "Starting Case Study 1");
         dotenv().ok();
 
         let halide_baseline = Ruleset::from_file("baseline/halide.rules");
@@ -522,14 +521,14 @@ mod test {
         let rules_t = Instant::now();
         let candidates: Ruleset<Pred> = Ruleset::from_llm(&prompt).await;
         let _ = write(
-            "jfp/halide/case_study1/log.txt",
+            "jfp/cs1/halide/log.txt",
             &format!(
                 "{} rule candidates from LLM | {:?}",
                 candidates.len(),
                 rules_t.elapsed()
             ),
         );
-        candidates.to_file("jfp/halide/case_study1/LLM-1-candidates.rules");
+        candidates.to_file("jfp/cs1/halide/LLM-1-candidates.rules");
 
         let priors = [
             ("None", Ruleset::default()),
@@ -549,7 +548,7 @@ mod test {
                 1,
             );
             let _ = write(
-                "jfp/halide/case_study1/log.txt",
+                "jfp/cs1/halide/log.txt",
                 &format!(
                     "{} | {} selected rules ({} invalid) | {:?}",
                     prior_name,
@@ -567,7 +566,7 @@ mod test {
                 &name,
                 &halide_baseline,
                 "Halide",
-                "case_study1",
+                "cs1",
             );
             // Don't do Halide->X because Halide rules aren't designed for eqsat
 
@@ -581,16 +580,10 @@ mod test {
                     &name,
                     &prior_rules1,
                     &prior_name1,
-                    "case_study1",
+                    "cs1",
                 );
                 // X->LLM-1
-                write_derivability(
-                    prior_rules1.clone(),
-                    &prior_name1,
-                    &sound,
-                    &name,
-                    "case_study1",
-                );
+                write_derivability(prior_rules1.clone(), &prior_name1, &sound, &name, "cs1");
             }
 
             // Reprompt for missing rules
@@ -608,7 +601,7 @@ mod test {
             let reprompted_rules_t = Instant::now();
             let mut reprompted_candidates: Ruleset<Pred> = Ruleset::from_llm(&reprompt).await;
             let _ = write(
-                "jfp/halide/case_study1/log.txt",
+                "jfp/cs1/halide/log.txt",
                 &format!(
                     "{} rule candidates (reprompted) | {:?}",
                     reprompted_candidates.len(),
@@ -616,7 +609,7 @@ mod test {
                 ),
             );
             reprompted_candidates.to_file(&format!(
-                "jfp/halide/case_study1/LLM-{}-2-candidates.rules",
+                "jfp/cs1/halide/LLM-{}-2-candidates.rules",
                 prior_name
             ));
 
@@ -628,7 +621,7 @@ mod test {
                 1,
             );
             let _ = write(
-                "jfp/halide/case_study1/log.txt",
+                "jfp/cs1/halide/log.txt",
                 &format!(
                     "{} | Reprompt | {} selected rules ({} invalid) | {:?}",
                     prior_name,
@@ -646,7 +639,7 @@ mod test {
                 &reprompted_name,
                 &halide_baseline,
                 "Halide",
-                "case_study1",
+                "cs1",
             );
             // Don't do Halide->X because Halide rules aren't designed for eqsat
 
@@ -660,7 +653,7 @@ mod test {
                     &reprompted_name,
                     &prior_rules1,
                     &prior_name1,
-                    "case_study1",
+                    "cs1",
                 );
 
                 // X->LLM-2
@@ -669,7 +662,7 @@ mod test {
                     &prior_name1,
                     &reprompted_sound.union(&sound),
                     &reprompted_name,
-                    "case_study1",
+                    "cs1",
                 );
             }
         }

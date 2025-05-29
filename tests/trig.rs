@@ -429,14 +429,14 @@ mod test {
             "cannot": cannot.to_str_vec()
         });
         let _ = write(
-            "jfp/trig/log.txt",
+            "jfp/cs1/trig/log.txt",
             &format!(
                 "{rules_name}->{against_name} | {:.3} ({:.1?})",
                 can.len() as f64 / against.len() as f64,
                 derive_t_elapsed
             ),
         );
-        let filename = format!("jfp/trig/{rules_name}-{against_name}-derive.json");
+        let filename = format!("jfp/cs1/trig/{rules_name}-{against_name}-derive.json");
         let _ = write(&filename, &to_string_pretty(&v).unwrap());
     }
 
@@ -474,22 +474,22 @@ mod test {
         let rules_t = Instant::now();
         let candidates = Ruleset::from_llm(&prompt).await;
         let _ = write(
-            "jfp/trig/log.txt",
+            "jfp/cs1/trig/log.txt",
             &format!(
                 "{} rule candidates in {:?}",
                 candidates.len(),
                 rules_t.elapsed()
             ),
         );
-        candidates.to_file("jfp/trig/candidates.rules");
+        candidates.to_file("jfp/cs1/trig/candidates.rules");
 
         let sound_t = Instant::now();
         let mut sound = Trig::validate_all(&candidates, &start_rules());
         let _ = write(
-            "jfp/trig/log.txt",
+            "jfp/cs1/trig/log.txt",
             &format!("{} sound rules in {:?}", sound.len(), sound_t.elapsed()),
         );
-        sound.to_file("jfp/trig/sound.rules");
+        sound.to_file("jfp/cs1/trig/sound.rules");
         let minimize_t = Instant::now();
         let (minimized_sound, _) = sound.minimize(
             complex_rules.clone(),
@@ -497,14 +497,14 @@ mod test {
             1,
         );
         let _ = write(
-            "jfp/trig/log.txt",
+            "jfp/cs1/trig/log.txt",
             &format!(
                 "{} minimized sound rules in {:?}",
                 minimized_sound.len(),
                 minimize_t.elapsed()
             ),
         );
-        minimized_sound.to_file("jfp/trig/LLM-1.rules");
+        minimized_sound.to_file("jfp/cs1/trig/LLM-1.rules");
 
         write_derivability(
             minimized_sound.union(&complex_rules),
@@ -541,19 +541,19 @@ mod test {
         );
         let repromped_candidates = Ruleset::from_llm(&reprompt).await;
         let _ = write(
-            "jfp/trig/log.txt",
+            "jfp/cs1/trig/log.txt",
             &format!(
                 "{} rule candidates (reprompted) in {:?}",
                 candidates.len(),
                 rules_t.elapsed()
             ),
         );
-        repromped_candidates.to_file("jfp/trig/reprompted-candidates.rules");
+        repromped_candidates.to_file("jfp/cs1/trig/reprompted-candidates.rules");
         let sound_t = Instant::now();
         let mut reprompted_sound = Trig::validate_all(&repromped_candidates, &start_rules());
-        reprompted_sound.to_file("jfp/trig/reprompted-sound.rules");
+        reprompted_sound.to_file("jfp/cs1/trig/reprompted-sound.rules");
         let _ = write(
-            "jfp/trig/log.txt",
+            "jfp/cs1/trig/log.txt",
             &format!(
                 "{} sound rules (reprompted) in {:?}",
                 reprompted_sound.len(),
@@ -568,7 +568,7 @@ mod test {
             1,
         );
         let _ = write(
-            "jfp/trig/log.txt",
+            "jfp/cs1/trig/log.txt",
             &format!(
                 "{} minimized sound rules in {:?}",
                 min_reprompted_sound.len(),
@@ -577,7 +577,7 @@ mod test {
         );
         minimized_sound
             .union(&min_reprompted_sound)
-            .to_file("jfp/trig/LLM-2.rules");
+            .to_file("jfp/cs1/trig/LLM-2.rules");
 
         write_derivability(
             min_reprompted_sound
