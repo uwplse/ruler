@@ -8,12 +8,10 @@ use openai_api_rs::v1::{
 
 pub fn models() -> Vec<String> {
     vec![
-        "google/gemini-flash-1.5".to_string(),
         "google/gemini-2.5-flash-preview".to_string(),
-        "google/gemini-2.5-pro-preview".to_string(),
         "openai/gpt-4o-mini".to_string(),
-        // "anthropic/claude-3.7-sonnet".to_string(),
         "openai/gpt-4.1".to_string(),
+        "deepseek/deepseek-chat-v3-0324".to_string(),
     ]
 }
 

@@ -1,0 +1,45 @@
+{
+  "duration": {
+    "secs": 0,
+    "nanos": 192359417
+  },
+  "num_rules": 96,
+  "num_against": 33,
+  "can": [
+    "(sin (/ PI 2)) ==> (cos 0)",
+    "(cos 0) ==> (sin (/ PI 2))",
+    "(cos (* PI 2)) ==> (cos 0)",
+    "(cos 0) ==> (cos (* PI 2))",
+    "(cos (/ PI 2)) ==> (tan PI)",
+    "(tan PI) ==> (cos (/ PI 2))",
+    "(tan (* PI 2)) ==> (tan PI)",
+    "(tan PI) ==> (tan (* PI 2))",
+    "(sin PI) ==> (sin (* PI 2))",
+    "(sin (* PI 2)) ==> (sin PI)",
+    "(sin 0) ==> (sin PI)",
+    "(sin PI) ==> (sin 0)",
+    "(tan 0) ==> (tan PI)",
+    "(tan PI) ==> (tan 0)",
+    "0 ==> (tan PI)",
+    "(tan PI) ==> 0",
+    "(sin PI) ==> (tan PI)",
+    "(tan PI) ==> (sin PI)",
+    "(- (cos ?a)) ==> (cos (- PI ?a))",
+    "(cos (- PI ?a)) ==> (- (cos ?a))",
+    "(sin ?a) ==> (sin (- PI ?a))",
+    "(sin (- PI ?a)) ==> (sin ?a)",
+    "(- (sin ?a)) ==> (sin (- ?a))",
+    "(sin (- ?a)) ==> (- (sin ?a))",
+    "(cos (- ?a)) ==> (cos ?a)",
+    "(cos ?a) ==> (cos (- ?a))",
+    "(- ?a ?a) ==> (- (- ?a ?a))",
+    "(- (- ?a ?a)) ==> (- ?a ?a)",
+    "(+ ?b ?a) ==> (+ ?a ?b)"
+  ],
+  "cannot": [
+    "(sin ?a) ==> (cos (- (/ PI 2) ?a))",
+    "(cos (- (/ PI 2) ?a)) ==> (sin ?a)",
+    "(sin (+ (/ PI 2) ?a)) ==> (cos ?a)",
+    "(cos ?a) ==> (sin (+ (/ PI 2) ?a))"
+  ]
+}

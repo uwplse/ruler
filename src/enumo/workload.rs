@@ -3,7 +3,7 @@ use itertools::all;
 
 use super::*;
 use crate::{llm, SynthAnalysis, SynthLanguage};
-use std::{collections::HashSet, io::Write};
+use std::{collections::HashSet, io::Write, time::Instant};
 
 /// Workloads are sets of terms from a domain
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -62,6 +62,7 @@ impl Workload {
     pub async fn from_llm(prompt: &str) -> Self {
         let mut valid_sexps = HashSet::new();
         for model in llm::models() {
+            let model_t = Instant::now();
             let mut valid = 0;
             let mut invalid = 0;
             let res = llm::query(prompt, &model).await;
@@ -74,7 +75,13 @@ impl Workload {
                     println!("Skipping invalid s-expression: {}", line);
                 }
             }
-            println!("{} | {} valid / {} invalid", model, valid, invalid);
+            println!(
+                "{} | {} valid / {} invalid | {:?}",
+                model,
+                valid,
+                invalid,
+                model_t.elapsed()
+            );
         }
         Workload::Set(valid_sexps.into_iter().collect())
     }

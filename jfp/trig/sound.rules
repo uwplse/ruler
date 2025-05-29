@@ -1,0 +1,52 @@
+(tan ?x) ==> (/ (sin ?x) (cos ?x))
+(/ (sin ?x) (cos ?x)) ==> (tan ?x)
+(sin ?x) ==> (- (sin (- ?x)))
+(- (sin (- ?x))) ==> (sin ?x)
+(cos ?x) ==> (cos (- ?x))
+(cos (- ?x)) ==> (cos ?x)
+(sin PI) ==> 0
+0 ==> (sin PI)
+(cos PI) ==> -1
+-1 ==> (cos PI)
+(sin (* 2 PI)) ==> 0
+0 ==> (sin (* 2 PI))
+(cos (* 2 PI)) ==> 1
+1 ==> (cos (* 2 PI))
+(sin 0) ==> 0
+0 ==> (sin 0)
+(cos 0) ==> 1
+1 ==> (cos 0)
+(sin (/ PI 2)) ==> 1
+1 ==> (sin (/ PI 2))
+(cos (/ PI 2)) ==> 0
+0 ==> (cos (/ PI 2))
+(tan PI) ==> 0
+0 ==> (tan PI)
+(tan 0) ==> 0
+0 ==> (tan 0)
+(sin (+ ?x PI)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (+ ?x PI))
+(cos (+ ?x PI)) ==> (- (cos ?x))
+(- (cos ?x)) ==> (cos (+ ?x PI))
+(sin (- ?x PI)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (- ?x PI))
+(sin (* -1 ?x)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (* -1 ?x))
+(cos (* -1 ?x)) ==> (cos ?x)
+(cos ?x) ==> (cos (* -1 ?x))
+(sin (- ?x)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (- ?x))
+(cos (- (/ PI 2))) ==> 0
+0 ==> (cos (- (/ PI 2)))
+(sin (+ ?x (* 2 PI))) ==> (sin ?x)
+(sin ?x) ==> (sin (+ ?x (* 2 PI)))
+(cos (+ ?x (* 2 PI))) ==> (cos ?x)
+(cos ?x) ==> (cos (+ ?x (* 2 PI)))
+(sin (+ PI ?x)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (+ PI ?x))
+(cos (+ PI ?x)) ==> (- (cos ?x))
+(- (cos ?x)) ==> (cos (+ PI ?x))
+(sin (- PI ?x)) ==> (sin ?x)
+(sin ?x) ==> (sin (- PI ?x))
+(cos (- PI ?x)) ==> (- (cos ?x))
+(- (cos ?x)) ==> (cos (- PI ?x))

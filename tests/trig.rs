@@ -441,20 +441,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn case_study2() {
+    async fn case_study1() {
         dotenv().ok();
 
         let complex_rules: Ruleset<Trig> =
             Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
         let herbie_baseline: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
-        let enumo_baseline: Ruleset<Trig> = Ruleset::from_file("jfp/trig/enumo.rules");
-
-        write_derivability(
-            enumo_baseline.union(&complex_rules),
-            "ENUMO-C",
-            &herbie_baseline,
-            "Herbie",
-        );
+        let enumo_baseline: Ruleset<Trig> = Ruleset::from_file("jfp/baseline/enumo_trig.rules");
 
         let prompt = "
         Your task is to perform rule inference for equality saturation.
@@ -572,16 +565,6 @@ mod test {
             "Enumo",
             &reprompted_sound.union(&sound),
             "LLM-2",
-        );
-
-        write_derivability(
-            enumo_baseline
-                .union(&sound)
-                .union(&reprompted_sound)
-                .union(&complex_rules),
-            "ENUMO-LLM-2-C",
-            &herbie_baseline,
-            "Herbie",
         );
     }
 

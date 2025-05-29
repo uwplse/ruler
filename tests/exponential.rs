@@ -388,19 +388,12 @@ mod test {
     }
 
     #[tokio::test]
-    async fn case_study2() {
+    async fn case_study1() {
         dotenv().ok();
 
         let rational_rules = rational_rules();
         let herbie_baseline = Ruleset::from_file("baseline/herbie-exp.rules");
-        let enumo_baseline = Ruleset::from_file("jfp/exp/enumo.rules");
-
-        write_derivability(
-            enumo_baseline.union(&rational_rules),
-            "ENUMO-RAT",
-            &herbie_baseline,
-            "Herbie",
-        );
+        let enumo_baseline = Ruleset::from_file("jfp/baseline/enumo_exp.rules");
 
         let prompt = "
         Your task is to perform rule inference for equality saturation.
@@ -517,16 +510,6 @@ mod test {
             "Enumo",
             &reprompted_sound.union(&sound),
             "LLM-2",
-        );
-
-        write_derivability(
-            enumo_baseline
-                .union(&sound)
-                .union(&reprompted_sound)
-                .union(&rational_rules),
-            "ENUMO-LLM-2-RAT",
-            &herbie_baseline,
-            "Herbie",
         );
     }
 }

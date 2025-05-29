@@ -9,7 +9,7 @@ use std::{
         Arc,
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -218,6 +218,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut rules = IndexMap::default();
 
         for model in llm::models() {
+            let model_t = Instant::now();
             let mut num_rules = 0;
             let mut invalid = 0;
             let res = llm::query(prompt, &model).await;
@@ -247,7 +248,10 @@ impl<L: SynthLanguage> Ruleset<L> {
                 }
             }
 
-            println!("{model} | {num_rules} ({invalid} invalid)");
+            println!(
+                "{model} | {num_rules} ({invalid} invalid) | {:?}",
+                model_t.elapsed()
+            );
         }
 
         println!("Combined LLM Ruleset | {}", rules.len());
