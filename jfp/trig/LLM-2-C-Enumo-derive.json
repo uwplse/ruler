@@ -1,9 +1,9 @@
 {
   "duration": {
     "secs": 0,
-    "nanos": 798055625
+    "nanos": 105198458
   },
-  "num_rules": 151,
+  "num_rules": 84,
   "num_against": 33,
   "can": [
     "(sin (/ PI 2)) ==> (cos 0)",
@@ -32,14 +32,13 @@
     "(sin (- ?a)) ==> (- (sin ?a))",
     "(cos (- ?a)) ==> (cos ?a)",
     "(cos ?a) ==> (cos (- ?a))",
+    "(sin ?a) ==> (cos (- (/ PI 2) ?a))",
+    "(cos (- (/ PI 2) ?a)) ==> (sin ?a)",
+    "(sin (+ (/ PI 2) ?a)) ==> (cos ?a)",
+    "(cos ?a) ==> (sin (+ (/ PI 2) ?a))",
     "(- ?a ?a) ==> (- (- ?a ?a))",
     "(- (- ?a ?a)) ==> (- ?a ?a)",
     "(+ ?b ?a) ==> (+ ?a ?b)"
   ],
-  "cannot": [
-    "(sin ?a) ==> (cos (- (/ PI 2) ?a))",
-    "(cos (- (/ PI 2) ?a)) ==> (sin ?a)",
-    "(sin (+ (/ PI 2) ?a)) ==> (cos ?a)",
-    "(cos ?a) ==> (sin (+ (/ PI 2) ?a))"
-  ]
+  "cannot": []
 }

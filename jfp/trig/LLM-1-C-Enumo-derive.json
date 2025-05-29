@@ -1,9 +1,9 @@
 {
   "duration": {
     "secs": 0,
-    "nanos": 192359417
+    "nanos": 147558667
   },
-  "num_rules": 96,
+  "num_rules": 80,
   "num_against": 33,
   "can": [
     "(sin (/ PI 2)) ==> (cos 0)",

@@ -429,22 +429,37 @@ mod test {
         );
         candidates.to_file("jfp/exp/candidates.rules");
         let sound_t = Instant::now();
-        let sound = Exponential::validate_all(&candidates, &start_rules());
+        let mut sound = Exponential::validate_all(&candidates, &start_rules());
         let _ = write(
             "jfp/exp/log.txt",
             &format!("{} sound rules in {:?}", sound.len(), sound_t.elapsed()),
         );
         sound.to_file("jfp/exp/sound.rules");
+        let minimize_t = Instant::now();
+        let (minimized_sound, _) = sound.minimize(
+            rational_rules.clone(),
+            Scheduler::Compress(Limits::minimize()),
+            1,
+        );
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!(
+                "{} minimized sound rules in {:?}",
+                minimized_sound.len(),
+                minimize_t.elapsed()
+            ),
+        );
+        minimized_sound.to_file("jfp/exp/LLM-1.rules");
 
         write_derivability(
-            sound.union(&rational_rules),
+            minimized_sound.union(&rational_rules),
             "LLM-1-RAT",
             &enumo_baseline,
             "Enumo",
         );
 
         write_derivability(
-            sound.union(&rational_rules),
+            minimized_sound.union(&rational_rules),
             "LLM-1-RAT",
             &herbie_baseline,
             "Herbie",
@@ -453,7 +468,7 @@ mod test {
         write_derivability(
             enumo_baseline.union(&rational_rules),
             "Enumo",
-            &sound,
+            &minimized_sound,
             "LLM-1",
         );
 
@@ -467,7 +482,7 @@ mod test {
         A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
         Print only the rules, one rule per line, with no additional text or explanation.
         ",
-            sound.to_str_vec().join("\n")
+            minimized_sound.to_str_vec().join("\n")
         );
         let repromped_candidates = Ruleset::from_llm(&reprompt).await;
         let _ = write(
@@ -480,7 +495,7 @@ mod test {
         );
         repromped_candidates.to_file("jfp/exp/reprompted-candidates.rules");
         let sound_t = Instant::now();
-        let reprompted_sound = Exponential::validate_all(&repromped_candidates, &start_rules());
+        let mut reprompted_sound = Exponential::validate_all(&repromped_candidates, &start_rules());
         reprompted_sound.to_file("jfp/exp/reprompted-sound.rules");
         let _ = write(
             "jfp/exp/log.txt",
@@ -491,15 +506,37 @@ mod test {
             ),
         );
 
+        let minimize_t = Instant::now();
+        let (min_reprompted_sound, _) = reprompted_sound.minimize(
+            rational_rules.clone().union(&minimized_sound),
+            Scheduler::Compress(Limits::minimize()),
+            1,
+        );
+        let _ = write(
+            "jfp/exp/log.txt",
+            &format!(
+                "{} minimized sound rules in {:?}",
+                min_reprompted_sound.len(),
+                minimize_t.elapsed()
+            ),
+        );
+        minimized_sound
+            .union(&min_reprompted_sound)
+            .to_file("jfp/exp/LLM-2.rules");
+
         write_derivability(
-            reprompted_sound.union(&sound).union(&rational_rules),
+            min_reprompted_sound
+                .union(&minimized_sound)
+                .union(&rational_rules),
             "LLM-2-RAT",
             &enumo_baseline,
             "Enumo",
         );
 
         write_derivability(
-            reprompted_sound.union(&sound).union(&rational_rules),
+            min_reprompted_sound
+                .union(&minimized_sound)
+                .union(&rational_rules),
             "LLM-2-RAT",
             &herbie_baseline,
             "Herbie",
@@ -508,7 +545,7 @@ mod test {
         write_derivability(
             enumo_baseline.union(&rational_rules),
             "Enumo",
-            &reprompted_sound.union(&sound),
+            &min_reprompted_sound.union(&minimized_sound),
             "LLM-2",
         );
     }

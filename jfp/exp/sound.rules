@@ -1,41 +1,44 @@
-(exp (+ ?x ?y)) ==> (* (exp ?x) (exp ?y))
-(* (exp ?x) (exp ?y)) ==> (exp (+ ?x ?y))
-(exp (* -1 ?x)) ==> (/ 1 (exp ?x))
-(/ 1 (exp ?x)) ==> (exp (* -1 ?x))
 (exp 0) ==> 1
 1 ==> (exp 0)
-(exp 1) ==> (* (exp 0) (exp 1))
-(* (exp 0) (exp 1)) ==> (exp 1)
 (log (exp ?x)) ==> ?x
 ?x ==> (log (exp ?x))
 (exp (log ?x)) ==> ?x
 ?x ==> (exp (log ?x))
-(log (pow ?x ?y)) ==> (* ?y (log ?x))
-(* ?y (log ?x)) ==> (log (pow ?x ?y))
-(log 1) ==> 0
-0 ==> (log 1)
-(pow ?x 0) ==> 1
 (pow ?x 1) ==> ?x
 ?x ==> (pow ?x 1)
-(pow ?x (+ ?y ?z)) ==> (* (pow ?x ?y) (pow ?x ?z))
-(* (pow ?x ?y) (pow ?x ?z)) ==> (pow ?x (+ ?y ?z))
+(pow ?x 0) ==> 1
+(pow 1 ?x) ==> 1
 (pow ?x (* ?y ?z)) ==> (pow (pow ?x ?y) ?z)
 (pow (pow ?x ?y) ?z) ==> (pow ?x (* ?y ?z))
+(log (pow ?x ?y)) ==> (* ?y (log ?x))
+(* ?y (log ?x)) ==> (log (pow ?x ?y))
+(exp (+ ?x ?y)) ==> (* (exp ?x) (exp ?y))
+(* (exp ?x) (exp ?y)) ==> (exp (+ ?x ?y))
+(exp (* ?x ?y)) ==> (pow (exp ?x) ?y)
+(pow (exp ?x) ?y) ==> (exp (* ?x ?y))
+(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))
+(* (exp ?a) (exp ?b)) ==> (exp (+ ?a ?b))
+(exp (* ?a ?b)) ==> (pow (exp ?a) ?b)
+(pow (exp ?a) ?b) ==> (exp (* ?a ?b))
+(log (pow ?a ?b)) ==> (* ?b (log ?a))
+(* ?b (log ?a)) ==> (log (pow ?a ?b))
+(pow ?a 0) ==> 1
+(pow ?a 1) ==> ?a
+?a ==> (pow ?a 1)
+(pow 1 ?b) ==> 1
+(pow ?a 2) ==> (* ?a ?a)
+(* ?a ?a) ==> (pow ?a 2)
+(pow ?x (- ?y)) ==> (/ 1 (pow ?x ?y))
+(/ 1 (pow ?x ?y)) ==> (pow ?x (- ?y))
+(log 1) ==> 0
+0 ==> (log 1)
 (pow ?x -1) ==> (/ 1 ?x)
 (/ 1 ?x) ==> (pow ?x -1)
-(pow ?x ?y) ==> (exp (* ?y (log ?x)))
-(exp (* ?y (log ?x))) ==> (pow ?x ?y)
-(exp 1) ==> (exp 1)
-(pow 1 ?x) ==> 1
-(exp (log (abs ?x))) ==> (abs ?x)
-(abs ?x) ==> (exp (log (abs ?x)))
-(exp (- ?x)) ==> (/ 1 (exp ?x))
-(/ 1 (exp ?x)) ==> (exp (- ?x))
-(log (/ 1 ?x)) ==> (- (log ?x))
-(- (log ?x)) ==> (log (/ 1 ?x))
+(exp (log 1)) ==> 1
+1 ==> (exp (log 1))
+(log (exp 0)) ==> 0
+0 ==> (log (exp 0))
 (exp (* ?x (log ?y))) ==> (pow ?y ?x)
 (pow ?y ?x) ==> (exp (* ?x (log ?y)))
-(exp (* 2 (log ?x))) ==> (pow ?x 2)
-(pow ?x 2) ==> (exp (* 2 (log ?x)))
-(exp (* 3 (log ?x))) ==> (pow ?x 3)
-(pow ?x 3) ==> (exp (* 3 (log ?x)))
+(pow ?x ?y) ==> (exp (* ?y (log ?x)))
+(exp (* ?y (log ?x))) ==> (pow ?x ?y)

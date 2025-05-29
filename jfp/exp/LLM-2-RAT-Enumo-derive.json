@@ -1,9 +1,9 @@
 {
   "duration": {
     "secs": 0,
-    "nanos": 105314166
+    "nanos": 105263000
   },
-  "num_rules": 222,
+  "num_rules": 179,
   "num_against": 40,
   "can": [
     "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",

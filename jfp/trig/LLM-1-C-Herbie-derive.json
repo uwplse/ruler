@@ -1,9 +1,9 @@
 {
   "duration": {
     "secs": 1,
-    "nanos": 279419542
+    "nanos": 633127542
   },
-  "num_rules": 96,
+  "num_rules": 80,
   "num_against": 36,
   "can": [
     "(tan ?a) ==> (/ (sin ?a) (cos ?a))",

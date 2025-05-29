@@ -1,9 +1,9 @@
 {
   "duration": {
     "secs": 0,
-    "nanos": 222751917
+    "nanos": 119834208
   },
-  "num_rules": 222,
+  "num_rules": 179,
   "num_against": 75,
   "can": [
     "(+ (log ?a) (log ?b)) ==> (log (* ?a ?b))",
