@@ -671,34 +671,12 @@ mod test {
     #[tokio::test]
     async fn case_study2() {
         dotenv().ok();
-        let enumo_baseline: Ruleset<Pred> = Ruleset::from_file("jfp/halide/baseline/enumo.rules");
+        let enumo_baseline: Ruleset<Pred> = Ruleset::from_file("jfp/baseline/enumo_halide.rules");
         let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        let llm_2: Ruleset<Pred> = Ruleset::from_file("jfp/cs1/halide/LLM-None-1.rules")
+            .union(&Ruleset::from_file("jfp/cs1/halide/LLM-None-2.rules"));
 
-        enum WkldType {
-            Term,
-            Pat,
-        }
-
-        impl fmt::Display for WkldType {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                match self {
-                    WkldType::Term => write!(f, "TERM"),
-                    WkldType::Pat => write!(f, "PAT"),
-                }
-            }
-        }
-        for ty in [WkldType::Term, WkldType::Pat] {
-            let leaf_prompt = match ty {
-                WkldType::Term => "Use 0 and 1 for constants and w, x, y, and z for variables. Do not use any variables other than `w`, `x`, `y`, and `z`.",
-                WkldType::Pat => "Use ?C as a placeholder for all constants and ?V as a placeholder for all variables.
-        For example, (+ ?V ?C) represents any term where a variable is added to a constant.
-        Terms should use between 2 and 5 operators and should have at most 5 placeholders.",
-            };
-            let expected_num_terms = match ty {
-                WkldType::Term => "1000 - 2000",
-                WkldType::Pat => "100 - 500",
-            };
-            let prompt = &format!("
+        let prompt = "
         Your task is to perform term enumeration for rule inference.
         The domain is boolean logic and arithmetic, as follows:
             Values: integers
@@ -708,146 +686,102 @@ mod test {
 
         Terms must be written using s-expressions and prefix notation.
         For example, (a + b) is not a valid term, but (+ a b) is a valid term.
-        {leaf_prompt}
+        Use 0 and 1 for constants and w, x, y, and z for variables.
+        Do not use any variables other than `w`, `x`, `y`, and `z`.
 
         Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
         Do not use any operators or syntax not listed here.
 
         Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
+        Try to generate pairs of terms that might be equivalent, so that rewrite rules can be inferred.
         The generated terms should adequately cover the set of all possible terms.
         The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
-        You should generate {expected_num_terms} terms.
+        You should generate at least 1000 terms.
         Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
-        Print only the terms, one term per line, with no additional text or explanation.");
-            let wkld_t = Instant::now();
-            let wkld = Workload::from_llm(&prompt)
-                .await
-                .as_lang_with_vars::<Pred>(vec![
-                    "w".to_string(),
-                    "x".to_string(),
-                    "y".to_string(),
-                    "z".to_string(),
-                    "?C".to_string(),
-                    "?V".to_string(),
-                ]);
-            let wkld = match ty {
-                WkldType::Term => wkld,
-                WkldType::Pat => wkld
-                    .filter(ruler::enumo::Filter::MetricLt(
-                        ruler::enumo::Metric::Atoms,
-                        15,
-                    ))
-                    .plug("?C", &Workload::new(["0", "1"]))
-                    .plug("?V", &Workload::new(["a", "b", "c"])),
-            };
+        Print only the terms, one term per line, with no additional text or explanation.
+        ";
+        let wkld_t = Instant::now();
+        let wkld = Workload::from_llm(&prompt)
+            .await
+            .as_lang_with_vars::<Pred>(vec!["w".into(), "x".into(), "y".into(), "z".into()]);
+        let _ = write(
+            "jfp/cs2/halide/log.txt",
+            &format!(
+                "LLM Workload: {} | {:?}",
+                wkld.force().len(),
+                wkld_t.elapsed()
+            ),
+        );
+        wkld.to_file("jfp/cs2/halide/llm-wkld.terms");
+
+        let priors = [
+            ("None", Ruleset::default()),
+            ("A5", Ruleset::from_file("jfp/baseline/atoms5_halide.rules")),
+            ("Enumo", enumo_baseline.clone()),
+            ("LLM-2", llm_2.clone()),
+        ];
+        for (prior_name, prior_rules) in &priors {
+            let _ = write("jfp/cs2/halide/log.txt", &format!("--- {prior_name} ---"));
+            let rule_syn_t = Instant::now();
+            // Wkld -> Egraph
+            let egraph = wkld.to_egraph::<Pred>();
+            println!("Initial egraph size: {}", egraph.number_of_classes());
+
+            // Run prior rules
+            let compress_t = Instant::now();
+            let compressed = Scheduler::Compress(Limits::synthesis()).run(&egraph, &prior_rules);
+            println!(
+                "{} prior rules | {} eclasses | {:?}",
+                prior_name,
+                compressed.number_of_classes(),
+                compress_t.elapsed()
+            );
+
+            // cvec match
+            let cvec_match_t = Instant::now();
+            let mut candidates = Ruleset::cvec_match(&compressed);
+            println!(
+                "{} candidates | {:?}",
+                candidates.len(),
+                cvec_match_t.elapsed()
+            );
+
+            // minimize
+            let minimize_t = Instant::now();
+            let (rules, _) = candidates.minimize(
+                prior_rules.clone(),
+                Scheduler::Compress(Limits::minimize()),
+                1,
+            );
+            println!("{} selected | {:?}", rules.len(), minimize_t);
+
+            let rule_syn_t = rule_syn_t.elapsed();
             let _ = write(
-                "jfp/halide/case_study2/log.txt",
+                "jfp/cs2/halide/log.txt",
                 &format!(
-                    "LLM workload ({}): {} | {:?}",
-                    ty,
-                    wkld.force().len(),
-                    wkld_t.elapsed()
+                    "W-{prior_name} | {} rules | rule synth time: {:?}",
+                    rules.len(),
+                    rule_syn_t
                 ),
             );
-            wkld.to_file(&format!("jfp/halide/case_study2/{}.terms", ty));
+            rules.to_file(&format!("jfp/cs2/halide/w-{prior_name}.rules"));
 
-            let priors = [
-                ("A5", Ruleset::from_file("jfp/halide/baseline/atoms5.rules")),
-                (
-                    "Enumo",
-                    Ruleset::from_file("jfp/halide/baseline/enumo.rules"),
-                ),
-                (
-                    "LLM-2",
-                    Ruleset::from_file("jfp/halide/case_study1/None-rules.rules").union(
-                        &Ruleset::from_file("jfp/halide/case_study1/None-reprompted-rules.rules"),
-                    ),
-                ),
-            ];
-
-            for (prior_name, prior_rules) in &priors {
-                let _ = write(
-                    "jfp/halide/case_study2/log.txt",
-                    &format!("--- {} | {} ---", ty, prior_name),
-                );
-                let rule_syn_t = Instant::now();
-                // Wkld -> egraph
-                let egraph = wkld.to_egraph::<Pred>();
-                let _ = write(
-                    "jfp/halide/case_study2/log.txt",
-                    &format!("{} eclasses", egraph.number_of_classes()),
-                );
-
-                // Run prior rules
-                let compress_t = Instant::now();
-                let compressed =
-                    Scheduler::Compress(Limits::synthesis()).run(&egraph, &prior_rules);
-                let _ = write(
-                    "jfp/halide/case_study2/log.txt",
-                    &format!(
-                        "{} prior rules | {} eclasses | {:?}",
-                        prior_name,
-                        compressed.number_of_classes(),
-                        compress_t.elapsed()
-                    ),
-                );
-
-                // Cvec match for candidate generation
-                let cvec_match_t = Instant::now();
-                let mut candidates = Ruleset::cvec_match(&compressed);
-                let _ = write(
-                    "jfp/halide/case_study2/log.txt",
-                    &format!(
-                        "{} candidates | {:?}",
-                        candidates.len(),
-                        cvec_match_t.elapsed()
-                    ),
-                );
-
-                // Minimize
-                let minimize_t = Instant::now();
-                let (rules, _) = candidates.minimize(
-                    prior_rules.clone(),
-                    Scheduler::Compress(Limits::minimize()),
-                    match ty {
-                        WkldType::Term => 1,
-                        WkldType::Pat => 5,
-                    },
-                );
-                let _ = write(
-                    "jfp/halide/case_study2/log.txt",
-                    &format!(
-                        "{} selected rules | {:?}",
-                        rules.len(),
-                        minimize_t.elapsed()
-                    ),
-                );
-                let rule_syn_t = rule_syn_t.elapsed();
-                let _ = write(
-                    "jfp/halide/case_study2/log.txt",
-                    &format!("{}-{} rule synth time: {:?}", ty, prior_name, rule_syn_t),
-                );
-                rules.to_file(&format!("jfp/halide/case_study2/{ty}-{prior_name}.rules"));
-
-                // Derive
-                let all_rules = rules.union(&prior_rules);
-                write_derivability(
-                    all_rules.clone(),
-                    &format!("{}-{}", ty, prior_name),
-                    &halide_baseline,
-                    "halide",
-                    "case_study2",
-                );
-                if *prior_name != "Enumo" {
-                    write_derivability(
-                        all_rules,
-                        &format!("{}-{}", ty, prior_name),
-                        &enumo_baseline,
-                        "enumo",
-                        "case_study2",
-                    );
-                }
-            }
+            // Derive
+            let all_rules = rules.union(&prior_rules);
+            write_derivability(
+                all_rules.clone(),
+                &format!("w-{prior_name}"),
+                &halide_baseline,
+                "Halide",
+                "cs2",
+            );
+            write_derivability(
+                all_rules.clone(),
+                &format!("w-{prior_name}"),
+                &enumo_baseline,
+                "Enumo",
+                "cs2",
+            );
         }
     }
 
