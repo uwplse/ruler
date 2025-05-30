@@ -672,6 +672,7 @@ mod test {
     async fn case_study2() {
         dotenv().ok();
         let enumo_baseline: Ruleset<Pred> = Ruleset::from_file("jfp/baseline/enumo_halide.rules");
+        let a5_baseline: Ruleset<Pred> = Ruleset::from_file("jfp/baseline/atoms5_halide.rules");
         let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let llm_2: Ruleset<Pred> = Ruleset::from_file("jfp/cs1/halide/LLM-None-1.rules")
             .union(&Ruleset::from_file("jfp/cs1/halide/LLM-None-2.rules"));
@@ -773,6 +774,13 @@ mod test {
                 &format!("w-{prior_name}"),
                 &halide_baseline,
                 "Halide",
+                "cs2",
+            );
+            write_derivability(
+                all_rules.clone(),
+                &format!("w-{prior_name}"),
+                &a5_baseline,
+                "A5",
                 "cs2",
             );
             write_derivability(
