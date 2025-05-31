@@ -33,6 +33,7 @@ pub fn trig_rules() -> Ruleset<Trig> {
         .clone()
         .plug("op", &t_ops)
         .plug("v", &consts)
+        .append(Workload::new(["0", "1"]))
         .filter(valid_trig);
 
     let simple_terms = app.clone().plug("op", &t_ops).plug(
