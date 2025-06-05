@@ -9,7 +9,7 @@ pub fn replicate_ruler1_recipe() -> Ruleset<Math> {
 
     // Domain
     let vars = &Workload::new(["a", "b", "c"]);
-    let consts = &Workload::new(["0", "-1", "1"]);
+    let consts = &Workload::default();
     let uops = &Workload::new(["~", "fabs"]);
     let bops = &Workload::new(["+", "-", "*", "/"]);
     let lang = base_lang(2).plug("OP1", uops).plug("OP2", bops);

@@ -9,11 +9,7 @@ pub fn bool_rules() -> Ruleset<Bool> {
     let r5 = recursive_rules(
         Metric::Atoms,
         5,
-        Lang::new(
-            &["true", "false"],
-            &["a", "b", "c"],
-            &[&["~"], &["&", "|", "^"]],
-        ),
+        Lang::new(&[], &["a", "b", "c"], &[&["~"], &["&", "|", "^"]]),
         Ruleset::default(),
     );
     all.extend(r5);
