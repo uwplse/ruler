@@ -57,8 +57,9 @@ impl Workload {
         Self::Set(sexps)
     }
 
-    pub async fn from_llm(prompt: &str) -> Self {
+    pub async fn from_llm(_prompt: &str) -> Self {
         // TODO
+        Self::empty()
     }
 
     /// Materialize the workload into an e-graph

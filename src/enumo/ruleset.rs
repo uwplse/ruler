@@ -212,8 +212,9 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(all_rules)
     }
 
-    pub async fn from_llm(prompt: &str) -> Self {
+    pub async fn from_llm(_prompt: &str) -> Self {
         // TODO
+        Self::default()
     }
 
     pub fn pretty_print(&self) {
