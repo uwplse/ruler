@@ -3,7 +3,7 @@ use std::str::FromStr;
 use super::*;
 
 /// S-expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub enum Sexp {
     Atom(String),
     List(Vec<Self>),
