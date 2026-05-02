@@ -167,41 +167,33 @@ impl SynthLanguage for Math {
 
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
-        let ctx = z3::Context::new(&cfg);
-        let solver = z3::Solver::new(&ctx);
-        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        let lhs_denom = Self::error_conditions(
-            &ctx,
-            Self::pat_to_sexp(lhs),
-            z3::ast::Bool::from_bool(&ctx, true),
-        );
-        let rhs_denom = Self::error_conditions(
-            &ctx,
-            Self::pat_to_sexp(rhs),
-            z3::ast::Bool::from_bool(&ctx, true),
-        );
+        z3::with_z3_config(&cfg, || {
+            let solver = z3::Solver::new();
+            let lexpr = egg_to_z3(Self::instantiate(lhs).as_ref());
+            let rexpr = egg_to_z3(Self::instantiate(rhs).as_ref());
+            let lhs_denom = Self::error_conditions(
+                Self::pat_to_sexp(lhs),
+                z3::ast::Bool::from_bool(true),
+            );
+            let rhs_denom = Self::error_conditions(
+                Self::pat_to_sexp(rhs),
+                z3::ast::Bool::from_bool(true),
+            );
 
-        let mut assert_equal = lexpr._eq(&rexpr);
+            let mut assert_equal = lexpr.eq(&rexpr);
 
-        for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
-            assert_equal = condition.not().implies(&assert_equal);
-        }
+            for condition in lhs_denom.iter().chain(rhs_denom.iter()) {
+                assert_equal = condition.not().implies(&assert_equal);
+            }
 
-        let rhs_errors =
-            z3::ast::Bool::or(&ctx, &rhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
-        let lhs_errors =
-            z3::ast::Bool::or(&ctx, &lhs_denom.iter().collect::<Vec<&z3::ast::Bool>>());
-        let error_preserved = rhs_errors.iff(&lhs_errors);
-        let assertion = z3::ast::Bool::and(&ctx, &[&assert_equal, &error_preserved]);
+            let rhs_errors = z3::ast::Bool::or(&rhs_denom.clone());
+            let lhs_errors = z3::ast::Bool::or(&lhs_denom.clone());
+            let error_preserved = rhs_errors.iff(&lhs_errors);
+            let assertion = z3::ast::Bool::and(&[assert_equal, error_preserved]);
 
-        solver.assert(&assertion.clone().not());
-        let res = Self::z3_res_to_validationresult(solver.check());
-        /*if let ValidationResult::Valid = res {
-            eprintln!("verifying {} => {}", lhs, rhs);
-        eprintln!("assertion: {}", assertion);
-        }*/
-        res
+            solver.assert(&assertion.clone().not());
+            Self::z3_res_to_validationresult(solver.check())
+        })
     }
 
     fn is_constant(&self) -> bool {
@@ -214,16 +206,15 @@ impl SynthLanguage for Math {
 }
 
 impl Math {
-    fn _one_of_errors(ctx: &z3::Context, denoms: HashSet<String>) -> z3::ast::Bool {
-        let zero_z3 = z3::ast::Real::from_real(&ctx, 0, 1);
+    fn _one_of_errors(denoms: HashSet<String>) -> z3::ast::Bool {
+        let zero_z3 = z3::ast::Real::from_real(0, 1);
 
-        let mut one_of_rhs_errors = z3::ast::Bool::from_bool(ctx, false);
+        let mut one_of_rhs_errors = z3::ast::Bool::from_bool(false);
         for d in denoms {
             let expr = egg_to_z3(
-                ctx,
                 Self::instantiate(&d.to_string().parse::<Pattern<Math>>().unwrap()).as_ref(),
             );
-            one_of_rhs_errors = z3::ast::Bool::or(ctx, &[&one_of_rhs_errors, &expr._eq(&zero_z3)]);
+            one_of_rhs_errors = z3::ast::Bool::or(&[one_of_rhs_errors, expr.eq(&zero_z3)]);
         }
         one_of_rhs_errors
     }
@@ -323,43 +314,41 @@ impl Math {
     /// For example,
     /// In (if x y z), the expression y
     /// has condition (!= x 0)
-    fn error_conditions<'a>(
-        ctx: &'a z3::Context,
+    fn error_conditions(
         sexp: Sexp,
-        path: z3::ast::Bool<'a>,
-    ) -> Vec<z3::ast::Bool<'a>> {
-        let mut res = Vec::<z3::ast::Bool<'a>>::default();
+        path: z3::ast::Bool,
+    ) -> Vec<z3::ast::Bool> {
+        let mut res = Vec::<z3::ast::Bool>::default();
         match sexp {
             Sexp::List(list) => {
                 if list[0] == Sexp::String("/".to_string()) {
                     let denom = list[2].to_string();
                     let expr = egg_to_z3(
-                        &ctx,
                         Self::instantiate(&denom.to_string().parse::<Pattern<Math>>().unwrap())
                             .as_ref(),
                     );
-                    let is_zero = expr._eq(&z3::ast::Real::from_real(ctx, 0, 1));
+                    let is_zero = expr.eq(&z3::ast::Real::from_real(0, 1));
 
-                    res.push(z3::ast::Bool::and(ctx, &[&is_zero, &path]));
+                    res.push(z3::ast::Bool::and(&[is_zero, path.clone()]));
                 }
 
                 if list[0] == Sexp::String("if".to_string()) {
                     let cond_real = egg_to_z3(
-                        &ctx,
                         Self::instantiate(&list[1].to_string().parse::<Pattern<Math>>().unwrap())
                             .as_ref(),
                     );
-                    let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                    let new_path_pos = z3::ast::Bool::and(
-                        &ctx,
-                        &[&path, &z3::ast::Bool::not(&cond_real._eq(&zero))],
-                    );
-                    let new_path_neg = z3::ast::Bool::and(&ctx, &[&path, &cond_real._eq(&zero)]);
-                    res.extend(Self::error_conditions(ctx, list[2].clone(), new_path_pos));
-                    res.extend(Self::error_conditions(ctx, list[3].clone(), new_path_neg));
+                    let zero = z3::ast::Real::from_real(0, 1);
+                    let new_path_pos = z3::ast::Bool::and(&[
+                        path.clone(),
+                        cond_real.eq(&zero).not(),
+                    ]);
+                    let new_path_neg =
+                        z3::ast::Bool::and(&[path.clone(), cond_real.eq(&zero)]);
+                    res.extend(Self::error_conditions(list[2].clone(), new_path_pos));
+                    res.extend(Self::error_conditions(list[3].clone(), new_path_neg));
                 } else {
                     for s in list {
-                        res.extend(Self::error_conditions(ctx, s, path.clone()));
+                        res.extend(Self::error_conditions(s, path.clone()));
                     }
                 };
             }
@@ -437,50 +426,42 @@ impl Math {
     }
 }
 
-fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Math]) -> z3::ast::Real<'a> {
+fn egg_to_z3(expr: &[Math]) -> z3::ast::Real {
     let mut buf: Vec<z3::ast::Real> = vec![];
     for node in expr.as_ref().iter() {
         match node {
-            Math::Add([x, y]) => buf.push(z3::ast::Real::add(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
-            Math::Sub([x, y]) => buf.push(z3::ast::Real::sub(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
-            Math::Mul([x, y]) => buf.push(z3::ast::Real::mul(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
-            Math::Div([x, y]) => buf.push(z3::ast::Real::div(
-                &buf[usize::from(*x)],
-                &buf[usize::from(*y)],
-            )),
-            Math::Neg(x) => buf.push(z3::ast::Real::unary_minus(&buf[usize::from(*x)])),
+            Math::Add([x, y]) => buf.push(z3::ast::Real::add(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
+            Math::Sub([x, y]) => buf.push(z3::ast::Real::sub(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
+            Math::Mul([x, y]) => buf.push(z3::ast::Real::mul(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
+            Math::Div([x, y]) => {
+                let l = buf[usize::from(*x)].clone();
+                let r = buf[usize::from(*y)].clone();
+                buf.push(l.div(&r));
+            }
+            Math::Neg(x) => buf.push(buf[usize::from(*x)].unary_minus()),
             Math::Abs(a) => {
-                let inner = &buf[usize::from(*a)].clone();
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Real::le(inner, &zero),
-                    &z3::ast::Real::unary_minus(inner),
-                    &inner,
-                ));
+                let inner = buf[usize::from(*a)].clone();
+                let zero = z3::ast::Real::from_real(0, 1);
+                buf.push(inner.le(&zero).ite(&inner.unary_minus(), &inner));
             }
             Math::Lit(c) => buf.push(z3::ast::Real::from_real(
-                ctx,
                 (c.numer()).to_i32().unwrap(),
                 (c.denom()).to_i32().unwrap(),
             )),
-            Math::Var(v) => buf.push(z3::ast::Real::new_const(ctx, v.to_string())),
+            Math::Var(v) => buf.push(z3::ast::Real::new_const(v.to_string())),
             Math::If([x, y, z]) => {
-                let zero = z3::ast::Real::from_real(ctx, 0, 1);
-                let cond = z3::ast::Bool::not(&buf[usize::from(*x)]._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &cond,
-                    &buf[usize::from(*y)],
-                    &buf[usize::from(*z)],
-                ))
+                let zero = z3::ast::Real::from_real(0, 1);
+                let cond = buf[usize::from(*x)].eq(&zero).not();
+                buf.push(cond.ite(&buf[usize::from(*y)], &buf[usize::from(*z)]))
             }
         }
     }

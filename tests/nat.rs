@@ -136,36 +136,37 @@ impl SynthLanguage for Nat {
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
-        let ctx = z3::Context::new(&cfg);
-        let solver = z3::Solver::new(&ctx);
-        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check() {
-            z3::SatResult::Unsat => ValidationResult::Valid,
-            z3::SatResult::Unknown => ValidationResult::Unknown,
-            z3::SatResult::Sat => ValidationResult::Invalid,
-        }
+        z3::with_z3_config(&cfg, || {
+            let solver = z3::Solver::new();
+            let lexpr = egg_to_z3(Self::instantiate(lhs).as_ref());
+            let rexpr = egg_to_z3(Self::instantiate(rhs).as_ref());
+            solver.assert(&lexpr.eq(&rexpr).not());
+            match solver.check() {
+                z3::SatResult::Unsat => ValidationResult::Valid,
+                z3::SatResult::Unknown => ValidationResult::Unknown,
+                z3::SatResult::Sat => ValidationResult::Invalid,
+            }
+        })
     }
 }
 
-fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Nat]) -> z3::ast::Int<'a> {
+fn egg_to_z3(expr: &[Nat]) -> z3::ast::Int {
     let mut buf = vec![];
-    let zero = z3::ast::Int::from_i64(ctx, 0);
-    let one = z3::ast::Int::from_i64(ctx, 1);
+    let zero = z3::ast::Int::from_i64(0);
+    let one = z3::ast::Int::from_i64(1);
     for node in expr.as_ref().iter() {
         match node {
             Nat::Z => buf.push(zero.clone()),
-            Nat::S(x) => buf.push(z3::ast::Int::add(ctx, &[&buf[usize::from(*x)], &one])),
-            Nat::Add([x, y]) => buf.push(z3::ast::Int::add(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
-            Nat::Mul([x, y]) => buf.push(z3::ast::Int::mul(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
-            Nat::Var(v) => buf.push(z3::ast::Int::new_const(ctx, v.to_string())),
+            Nat::S(x) => buf.push(z3::ast::Int::add(&[buf[usize::from(*x)].clone(), one.clone()])),
+            Nat::Add([x, y]) => buf.push(z3::ast::Int::add(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
+            Nat::Mul([x, y]) => buf.push(z3::ast::Int::mul(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
+            Nat::Var(v) => buf.push(z3::ast::Int::new_const(v.to_string())),
         }
     }
     buf.pop().unwrap()
