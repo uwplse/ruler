@@ -1,7 +1,16 @@
 use egg::{AstSize, EClass, Extractor, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{io::Write, sync::Arc};
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
+use std::{
+    io::Write,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 use crate::{
     CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
@@ -431,10 +440,24 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
+
+        let total = self.len() as u64;
+        let pb = ProgressBar::new(total);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("##-"),
+        );
+
         while !self.is_empty() {
+            let before = self.len();
             let selected = self.select(step_size, &mut invalid);
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
+            let after = self.len();
+            let processed = before.saturating_sub(after);
+            pb.inc(processed as u64);
         }
         // Return only the new rules
         chosen.remove_all(prior);
@@ -479,7 +502,44 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|rule| self.can_derive(derive_type, rule, limits))
+        let against: Vec<&Rule<L>> = against.0.values().collect();
+        let total = against.len();
+
+        let counter = Arc::new(AtomicUsize::new(0));
+        let pb = ProgressBar::new(total as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("##-"),
+        );
+        let counter_clone = Arc::clone(&counter);
+        let pb_clone = pb.clone();
+
+        let handle = thread::spawn(move || {
+            loop {
+                let processed = counter_clone.load(Ordering::Relaxed);
+                pb_clone.set_position(processed as u64);
+                if processed >= total {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+            pb_clone.finish();
+        });
+
+        let (yeses, nos): (Vec<_>, Vec<_>) = against.into_par_iter().partition(|rule| {
+            counter.fetch_add(1, Ordering::Relaxed);
+            self.can_derive(derive_type, rule, limits)
+        });
+
+        handle.join().unwrap();
+
+        let mut yes = Ruleset::default();
+        let mut no = Ruleset::default();
+        yes.add_all(yeses);
+        no.add_all(nos);
+        (yes, no)
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {

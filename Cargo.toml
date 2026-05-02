@@ -24,7 +24,8 @@ itertools = "0.9.0"
 z3 = {version = "0.20", features = ["bundled"]}
 rustc-hash = "1"
 symbolic_expressions = "5"
-rayon = "1"
+rayon = "1.10"
+indicatif = "0.17"
 smallstr = "0.3"
 [dependencies.egg]
 version = "0.9"
