@@ -48,8 +48,11 @@ impl Workload {
         let infile = std::fs::File::open(filename).expect("can't open file");
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
-        for line in std::io::BufRead::lines(reader) {
-            sexps.push(line.unwrap().parse().unwrap());
+        for line in std::io::BufRead::lines(reader).map_while(Result::ok) {
+            match line.parse() {
+                Ok(sexp) => sexps.push(sexp),
+                Err(e) => eprintln!("Skipping invalid s-expression {:?}: {}", line, e),
+            }
         }
         Self::Set(sexps)
     }
@@ -267,6 +270,18 @@ mod test {
         for t in expected.force() {
             assert!(actual.contains(&t));
         }
+    }
+
+    #[test]
+    fn from_file_skips_invalid_lines() {
+        let path = std::env::temp_dir().join("ruler_workload_from_file_test.txt");
+        let path_str = path.to_str().unwrap();
+        std::fs::write(&path, "(+ 1 2)\n(unbalanced\n(* 3 4)\n").unwrap();
+
+        let wkld = Workload::from_file(path_str);
+        assert_eq!(wkld.force().len(), 2);
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
