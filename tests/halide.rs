@@ -147,135 +147,112 @@ impl SynthLanguage for Pred {
     fn validate(lhs: &Pattern<Self>, rhs: &Pattern<Self>) -> ValidationResult {
         let mut cfg = z3::Config::new();
         cfg.set_timeout_msec(1000);
-        let ctx = z3::Context::new(&cfg);
-        let solver = z3::Solver::new(&ctx);
-        let lexpr = egg_to_z3(&ctx, Self::instantiate(lhs).as_ref());
-        let rexpr = egg_to_z3(&ctx, Self::instantiate(rhs).as_ref());
-        solver.assert(&lexpr._eq(&rexpr).not());
-        match solver.check() {
-            z3::SatResult::Unsat => ValidationResult::Valid,
-            z3::SatResult::Unknown => ValidationResult::Unknown,
-            z3::SatResult::Sat => ValidationResult::Invalid,
-        }
+        z3::with_z3_config(&cfg, || {
+            let solver = z3::Solver::new();
+            let lexpr = egg_to_z3(Self::instantiate(lhs).as_ref());
+            let rexpr = egg_to_z3(Self::instantiate(rhs).as_ref());
+            solver.assert(&lexpr.eq(&rexpr).not());
+            match solver.check() {
+                z3::SatResult::Unsat => ValidationResult::Valid,
+                z3::SatResult::Unknown => ValidationResult::Unknown,
+                z3::SatResult::Sat => ValidationResult::Invalid,
+            }
+        })
     }
 }
 
-fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Pred]) -> z3::ast::Int<'a> {
+fn egg_to_z3(expr: &[Pred]) -> z3::ast::Int {
     let mut buf: Vec<z3::ast::Int> = vec![];
-    let zero = z3::ast::Int::from_i64(ctx, 0);
-    let one = z3::ast::Int::from_i64(ctx, 1);
+    let zero = z3::ast::Int::from_i64(0);
+    let one = z3::ast::Int::from_i64(1);
     for node in expr.as_ref().iter() {
         match node {
-            Pred::Lit(c) => buf.push(z3::ast::Int::from_i64(ctx, c.to_i64().unwrap())),
+            Pred::Lit(c) => buf.push(z3::ast::Int::from_i64(c.to_i64().unwrap())),
             Pred::Lt([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::lt(l, r), &one, &zero))
+                buf.push(l.lt(r).ite(&one, &zero))
             }
             Pred::Leq([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), &one, &zero))
+                buf.push(l.le(r).ite(&one, &zero))
             }
             Pred::Eq([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::_eq(l, r), &one, &zero))
+                buf.push(l.eq(r).ite(&one, &zero))
             }
             Pred::Neq([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::_eq(l, r), &zero, &one))
+                buf.push(l.eq(r).ite(&zero, &one))
             }
             Pred::Implies([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                let l_not_z = z3::ast::Bool::not(&l._eq(&zero));
-                let r_not_z = z3::ast::Bool::not(&r._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Bool::implies(&l_not_z, &r_not_z),
-                    &one,
-                    &zero,
-                ))
+                let l_not_z = l.eq(&zero).not();
+                let r_not_z = r.eq(&zero).not();
+                buf.push(l_not_z.implies(&r_not_z).ite(&one, &zero))
             }
             Pred::Not(x) => {
                 let l = &buf[usize::from(*x)];
-                buf.push(z3::ast::Bool::ite(&l._eq(&zero), &one, &zero))
+                buf.push(l.eq(&zero).ite(&one, &zero))
             }
-            Pred::Neg(x) => buf.push(z3::ast::Int::unary_minus(&buf[usize::from(*x)])),
+            Pred::Neg(x) => buf.push(buf[usize::from(*x)].unary_minus()),
             Pred::And([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                let l_not_z = z3::ast::Bool::not(&l._eq(&zero));
-                let r_not_z = z3::ast::Bool::not(&r._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Bool::and(ctx, &[&l_not_z, &r_not_z]),
-                    &one,
-                    &zero,
-                ))
+                let l_not_z = l.eq(&zero).not();
+                let r_not_z = r.eq(&zero).not();
+                buf.push(z3::ast::Bool::and(&[l_not_z, r_not_z]).ite(&one, &zero))
             }
             Pred::Or([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                let l_not_z = z3::ast::Bool::not(&l._eq(&zero));
-                let r_not_z = z3::ast::Bool::not(&r._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Bool::or(ctx, &[&l_not_z, &r_not_z]),
-                    &one,
-                    &zero,
-                ))
+                let l_not_z = l.eq(&zero).not();
+                let r_not_z = r.eq(&zero).not();
+                buf.push(z3::ast::Bool::or(&[l_not_z, r_not_z]).ite(&one, &zero))
             }
             Pred::Xor([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                let l_not_z = z3::ast::Bool::not(&l._eq(&zero));
-                let r_not_z = z3::ast::Bool::not(&r._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &z3::ast::Bool::xor(&l_not_z, &r_not_z),
-                    &one,
-                    &zero,
-                ))
+                let l_not_z = l.eq(&zero).not();
+                let r_not_z = r.eq(&zero).not();
+                buf.push(l_not_z.xor(&r_not_z).ite(&one, &zero))
             }
-            Pred::Add([x, y]) => buf.push(z3::ast::Int::add(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
-            Pred::Sub([x, y]) => buf.push(z3::ast::Int::sub(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
-            Pred::Mul([x, y]) => buf.push(z3::ast::Int::mul(
-                ctx,
-                &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
-            )),
+            Pred::Add([x, y]) => buf.push(z3::ast::Int::add(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
+            Pred::Sub([x, y]) => buf.push(z3::ast::Int::sub(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
+            Pred::Mul([x, y]) => buf.push(z3::ast::Int::mul(&[
+                buf[usize::from(*x)].clone(),
+                buf[usize::from(*y)].clone(),
+            ])),
             Pred::Div([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(
-                    &r._eq(&zero),
-                    &zero,
-                    &z3::ast::Int::div(l, r),
-                ))
+                buf.push(r.eq(&zero).ite(&zero, &l.div(r)))
             }
             Pred::Min([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), l, r))
+                buf.push(l.le(r).ite(l, r))
             }
             Pred::Max([x, y]) => {
                 let l = &buf[usize::from(*x)];
                 let r = &buf[usize::from(*y)];
-                buf.push(z3::ast::Bool::ite(&z3::ast::Int::le(l, r), r, l))
+                buf.push(l.le(r).ite(r, l))
             }
             Pred::Select([x, y, z]) => {
-                let cond = z3::ast::Bool::not(&buf[usize::from(*x)]._eq(&zero));
-                buf.push(z3::ast::Bool::ite(
-                    &cond,
-                    &buf[usize::from(*y)],
-                    &buf[usize::from(*z)],
-                ))
+                let cond = buf[usize::from(*x)].eq(&zero).not();
+                buf.push(cond.ite(&buf[usize::from(*y)], &buf[usize::from(*z)]))
             }
-            Pred::Var(v) => buf.push(z3::ast::Int::new_const(ctx, v.to_string())),
+            Pred::Var(v) => buf.push(z3::ast::Int::new_const(v.to_string())),
         }
     }
     buf.pop().unwrap()
