@@ -25,40 +25,42 @@ impl<L: SynthLanguage> Display for Rule<L> {
 
 impl<L: SynthLanguage> Rule<L> {
     pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
-        if let Some((l, r)) = s.split_once("=>") {
-            let l_pat: Pattern<L> = l.parse().unwrap();
-            let r_pat: Pattern<L> = r.parse().unwrap();
-
-            let forwards = Self {
-                name: format!("{} ==> {}", l_pat, r_pat).into(),
-                lhs: l_pat.clone(),
-                rhs: r_pat.clone(),
-                rewrite: Rewrite::new(
-                    format!("{} ==> {}", l_pat, r_pat),
-                    l_pat.clone(),
-                    Rhs { rhs: r_pat.clone() },
-                )
-                .unwrap(),
-            };
-
-            if s.contains("<=>") {
-                let backwards = Self {
-                    name: format!("{} ==> {}", r_pat, l_pat).into(),
-                    lhs: r_pat.clone(),
-                    rhs: l_pat.clone(),
-                    rewrite: Rewrite::new(
-                        format!("{} ==> {}", r_pat, l_pat),
-                        r_pat,
-                        Rhs { rhs: l_pat },
-                    )
-                    .unwrap(),
-                };
-                Ok((forwards, Some(backwards)))
-            } else {
-                Ok((forwards, None))
-            }
+        let (l, r, bidirectional) = if let Some((l, r)) = s.split_once("<=>") {
+            (l, r, true)
+        } else if let Some((l, r)) = s.split_once("==>") {
+            (l, r, false)
+        } else if let Some((l, r)) = s.split_once("=>") {
+            (l, r, false)
         } else {
-            Err(format!("Failed to parse {}", s))
+            return Err(format!("Failed to parse {}", s));
+        };
+
+        let l_pat: Pattern<L> = l
+            .parse()
+            .map_err(|e| format!("Failed to parse LHS of {}: {:?}", s, e))?;
+        let r_pat: Pattern<L> = r
+            .parse()
+            .map_err(|e| format!("Failed to parse RHS of {}: {:?}", s, e))?;
+        // egg's pattern parser silently accepts trailing junk (e.g. `* ?b ?a)`
+        // parses as just `*`).
+        // Reject anything where the parse doesn't round-trip to the input.
+        let normalize_ws = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+        if normalize_ws(&l_pat.to_string()) != normalize_ws(l) {
+            return Err(format!("Failed to parse LHS of {}", s));
+        }
+        if normalize_ws(&r_pat.to_string()) != normalize_ws(r) {
+            return Err(format!("Failed to parse RHS of {}", s));
+        }
+
+        let forwards = Self::new(&l_pat, &r_pat)
+            .ok_or_else(|| format!("Failed to build rewrite for {}", s))?;
+
+        if bidirectional {
+            let backwards = Self::new(&r_pat, &l_pat)
+                .ok_or_else(|| format!("Failed to build reverse rewrite for {}", s))?;
+            Ok((forwards, Some(backwards)))
+        } else {
+            Ok((forwards, None))
         }
     }
 }
@@ -162,6 +164,8 @@ fn apply_pat<L: Language, A: Analysis<L>>(
 
 #[cfg(test)]
 mod test {
+    use egg::SymbolLang;
+
     use crate::enumo::Rule;
 
     #[test]
@@ -187,5 +191,20 @@ mod test {
         assert!(backwards.is_some());
         assert_eq!(backwards.unwrap().name.to_string(), "(* c d) ==> (* a b)");
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+    }
+
+    #[test]
+    fn parse_invalid_rules() {
+        // malformed parens on LHS
+        let r1 = Rule::<SymbolLang>::from_string("(* ?a ?b ==> (* ?b ?a)");
+        assert!(r1.is_err());
+
+        // malformed parens on RHS
+        let r2 = Rule::<SymbolLang>::from_string("(* ?a ?b) ==> * ?b ?a)");
+        assert!(r2.is_err());
+
+        // Var on RHS that isn't on LHS
+        let r3 = Rule::<egg::SymbolLang>::from_string("(* ?a ?a) ==> (* ?a ?b)");
+        assert!(r3.is_err());
     }
 }

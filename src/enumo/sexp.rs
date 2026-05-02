@@ -14,7 +14,7 @@ impl FromStr for Sexp {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use symbolic_expressions::parser::parse_str;
-        let sexp = parse_str(s).unwrap();
+        let sexp = parse_str(s).map_err(|e| format!("Failed to parse {}: {:?}", s, e))?;
         Ok(Self::from_symbolic_expr(sexp))
     }
 }
@@ -118,6 +118,14 @@ impl Sexp {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn from_str_invalid_returns_err() {
+        // Unbalanced parens and other malformed inputs should return Err, not panic.
+        assert!("(+ 1 2".parse::<Sexp>().is_err());
+        assert!(")".parse::<Sexp>().is_err());
+        assert!("(a (b c)".parse::<Sexp>().is_err());
+    }
 
     #[test]
     fn from_str() {
