@@ -203,6 +203,10 @@ impl<L: SynthLanguage> Ruleset<L> {
         Self(all_rules)
     }
 
+    pub async fn from_llm(prompt: &str) -> Self {
+        // TODO
+    }
+
     pub fn pretty_print(&self) {
         let mut strs = vec![];
         for (name, rule) in &self.0 {
