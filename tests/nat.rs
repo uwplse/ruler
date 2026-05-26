@@ -157,7 +157,10 @@ fn egg_to_z3(expr: &[Nat]) -> z3::ast::Int {
     for node in expr.as_ref().iter() {
         match node {
             Nat::Z => buf.push(zero.clone()),
-            Nat::S(x) => buf.push(z3::ast::Int::add(&[buf[usize::from(*x)].clone(), one.clone()])),
+            Nat::S(x) => buf.push(z3::ast::Int::add(&[
+                buf[usize::from(*x)].clone(),
+                one.clone(),
+            ])),
             Nat::Add([x, y]) => buf.push(z3::ast::Int::add(&[
                 buf[usize::from(*x)].clone(),
                 buf[usize::from(*y)].clone(),

@@ -171,14 +171,10 @@ impl SynthLanguage for Math {
             let solver = z3::Solver::new();
             let lexpr = egg_to_z3(Self::instantiate(lhs).as_ref());
             let rexpr = egg_to_z3(Self::instantiate(rhs).as_ref());
-            let lhs_denom = Self::error_conditions(
-                Self::pat_to_sexp(lhs),
-                z3::ast::Bool::from_bool(true),
-            );
-            let rhs_denom = Self::error_conditions(
-                Self::pat_to_sexp(rhs),
-                z3::ast::Bool::from_bool(true),
-            );
+            let lhs_denom =
+                Self::error_conditions(Self::pat_to_sexp(lhs), z3::ast::Bool::from_bool(true));
+            let rhs_denom =
+                Self::error_conditions(Self::pat_to_sexp(rhs), z3::ast::Bool::from_bool(true));
 
             let mut assert_equal = lexpr.eq(&rexpr);
 
@@ -314,10 +310,7 @@ impl Math {
     /// For example,
     /// In (if x y z), the expression y
     /// has condition (!= x 0)
-    fn error_conditions(
-        sexp: Sexp,
-        path: z3::ast::Bool,
-    ) -> Vec<z3::ast::Bool> {
+    fn error_conditions(sexp: Sexp, path: z3::ast::Bool) -> Vec<z3::ast::Bool> {
         let mut res = Vec::<z3::ast::Bool>::default();
         match sexp {
             Sexp::List(list) => {
@@ -338,12 +331,9 @@ impl Math {
                             .as_ref(),
                     );
                     let zero = z3::ast::Real::from_real(0, 1);
-                    let new_path_pos = z3::ast::Bool::and(&[
-                        path.clone(),
-                        cond_real.eq(&zero).not(),
-                    ]);
-                    let new_path_neg =
-                        z3::ast::Bool::and(&[path.clone(), cond_real.eq(&zero)]);
+                    let new_path_pos =
+                        z3::ast::Bool::and(&[path.clone(), cond_real.eq(&zero).not()]);
+                    let new_path_neg = z3::ast::Bool::and(&[path.clone(), cond_real.eq(&zero)]);
                     res.extend(Self::error_conditions(list[2].clone(), new_path_pos));
                     res.extend(Self::error_conditions(list[3].clone(), new_path_neg));
                 } else {
