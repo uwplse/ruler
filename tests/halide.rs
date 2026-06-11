@@ -1,6 +1,5 @@
 use num::{ToPrimitive, Zero};
 use ruler::*;
-use z3::ast::Ast;
 
 type Constant = i64;
 

@@ -9,7 +9,6 @@ use ruler::{
 use std::{ops::*, time::Instant};
 use symbolic_expressions::parser::parse_str;
 use symbolic_expressions::Sexp;
-use z3::ast::Ast;
 #[path = "./recipes/rational_best.rs"]
 pub mod rational_best;
 #[path = "./recipes/rational_replicate.rs"]
@@ -203,7 +202,7 @@ impl SynthLanguage for Math {
 
 impl Math {
     fn _one_of_errors(denoms: HashSet<String>) -> z3::ast::Bool {
-        let zero_z3 = z3::ast::Real::from_real(0, 1);
+        let zero_z3 = z3::ast::Real::from_rational(0, 1);
 
         let mut one_of_rhs_errors = z3::ast::Bool::from_bool(false);
         for d in denoms {
@@ -320,7 +319,7 @@ impl Math {
                         Self::instantiate(&denom.to_string().parse::<Pattern<Math>>().unwrap())
                             .as_ref(),
                     );
-                    let is_zero = expr.eq(&z3::ast::Real::from_real(0, 1));
+                    let is_zero = expr.eq(&z3::ast::Real::from_rational(0, 1));
 
                     res.push(z3::ast::Bool::and(&[is_zero, path.clone()]));
                 }
@@ -330,7 +329,7 @@ impl Math {
                         Self::instantiate(&list[1].to_string().parse::<Pattern<Math>>().unwrap())
                             .as_ref(),
                     );
-                    let zero = z3::ast::Real::from_real(0, 1);
+                    let zero = z3::ast::Real::from_rational(0, 1);
                     let new_path_pos =
                         z3::ast::Bool::and(&[path.clone(), cond_real.eq(&zero).not()]);
                     let new_path_neg = z3::ast::Bool::and(&[path.clone(), cond_real.eq(&zero)]);
@@ -440,16 +439,16 @@ fn egg_to_z3(expr: &[Math]) -> z3::ast::Real {
             Math::Neg(x) => buf.push(buf[usize::from(*x)].unary_minus()),
             Math::Abs(a) => {
                 let inner = buf[usize::from(*a)].clone();
-                let zero = z3::ast::Real::from_real(0, 1);
+                let zero = z3::ast::Real::from_rational(0, 1);
                 buf.push(inner.le(&zero).ite(&inner.unary_minus(), &inner));
             }
-            Math::Lit(c) => buf.push(z3::ast::Real::from_real(
-                (c.numer()).to_i32().unwrap(),
-                (c.denom()).to_i32().unwrap(),
+            Math::Lit(c) => buf.push(z3::ast::Real::from_rational(
+                (c.numer()).to_i64().unwrap(),
+                (c.denom()).to_i64().unwrap(),
             )),
             Math::Var(v) => buf.push(z3::ast::Real::new_const(v.to_string())),
             Math::If([x, y, z]) => {
-                let zero = z3::ast::Real::from_real(0, 1);
+                let zero = z3::ast::Real::from_rational(0, 1);
                 let cond = buf[usize::from(*x)].eq(&zero).not();
                 buf.push(cond.ite(&buf[usize::from(*y)], &buf[usize::from(*z)]))
             }
@@ -762,6 +761,12 @@ pub mod test {
     #[test]
     fn just_best() {
         best_enumo_recipe();
+    }
+
+    #[test]
+    fn replicate_ruler1() {
+        let rules = replicate_ruler1_recipe();
+        rules.to_file("out/rational.rules");
     }
 
     #[test]

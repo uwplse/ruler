@@ -3,7 +3,6 @@ use num_bigint::ToBigInt;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use ruler::*;
-use z3::ast::Ast;
 
 egg::define_language! {
   pub enum Nat {

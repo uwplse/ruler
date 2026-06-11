@@ -182,8 +182,22 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub fn to_file(&self, filename: &str) {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
-        for (name, _) in &self.0 {
-            writeln!(file, "{}", name).expect("Unable to write");
+
+        let mut strs = vec![];
+        for (name, rule) in &self.0 {
+            let reverse = Rule::new(&rule.rhs, &rule.lhs);
+            if reverse.is_some() && self.contains(&reverse.unwrap()) {
+                let reverse_name = format!("{} <=> {}", rule.rhs, rule.lhs);
+                if !strs.contains(&reverse_name) {
+                    strs.push(format!("{} <=> {}", rule.lhs, rule.rhs));
+                }
+            } else {
+                strs.push(name.to_string());
+            }
+        }
+
+        for s in strs {
+            writeln!(file, "{}", s).expect("Unable to write");
         }
     }
 
