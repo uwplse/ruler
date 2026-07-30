@@ -379,7 +379,7 @@ mod test {
 
     fn start_rules() -> Ruleset {
         let syntax_rules =
-            Ruleset::new(["(pow ?x ?y) <=> (^ ?x ?y", "(abs ?x ?y) <=> (fabs ?x ?y)"]);
+            Ruleset::new(["(pow ?x ?y) <=> (^ ?x ?y)", "(abs ?x ?y) <=> (fabs ?x ?y)"]);
         let mut rules = Exponential::get_exploratory_rules();
         rules.extend(rational_rules());
         rules.extend(starting_exponential_rules());
@@ -410,7 +410,7 @@ mod test {
         Do not use any operators or syntax not listed here.
         Do not use imaginary numbers.
         All of the rules should use `exp`, `log`, `sqrt`, `cbrt`, or `pow`.
-        You may assume there is already a good set of rewrite rules for `-`, `-`, `+`, and `/`.
+        You may assume there is already a good set of rewrite rules for `-`, `*`, `+`, and `/`.
 
         Your task is to generate sound, useful, and complete rewrite rules for the domain.
         The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
@@ -484,13 +484,14 @@ mod test {
         ",
             minimized_sound.to_str_vec().join("\n")
         );
+        let reprompted_t = Instant::now();
         let repromped_candidates = Ruleset::from_llm(&reprompt).await;
         let _ = write(
             "jfp/cs1/exp/log.txt",
             &format!(
                 "{} rule candidates (reprompted) in {:?}",
-                candidates.len(),
-                rules_t.elapsed()
+                repromped_candidates.len(),
+                reprompted_t.elapsed()
             ),
         );
         repromped_candidates.to_file("jfp/cs1/exp/reprompted-candidates.rules");

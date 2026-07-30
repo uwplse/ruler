@@ -8,14 +8,14 @@ use openai_api_rs::v1::{
 
 pub fn models() -> Vec<String> {
     vec![
-        "deepseek/deepseek-v4-pro".to_string(), // open-weights (was deepseek-chat-v3-0324)
-        "google/gemini-3.6-flash".to_string(),  // fast Google (was gemini-2.5-flash-preview)
-        "openai/gpt-5.6-luna".to_string(),      // cheap tier (was gpt-4o-mini)
+        "google/gemini-3.6-flash".to_string(),
+        "openai/gpt-5.6-luna".to_string(),
         "anthropic/claude-sonnet-5".to_string(),
     ]
 }
 
 pub async fn query(prompt: &str, model: &str) -> Vec<String> {
+    println!("Starting query to {model}");
     let api_key = env::var("OPENROUTER_API_KEY").expect("API_KEY not set");
     let mut client = OpenAIClient::builder()
         .with_endpoint("https://openrouter.ai/api/v1")
@@ -34,6 +34,7 @@ pub async fn query(prompt: &str, model: &str) -> Vec<String> {
     );
 
     let res = client.chat_completion(req).await;
+    println!("got response");
     if res.is_ok() {
         let res = res.unwrap().choices[0].message.content.clone().unwrap();
 

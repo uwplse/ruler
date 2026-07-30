@@ -514,7 +514,7 @@ mod test {
         The set of rewrite rules should be sufficient to decide the equality between any
         two terms in the domain.
         You should generate at least 200 rules.
-        A rewrite rule has the form `l => r` where `l` and `r` are valid terms from
+        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from
         the domain that are always equivalent.
         Print only the rules, one rule per line, with no additional text or explanation.
         ";

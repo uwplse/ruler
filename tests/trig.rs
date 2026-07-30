@@ -464,7 +464,7 @@ mod test {
         Do not use any operators or syntax not listed here.
         Do not use imaginary numbers.
         All of the rules should use `sin`, `cos`, or `tan`.
-        You may assume there is already a good set of rewrite rules for `-`, `-`, `+`, `/`, and `sqr`.
+        You may assume there is already a good set of rewrite rules for `-`, `*`, `+`, `/`, and `sqr`.
 
         Your task is to generate sound, useful, and complete rewrite rules for the domain.
         The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
@@ -529,7 +529,7 @@ mod test {
 
         let reprompt = format!(
             "
-        The following are rewrite rules for exponential functions:
+        The following are rewrite rules for trig functions:
         {}
         
         These rules will be used for equality saturation.
@@ -539,13 +539,14 @@ mod test {
         ",
             minimized_sound.to_str_vec().join("\n")
         );
+        let reprompted_t = Instant::now();
         let repromped_candidates = Ruleset::from_llm(&reprompt).await;
         let _ = write(
             "jfp/cs1/trig/log.txt",
             &format!(
                 "{} rule candidates (reprompted) in {:?}",
-                candidates.len(),
-                rules_t.elapsed()
+                repromped_candidates.len(),
+                reprompted_t.elapsed()
             ),
         );
         repromped_candidates.to_file("jfp/cs1/trig/reprompted-candidates.rules");
