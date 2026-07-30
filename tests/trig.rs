@@ -450,26 +450,36 @@ mod test {
         let enumo_baseline: Ruleset<Trig> = Ruleset::from_file("jfp/baseline/enumo_trig.rules");
 
         let prompt = "
-        Your task is to perform rule inference for equality saturation.
+        You are generating rewrite rules for an equality saturation system.
         The domain is trigonometric functions, as follows:
-        Values: real numbers, PI
-        Unary operators: -, sin, cos, tan, sqr
-        Binary operators: +, -, *, /
+        Values: real numbers, and the constant PI
+        Unary operators: - (negation), sin, cos, tan, sqr (square)
+        Binary operators: +, - (subtraction), *, /
 
         Terms must be written using s-expressions and prefix notation.
         For example, (a + b) is not a valid term, but (+ a b) is a valid term.
-        Variables are ?x, ?y, and ?z.
-
-        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Variables are ?x, ?y, and ?z. The constant PI may appear in terms, e.g. (/ PI 2).
         Do not use any operators or syntax not listed here.
         Do not use imaginary numbers.
-        All of the rules should use `sin`, `cos`, or `tan`.
-        You may assume there is already a good set of rewrite rules for `-`, `*`, `+`, `/`, and `sqr`.
 
-        Your task is to generate sound, useful, and complete rewrite rules for the domain.
-        The set of rewrite rules should be sufficient to decide the equality between any two terms in the domain.
-        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
-        Print only the rules, one rule per line, with no additional text or explanation.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL real values of the variables (wherever both sides are defined). For example:
+        (sin (- ?x)) ==> (- (sin ?x))
+        (+ (sqr (sin ?x)) (sqr (cos ?x))) ==> 1
+
+        Good rewrite rules already exist for pure arithmetic (unary negation, +, -, *, /, and sqr), so every rule you generate must involve sin, cos, or tan. Cover at least the following categories:
+        - values of sin, cos, and tan at 0, PI/6, PI/4, PI/3, PI/2, PI, and their simple multiples
+        - parity of sin, cos, and tan (negated arguments)
+        - phase shifts relating sin, cos, and tan (arguments offset by PI/2 or PI)
+        - the Pythagorean identity and its variants
+        - angle sum and difference identities
+        - double-angle and half-angle identities
+        - product-to-sum and sum-to-product identities
+        - the definition of tan in terms of sin and cos
+
+        Every rule must be sound for all real values of the variables, not only at special angles.
+        Print only the rules, one rule per line, in the exact `l ==> r` syntax shown above.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let rules_t = Instant::now();
         let candidates = Ruleset::from_llm(prompt).await;
@@ -529,13 +539,23 @@ mod test {
 
         let reprompt = format!(
             "
-        The following are rewrite rules for trig functions:
+        You are generating rewrite rules for an equality saturation system.
+        The domain is trigonometric functions, as follows:
+        Values: real numbers, and the constant PI
+        Unary operators: - (negation), sin, cos, tan, sqr (square)
+        Binary operators: +, - (subtraction), *, /
+
+        The following rewrite rules are already in the ruleset:
         {}
-        
-        These rules will be used for equality saturation.
-        Are there any rules missing? Please generate the missing rules.
-        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
-        Print only the rules, one rule per line, with no additional text or explanation.
+
+        Identify sound rewrite rules for this domain that are missing from the ruleset above, and print them.
+        Do not repeat rules from the list above, and do not print trivial variants of them (e.g. renamed variables or swapped arguments of commutative operators).
+        Every rule must involve sin, cos, or tan; rules for pure arithmetic already exist.
+        Terms are s-expressions in prefix notation; variables are ?x, ?y, and ?z.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL real values of the variables. For example: (sin (- ?x)) ==> (- (sin ?x))
+        If no rules are missing, print nothing.
+        Print only the rules, one rule per line.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ",
             minimized_sound.to_str_vec().join("\n")
         );

@@ -500,23 +500,37 @@ mod test {
         let halide_baseline = Ruleset::from_file("baseline/halide.rules");
 
         let prompt = "
-        Your task is to perform rule inference for equality saturation.
-        The domain is boolean logic and arithmetic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, min, max
-            Ternary Operators: select
+        You are generating rewrite rules for an equality saturation system.
+        The domain is boolean logic and integer arithmetic, as follows:
+            Values: integers. Comparisons and boolean operators return 1 (true) or 0 (false); any nonzero value is treated as true.
+            Unary Operators: - (negation), ! (logical not)
+            Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+            Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
 
         Terms must be written using s-expressions and prefix notation.
-        Variables are ?x, ?y, and ?z.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Variables are ?x, ?y, and ?z. The integer constants 0 and 1 may also appear in rules.
+        Do not use any operators or syntax not listed here.
 
-        Your task is to generate sound, useful, and complete rewrite rules for the domain.
-        The set of rewrite rules should be sufficient to decide the equality between any
-        two terms in the domain.
-        You should generate at least 200 rules.
-        A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from
-        the domain that are always equivalent.
-        Print only the rules, one rule per line, with no additional text or explanation.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL integer values of the variables. For example:
+        (+ ?x ?y) ==> (+ ?y ?x)
+        (min ?x ?x) ==> ?x
+        (select 1 ?x ?y) ==> ?x
+
+        Generate a comprehensive set of sound rewrite rules for this domain, covering at least the following categories:
+        - identity and annihilator rules for each operator (e.g. adding 0, multiplying by 0 or 1)
+        - commutativity and associativity of +, *, min, max, &&, ||, ^, and commutativity of == and !=
+        - distributivity rules (e.g. * over +, && over ||, min and max over +, min over max)
+        - negation and logical-not rules (double negation, De Morgan's laws, ! of a comparison as the flipped comparison)
+        - relationships among <, <=, ==, and != (e.g. swapping argument order, complements)
+        - absorption and idempotence rules for min, max, &&, ||
+        - select rules (constant condition, equal branches, pushing operators into select, nested selects)
+        - rules connecting comparisons with min and max (e.g. (<= (min ?x ?y) ?x) ==> 1)
+
+        Generate at least 200 rules.
+        Every rule must be sound: both sides must be equal for every assignment of integer values to the variables, including 0 and negative values.
+        Print only the rules, one rule per line, in the exact `l ==> r` syntax shown above.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let rules_t = Instant::now();
         let candidates: Ruleset<Pred> = Ruleset::from_llm(prompt).await;
@@ -588,15 +602,24 @@ mod test {
 
             // Reprompt for missing rules
             let reprompt = &format!("
-            The following are rewrite rules for the domain of boolean logic and arithmetic:
+            You are generating rewrite rules for an equality saturation system.
+            The domain is boolean logic and integer arithmetic, as follows:
+                Values: integers. Comparisons and boolean operators return 1 (true) or 0 (false); any nonzero value is treated as true.
+                Unary Operators: - (negation), ! (logical not)
+                Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+                Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
+
+            The following rewrite rules are already in the ruleset:
             {}
             {}
 
-            These rules will be used for equality saturation.
-            Are there any rules missing? Please generate the missing rules.
-            A rewrite rule has the form `l ==> r` where `l` and `r` are valid terms from the domain that are always equivalent.
-            Do not use = or => to write rules, only use ==>.
-            Print only the rules, one rule per line, with no additional text or explanation.
+            Identify sound rewrite rules for this domain that are missing from the ruleset above, and print them.
+            Do not repeat rules from the list above, and do not print trivial variants of them (e.g. renamed variables or swapped arguments of commutative operators).
+            Terms are s-expressions in prefix notation; variables are ?x, ?y, and ?z, and the integer constants 0 and 1 may also appear.
+            A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL integer values of the variables. For example: (min ?x ?x) ==> ?x
+            If no rules are missing, print nothing.
+            Print only the rules, one rule per line.
+            Plain text only - no markdown, no code fences, no numbering, no extra commentary.
             ", sound.to_str_vec().join("\n"), prior_rules.to_str_vec().join("\n"));
             let reprompted_rules_t = Instant::now();
             let mut reprompted_candidates: Ruleset<Pred> = Ruleset::from_llm(reprompt).await;
@@ -677,28 +700,34 @@ mod test {
             .union(&Ruleset::from_file("jfp/cs1/halide/LLM-None-2.rules"));
 
         let prompt = "
-        Your task is to perform term enumeration for rule inference.
-        The domain is boolean logic and arithmetic, as follows:
-            Values: integers
-            Unary Operators: -, !
-            Binary Operators: <, <=, ==, !=, &&, ||, ^, +, -, *, min, max
-            Ternary Operators: select
+        You are generating a workload of terms from which rewrite rules will be inferred.
+        The domain is boolean logic and integer arithmetic, as follows:
+            Values: use only the integer constants 0 and 1
+            Variables: use only w, x, y, and z
+            Unary Operators: - (negation), ! (logical not)
+            Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+            Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
 
         Terms must be written using s-expressions and prefix notation.
-        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
-        Use 0 and 1 for constants and w, x, y, and z for variables.
-        Do not use any variables other than `w`, `x`, `y`, and `z`.
+        For example, (x + y) is not a valid term, but (+ x y) is a valid term.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Terms contain no ? marks. Do not use any operators, constants, or variables not listed here.
 
-        Binary operators must have exactly two operands. For example, (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
-        Do not use any operators or syntax not listed here.
+        Example terms in the required format:
+        (min x (max y x))
+        (select (< x y) x y)
+        (+ (* x 1) (* y 0))
 
-        Your task is to generate a list of terms from this domain, from which a set of rewrite rules will be inferred.
-        Try to generate pairs of terms that might be equivalent, so that rewrite rules can be inferred.
-        The generated terms should adequately cover the set of all possible terms.
-        The generated terms should vary in complexity and size so that they lead to interesting rewrite rules.
-        You should generate at least 1000 terms.
-        Your response should not contain `...` or another indicator that you have stopped before finishing term enumeration.
-        Print only the terms, one term per line, with no additional text or explanation.
+        Rewrite rules will be inferred by finding pairs of equivalent terms in this workload, so:
+        - generate many pairs or clusters of terms that are likely to be equivalent to each other;
+        - vary the terms in size and nesting depth, from single operators up to terms with 3 or 4 nested operators;
+        - cover every operator, and mix operator families in the same term (e.g. comparisons inside select, arithmetic inside min and max, boolean combinations of comparisons).
+
+        Generate at least 1000 terms in total. As a guide, generate roughly 100 terms emphasizing each of the following groups: arithmetic (+, -, *); min and max; comparisons; boolean operators (&&, ||, ^, !); select; negation; arithmetic combined with min and max; comparisons combined with boolean operators; comparisons combined with select; and mixed terms using three or more operator families.
+        Do not print group labels or headers.
+        Do not stop early: your response must not contain `...` or any other indication that the list is incomplete.
+        Print only the terms, one term per line.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let wkld_t = Instant::now();
         let wkld = Workload::from_llm(prompt)
