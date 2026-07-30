@@ -194,7 +194,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
         for (name, _) in &self.0 {
-            writeln!(file, "{}", name).expect("Unable to write");
+            writeln!(file, "{name}").expect("Unable to write");
         }
     }
 
@@ -231,7 +231,7 @@ impl<L: SynthLanguage> Ruleset<L> {
                                 rules.insert(forwards.name.clone(), forwards);
                             } else {
                                 invalid += 1;
-                                println!("Invalid rule: {}", line);
+                                println!("Invalid rule: {line}");
                             }
                             if let Some(backwards) = Rule::new(&r_pat, &l_pat) {
                                 num_rules += 1;
@@ -239,11 +239,11 @@ impl<L: SynthLanguage> Ruleset<L> {
                             }
                         } else {
                             invalid += 1;
-                            println!("Invalid rule: {}", line);
+                            println!("Invalid rule: {line}");
                         }
                     } else {
                         invalid += 1;
-                        println!("Invalid rule: {}", line);
+                        println!("Invalid rule: {line}");
                     }
                 }
             }

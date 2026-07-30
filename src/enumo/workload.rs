@@ -41,7 +41,7 @@ impl Workload {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
         for name in &self.force() {
-            writeln!(file, "{}", name).expect("Unable to write");
+            writeln!(file, "{name}").expect("Unable to write");
         }
     }
 
@@ -53,7 +53,7 @@ impl Workload {
             if let Ok(sexp) = line.parse() {
                 sexps.push(sexp);
             } else {
-                println!("Skipping invalid s-expression: {}", line);
+                println!("Skipping invalid s-expression: {line}");
             }
         }
         Self::Set(sexps)
@@ -72,7 +72,7 @@ impl Workload {
                     valid_sexps.insert(sexp);
                 } else {
                     invalid += 1;
-                    println!("Skipping invalid s-expression: {}", line);
+                    println!("Skipping invalid s-expression: {line}");
                 }
             }
             println!(
@@ -101,7 +101,7 @@ impl Workload {
                             v.remove(0);
                             let r = !expected_vars.is_empty() && expected_vars.contains(&v);
                             if !r {
-                                println!("Contains unexpected vars: {}", sexp);
+                                println!("Contains unexpected vars: {sexp}");
                             }
                             r
                         } else {
@@ -182,7 +182,7 @@ impl Workload {
 
     pub fn pretty_print(&self) {
         for t in self.force() {
-            println!("{}", t);
+            println!("{t}");
         }
     }
 

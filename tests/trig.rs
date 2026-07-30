@@ -333,7 +333,7 @@ impl Trig {
             if l_id == r_id {
                 valid.add(candidate.clone());
             } else {
-                println!("Unable to verify {}", candidate);
+                println!("Unable to verify {candidate}");
             }
         }
         println!(
@@ -388,7 +388,7 @@ mod test {
     fn write(f: &str, s: &str) -> io::Result<()> {
         let mut file = OpenOptions::new().append(true).create(true).open(f)?;
 
-        writeln!(file, "{}", s)?;
+        writeln!(file, "{s}")?;
         Ok(())
     }
 
@@ -472,7 +472,7 @@ mod test {
         Print only the rules, one rule per line, with no additional text or explanation.
         ";
         let rules_t = Instant::now();
-        let candidates = Ruleset::from_llm(&prompt).await;
+        let candidates = Ruleset::from_llm(prompt).await;
         let _ = write(
             "jfp/cs1/trig/log.txt",
             &format!(

@@ -52,7 +52,7 @@ pub async fn query(prompt: &str, model: &str) -> Vec<String> {
 
         lines
     } else {
-        eprintln!("Error: {:?}", res);
+        eprintln!("Error: {res:?}");
         vec![]
     }
 }

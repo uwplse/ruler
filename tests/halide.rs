@@ -38,49 +38,49 @@ impl SynthLanguage for Pred {
         let one = 1.to_i64().unwrap();
         let zero = 0.to_i64().unwrap();
         match self {
-            Pred::Lit(c) => vec![Some(c.clone()); cvec_len],
+            Pred::Lit(c) => vec![Some(*c); cvec_len],
             Pred::Lt([x, y]) => {
-                map!(get_cvec, x, y => if x < y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x < y {Some(one)} else {Some(zero)})
             }
             Pred::Leq([x, y]) => {
-                map!(get_cvec, x, y => if x <= y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x <= y {Some(one)} else {Some(zero)})
             }
             Pred::Eq([x, y]) => {
-                map!(get_cvec, x, y => if x == y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x == y {Some(one)} else {Some(zero)})
             }
             Pred::Neq([x, y]) => {
-                map!(get_cvec, x, y => if x != y {Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x, y => if x != y {Some(one)} else {Some(zero)})
             }
             Pred::Implies([x, y]) => {
                 map!(get_cvec, x, y => {
-                  let xbool = x.clone() != zero;
-                  let ybool = y.clone() != zero;
-                  if !xbool || ybool {Some(one.clone())} else {Some(zero.clone())}
+                  let xbool = *x != zero;
+                  let ybool = *y != zero;
+                  if !xbool || ybool {Some(one)} else {Some(zero)}
                 })
             }
             Pred::Not(x) => {
-                map!(get_cvec, x => if x.clone() == zero { Some(one.clone())} else {Some(zero.clone())})
+                map!(get_cvec, x => if *x == zero { Some(one)} else {Some(zero)})
             }
             Pred::Neg(x) => map!(get_cvec, x => Some(-x)),
             Pred::And([x, y]) => {
                 map!(get_cvec, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if xbool && ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                    let xbool = *x != zero;
+                    let ybool = *y != zero;
+                    if xbool && ybool { Some(one) } else { Some(zero) }
                 })
             }
             Pred::Or([x, y]) => {
                 map!(get_cvec, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if xbool || ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                    let xbool = *x != zero;
+                    let ybool = *y != zero;
+                    if xbool || ybool { Some(one) } else { Some(zero) }
                 })
             }
             Pred::Xor([x, y]) => {
                 map!(get_cvec, x, y => {
-                    let xbool = x.clone() != zero;
-                    let ybool = y.clone() != zero;
-                    if xbool ^ ybool { Some(one.clone()) } else { Some(zero.clone()) }
+                    let xbool = *x != zero;
+                    let ybool = *y != zero;
+                    if xbool ^ ybool { Some(one) } else { Some(zero) }
                 })
             }
             Pred::Add([x, y]) => map!(get_cvec, x, y => x.checked_add(*y)),
@@ -88,16 +88,16 @@ impl SynthLanguage for Pred {
             Pred::Mul([x, y]) => map!(get_cvec, x, y => x.checked_mul(*y)),
             Pred::Div([x, y]) => map!(get_cvec, x, y => {
               if y.is_zero() {
-                Some(zero.clone())
+                Some(zero)
               } else {
                 x.checked_div(*y)
               }
             }),
-            Pred::Min([x, y]) => map!(get_cvec, x, y => Some(x.min(y).clone())),
-            Pred::Max([x, y]) => map!(get_cvec, x, y => Some(x.max(y).clone())),
+            Pred::Min([x, y]) => map!(get_cvec, x, y => Some(*x.min(y))),
+            Pred::Max([x, y]) => map!(get_cvec, x, y => Some(*x.max(y))),
             Pred::Select([x, y, z]) => map!(get_cvec, x, y, z => {
-              let xbool = x.clone() != zero;
-              if xbool {Some(y.clone())} else {Some(z.clone())}
+              let xbool = *x != zero;
+              if xbool {Some(*y)} else {Some(*z)}
             }),
             Pred::Var(_) => vec![],
         }
@@ -110,13 +110,13 @@ impl SynthLanguage for Pred {
         let mut get_const = |x| {
             let ival = get_interval(x);
             if ival.low == ival.high {
-                ival.low.clone()
+                ival.low
             } else {
                 None
             }
         };
         let val = match self {
-            Pred::Lit(n) => Some(n.clone()),
+            Pred::Lit(n) => Some(*n),
             Pred::Lt([x, y]) => match (get_const(x), get_const(y)) {
                 (Some(x), Some(y)) => Some(if x < y { 1 } else { 0 }),
                 _ => None,
@@ -209,7 +209,7 @@ impl SynthLanguage for Pred {
         egraph.analysis.cvec_len = cvecs[0].len();
 
         println!("Cvec len: {}", egraph.analysis.cvec_len);
-        println!("Vars: {:?}", vars);
+        println!("Vars: {vars:?}");
 
         for (i, v) in vars.iter().enumerate() {
             let id = egraph.add(Pred::Var(Symbol::from(v.clone())));
@@ -398,7 +398,7 @@ mod test {
     fn write(f: &str, s: &str) -> io::Result<()> {
         let mut file = OpenOptions::new().append(true).create(true).open(f)?;
 
-        writeln!(file, "{}", s)?;
+        writeln!(file, "{s}")?;
         Ok(())
     }
 
@@ -519,7 +519,7 @@ mod test {
         Print only the rules, one rule per line, with no additional text or explanation.
         ";
         let rules_t = Instant::now();
-        let candidates: Ruleset<Pred> = Ruleset::from_llm(&prompt).await;
+        let candidates: Ruleset<Pred> = Ruleset::from_llm(prompt).await;
         let _ = write(
             "jfp/cs1/halide/log.txt",
             &format!(
@@ -562,7 +562,7 @@ mod test {
             sound.to_file(&format!("jfp/cs1/halide/{name}.rules"));
 
             write_derivability(
-                sound.union(&prior_rules),
+                sound.union(prior_rules),
                 &name,
                 &halide_baseline,
                 "Halide",
@@ -576,14 +576,14 @@ mod test {
                 }
                 // LLM-1->X
                 write_derivability(
-                    sound.union(&prior_rules),
+                    sound.union(prior_rules),
                     &name,
-                    &prior_rules1,
-                    &prior_name1,
+                    prior_rules1,
+                    prior_name1,
                     "cs1",
                 );
                 // X->LLM-1
-                write_derivability(prior_rules1.clone(), &prior_name1, &sound, &name, "cs1");
+                write_derivability(prior_rules1.clone(), prior_name1, &sound, &name, "cs1");
             }
 
             // Reprompt for missing rules
@@ -599,7 +599,7 @@ mod test {
             Print only the rules, one rule per line, with no additional text or explanation.
             ", sound.to_str_vec().join("\n"), prior_rules.to_str_vec().join("\n"));
             let reprompted_rules_t = Instant::now();
-            let mut reprompted_candidates: Ruleset<Pred> = Ruleset::from_llm(&reprompt).await;
+            let mut reprompted_candidates: Ruleset<Pred> = Ruleset::from_llm(reprompt).await;
             let _ = write(
                 "jfp/cs1/halide/log.txt",
                 &format!(
@@ -609,14 +609,13 @@ mod test {
                 ),
             );
             reprompted_candidates.to_file(&format!(
-                "jfp/cs1/halide/LLM-{}-2-candidates.rules",
-                prior_name
+                "jfp/cs1/halide/LLM-{prior_name}-2-candidates.rules"
             ));
 
             // Minimize reprompted
             let reprompt_minimize_t = Instant::now();
             let (reprompted_sound, invalid) = reprompted_candidates.minimize(
-                sound.union(&prior_rules),
+                sound.union(prior_rules),
                 Scheduler::Compress(Limits::minimize()),
                 1,
             );
@@ -635,7 +634,7 @@ mod test {
             reprompted_sound.to_file(&format!("jfp/cs1/halide/{reprompted_name}.rules"));
 
             write_derivability(
-                reprompted_sound.union(&sound).union(&prior_rules),
+                reprompted_sound.union(&sound).union(prior_rules),
                 &reprompted_name,
                 &halide_baseline,
                 "Halide",
@@ -649,17 +648,17 @@ mod test {
                 }
                 // LLM-2->X
                 write_derivability(
-                    reprompted_sound.union(&sound).union(&prior_rules),
+                    reprompted_sound.union(&sound).union(prior_rules),
                     &reprompted_name,
-                    &prior_rules1,
-                    &prior_name1,
+                    prior_rules1,
+                    prior_name1,
                     "cs1",
                 );
 
                 // X->LLM-2
                 write_derivability(
                     prior_rules1.clone(),
-                    &prior_name1,
+                    prior_name1,
                     &reprompted_sound.union(&sound),
                     &reprompted_name,
                     "cs1",
@@ -702,7 +701,7 @@ mod test {
         Print only the terms, one term per line, with no additional text or explanation.
         ";
         let wkld_t = Instant::now();
-        let wkld = Workload::from_llm(&prompt)
+        let wkld = Workload::from_llm(prompt)
             .await
             .as_lang_with_vars::<Pred>(vec!["w".into(), "x".into(), "y".into(), "z".into()]);
         let _ = write(
@@ -730,7 +729,7 @@ mod test {
 
             // Run prior rules
             let compress_t = Instant::now();
-            let compressed = Scheduler::Compress(Limits::synthesis()).run(&egraph, &prior_rules);
+            let compressed = Scheduler::Compress(Limits::synthesis()).run(&egraph, prior_rules);
             println!(
                 "{} prior rules | {} eclasses | {:?}",
                 prior_name,
@@ -768,7 +767,7 @@ mod test {
             rules.to_file(&format!("jfp/cs2/halide/w-{prior_name}.rules"));
 
             // Derive
-            let all_rules = rules.union(&prior_rules);
+            let all_rules = rules.union(prior_rules);
             write_derivability(
                 all_rules.clone(),
                 &format!("w-{prior_name}"),

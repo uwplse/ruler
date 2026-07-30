@@ -136,11 +136,11 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Bool]) -> z3::ast::Bool<'a> {
         match node {
             Bool::Not(x) => buf.push(z3::ast::Bool::not(&buf[usize::from(*x)])),
             Bool::And([x, y]) => buf.push(z3::ast::Bool::and(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
             Bool::Or([x, y]) => buf.push(z3::ast::Bool::or(
-                &ctx,
+                ctx,
                 &[&buf[usize::from(*x)], &buf[usize::from(*y)]],
             )),
             Bool::Xor([x, y]) => buf.push(z3::ast::Bool::xor(
@@ -151,8 +151,8 @@ fn egg_to_z3<'a>(ctx: &'a z3::Context, expr: &[Bool]) -> z3::ast::Bool<'a> {
                 &buf[usize::from(*x)],
                 &buf[usize::from(*y)],
             )),
-            Bool::Lit(c) => buf.push(z3::ast::Bool::from_bool(&ctx, *c)),
-            Bool::Var(sym) => buf.push(z3::ast::Bool::new_const(&ctx, sym.to_string())),
+            Bool::Lit(c) => buf.push(z3::ast::Bool::from_bool(ctx, *c)),
+            Bool::Var(sym) => buf.push(z3::ast::Bool::new_const(ctx, sym.to_string())),
         }
     }
     buf.pop().unwrap()
@@ -425,7 +425,7 @@ mod test {
                 match_: 1000,
             },
         );
-        assert!(can.len() > 0);
-        assert!(cannot.len() > 0);
+        assert!(!can.is_empty());
+        assert!(!cannot.is_empty());
     }
 }

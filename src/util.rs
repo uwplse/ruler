@@ -65,7 +65,7 @@ macro_rules! map {
 
 /// Helper function to count the number of lines in a file
 pub fn count_lines(name: &str) -> Option<usize> {
-    let filepath = format!("tests/recipes/{}.rs", name);
+    let filepath = format!("tests/recipes/{name}.rs");
     if let Ok(file) = File::open(filepath) {
         Some(BufReader::new(file).lines().count())
     } else {

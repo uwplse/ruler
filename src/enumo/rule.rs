@@ -29,20 +29,20 @@ impl<L: SynthLanguage> Rule<L> {
             let l_pat = l.parse();
             let r_pat = r.parse();
             if l_pat.is_err() || r_pat.is_err() {
-                return Err(format!("Failed to parse {}", s));
+                return Err(format!("Failed to parse {s}"));
             }
             let l_pat: Pattern<L> = l_pat.unwrap();
             let r_pat: Pattern<L> = r_pat.unwrap();
 
             let rewrite = Rewrite::new(
-                format!("{} ==> {}", l_pat, r_pat),
+                format!("{l_pat} ==> {r_pat}"),
                 l_pat.clone(),
                 Rhs { rhs: r_pat.clone() },
             );
 
             let forwards = if let Ok(rewrite) = rewrite {
                 Some(Self {
-                    name: format!("{} ==> {}", l_pat, r_pat).into(),
+                    name: format!("{l_pat} ==> {r_pat}").into(),
                     lhs: l_pat.clone(),
                     rhs: r_pat.clone(),
                     rewrite,
@@ -52,13 +52,13 @@ impl<L: SynthLanguage> Rule<L> {
             };
             let backwards = if s.contains("<=>") {
                 let rewrite = Rewrite::new(
-                    format!("{} ==> {}", r_pat, l_pat),
+                    format!("{r_pat} ==> {l_pat}"),
                     r_pat.clone(),
                     Rhs { rhs: l_pat.clone() },
                 );
                 if let Ok(rewrite) = rewrite {
                     Some(Self {
-                        name: format!("{} ==> {}", r_pat, l_pat).into(),
+                        name: format!("{r_pat} ==> {l_pat}").into(),
                         lhs: r_pat.clone(),
                         rhs: l_pat.clone(),
                         rewrite,
@@ -73,11 +73,11 @@ impl<L: SynthLanguage> Rule<L> {
             if let Some(forwards) = forwards {
                 Ok((forwards, backwards))
             } else {
-                println!("Ignoring invalid rule {}", s);
-                Err(format!("Failed to parse {}", s))
+                println!("Ignoring invalid rule {s}");
+                Err(format!("Failed to parse {s}"))
             }
         } else {
-            Err(format!("Failed to parse {}", s))
+            Err(format!("Failed to parse {s}"))
         }
     }
 }
@@ -120,7 +120,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 
 impl<L: SynthLanguage> Rule<L> {
     pub fn new(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Option<Self> {
-        let name = format!("{} ==> {}", l_pat, r_pat);
+        let name = format!("{l_pat} ==> {r_pat}");
         let rhs = Rhs { rhs: r_pat.clone() };
         let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
 
