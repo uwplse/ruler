@@ -1,0 +1,8 @@
+(exp 0) ==> 1
+1 ==> (exp 0)
+(pow ?x 1) ==> ?x
+?x ==> (pow ?x 1)
+(pow ?x (+ ?y ?z)) ==> (* (pow ?x ?y) (pow ?x ?z))
+(* (pow ?x ?y) (pow ?x ?z)) ==> (pow ?x (+ ?y ?z))
+(pow (exp ?x) ?y) ==> (exp (* ?y ?x))
+(exp (* ?y ?x)) ==> (pow (exp ?x) ?y)
