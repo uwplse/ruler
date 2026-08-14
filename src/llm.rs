@@ -6,24 +6,19 @@ use openai_api_rs::v1::{
     chat_completion::{self, ChatCompletionRequest},
 };
 
-// Defaults to a local Ollama server. Set LLM_ENDPOINT/LLM_MODELS (and
-// OPENROUTER_API_KEY) to use a hosted provider instead, e.g.
-// LLM_ENDPOINT=https://openrouter.ai/api/v1 LLM_MODELS=google/gemini-3.6-flash,openai/gpt-5.6-luna
 pub fn models() -> Vec<String> {
-    match env::var("LLM_MODELS") {
-        Ok(s) => s.split(',').map(|m| m.trim().to_string()).collect(),
-        Err(_) => vec!["llama3.1:8b".to_string()],
-    }
+    vec![
+        "google/gemini-3.6-flash".to_string(),
+        "openai/gpt-5.6-luna".to_string(),
+        "anthropic/claude-sonnet-5".to_string(),
+    ]
 }
 
 pub async fn query(prompt: &str, model: &str) -> Vec<String> {
     println!("Starting query to {model}");
-    let endpoint =
-        env::var("LLM_ENDPOINT").unwrap_or_else(|_| "http://localhost:11434/v1".to_string());
-    // Local servers ignore the API key, but the client requires one
-    let api_key = env::var("OPENROUTER_API_KEY").unwrap_or_else(|_| "ollama".to_string());
+    let api_key = env::var("OPENROUTER_API_KEY").expect("API_KEY not set");
     let mut client = OpenAIClient::builder()
-        .with_endpoint(endpoint)
+        .with_endpoint("https://openrouter.ai/api/v1")
         .with_api_key(api_key)
         .build()
         .unwrap();
@@ -50,10 +45,7 @@ pub async fn query(prompt: &str, model: &str) -> Vec<String> {
             .map(String::from)
             .collect();
 
-        let filename = format!(
-            "llm/out/{}-response.txt",
-            model.replace('/', "-").replace(':', "-")
-        );
+        let filename = format!("llm/out/{}-response.txt", model.replace("/", "-"));
         let mut file =
             std::fs::File::create(filename).unwrap_or_else(|_| panic!("Failed to open file"));
         writeln!(file, "{}", lines.join("\n")).expect("unable to write");
