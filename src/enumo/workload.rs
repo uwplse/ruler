@@ -1,7 +1,7 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
-use crate::{SynthAnalysis, SynthLanguage};
+use crate::{IndexSet, SynthAnalysis, SynthLanguage};
 use std::io::Write;
 
 /// Workloads are sets of terms from a domain
@@ -49,7 +49,15 @@ impl Workload {
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
         for line in std::io::BufRead::lines(reader) {
-            sexps.push(line.unwrap().parse().unwrap());
+            let line = line.unwrap();
+            if line.trim().is_empty() {
+                continue;
+            }
+            // Tolerate malformed terms, but report
+            match line.parse() {
+                Ok(sexp) => sexps.push(sexp),
+                Err(e) => eprintln!("Skipping invalid term in {filename}: {e}"),
+            }
         }
         Self::Set(sexps)
     }
@@ -108,11 +116,14 @@ impl Workload {
                 set
             }
             Workload::Append(workloads) => {
-                let mut set = vec![];
+                // Deduplicate across the appended workloads. IndexSet
+                // preserves insertion order, which matters downstream
+                // (e.g. variable initialization order in to_egraph).
+                let mut set: IndexSet<Sexp> = IndexSet::default();
                 for w in workloads {
                     set.extend(w.force());
                 }
-                set
+                set.into_iter().collect()
             }
         }
     }
@@ -137,10 +148,11 @@ impl Workload {
         let into: Workload = workload.into();
         match (self, into) {
             (Workload::Set(xs), Workload::Set(ys)) => {
-                let mut all = vec![];
+                // Deduplicate, preserving first-occurrence order
+                let mut all: IndexSet<Sexp> = IndexSet::default();
                 all.extend(xs);
                 all.extend(ys);
-                Workload::Set(all)
+                Workload::Set(all.into_iter().collect())
             }
             (Workload::Append(xs), Workload::Append(ys)) => {
                 let mut all = vec![];
@@ -263,6 +275,19 @@ mod test {
         for t in expected.force() {
             assert!(actual.contains(&t));
         }
+    }
+
+    #[test]
+    fn append_dups() {
+        // Appending two Sets dedups, preserving first-occurrence order
+        let w1 = Workload::new(["a", "b", "x"]);
+        let w2 = Workload::new(["c", "x", "d", "d"]);
+        let appended = w1.append(w2).force();
+        assert_eq!(appended, Workload::new(["a", "b", "x", "c", "d"]).force());
+
+        // Forcing an Append also dedups
+        let apps = Workload::Append(vec![Workload::new(["a", "b"]), Workload::new(["b", "c"])]);
+        assert_eq!(apps.force(), Workload::new(["a", "b", "c"]).force());
     }
 
     #[test]

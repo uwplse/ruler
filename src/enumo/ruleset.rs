@@ -82,11 +82,13 @@ impl<L: SynthLanguage> Ruleset<L> {
     {
         let mut map = IndexMap::default();
         for v in vals {
-            if let Ok((forwards, backwards)) = Rule::from_string(v.as_ref()) {
-                map.insert(forwards.name.clone(), forwards);
-                if let Some(backwards) = backwards {
-                    map.insert(backwards.name.clone(), backwards);
-                }
+            // Rulesets constructed from string literals are trusted input;
+            // a malformed rule is an author error, so fail loudly.
+            let (forwards, backwards) =
+                Rule::from_string(v.as_ref()).unwrap_or_else(|e| panic!("{}", e));
+            map.insert(forwards.name.clone(), forwards);
+            if let Some(backwards) = backwards {
+                map.insert(backwards.name.clone(), backwards);
             }
         }
         Ruleset(map)
@@ -206,11 +208,19 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut all_rules = IndexMap::default();
         for line in std::io::BufRead::lines(reader) {
             let line = line.unwrap();
-            if let Ok((forwards, backwards)) = Rule::from_string(&line) {
-                all_rules.insert(forwards.name.clone(), forwards);
-                if let Some(backwards) = backwards {
-                    all_rules.insert(backwards.name.clone(), backwards);
+            if line.trim().is_empty() {
+                continue;
+            }
+            // Rule files may contain generated (e.g. LLM-produced) rules,
+            // so tolerate malformed lines, but report every skip.
+            match Rule::from_string(&line) {
+                Ok((forwards, backwards)) => {
+                    all_rules.insert(forwards.name.clone(), forwards);
+                    if let Some(backwards) = backwards {
+                        all_rules.insert(backwards.name.clone(), backwards);
+                    }
                 }
+                Err(e) => eprintln!("Skipping invalid rule in {filename}: {e}"),
             }
         }
         Self(all_rules)
