@@ -37,10 +37,10 @@ pub fn trig_rules() -> Ruleset<Trig> {
 
     let simple_terms = app.clone().plug("op", &t_ops).plug(
         "v",
-        &Workload::new(["a", "(~ a)", "(+ PI a)", "(- PI a)", "(+ a a)"]),
+        &Workload::new(["a", "(- a)", "(+ PI a)", "(- PI a)", "(+ a a)"]),
     );
 
-    let neg_terms = Workload::new(["(~ x)"]).plug("x", &simple_terms);
+    let neg_terms = Workload::new(["(- x)"]).plug("x", &simple_terms);
 
     let squares = Workload::new(["(sqr x)"])
         .plug("x", &app)

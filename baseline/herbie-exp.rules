@@ -1,9 +1,9 @@
 (+ (log ?a) (log ?b)) ==> (log (* ?a ?b))
 (- (log ?a) (log ?b)) ==> (log (/ ?a ?b))
-(~ (log ?a)) ==> (log (/ 1 ?a))
+(- (log ?a)) ==> (log (/ 1 ?a))
 (log (* ?a ?b)) ==> (+ (log ?a) (log ?b))
 (log (/ ?a ?b)) ==> (- (log ?a) (log ?b))
-(log (/ 1 ?a)) ==> (~ (log ?a))
+(log (/ 1 ?a)) ==> (- (log ?a))
 (log (pow ?a ?b)) ==> (* ?b (log ?a))
 (/ 1 ?a) ==> (pow ?a -1)
 (pow 0 ?a) ==> 0
@@ -12,8 +12,8 @@
 (* (pow ?a ?b) (pow ?a ?c)) ==> (pow ?a (+ ?b ?c))
 (* (pow ?a ?b) (pow ?c ?b)) ==> (pow (* ?a ?c) ?b)
 (pow (pow ?a ?b) ?c) ==> (pow ?a (* ?b ?c))
-(pow ?a (~ ?b)) ==> (/ 1 (pow ?a ?b))
-(/ 1 (pow ?a ?b)) ==> (pow ?a (~ ?b))
+(pow ?a (- ?b)) ==> (/ 1 (pow ?a ?b))
+(/ 1 (pow ?a ?b)) ==> (pow ?a (- ?b))
 (/ (pow ?a ?b) (pow ?a ?c)) ==> (pow ?a (- ?b ?c))
 (pow ?a (- ?b ?c)) ==> (/ (pow ?a ?b) (pow ?a ?c))
 (pow ?a (* ?b ?c)) ==> (pow (pow ?a ?b) ?c)
@@ -35,7 +35,7 @@
 (pow ?a 1) ==> ?a
 (pow ?a -1) ==> (/ 1 ?a)
 (* (exp ?a) (exp ?b)) ==> (exp (+ ?a ?b))
-(/ 1 (exp ?a)) ==> (exp (~ ?a))
+(/ 1 (exp ?a)) ==> (exp (- ?a))
 (/ (exp ?a) (exp ?b)) ==> (exp (- ?a ?b))
 (exp (* ?a ?b)) ==> (pow (exp ?a) ?b)
 (exp (/ ?a 2)) ==> (sqrt (exp ?a))
@@ -43,7 +43,7 @@
 (exp (* ?a 2)) ==> (* (exp ?a) (exp ?a))
 (exp (* ?a 3)) ==> (pow (exp ?a) 3)
 (exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))
-(exp (~ ?a)) ==> (/ 1 (exp ?a))
+(exp (- ?a)) ==> (/ 1 (exp ?a))
 (exp (- ?a ?b)) ==> (/ (exp ?a) (exp ?b))
 (exp 0) ==> 1
 1 ==> (exp 0)
@@ -65,7 +65,7 @@
 (cbrt (pow ?a 3)) ==> ?a
 (* (* (cbrt ?a) (cbrt ?a)) (cbrt ?a)) ==> ?a
 (* (cbrt ?a) (* (cbrt ?a) (cbrt ?a))) ==> ?a
-(pow (~ ?a) 3) ==> (~ (pow ?a 3))
+(pow (- ?a) 3) ==> (- (pow ?a 3))
 (sqrt (* ?a ?b)) ==> (* (sqrt ?a) (sqrt ?b))
 (sqrt (/ ?a ?b)) ==> (/ (sqrt ?a) (sqrt ?b))
 (sqrt (pow ?a ?b)) ==> (pow ?a (/ ?b 2))

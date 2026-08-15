@@ -19,11 +19,13 @@ egg::define_language! {
         "exp" = Exp(Id),
         "log" = Log(Id),
         "pow" = Pow([Id; 2]),
+        // alias for pow, so that externally generated terms parse
+        "^" = Pow2([Id; 2]),
         "sqrt" = Sqrt(Id),
         "cbrt" = Cbrt(Id),
 
         // arithmetic operators
-        "~" = Neg(Id),
+        "-" = Neg(Id),
         "+" = Add([Id; 2]),
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
@@ -31,6 +33,8 @@ egg::define_language! {
         "if" = If([Id; 3]),
         // (for compatibility with rationals)
         "fabs" = Abs(Id),
+        // alias for fabs, so that externally generated terms parse
+        "abs" = Abs2(Id),
 
         // constants
         Num(Rational),
@@ -120,14 +124,35 @@ mod test {
 
     type Ruleset = enumo::Ruleset<Exponential>;
 
+    #[test]
+    fn herbie_baseline_parses() {
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
+        assert_eq!(herbie.len(), 82);
+    }
+
+    #[test]
+    fn syntax_aliases() {
+        // Bridge rules connecting the alias operators to the canonical
+        // ones. Ruleset::new panics on malformed rules, so this also
+        // guards the rules' arities (both aliases are used unapplied
+        // elsewhere, e.g. in case-study start rules).
+        let bridge: Ruleset =
+            enumo::Ruleset::new(&["(pow ?x ?y) <=> (^ ?x ?y)", "(abs ?x) <=> (fabs ?x)"]);
+        assert_eq!(bridge.len(), 4);
+
+        // Alias terms parse in the language
+        let wkld = enumo::Workload::new(["(^ a b)", "(abs a)", "(pow a b)", "(fabs a)"]);
+        assert_eq!(wkld.as_lang::<Exponential>().force().len(), 4);
+    }
+
     pub fn starting_exponential_rules() -> Ruleset {
         Ruleset::new(&[
             // exponential properties (expand)
             "(exp (+ ?a ?b)) ==> (* (exp ?a) (exp ?b))",
-            "(exp (~ ?a)) ==> (/ 1 (exp ?a))",
+            "(exp (- ?a)) ==> (/ 1 (exp ?a))",
             // exponential properties (simplify)
             "(* (exp ?a) (exp ?b)) ==> (exp (+ ?a ?b))",
-            "(/ 1 (exp ?a)) ==> (exp (~ ?a))",
+            "(/ 1 (exp ?a)) ==> (exp (- ?a))",
             "(exp 0) ==> 1",
             // inverse properties
             "(log (exp ?a)) ==> ?a",
@@ -148,12 +173,12 @@ mod test {
             "?a ==> (- ?a 0)",
             "(/ ?a 1) ==> ?a",
             "?a ==> (/ ?a 1)",
-            "(/ ?a -1) ==> (~ ?a)",
-            "(~ ?a) ==> (/ ?a -1)",
-            "(- 0 ?a) ==> (~ ?a)",
-            "(~ ?a) ==> (- 0 ?a)",
-            "(* ?a -1) ==> (~ ?a)",
-            "(~ ?a) ==> (* ?a -1)",
+            "(/ ?a -1) ==> (- ?a)",
+            "(- ?a) ==> (/ ?a -1)",
+            "(- 0 ?a) ==> (- ?a)",
+            "(- ?a) ==> (- 0 ?a)",
+            "(* ?a -1) ==> (- ?a)",
+            "(- ?a) ==> (* ?a -1)",
             "(- ?a ?a) ==> (* ?a 0)",
             "(* ?a 0) ==> (- ?a ?a)",
             "(+ ?a 1) ==> (- ?a -1)",
@@ -164,8 +189,8 @@ mod test {
             "(/ (- -1 ?a) ?a) ==> (* (+ ?a 1) (/ -1 ?a))",
             "(* (/ -1 ?a) (- 1 ?a)) ==> (/ (- ?a 1) ?a)",
             "(/ (- ?a 1) ?a) ==> (* (/ -1 ?a) (- 1 ?a))",
-            "(- (/ ?a ?a) (/ 0 ?a)) ==> (* (~ ?a) (/ -1 ?a))",
-            "(* (~ ?a) (/ -1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",
+            "(- (/ ?a ?a) (/ 0 ?a)) ==> (* (- ?a) (/ -1 ?a))",
+            "(* (- ?a) (/ -1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",
             "(* (- 1 ?a) (/ 1 ?a)) ==> (/ (- 1 ?a) ?a)",
             "(/ (- 1 ?a) ?a) ==> (* (- 1 ?a) (/ 1 ?a))",
             "(* ?a (/ 1 ?a)) ==> (- (/ ?a ?a) (/ 0 ?a))",

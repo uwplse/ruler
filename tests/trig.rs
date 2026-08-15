@@ -130,7 +130,7 @@ egg::define_language! {
     "cis" = Cis(Id),
 
     // arithmetic operators
-    "~" = Neg(Id),
+    "-" = Neg(Id),
     "+" = Add([Id; 2]),
     "-" = Sub([Id; 2]),
     "*" = Mul([Id; 2]),
@@ -156,38 +156,38 @@ impl SynthLanguage for Trig {
         Ruleset::new(&[
             // definition of sine, cosine, tangent
             // (sine)
-            "(sin ?a) ==> (/ (- (cis ?a) (cis (~ ?a))) (* 2 I))",
-            "(/ (- (cis ?a) (cis (~ ?a))) (* 2 I)) ==> (sin ?a)",
+            "(sin ?a) ==> (/ (- (cis ?a) (cis (- ?a))) (* 2 I))",
+            "(/ (- (cis ?a) (cis (- ?a))) (* 2 I)) ==> (sin ?a)",
             // (cosine)
-            "(cos ?a) ==> (/ (+ (cis ?a) (cis (~ ?a))) 2)",
-            "(/ (+ (cis ?a) (cis (~ ?a))) 2) ==> (cos ?a)",
+            "(cos ?a) ==> (/ (+ (cis ?a) (cis (- ?a))) 2)",
+            "(/ (+ (cis ?a) (cis (- ?a))) 2) ==> (cos ?a)",
             // (tangent)
-            "(tan ?a) ==> (* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a))))",
-            "(* I (/ (- (cis (~ ?a)) (cis ?a)) (+ (cis (~ ?a)) (cis ?a)))) ==> (tan ?a)",
+            "(tan ?a) ==> (* I (/ (- (cis (- ?a)) (cis ?a)) (+ (cis (- ?a)) (cis ?a))))",
+            "(* I (/ (- (cis (- ?a)) (cis ?a)) (+ (cis (- ?a)) (cis ?a)))) ==> (tan ?a)",
             // (sine, alternatively)
-            "(sin ?a) ==> (/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2)",
-            "(/ (- (* I (cis (~ ?a))) (* I (cis ?a))) 2) => (sin ?a)",
+            "(sin ?a) ==> (/ (- (* I (cis (- ?a))) (* I (cis ?a))) 2)",
+            "(/ (- (* I (cis (- ?a))) (* I (cis ?a))) 2) => (sin ?a)",
             // (cosine, alternatively)
-            "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I))",
-            "(/ (+ (* I (cis ?a)) (* I (cis (~ ?a)))) (* 2 I)) ==> (cos ?a)",
+            "(cos ?a) ==> (/ (+ (* I (cis ?a)) (* I (cis (- ?a)))) (* 2 I))",
+            "(/ (+ (* I (cis ?a)) (* I (cis (- ?a)))) (* 2 I)) ==> (cos ?a)",
             // relating tangent to sine and cosine
             "(tan ?a) ==> (/ (sin ?a) (cos ?a))",
             "(/ (sin ?a) (cos ?a)) ==> (tan ?a)",
             // definition of cos(a)*cos(b) and sin(a)*sin(b)
-            "(* (cos ?a) (cos ?b)) ==> (/ (+ (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)",
-            "(* (sin ?a) (sin ?b)) ==> (/ (- (+ (cis (- ?a ?b)) (cis (~ (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (~ (+ ?a ?b))))) 4)",
+            "(* (cos ?a) (cos ?b)) ==> (/ (+ (+ (cis (- ?a ?b)) (cis (- (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (- (+ ?a ?b))))) 4)",
+            "(* (sin ?a) (sin ?b)) ==> (/ (- (+ (cis (- ?a ?b)) (cis (- (- ?a ?b)))) (+ (cis (+ ?a ?b)) (cis (- (+ ?a ?b))))) 4)",
             // definition of cos(a)*sin(b) and sin(a)*cos(b)
-            "(* (cos ?a) (sin ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?b ?a)) (cis (~ (- ?b ?a))))) (* 4 I))",
-            "(* (sin ?a) (cos ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (~ (+ ?a ?b)))) (- (cis (- ?a ?b)) (cis (~ (- ?a ?b))))) (* 4 I))",
+            "(* (cos ?a) (sin ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (- (+ ?a ?b)))) (- (cis (- ?b ?a)) (cis (- (- ?b ?a))))) (* 4 I))",
+            "(* (sin ?a) (cos ?b)) ==> (/ (+ (- (cis (+ ?a ?b)) (cis (- (+ ?a ?b)))) (- (cis (- ?a ?b)) (cis (- (- ?a ?b))))) (* 4 I))",
             // definition of square
             "(sqr ?a) ==> (* ?a ?a)",
             "(* ?a ?a) ==> (sqr ?a)",
             // [Redundant, but left here so we don't have to compute them again]
             // definition of cos^2(a) and sin^2(a)
-            // "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)",
-            // "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
-            // "(* (sin ?a) (sin ?a)) ==> (~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4))",
-            // "(~ (/ (- (+ (sqr (cis ?a)) (sqr (cis (~ ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
+            // "(* (cos ?a) (cos ?a)) ==> (/ (+ (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4)",
+            // "(/ (+ (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4) ==> (* (cos ?a) (cos ?a))",
+            // "(* (sin ?a) (sin ?a)) ==> (- (/ (- (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4))",
+            // "(- (/ (- (+ (sqr (cis ?a)) (sqr (cis (- ?a)))) 2) 4)) ==> (* (sin ?a) (sin ?a))",
         ])
     }
 
@@ -288,7 +288,7 @@ impl SynthLanguage for Trig {
         }
 
         if let Some(v) = to_add {
-            // add (~ v) if v is negative or v is zero
+            // add (- v) if v is negative or v is zero
             if let Trig::RealConst(n) = v {
                 if let Ok(x) = n.as_str().parse::<Rational>() {
                     if x.is_negative() || x.is_zero() {
@@ -333,20 +333,30 @@ mod test {
             // constant folding for cis
             "(cis 0) ==> 1",
             "(cis (/ PI 2)) ==> I",
-            "(cis (~ (/ PI 2))) ==> (~ I)",
+            "(cis (- (/ PI 2))) ==> (- I)",
             "(cis PI) ==> -1",
             // cis identities
             "(cis (+ ?a ?b)) ==> (* (cis ?a) (cis ?b))",
             "(* (cis ?a) (cis ?b)) ==> (cis (+ ?a ?b))",
-            "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (~ ?b)))",
-            "(* (cis ?a) (cis (~ ?b))) ==> (cis (- ?a ?b))",
-            "(cis (~ ?a)) ==> (/ 1 (cis ?a))",
-            "(/ 1 (cis ?a)) ==> (cis (~ ?a))",
-            "(* (cis ?a) (cis (~ ?a))) ==> 1",
+            "(cis (- ?a ?b)) ==> (* (cis ?a) (cis (- ?b)))",
+            "(* (cis ?a) (cis (- ?b))) ==> (cis (- ?a ?b))",
+            "(cis (- ?a)) ==> (/ 1 (cis ?a))",
+            "(/ 1 (cis ?a)) ==> (cis (- ?a))",
+            "(* (cis ?a) (cis (- ?a))) ==> 1",
             // constant folding I
-            "(/ 1 I) ==> (~ I)",
+            "(/ 1 I) ==> (- I)",
             "(* I I) ==> -1",
         ])
+    }
+
+    #[test]
+    fn trusted_rule_files_parse() {
+        let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
+        assert_eq!(herbie.len(), 45);
+        let complex: Ruleset<Trig> = Ruleset::from_file("scripts/oopsla21/trig/complex.rules");
+        assert_eq!(complex.len(), 57);
+        let pruned: Ruleset<Trig> = Ruleset::from_file("jfp/cs1/trig/complex.rules");
+        assert_eq!(pruned.len(), 44);
     }
 
     #[test]
