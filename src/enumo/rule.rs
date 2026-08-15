@@ -30,11 +30,11 @@ impl<L: SynthLanguage> Rule<L> {
             let r_pat: Pattern<L> = r.parse().unwrap();
 
             let forwards = Self {
-                name: format!("{} ==> {}", l_pat, r_pat).into(),
+                name: format!("{l_pat} ==> {r_pat}").into(),
                 lhs: l_pat.clone(),
                 rhs: r_pat.clone(),
                 rewrite: Rewrite::new(
-                    format!("{} ==> {}", l_pat, r_pat),
+                    format!("{l_pat} ==> {r_pat}"),
                     l_pat.clone(),
                     Rhs { rhs: r_pat.clone() },
                 )
@@ -43,11 +43,11 @@ impl<L: SynthLanguage> Rule<L> {
 
             if s.contains("<=>") {
                 let backwards = Self {
-                    name: format!("{} ==> {}", r_pat, l_pat).into(),
+                    name: format!("{r_pat} ==> {l_pat}").into(),
                     lhs: r_pat.clone(),
                     rhs: l_pat.clone(),
                     rewrite: Rewrite::new(
-                        format!("{} ==> {}", r_pat, l_pat),
+                        format!("{r_pat} ==> {l_pat}"),
                         r_pat,
                         Rhs { rhs: l_pat },
                     )
@@ -58,7 +58,7 @@ impl<L: SynthLanguage> Rule<L> {
                 Ok((forwards, None))
             }
         } else {
-            Err(format!("Failed to parse {}", s))
+            Err(format!("Failed to parse {s}"))
         }
     }
 }
@@ -101,7 +101,7 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 
 impl<L: SynthLanguage> Rule<L> {
     pub fn new(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Option<Self> {
-        let name = format!("{} ==> {}", l_pat, r_pat);
+        let name = format!("{l_pat} ==> {r_pat}");
         let rhs = Rhs { rhs: r_pat.clone() };
         let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
 

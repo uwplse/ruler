@@ -21,8 +21,11 @@ float-cmp = "0.8.0"
 lazy_static = "1.4.0"
 itertools = "0.9.0"
 # fixed = "1.9.0"
-#z3 = "0.12.1"
-z3 = {version = "0.12.1", features = ["static-link-z3"]}
+# z3 <= 0.12 vendors z3 sources (4.8.9 / 4.12.1) that no longer compile with
+# clang >= 16. 0.13 is the last release with the lifetime-based API (0.14
+# removed `<'ctx>`); its crates.io package ships no z3 sources, so use
+# `gh-release`, which downloads and statically links the official libz3.
+z3 = {version = "0.13", features = ["gh-release"]}
 rustc-hash = "1"
 symbolic_expressions = "5"
 rayon = "1"

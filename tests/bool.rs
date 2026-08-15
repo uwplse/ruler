@@ -334,7 +334,7 @@ mod test {
                 match_: 1000,
             },
         );
-        assert!(can.len() > 0);
-        assert!(cannot.len() > 0);
+        assert!(!can.is_empty());
+        assert!(!cannot.is_empty());
     }
 }

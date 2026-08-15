@@ -22,11 +22,11 @@ impl FromStr for Sexp {
 impl std::fmt::Display for Sexp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Sexp::Atom(x) => write!(f, "{}", x),
+            Sexp::Atom(x) => write!(f, "{x}"),
             Sexp::List(l) => {
                 write!(f, "(").expect("not written");
                 for x in l {
-                    write!(f, "{} ", x).expect("not written");
+                    write!(f, "{x} ").expect("not written");
                 }
                 write!(f, ")").expect("not written");
                 Ok(())

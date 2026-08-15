@@ -40,7 +40,7 @@ impl Workload {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
         for name in &self.force() {
-            writeln!(file, "{}", name).expect("Unable to write");
+            writeln!(file, "{name}").expect("Unable to write");
         }
     }
 
@@ -119,7 +119,7 @@ impl Workload {
 
     pub fn pretty_print(&self) {
         for t in self.force() {
-            println!("{}", t);
+            println!("{t}");
         }
     }
 
