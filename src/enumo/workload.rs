@@ -62,6 +62,45 @@ impl Workload {
         Self::Set(sexps)
     }
 
+    /// Filter the workload down to terms that parse in the language `L`
+    /// (with no restriction on which variables appear). Workload terms are
+    /// untyped s-expressions, and `to_egraph` panics on terms outside `L`;
+    /// use this to safely ingest terms from untrusted sources
+    pub fn as_lang<L: SynthLanguage>(&self) -> Self {
+        self.as_lang_with_vars::<L>(vec![])
+    }
+
+    /// Filter the workload down to terms that parse in the language `L`
+    /// and (if `expected_vars` is non-empty) mention only those variables.
+    /// Filtered-out terms are reported to stderr.
+    pub fn as_lang_with_vars<L: SynthLanguage>(&self, expected_vars: Vec<String>) -> Self {
+        Workload::Set(
+            self.force()
+                .iter()
+                .filter(|sexp| match sexp.to_string().parse::<RecExpr<L>>() {
+                    Ok(expr) => expr.as_ref().iter().all(|node| {
+                        if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
+                            let mut v = v.to_string();
+                            v.remove(0); // strip the leading '?'
+                            let ok = expected_vars.is_empty() || expected_vars.contains(&v);
+                            if !ok {
+                                eprintln!("Skipping term with unexpected var '{v}': {sexp}");
+                            }
+                            ok
+                        } else {
+                            true
+                        }
+                    }),
+                    Err(_) => {
+                        eprintln!("Skipping term that does not parse in the language: {sexp}");
+                        false
+                    }
+                })
+                .cloned()
+                .collect(),
+        )
+    }
+
     /// Materialize the workload into an e-graph
     /// Will crash if there are terms in the e-graph that are not parseable as terms in domain L
     pub fn to_egraph<L: SynthLanguage>(&self) -> EGraph<L, SynthAnalysis> {

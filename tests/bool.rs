@@ -138,6 +138,45 @@ mod test {
     }
 
     #[test]
+    fn test_wkld_as_lang() {
+        let wkld = Workload::new([
+            "((& x y z) false)",
+            "(^ x y (-> z))",
+            "(-> x y (| z false))",
+            "(-> x y (-> z))",
+            "(x (& x y (| z)))",
+            "((& (~ z) x y))",
+            "((| (~ z) x y))",
+            "((^ (~ z) x y))",
+            "((-> (~ z) x y))",
+            "(~ (| y false))",
+            "(~ (| z true))",
+            "(~ (| z false))",
+            "(y (| x y (-> z)))",
+            "(z (^ x y (~ z)))",
+            "(& x (& y (~ (& z true))))",
+            "(| x (| y (~ (| z false))))",
+            "(^ x (^ y (~ (^ z true))))",
+            "(-> x (-> y (~ (-> z false))))",
+            "(~ ((& (~ x) y) z))",
+            "(~ ((| (~ x) y) z))",
+            "(~ ((^ (~ x) y) z))",
+            "(~ ((-> (~ x) y) z))",
+            "true",
+            "false",
+        ]);
+        assert_eq!(wkld.force().len(), 24);
+
+        // Keep only terms that parse as Bool (any variables allowed)
+        let valid = wkld.as_lang::<Bool>();
+        assert_eq!(valid.force().len(), 9);
+
+        // Additionally restrict which variables may appear
+        let restricted = wkld.as_lang_with_vars::<Bool>(vec!["x".into(), "y".into()]);
+        assert_eq!(restricted.force().len(), 3);
+    }
+
+    #[test]
     fn dsl() {
         let mut all_rules: Ruleset<Bool> = Ruleset::default();
         let atoms3 = iter_bool(3);
