@@ -1,5 +1,6 @@
 use egg::{AstSize, EClass, Extractor, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{io::Write, sync::Arc};
 
@@ -9,6 +10,18 @@ use crate::{
 };
 
 use super::{Rule, Scheduler};
+
+/// A progress bar for tracking long-running operations over `len` rules
+fn progress_bar(len: usize) -> ProgressBar {
+    let pb = ProgressBar::new(len as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+            .unwrap()
+            .progress_chars("##-"),
+    );
+    pb
+}
 
 /// A set of rewrite rules
 #[derive(Clone, Debug)]
@@ -427,11 +440,17 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
+        let pb = progress_bar(self.len());
         while !self.is_empty() {
+            let before = self.len();
             let selected = self.select(step_size, &mut invalid);
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
+            // Increment progress bar by however many candidates were consumed this
+            // iteration (selected + discarded as invalid or redundant).
+            pb.inc(before.saturating_sub(self.len()) as u64);
         }
+        pb.finish();
         // Return only the new rules
         chosen.remove_all(prior);
 
@@ -475,7 +494,14 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|rule| self.can_derive(derive_type, rule, limits))
+        let pb = progress_bar(against.len());
+        let result = against.partition(|rule| {
+            let derivable = self.can_derive(derive_type, rule, limits);
+            pb.inc(1);
+            derivable
+        });
+        pb.finish();
+        result
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {
