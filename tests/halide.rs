@@ -103,6 +103,99 @@ impl SynthLanguage for Pred {
         }
     }
 
+    fn mk_interval<'a, F>(&'a self, mut get_interval: F) -> Interval<Self::Constant>
+    where
+        F: FnMut(&'a Id) -> &'a Interval<Self::Constant>,
+    {
+        let mut get_const = |x| {
+            let ival = get_interval(x);
+            if ival.low == ival.high {
+                ival.low
+            } else {
+                None
+            }
+        };
+        let val = match self {
+            Pred::Lit(n) => Some(*n),
+            Pred::Lt([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if x < y { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Leq([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if x <= y { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Eq([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if x == y { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Neq([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if x != y { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Implies([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if x == 0 || y != 0 { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Not(x) => get_const(x).map(|c| if c == 0 { 1 } else { 0 }),
+            Pred::Neg(x) => get_const(x).map(|c| -c),
+            Pred::And([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if x != 0 && y != 0 { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Or([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if x != 0 || y != 0 { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Xor([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(if (x != 0) ^ (y != 0) { 1 } else { 0 }),
+                _ => None,
+            },
+            Pred::Add([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => x.checked_add(y),
+                _ => None,
+            },
+            Pred::Sub([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => x.checked_sub(y),
+                _ => None,
+            },
+            Pred::Mul([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => x.checked_mul(y),
+                _ => None,
+            },
+            Pred::Div([x, y]) => match (get_const(x), get_const(y)) {
+                // Conservative: eval defines x/0 = 0, but we simply
+                // don't fold division by zero.
+                (Some(x), Some(y)) => {
+                    if y == 0 {
+                        None
+                    } else {
+                        x.checked_div(y)
+                    }
+                }
+                _ => None,
+            },
+            Pred::Min([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(x.min(y)),
+                _ => None,
+            },
+            Pred::Max([x, y]) => match (get_const(x), get_const(y)) {
+                (Some(x), Some(y)) => Some(x.max(y)),
+                _ => None,
+            },
+            Pred::Select([x, y, z]) => match (get_const(x), get_const(y), get_const(z)) {
+                (Some(x), Some(y), Some(z)) => Some(if x == 0 { z } else { y }),
+                _ => None,
+            },
+            Pred::Var(_) => None,
+        };
+        if val.is_some() {
+            Interval::new(val, val)
+        } else {
+            Interval::new(None, None)
+        }
+    }
+
     fn initialize_vars(egraph: &mut EGraph<Self, SynthAnalysis>, vars: &[String]) {
         let consts = vec![
             Some((-10).to_i64().unwrap()),
@@ -291,6 +384,26 @@ mod test {
     use std::time::{Duration, Instant};
 
     use ruler::{enumo::Ruleset, logger};
+
+    #[test]
+    fn interval_constant_fold() {
+        use ruler::{enumo::Workload, EGraph, Interval, SynthAnalysis};
+
+        let egraph: EGraph<Pred, SynthAnalysis> =
+            Workload::new(["(+ 1 2)", "(min 0 1)", "(select 0 1 0)", "(+ a 0)"]).to_egraph();
+        let interval_of = |s: &str| {
+            let expr: egg::RecExpr<Pred> = s.parse().unwrap();
+            let id = egraph.lookup_expr(&expr).unwrap();
+            egraph[id].data.interval.clone()
+        };
+        assert_eq!(interval_of("(+ 1 2)"), Interval::new(Some(3), Some(3)));
+        assert_eq!(interval_of("(min 0 1)"), Interval::new(Some(0), Some(0)));
+        assert_eq!(
+            interval_of("(select 0 1 0)"),
+            Interval::new(Some(0), Some(0))
+        );
+        assert_eq!(interval_of("(+ a 0)"), Interval::new(None, None));
+    }
 
     #[test]
     fn run() {
