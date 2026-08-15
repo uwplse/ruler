@@ -383,7 +383,70 @@ mod test {
     use crate::Pred;
     use std::time::{Duration, Instant};
 
-    use ruler::{enumo::Ruleset, logger};
+    use ruler::{
+        enumo::{Metric, Ruleset},
+        logger,
+        recipe_utils::{recursive_rules, Lang},
+    };
+
+    #[test]
+    fn establish_baseline() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+
+        // A5: rules from plain atoms-5 enumeration over the full op set
+        let start = Instant::now();
+        let a5: Ruleset<Pred> = recursive_rules(
+            Metric::Atoms,
+            5,
+            Lang::new(
+                &["0", "1"],
+                &["a", "b", "c"],
+                &[
+                    &["-", "!"],
+                    &[
+                        "&&", "||", "^", "+", "-", "*", "min", "max", "<", "<=", "==", "!=",
+                    ],
+                    &["select"],
+                ],
+            ),
+            Ruleset::default(),
+        );
+        logger::log_line(
+            "jfp/baseline/log.txt",
+            &format!(
+                "ATOMS5 HALIDE | {} rules | {:.1?}",
+                a5.len(),
+                start.elapsed()
+            ),
+        );
+        a5.to_file("jfp/baseline/atoms5_halide.rules");
+
+        // Enumo: rules from the halide recipe
+        let start = Instant::now();
+        let enumo: Ruleset<Pred> = halide_rules();
+        logger::log_line(
+            "jfp/baseline/log.txt",
+            &format!(
+                "ENUMO HALIDE | {} rules | {:.1?}",
+                enumo.len(),
+                start.elapsed()
+            ),
+        );
+        enumo.to_file("jfp/baseline/enumo_halide.rules");
+
+        // Baseline-vs-baseline derivability (skipping Halide).
+        logger::write_derivability("jfp/baseline", &a5, "A5", &halide_baseline, "Halide");
+        logger::write_derivability("jfp/baseline", &a5, "A5", &a5, "A5");
+        logger::write_derivability("jfp/baseline", &a5, "A5", &enumo, "Enumo");
+        logger::write_derivability("jfp/baseline", &enumo, "Enumo", &halide_baseline, "Halide");
+        logger::write_derivability("jfp/baseline", &enumo, "Enumo", &a5, "A5");
+        logger::write_derivability("jfp/baseline", &enumo, "Enumo", &enumo, "Enumo");
+    }
 
     #[test]
     fn interval_constant_fold() {

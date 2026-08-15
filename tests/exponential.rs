@@ -125,6 +125,26 @@ mod test {
     type Ruleset = enumo::Ruleset<Exponential>;
 
     #[test]
+    fn establish_baseline() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        let start = Instant::now();
+        let rules = make_rules();
+        ruler::logger::log_line(
+            "jfp/baseline/log.txt",
+            &format!(
+                "ENUMO EXP | {} rules | {:.1?}",
+                rules.len(),
+                start.elapsed()
+            ),
+        );
+        rules.to_file("jfp/baseline/enumo_exp.rules");
+    }
+
+    #[test]
     fn herbie_baseline_parses() {
         let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
         assert_eq!(herbie.len(), 82);

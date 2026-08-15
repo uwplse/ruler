@@ -350,6 +350,26 @@ mod test {
     }
 
     #[test]
+    fn establish_baseline() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+
+        let start = Instant::now();
+        let rules = trig_rules();
+        ruler::logger::log_line(
+            "jfp/baseline/log.txt",
+            &format!(
+                "ENUMO TRIG | {} rules | {:.1?}",
+                rules.len(),
+                start.elapsed()
+            ),
+        );
+        rules.to_file("jfp/baseline/enumo_trig.rules");
+    }
+
+    #[test]
     fn trusted_rule_files_parse() {
         let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
         assert_eq!(herbie.len(), 45);

@@ -38,6 +38,61 @@ fn add_json_to_file(json: Value) {
         .expect("Unable to write to json file");
 }
 
+/// Append a line to a log file (creating parent directories as needed),
+/// echoing it to stdout so long runs are observable with --nocapture.
+pub fn log_line(path: &str, line: &str) {
+    use std::io::Write;
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+    }
+    let mut file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .unwrap_or_else(|_| panic!("Failed to open '{}'", path));
+    writeln!(file, "{line}").expect("Unable to write");
+    println!("{line}");
+}
+
+/// Compute LhsAndRhs derivability of `against` from `rules` and record it
+/// under `dir`: a summary line is appended to `<dir>/log.txt`, and the
+/// full result is written to `<dir>/<rules_name>-<against_name>-derive.json`
+/// (truncating any previous run's file, so the json stays valid across
+/// re-runs).
+pub fn write_derivability<L: SynthLanguage>(
+    dir: &str,
+    rules: &Ruleset<L>,
+    rules_name: &str,
+    against: &Ruleset<L>,
+    against_name: &str,
+) {
+    let start = Instant::now();
+    let (can, cannot) = rules.derive(DeriveType::LhsAndRhs, against, Limits::deriving());
+    let elapsed = start.elapsed();
+
+    log_line(
+        &format!("{dir}/log.txt"),
+        &format!(
+            "{rules_name}->{against_name} | {:.1}% ({:.1?})",
+            100.0 * can.len() as f64 / against.len() as f64,
+            elapsed
+        ),
+    );
+
+    let v = json!({
+        "rules_name": rules_name,
+        "against_name": against_name,
+        "num_rules": rules.len(),
+        "num_against": against.len(),
+        "time": elapsed.as_secs_f64(),
+        "can": can.to_str_vec(),
+        "cannot": cannot.to_str_vec()
+    });
+    let path = format!("{dir}/{rules_name}-{against_name}-derive.json");
+    fs::write(&path, serde_json::to_string_pretty(&v).unwrap())
+        .unwrap_or_else(|_| panic!("Failed to write '{}'", path));
+}
+
 /// Whether to skip computing "a derives b" when writing baseline rows.
 pub fn skip_derive(a: &str, b: &str) -> bool {
     // Items in this list will *not* run derivability
