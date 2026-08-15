@@ -2,11 +2,11 @@ use egg::{AstSize, EClass, Extractor, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{io::Write, sync::Arc};
+use std::{io::Write, sync::Arc, time::Instant};
 
 use crate::{
-    CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Signature,
-    SynthAnalysis, SynthLanguage,
+    llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Pattern,
+    Signature, SynthAnalysis, SynthLanguage,
 };
 
 use super::{Rule, Scheduler};
@@ -224,6 +224,50 @@ impl<L: SynthLanguage> Ruleset<L> {
             }
         }
         Self(all_rules)
+    }
+
+    /// Build a candidate ruleset by prompting every LLM in `llm::models()`
+    /// with `prompt`. Each response line of the form `l ==> r` contributes
+    /// candidates in *both* directions (whenever each direction can be
+    /// built); minimization later decides which direction(s) to keep.
+    /// Lines that yield no candidate are reported and skipped. Candidates
+    /// are deduplicated across models (by rule name).
+    pub async fn from_llm(prompt: &str) -> Self {
+        let mut all = Self::default();
+        for model in llm::models() {
+            let start = Instant::now();
+            let before = all.len();
+            let mut invalid = 0;
+            for line in llm::query(prompt, &model).await {
+                let pats = line
+                    .split_once("=>")
+                    .map(|(l, r)| (l.parse::<Pattern<L>>(), r.parse::<Pattern<L>>()));
+                let mut added = false;
+                if let Some((Ok(l_pat), Ok(r_pat))) = pats {
+                    if let Some(forwards) = Rule::new(&l_pat, &r_pat) {
+                        all.add(forwards);
+                        added = true;
+                    }
+                    if let Some(backwards) = Rule::new(&r_pat, &l_pat) {
+                        all.add(backwards);
+                        added = true;
+                    }
+                }
+                if !added {
+                    invalid += 1;
+                    eprintln!("Skipping invalid rule from {model}: {line}");
+                }
+            }
+            println!(
+                "{} | {} new rules ({} invalid lines) | {:?}",
+                model,
+                all.len() - before,
+                invalid,
+                start.elapsed()
+            );
+        }
+        println!("Combined LLM ruleset: {} rules", all.len());
+        all
     }
 
     pub fn pretty_print(&self) {

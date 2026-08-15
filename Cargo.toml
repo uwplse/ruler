@@ -5,6 +5,7 @@ authors = ["Max Willsey <me@mwillsey.com>", "Chandrakana Nandi <cnandi@cs.washin
 edition = "2018"
 
 [dependencies]
+openai-api-rs = "6.0.3"
 clap = { version = "3.0.7", features = ["derive"] }
 log = "0.4"
 env_logger = { version = "0.7", default-features = false }
@@ -42,6 +43,12 @@ version = "0.9"
 # rev = "e5ded849f55c735b88cc7fd8b74e111dca6685b5" # Use new rebuilding
 # rev = "18e62918ed3c7b30b55a61108f19d405d6b4c3c7" # Don't use cell
 # path = "../egg"
+
+[dev-dependencies]
+# For loading OPENROUTER_API_KEY from .env in LLM tests
+dotenv = "0.15"
+# For #[tokio::test] on async LLM tests
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 # Tests do a lot of work
 [profile.test]

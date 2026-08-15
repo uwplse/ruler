@@ -1,8 +1,8 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
-use crate::{IndexSet, SynthAnalysis, SynthLanguage};
-use std::io::Write;
+use crate::{llm, IndexSet, SynthAnalysis, SynthLanguage};
+use std::{io::Write, time::Instant};
 
 /// Workloads are sets of terms from a domain
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -60,6 +60,41 @@ impl Workload {
             }
         }
         Self::Set(sexps)
+    }
+
+    /// Build a workload by prompting every LLM in `llm::models()` with
+    /// `prompt`. Lines that do not parse as s-expressions are reported and
+    /// skipped; terms are deduplicated across models, preserving
+    /// first-seen order. Note that the terms are *not* checked against any
+    /// particular language here — chain with `as_lang`/`as_lang_with_vars`
+    /// for that.
+    pub async fn from_llm(prompt: &str) -> Self {
+        let mut terms: IndexSet<Sexp> = IndexSet::default();
+        for model in llm::models() {
+            let start = Instant::now();
+            let before = terms.len();
+            let mut invalid = 0;
+            for line in llm::query(prompt, &model).await {
+                match line.parse() {
+                    Ok(sexp) => {
+                        terms.insert(sexp);
+                    }
+                    Err(e) => {
+                        invalid += 1;
+                        eprintln!("Skipping invalid term from {model}: {e}");
+                    }
+                }
+            }
+            println!(
+                "{} | {} new terms ({} invalid lines) | {:?}",
+                model,
+                terms.len() - before,
+                invalid,
+                start.elapsed()
+            );
+        }
+        println!("Combined LLM workload: {} terms", terms.len());
+        Workload::Set(terms.into_iter().collect())
     }
 
     /// Filter the workload down to terms that parse in the language `L`

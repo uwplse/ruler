@@ -6,6 +6,8 @@
 /nightly
 /*.terms
 /*.rules
+# API keys (OPENROUTER_API_KEY)
+.env
 
 # Scripts
 scripts/ablation/output/*
