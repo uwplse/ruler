@@ -514,6 +514,40 @@ impl<L: SynthLanguage> Ruleset<L> {
         result
     }
 
+    /// Partition `candidates` into those this ruleset can prove and those
+    /// it cannot: a single e-graph is seeded with the lhs and rhs of every
+    /// candidate, this ruleset is run and a
+    /// candidate is verified iff its two sides end up in the same e-class.
+    ///
+    /// This is a batched (much cheaper) alternative to `derive`: one eqsat
+    /// run checks all candidates at once, at the cost of sharing the
+    /// scheduler's resource limits across all of them.
+    pub fn derive_all(&self, candidates: &Self, scheduler: Scheduler) -> (Self, Self) {
+        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
+        for rule in candidates.iter() {
+            egraph.add_expr(&L::instantiate(&rule.lhs));
+            egraph.add_expr(&L::instantiate(&rule.rhs));
+        }
+        let out_egraph = scheduler.run(&egraph, self);
+
+        let mut verified = Self::default();
+        let mut unverified = Self::default();
+        for rule in candidates.iter() {
+            let l_id = out_egraph
+                .lookup_expr(&L::instantiate(&rule.lhs))
+                .unwrap_or_else(|| panic!("Did not find {}", rule.lhs));
+            let r_id = out_egraph
+                .lookup_expr(&L::instantiate(&rule.rhs))
+                .unwrap_or_else(|| panic!("Did not find {}", rule.rhs));
+            if l_id == r_id {
+                verified.add(rule.clone());
+            } else {
+                unverified.add(rule.clone());
+            }
+        }
+        (verified, unverified)
+    }
+
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {
         let r1: Ruleset<L> = Ruleset::from_file(one);
         let r2: Ruleset<L> = Ruleset::from_file(two);

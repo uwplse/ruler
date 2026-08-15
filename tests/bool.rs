@@ -376,4 +376,28 @@ mod test {
         assert!(!can.is_empty());
         assert!(!cannot.is_empty());
     }
+
+    #[test]
+    fn derive_all() {
+        let trusted: Ruleset<Bool> = Ruleset::new(&[
+            "(& ?a ?b) ==> (& ?b ?a)",
+            "(| ?a ?b) ==> (| ?b ?a)",
+            "(& ?a ?a) ==> ?a",
+        ]);
+        let candidates: Ruleset<Bool> = Ruleset::new(&[
+            // Provable from the trusted rules
+            "(& ?x ?y) ==> (& ?y ?x)",
+            "(| (& ?x ?x) ?y) ==> (| ?y ?x)",
+            // Sound, but not provable from the trusted rules
+            "(^ ?x ?y) ==> (^ ?y ?x)",
+            // Unsound (and not provable)
+            "(& ?x ?y) ==> (| ?x ?y)",
+        ]);
+
+        let (verified, unverified) =
+            trusted.derive_all(&candidates, Scheduler::Saturating(Limits::deriving()));
+        assert_eq!(verified.len(), 2);
+        assert_eq!(unverified.len(), 2);
+        assert!(verified.contains(candidates.iter().next().unwrap()));
+    }
 }
