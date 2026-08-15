@@ -195,6 +195,9 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     pub fn to_file(&self, filename: &str) {
+        if let Some(parent) = std::path::Path::new(filename).parent() {
+            std::fs::create_dir_all(parent).unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+        }
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
         for (name, _) in &self.0 {
