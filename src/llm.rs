@@ -5,14 +5,36 @@
 
 use std::env;
 use std::io::Write;
+use std::time::Instant;
 
 use openai_api_rs::v1::{
     api::OpenAIClient,
     chat_completion::{self, ChatCompletionRequest},
 };
 
+/// Per-query audit log: every query's outcome (line count or error) is
+/// appended here, so a failed model query leaves a durable trace even
+/// when the caller's stdout is lost.
+pub const QUERY_LOG: &str = "llm/out/queries.txt";
+
+/// Append per-query parse statistics (from `from_llm` callers) to the
+/// query log.
+pub fn log_query_stats(
+    model: &str,
+    attempt: usize,
+    new: usize,
+    invalid: usize,
+    elapsed: std::time::Duration,
+) {
+    crate::logger::log_line(
+        QUERY_LOG,
+        &format!("{model} (query {attempt}) | {new} new ({invalid} invalid lines) | {elapsed:.1?}"),
+    );
+}
+
 /// The models to query. Each `Ruleset::from_llm` / `Workload::from_llm`
-/// call queries every model and combines the (deduplicated) results.
+/// call queries every model twice and combines the (deduplicated)
+/// results, to reduce variance in model output.
 pub fn models() -> Vec<String> {
     vec![
         "google/gemini-3.6-flash".to_string(),
@@ -24,10 +46,12 @@ pub fn models() -> Vec<String> {
 /// Send `prompt` to `model` and return the response as cleaned lines:
 /// anything after a `;` is treated as a comment and stripped, and blank
 /// lines are dropped. The cleaned response is also written to
-/// `llm/out/<model>-response.txt` for offline inspection.
-/// Returns no lines (with a message on stderr) if the query fails.
-pub async fn query(prompt: &str, model: &str) -> Vec<String> {
-    println!("Querying {model}");
+/// `llm/out/<model>-q<attempt>-response.txt` for offline inspection, and
+/// the outcome (including errors, which return no lines) is appended to
+/// the query log.
+pub async fn query(prompt: &str, model: &str, attempt: usize) -> Vec<String> {
+    println!("Querying {model} (query {attempt})");
+    let start = Instant::now();
     let api_key = env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY not set");
     let mut client = OpenAIClient::builder()
         .with_endpoint("https://openrouter.ai/api/v1")
@@ -50,7 +74,13 @@ pub async fn query(prompt: &str, model: &str) -> Vec<String> {
         Ok(res) => {
             let content = res.choices.first().and_then(|c| c.message.content.clone());
             let Some(content) = content else {
-                eprintln!("Empty response from {model}");
+                crate::logger::log_line(
+                    QUERY_LOG,
+                    &format!(
+                        "{model} (query {attempt}) | ERROR: empty response | {:.1?}",
+                        start.elapsed()
+                    ),
+                );
                 return vec![];
             };
 
@@ -62,15 +92,32 @@ pub async fn query(prompt: &str, model: &str) -> Vec<String> {
                 .collect();
 
             std::fs::create_dir_all("llm/out").expect("Failed to create llm/out");
-            let filename = format!("llm/out/{}-response.txt", model.replace('/', "-"));
+            let filename = format!(
+                "llm/out/{}-q{attempt}-response.txt",
+                model.replace('/', "-")
+            );
             let mut file = std::fs::File::create(&filename)
                 .unwrap_or_else(|_| panic!("Failed to create '{}'", filename));
             writeln!(file, "{}", lines.join("\n")).expect("Unable to write");
 
+            crate::logger::log_line(
+                QUERY_LOG,
+                &format!(
+                    "{model} (query {attempt}) | {} lines | {:.1?}",
+                    lines.len(),
+                    start.elapsed()
+                ),
+            );
             lines
         }
         Err(e) => {
-            eprintln!("Error querying {model}: {e:?}");
+            crate::logger::log_line(
+                QUERY_LOG,
+                &format!(
+                    "{model} (query {attempt}) | ERROR: {e:?} | {:.1?}",
+                    start.elapsed()
+                ),
+            );
             vec![]
         }
     }
@@ -96,7 +143,7 @@ mod tests {
         let prompt =
             "What are the standard Boolean Algebra Axioms? Print one axiom per line, plain text.";
         for model in models() {
-            let response = query(prompt, &model).await;
+            let response = query(prompt, &model, 1).await;
             assert!(!response.is_empty(), "empty response from {}", model);
         }
     }

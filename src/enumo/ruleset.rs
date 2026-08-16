@@ -230,7 +230,7 @@ impl<L: SynthLanguage> Ruleset<L> {
     }
 
     /// Build a candidate ruleset by prompting every LLM in `llm::models()`
-    /// with `prompt`. Each response line of the form `l ==> r` contributes
+    /// with `prompt` (twice per model). Each response line of the form `l ==> r` contributes
     /// candidates in *both* directions (whenever each direction can be
     /// built); minimization later decides which direction(s) to keep.
     /// Lines that yield no candidate are reported and skipped. Candidates
@@ -238,38 +238,43 @@ impl<L: SynthLanguage> Ruleset<L> {
     pub async fn from_llm(prompt: &str) -> Self {
         let mut all = Self::default();
         for model in llm::models() {
-            let start = Instant::now();
-            let before = all.len();
-            let mut invalid = 0;
-            for line in llm::query(prompt, &model).await {
-                let pats = line
-                    .split_once("=>")
-                    .map(|(l, r)| (l.parse::<Pattern<L>>(), r.parse::<Pattern<L>>()));
-                let mut added = false;
-                if let Some((Ok(l_pat), Ok(r_pat))) = pats {
-                    if let Some(forwards) = Rule::new(&l_pat, &r_pat) {
-                        all.add(forwards);
-                        added = true;
+            for attempt in 1..=2 {
+                let start = Instant::now();
+                let before = all.len();
+                let mut invalid = 0;
+                for line in llm::query(prompt, &model, attempt).await {
+                    let pats = line
+                        .split_once("=>")
+                        .map(|(l, r)| (l.parse::<Pattern<L>>(), r.parse::<Pattern<L>>()));
+                    let mut added = false;
+                    if let Some((Ok(l_pat), Ok(r_pat))) = pats {
+                        if let Some(forwards) = Rule::new(&l_pat, &r_pat) {
+                            all.add(forwards);
+                            added = true;
+                        }
+                        if let Some(backwards) = Rule::new(&r_pat, &l_pat) {
+                            all.add(backwards);
+                            added = true;
+                        }
                     }
-                    if let Some(backwards) = Rule::new(&r_pat, &l_pat) {
-                        all.add(backwards);
-                        added = true;
+                    if !added {
+                        invalid += 1;
+                        eprintln!("Skipping invalid rule from {model}: {line}");
                     }
                 }
-                if !added {
-                    invalid += 1;
-                    eprintln!("Skipping invalid rule from {model}: {line}");
-                }
+                llm::log_query_stats(
+                    &model,
+                    attempt,
+                    all.len() - before,
+                    invalid,
+                    start.elapsed(),
+                );
             }
-            println!(
-                "{} | {} new rules ({} invalid lines) | {:?}",
-                model,
-                all.len() - before,
-                invalid,
-                start.elapsed()
-            );
         }
-        println!("Combined LLM ruleset: {} rules", all.len());
+        crate::logger::log_line(
+            llm::QUERY_LOG,
+            &format!("Combined LLM ruleset: {} rules", all.len()),
+        );
         all
     }
 

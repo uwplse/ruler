@@ -13,6 +13,17 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Keep the machine awake for the whole run (macOS). Instant-based timings
+# in the logs pause during system sleep, and in-flight LLM queries can
+# time out across sleep cycles, so sleeping mid-run both distorts and
+# breaks results. Note: -s only prevents sleep on AC power, so plug in.
+if [ -z "$RULER_CAFFEINATED" ] && command -v caffeinate >/dev/null 2>&1; then
+    RULER_CAFFEINATED=1 exec caffeinate -is "$0" "$@"
+fi
+if command -v pmset >/dev/null 2>&1 && ! pmset -g batt | grep -q "AC Power"; then
+    echo "warning: on battery power — macOS may still sleep mid-run; plug in" >&2
+fi
+
 # --- preflight ---------------------------------------------------------
 if [ -z "$OPENROUTER_API_KEY" ] && ! grep -q "OPENROUTER_API_KEY" .env 2>/dev/null; then
     echo "error: OPENROUTER_API_KEY is not exported and not in .env" >&2

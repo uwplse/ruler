@@ -66,7 +66,7 @@ impl Workload {
     }
 
     /// Build a workload by prompting every LLM in `llm::models()` with
-    /// `prompt`. Lines that do not parse as s-expressions are reported and
+    /// `prompt` (twice per model). Lines that do not parse as s-expressions are reported and
     /// skipped; terms are deduplicated across models, preserving
     /// first-seen order. Note that the terms are *not* checked against any
     /// particular language here — chain with `as_lang`/`as_lang_with_vars`
@@ -74,29 +74,34 @@ impl Workload {
     pub async fn from_llm(prompt: &str) -> Self {
         let mut terms: IndexSet<Sexp> = IndexSet::default();
         for model in llm::models() {
-            let start = Instant::now();
-            let before = terms.len();
-            let mut invalid = 0;
-            for line in llm::query(prompt, &model).await {
-                match line.parse() {
-                    Ok(sexp) => {
-                        terms.insert(sexp);
-                    }
-                    Err(e) => {
-                        invalid += 1;
-                        eprintln!("Skipping invalid term from {model}: {e}");
+            for attempt in 1..=2 {
+                let start = Instant::now();
+                let before = terms.len();
+                let mut invalid = 0;
+                for line in llm::query(prompt, &model, attempt).await {
+                    match line.parse() {
+                        Ok(sexp) => {
+                            terms.insert(sexp);
+                        }
+                        Err(e) => {
+                            invalid += 1;
+                            eprintln!("Skipping invalid term from {model}: {e}");
+                        }
                     }
                 }
+                llm::log_query_stats(
+                    &model,
+                    attempt,
+                    terms.len() - before,
+                    invalid,
+                    start.elapsed(),
+                );
             }
-            println!(
-                "{} | {} new terms ({} invalid lines) | {:?}",
-                model,
-                terms.len() - before,
-                invalid,
-                start.elapsed()
-            );
         }
-        println!("Combined LLM workload: {} terms", terms.len());
+        crate::logger::log_line(
+            llm::QUERY_LOG,
+            &format!("Combined LLM workload: {} terms", terms.len()),
+        );
         Workload::Set(terms.into_iter().collect())
     }
 
