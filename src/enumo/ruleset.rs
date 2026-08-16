@@ -521,7 +521,10 @@ impl<L: SynthLanguage> Ruleset<L> {
     ///     2. Run the ruleset
     ///     3. Return true if the lhs and rhs are equivalent, false otherwise.
     pub fn can_derive(&self, derive_type: DeriveType, rule: &Rule<L>, limits: Limits) -> bool {
-        let scheduler = Scheduler::Saturating(limits);
+        // Simple (plain bounded eqsat) rather than Saturating: Saturating
+        // can be much slower on large rulesets, and Simple is what
+        // produced the JFP 2026 case-study derivability numbers.
+        let scheduler = Scheduler::Simple(limits);
         let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
         let lexpr = &L::instantiate(&rule.lhs);
         let rexpr = &L::instantiate(&rule.rhs);
