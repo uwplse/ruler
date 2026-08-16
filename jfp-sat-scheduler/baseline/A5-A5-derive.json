@@ -3,7 +3,7 @@
   "against_name": "A5",
   "num_rules": 480,
   "num_against": 480,
-  "time": 0.211744041,
+  "time": 0.2035595,
   "can": [
     "(!= ?a (min ?a 0)) ==> (max 0 (min ?a 1))",
     "(max 0 (min ?a 1)) ==> (!= ?a (min ?a 0))",

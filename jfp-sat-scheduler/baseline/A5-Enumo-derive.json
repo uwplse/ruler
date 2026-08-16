@@ -3,7 +3,7 @@
   "against_name": "Enumo",
   "num_rules": 480,
   "num_against": 840,
-  "time": 65.707248959,
+  "time": 67.346720042,
   "can": [
     "(&& (^ ?b ?a) 1) ==> (^ ?b ?a)",
     "(^ ?b ?a) ==> (&& (^ ?b ?a) 1)",

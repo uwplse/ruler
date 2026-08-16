@@ -26,6 +26,8 @@ Inputs and outputs for the LLM case studies (paper Tables 7 and 8,
 - Run the case-study tests by name with `--release --nocapture`; never
   bare `cargo test` (LLM spend + hour-long recipes). Requires
   `OPENROUTER_API_KEY` in `.env` at the repo root.
+- `scripts/run_llm_case_studies.sh` runs the whole pipeline in order
+  (baselines → cs1 → cs2) and prints per-step timings.
 
 ## Row-name mapping to the paper
 

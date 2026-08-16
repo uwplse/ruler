@@ -1,0 +1,35 @@
+{
+  "rules_name": "Enumo",
+  "against_name": "LLM-2",
+  "num_rules": 100,
+  "num_against": 24,
+  "time": 4.13680525,
+  "can": [
+    "(cos (/ PI 2)) ==> 0",
+    "0 ==> (cos (/ PI 2))",
+    "(tan 0) ==> 0",
+    "0 ==> (tan 0)",
+    "(sin PI) ==> 0",
+    "0 ==> (sin PI)",
+    "(tan PI) ==> 0",
+    "0 ==> (tan PI)",
+    "(sin (+ ?x PI)) ==> (- (sin ?x))",
+    "(- (sin ?x)) ==> (sin (+ ?x PI))",
+    "(cos (+ ?x PI)) ==> (- (cos ?x))",
+    "(- (cos ?x)) ==> (cos (+ ?x PI))",
+    "(sin (- ?x)) ==> (- (sin ?x))",
+    "(- (sin ?x)) ==> (sin (- ?x))",
+    "(cos (- ?x)) ==> (cos ?x)",
+    "(cos ?x) ==> (cos (- ?x))"
+  ],
+  "cannot": [
+    "(sin (/ PI 2)) ==> 1",
+    "1 ==> (sin (/ PI 2))",
+    "(cos PI) ==> (- 1)",
+    "(- 1) ==> (cos PI)",
+    "(tan ?x) ==> (/ (sin ?x) (cos ?x))",
+    "(/ (sin ?x) (cos ?x)) ==> (tan ?x)",
+    "(cos 0) ==> 1",
+    "1 ==> (cos 0)"
+  ]
+}
