@@ -1,0 +1,47 @@
+(exp 0) ==> 1
+1 ==> (exp 0)
+(log 1) ==> 0
+0 ==> (log 1)
+(pow ?x 0) ==> 1
+(pow ?x 1) ==> ?x
+?x ==> (pow ?x 1)
+(pow 1 ?x) ==> 1
+(sqrt 1) ==> 1
+1 ==> (sqrt 1)
+(cbrt 1) ==> 1
+1 ==> (cbrt 1)
+(log (exp ?x)) ==> ?x
+?x ==> (log (exp ?x))
+(exp (log ?x)) ==> ?x
+?x ==> (exp (log ?x))
+(exp (+ ?x ?y)) ==> (* (exp ?x) (exp ?y))
+(* (exp ?x) (exp ?y)) ==> (exp (+ ?x ?y))
+(exp (- ?x)) ==> (/ 1 (exp ?x))
+(/ 1 (exp ?x)) ==> (exp (- ?x))
+(log (pow ?x ?y)) ==> (* ?y (log ?x))
+(* ?y (log ?x)) ==> (log (pow ?x ?y))
+(log (/ 1 ?x)) ==> (- (log ?x))
+(- (log ?x)) ==> (log (/ 1 ?x))
+(pow ?x (- ?y)) ==> (/ 1 (pow ?x ?y))
+(/ 1 (pow ?x ?y)) ==> (pow ?x (- ?y))
+(pow ?x ?y) ==> (exp (* ?y (log ?x)))
+(exp (* ?y (log ?x))) ==> (pow ?x ?y)
+(* ?x ?x) ==> (pow ?x 2)
+(pow ?x 2) ==> (* ?x ?x)
+(pow (pow ?x ?y) ?z) ==> (pow ?x (* ?y ?z))
+(pow ?x (* ?y ?z)) ==> (pow (pow ?x ?y) ?z)
+(pow (exp ?x) (* ?y ?z)) ==> (pow (pow (exp ?x) ?y) ?z)
+(pow (pow (exp ?x) ?y) ?z) ==> (pow (exp ?x) (* ?y ?z))
+(pow (exp ?x) (- ?y)) ==> (/ 1 (pow (exp ?x) ?y))
+(/ 1 (pow (exp ?x) ?y)) ==> (pow (exp ?x) (- ?y))
+(pow (exp ?x) ?y) ==> (exp (* ?x ?y))
+(exp (* ?x ?y)) ==> (pow (exp ?x) ?y)
+(pow (exp ?x) 0) ==> 1
+(pow (exp ?x) 1) ==> (exp ?x)
+(exp ?x) ==> (pow (exp ?x) 1)
+(pow ?x (- ?a)) ==> (/ 1 (pow ?x ?a))
+(/ 1 (pow ?x ?a)) ==> (pow ?x (- ?a))
+(pow (pow ?x ?a) ?b) ==> (pow ?x (* ?a ?b))
+(pow ?x (* ?a ?b)) ==> (pow (pow ?x ?a) ?b)
+(exp (* ?x (log ?y))) ==> (pow ?y ?x)
+(pow ?y ?x) ==> (exp (* ?x (log ?y)))

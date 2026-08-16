@@ -1,0 +1,28 @@
+(log 1) ==> 0
+0 ==> (log 1)
+(sqrt 1) ==> 1
+1 ==> (sqrt 1)
+(cbrt 1) ==> 1
+1 ==> (cbrt 1)
+(pow ?x 0) ==> 1
+(pow 1 ?x) ==> 1
+(log (/ 1 ?x)) ==> (- (log ?x))
+(- (log ?x)) ==> (log (/ 1 ?x))
+(* ?x ?x) ==> (pow ?x 2)
+(pow ?x 2) ==> (* ?x ?x)
+(log (exp ?x)) ==> ?x
+?x ==> (log (exp ?x))
+(exp (log ?x)) ==> ?x
+?x ==> (exp (log ?x))
+(pow ?x (- ?a)) ==> (/ 1 (pow ?x ?a))
+(/ 1 (pow ?x ?a)) ==> (pow ?x (- ?a))
+(exp (+ ?x ?y)) ==> (* (exp ?x) (exp ?y))
+(* (exp ?x) (exp ?y)) ==> (exp (+ ?x ?y))
+(exp (* ?x (log ?y))) ==> (pow ?y ?x)
+(pow ?y ?x) ==> (exp (* ?x (log ?y)))
+(log (pow ?x ?y)) ==> (* ?y (log ?x))
+(* ?y (log ?x)) ==> (log (pow ?x ?y))
+(pow (exp ?x) ?y) ==> (exp (* ?x ?y))
+(exp (* ?x ?y)) ==> (pow (exp ?x) ?y)
+(pow (pow ?x ?a) ?b) ==> (pow ?x (* ?a ?b))
+(pow ?x (* ?a ?b)) ==> (pow (pow ?x ?a) ?b)

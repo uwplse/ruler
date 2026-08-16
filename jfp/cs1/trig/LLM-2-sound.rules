@@ -1,0 +1,16 @@
+(sin 0) ==> 0
+0 ==> (sin 0)
+(cos 0) ==> 1
+1 ==> (cos 0)
+(tan 0) ==> 0
+0 ==> (tan 0)
+(sin PI) ==> 0
+0 ==> (sin PI)
+(sin (* 2 PI)) ==> 0
+0 ==> (sin (* 2 PI))
+(cos (* 2 PI)) ==> 1
+1 ==> (cos (* 2 PI))
+(sin (+ ?x (* 2 PI))) ==> (sin ?x)
+(sin ?x) ==> (sin (+ ?x (* 2 PI)))
+(cos (+ ?x (* 2 PI))) ==> (cos ?x)
+(cos ?x) ==> (cos (+ ?x (* 2 PI)))
