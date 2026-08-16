@@ -165,6 +165,224 @@ mod test {
         assert_eq!(wkld.as_lang::<Exponential>().force().len(), 4);
     }
 
+    /// Trusted rules for validating LLM candidates by derivation. The
+    /// syntax rules connect the `^`/`abs` aliases to `pow`/`fabs`.
+    fn start_rules() -> Ruleset {
+        let syntax_rules = Ruleset::new(["(pow ?x ?y) <=> (^ ?x ?y)", "(abs ?x) <=> (fabs ?x)"]);
+        let mut rules = Exponential::get_exploratory_rules();
+        rules.extend(rational_rules());
+        rules.extend(starting_exponential_rules());
+        rules.extend(syntax_rules);
+        rules
+    }
+
+    #[tokio::test]
+    async fn case_study1() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+        dotenv::dotenv().ok();
+        // Skip (rather than fail) when no API key is configured locally
+        if std::env::var("OPENROUTER_API_KEY").is_err() {
+            eprintln!("Skipping case_study1: OPENROUTER_API_KEY not set");
+            return;
+        }
+        assert!(
+            std::path::Path::new("jfp/baseline/enumo_exp.rules").exists(),
+            "missing jfp/baseline/enumo_exp.rules: run establish_baseline first"
+        );
+
+        let dir = "jfp/cs1/exp";
+        let rational = rational_rules();
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
+        let enumo_baseline: Ruleset = Ruleset::from_file("jfp/baseline/enumo_exp.rules");
+        let start = start_rules();
+
+        let prompt = "
+        You are generating rewrite rules for an equality saturation system.
+        The domain is exponential and logarithmic functions, as follows:
+        Values: real numbers
+        Unary operators: - (negation), exp, log, sqrt, cbrt
+        Binary operators: +, - (subtraction), *, /, pow
+
+        Terms must be written using s-expressions and prefix notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Variables are ?x, ?y, and ?z.
+        Do not use any operators or syntax not listed here.
+        Do not use imaginary numbers.
+
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL real values of the variables wherever both sides are defined (log and sqrt are undefined for negative arguments). For example:
+        (log (exp ?x)) ==> ?x
+        (exp (+ ?x ?y)) ==> (* (exp ?x) (exp ?y))
+
+        Good rewrite rules already exist for pure arithmetic (unary negation, +, -, *, and /), so every rule you generate must involve exp, log, sqrt, cbrt, or pow. Cover at least the following categories:
+        - special values (e.g. exp of 0, log of 1)
+        - exp and log as inverses of each other
+        - the addition and subtraction laws for exp
+        - the product, quotient, and power laws for log
+        - laws for pow (exponents 0 and 1, sums, products, and negations of exponents)
+        - pow expressed using exp and log
+        - relationships among sqrt, cbrt, pow, and squaring
+        - distributing sqrt and cbrt over products and quotients
+
+        Be careful about soundness over the real numbers: only generate a rule if both sides agree wherever they are defined (beware of rules that hold only for positive arguments).
+        Print only the rules, one rule per line, in the exact `l ==> r` syntax shown above.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        ";
+        let t = Instant::now();
+        let candidates = Ruleset::from_llm(prompt).await;
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-1: {} candidates | {:.1?}",
+                candidates.len(),
+                t.elapsed()
+            ),
+        );
+        candidates.to_file(&format!("{dir}/LLM-1-candidates.rules"));
+
+        // Validate the candidates by derivation from the start rules
+        let t = Instant::now();
+        let (mut sound, unverified) = start.derive_all(
+            &candidates,
+            enumo::Scheduler::Saturating(Limits::deriving()),
+        );
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-1: {} sound / {} unverified of {} candidates | {:.1?}",
+                sound.len(),
+                unverified.len(),
+                candidates.len(),
+                t.elapsed()
+            ),
+        );
+        sound.to_file(&format!("{dir}/LLM-1-sound.rules"));
+
+        // Minimize the sound rules against the rational rules
+        let t = Instant::now();
+        let (llm1, _) = sound.minimize(
+            rational.clone(),
+            enumo::Scheduler::Compress(Limits::minimize()),
+        );
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!("LLM-1: {} minimized | {:.1?}", llm1.len(), t.elapsed()),
+        );
+        llm1.to_file(&format!("{dir}/LLM-1.rules"));
+
+        ruler::logger::write_derivability(
+            dir,
+            &llm1.union(&rational),
+            "LLM-1-RAT",
+            &enumo_baseline,
+            "Enumo",
+        );
+        ruler::logger::write_derivability(
+            dir,
+            &llm1.union(&rational),
+            "LLM-1-RAT",
+            &herbie,
+            "Herbie",
+        );
+        ruler::logger::write_derivability(
+            dir,
+            &enumo_baseline.union(&rational),
+            "Enumo",
+            &llm1,
+            "LLM-1",
+        );
+
+        let reprompt = format!("
+        You are generating rewrite rules for an equality saturation system.
+        The domain is exponential and logarithmic functions, as follows:
+        Values: real numbers
+        Unary operators: - (negation), exp, log, sqrt, cbrt
+        Binary operators: +, - (subtraction), *, /, pow
+
+        The following rewrite rules are already in the ruleset:
+        {}
+
+        Identify sound rewrite rules for this domain that are missing from the ruleset above, and print them.
+        Do not repeat rules from the list above, and do not print trivial variants of them (e.g. renamed variables or swapped arguments of commutative operators).
+        Every rule must involve exp, log, sqrt, cbrt, or pow; rules for pure arithmetic already exist.
+        Terms are s-expressions in prefix notation; variables are ?x, ?y, and ?z.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL real values of the variables wherever both sides are defined. For example: (log (exp ?x)) ==> ?x
+        If no rules are missing, print nothing.
+        Print only the rules, one rule per line.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        ",
+            llm1.to_str_vec().join("\n")
+        );
+        let t = Instant::now();
+        let reprompted = Ruleset::from_llm(&reprompt).await;
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-2: {} candidates (reprompted) | {:.1?}",
+                reprompted.len(),
+                t.elapsed()
+            ),
+        );
+        reprompted.to_file(&format!("{dir}/LLM-2-candidates.rules"));
+
+        // Validate the reprompted candidates by derivation from the
+        // start rules
+        let t = Instant::now();
+        let (mut sound2, unverified2) = start.derive_all(
+            &reprompted,
+            enumo::Scheduler::Saturating(Limits::deriving()),
+        );
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-2: {} sound / {} unverified of {} candidates | {:.1?}",
+                sound2.len(),
+                unverified2.len(),
+                reprompted.len(),
+                t.elapsed()
+            ),
+        );
+        sound2.to_file(&format!("{dir}/LLM-2-sound.rules"));
+
+        // Minimize against everything already selected
+        let t = Instant::now();
+        let (min2, _) = sound2.minimize(
+            rational.union(&llm1),
+            enumo::Scheduler::Compress(Limits::minimize()),
+        );
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!("LLM-2: {} minimized | {:.1?}", min2.len(), t.elapsed()),
+        );
+        let llm2 = llm1.union(&min2);
+        llm2.to_file(&format!("{dir}/LLM-2.rules"));
+
+        ruler::logger::write_derivability(
+            dir,
+            &llm2.union(&rational),
+            "LLM-2-RAT",
+            &enumo_baseline,
+            "Enumo",
+        );
+        ruler::logger::write_derivability(
+            dir,
+            &llm2.union(&rational),
+            "LLM-2-RAT",
+            &herbie,
+            "Herbie",
+        );
+        ruler::logger::write_derivability(
+            dir,
+            &enumo_baseline.union(&rational),
+            "Enumo",
+            &llm2,
+            "LLM-2",
+        );
+    }
+
     pub fn starting_exponential_rules() -> Ruleset {
         Ruleset::new(&[
             // exponential properties (expand)

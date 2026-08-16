@@ -349,6 +349,179 @@ mod test {
         ])
     }
 
+    /// Trusted rules for validating LLM candidates by derivation:
+    /// the pruned complex rules plus the cis/I prior and lifting rules.
+    fn start_rules() -> Ruleset<Trig> {
+        let mut rules: Ruleset<Trig> = Ruleset::from_file("jfp/cs1/trig/complex.rules");
+        rules.extend(prior_rules());
+        rules.extend(Trig::get_exploratory_rules());
+        rules
+    }
+
+    #[tokio::test]
+    async fn case_study1() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+        dotenv::dotenv().ok();
+        // Skip (rather than fail) when no API key is configured locally
+        if std::env::var("OPENROUTER_API_KEY").is_err() {
+            eprintln!("Skipping case_study1: OPENROUTER_API_KEY not set");
+            return;
+        }
+        assert!(
+            std::path::Path::new("jfp/baseline/enumo_trig.rules").exists(),
+            "missing jfp/baseline/enumo_trig.rules: run establish_baseline first"
+        );
+
+        let dir = "jfp/cs1/trig";
+        let complex: Ruleset<Trig> = Ruleset::from_file("jfp/cs1/trig/complex.rules");
+        let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
+        let enumo: Ruleset<Trig> = Ruleset::from_file("jfp/baseline/enumo_trig.rules");
+        let start = start_rules();
+
+        let prompt = "
+        You are generating rewrite rules for an equality saturation system.
+        The domain is trigonometric functions, as follows:
+        Values: real numbers, and the constant PI
+        Unary operators: - (negation), sin, cos, tan, sqr (square)
+        Binary operators: +, - (subtraction), *, /
+
+        Terms must be written using s-expressions and prefix notation.
+        For example, (a + b) is not a valid term, but (+ a b) is a valid term.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Variables are ?x, ?y, and ?z. The constant PI may appear in terms, e.g. (/ PI 2).
+        Do not use any operators or syntax not listed here.
+        Do not use imaginary numbers.
+
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL real values of the variables (wherever both sides are defined). For example:
+        (sin (- ?x)) ==> (- (sin ?x))
+        (+ (sqr (sin ?x)) (sqr (cos ?x))) ==> 1
+
+        Good rewrite rules already exist for pure arithmetic (unary negation, +, -, *, /, and sqr), so every rule you generate must involve sin, cos, or tan. Cover at least the following categories:
+        - values of sin, cos, and tan at 0, PI/6, PI/4, PI/3, PI/2, PI, and their simple multiples
+        - parity of sin, cos, and tan (negated arguments)
+        - phase shifts relating sin, cos, and tan (arguments offset by PI/2 or PI)
+        - the Pythagorean identity and its variants
+        - angle sum and difference identities
+        - double-angle and half-angle identities
+        - product-to-sum and sum-to-product identities
+        - the definition of tan in terms of sin and cos
+
+        Every rule must be sound for all real values of the variables, not only at special angles.
+        Print only the rules, one rule per line, in the exact `l ==> r` syntax shown above.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        ";
+        let t = Instant::now();
+        let candidates = Ruleset::from_llm(prompt).await;
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-1: {} candidates | {:.1?}",
+                candidates.len(),
+                t.elapsed()
+            ),
+        );
+        candidates.to_file(&format!("{dir}/LLM-1-candidates.rules"));
+
+        // Validate the candidates by derivation from the start rules
+        let t = Instant::now();
+        let (mut sound, unverified) =
+            start.derive_all(&candidates, Scheduler::Saturating(Limits::deriving()));
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-1: {} sound / {} unverified of {} candidates | {:.1?}",
+                sound.len(),
+                unverified.len(),
+                candidates.len(),
+                t.elapsed()
+            ),
+        );
+        sound.to_file(&format!("{dir}/LLM-1-sound.rules"));
+
+        // Minimize the sound rules against the complex rules
+        let t = Instant::now();
+        let (llm1, _) = sound.minimize(complex.clone(), Scheduler::Compress(Limits::minimize()));
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!("LLM-1: {} minimized | {:.1?}", llm1.len(), t.elapsed()),
+        );
+        llm1.to_file(&format!("{dir}/LLM-1.rules"));
+
+        ruler::logger::write_derivability(dir, &llm1.union(&complex), "LLM-1-C", &enumo, "Enumo");
+        ruler::logger::write_derivability(dir, &llm1.union(&complex), "LLM-1-C", &herbie, "Herbie");
+        ruler::logger::write_derivability(dir, &enumo.union(&complex), "Enumo", &llm1, "LLM-1");
+
+        let reprompt = format!("
+        You are generating rewrite rules for an equality saturation system.
+        The domain is trigonometric functions, as follows:
+        Values: real numbers, and the constant PI
+        Unary operators: - (negation), sin, cos, tan, sqr (square)
+        Binary operators: +, - (subtraction), *, /
+
+        The following rewrite rules are already in the ruleset:
+        {}
+
+        Identify sound rewrite rules for this domain that are missing from the ruleset above, and print them.
+        Do not repeat rules from the list above, and do not print trivial variants of them (e.g. renamed variables or swapped arguments of commutative operators).
+        Every rule must involve sin, cos, or tan; rules for pure arithmetic already exist.
+        Terms are s-expressions in prefix notation; variables are ?x, ?y, and ?z.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL real values of the variables. For example: (sin (- ?x)) ==> (- (sin ?x))
+        If no rules are missing, print nothing.
+        Print only the rules, one rule per line.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        ",
+            llm1.to_str_vec().join("\n")
+        );
+        let t = Instant::now();
+        let reprompted = Ruleset::from_llm(&reprompt).await;
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-2: {} candidates (reprompted) | {:.1?}",
+                reprompted.len(),
+                t.elapsed()
+            ),
+        );
+        reprompted.to_file(&format!("{dir}/LLM-2-candidates.rules"));
+
+        // Validate the reprompted candidates by derivation from the
+        // start rules
+        let t = Instant::now();
+        let (mut sound2, unverified2) =
+            start.derive_all(&reprompted, Scheduler::Saturating(Limits::deriving()));
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-2: {} sound / {} unverified of {} candidates | {:.1?}",
+                sound2.len(),
+                unverified2.len(),
+                reprompted.len(),
+                t.elapsed()
+            ),
+        );
+        sound2.to_file(&format!("{dir}/LLM-2-sound.rules"));
+
+        // Minimize against everything already selected
+        let t = Instant::now();
+        let (min2, _) = sound2.minimize(
+            complex.union(&llm1),
+            Scheduler::Compress(Limits::minimize()),
+        );
+        ruler::logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!("LLM-2: {} minimized | {:.1?}", min2.len(), t.elapsed()),
+        );
+        let llm2 = llm1.union(&min2);
+        llm2.to_file(&format!("{dir}/LLM-2.rules"));
+
+        ruler::logger::write_derivability(dir, &llm2.union(&complex), "LLM-2-C", &enumo, "Enumo");
+        ruler::logger::write_derivability(dir, &llm2.union(&complex), "LLM-2-C", &herbie, "Herbie");
+        ruler::logger::write_derivability(dir, &enumo.union(&complex), "Enumo", &llm2, "LLM-2");
+    }
+
     #[test]
     fn establish_baseline() {
         // Skip this test in github actions

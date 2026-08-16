@@ -384,10 +384,200 @@ mod test {
     use std::time::{Duration, Instant};
 
     use ruler::{
-        enumo::{Metric, Ruleset},
+        enumo::{Metric, Ruleset, Scheduler},
         logger,
         recipe_utils::{recursive_rules, Lang},
+        Limits,
     };
+
+    #[tokio::test]
+    async fn case_study1() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+        dotenv::dotenv().ok();
+        // Skip (rather than fail) when no API key is configured locally
+        if std::env::var("OPENROUTER_API_KEY").is_err() {
+            eprintln!("Skipping case_study1: OPENROUTER_API_KEY not set");
+            return;
+        }
+        for f in [
+            "jfp/baseline/atoms5_halide.rules",
+            "jfp/baseline/enumo_halide.rules",
+        ] {
+            assert!(
+                std::path::Path::new(f).exists(),
+                "missing {}: run establish_baseline first",
+                f
+            );
+        }
+
+        let dir = "jfp/cs1/halide";
+        let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+
+        let prompt = "
+        You are generating rewrite rules for an equality saturation system.
+        The domain is boolean logic and integer arithmetic, as follows:
+            Values: integers. Comparisons and boolean operators return 1 (true) or 0 (false); any nonzero value is treated as true.
+            Unary Operators: - (negation), ! (logical not)
+            Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+            Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
+
+        Terms must be written using s-expressions and prefix notation.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Variables are ?x, ?y, and ?z. The integer constants 0 and 1 may also appear in rules.
+        Do not use any operators or syntax not listed here.
+
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL integer values of the variables. For example:
+        (+ ?x ?y) ==> (+ ?y ?x)
+        (min ?x ?x) ==> ?x
+        (select 1 ?x ?y) ==> ?x
+
+        Generate a comprehensive set of sound rewrite rules for this domain, covering at least the following categories:
+        - identity and annihilator rules for each operator (e.g. adding 0, multiplying by 0 or 1)
+        - commutativity and associativity of +, *, min, max, &&, ||, ^, and commutativity of == and !=
+        - distributivity rules (e.g. * over +, && over ||, min and max over +, min over max)
+        - negation and logical-not rules (double negation, De Morgan's laws, ! of a comparison as the flipped comparison)
+        - relationships among <, <=, ==, and != (e.g. swapping argument order, complements)
+        - absorption and idempotence rules for min, max, &&, ||
+        - select rules (constant condition, equal branches, pushing operators into select, nested selects)
+        - rules connecting comparisons with min and max (e.g. (<= (min ?x ?y) ?x) ==> 1)
+
+        Generate at least 200 rules.
+        Every rule must be sound: both sides must be equal for every assignment of integer values to the variables, including 0 and negative values.
+        Print only the rules, one rule per line, in the exact `l ==> r` syntax shown above.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        ";
+        let start = Instant::now();
+        let candidates: Ruleset<Pred> = Ruleset::from_llm(prompt).await;
+        logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM-1: {} candidates | {:.1?}",
+                candidates.len(),
+                start.elapsed()
+            ),
+        );
+        candidates.to_file(&format!("{dir}/LLM-1-candidates.rules"));
+
+        let priors = [
+            ("None", Ruleset::default()),
+            ("A5", Ruleset::from_file("jfp/baseline/atoms5_halide.rules")),
+            (
+                "Enumo",
+                Ruleset::from_file("jfp/baseline/enumo_halide.rules"),
+            ),
+        ];
+
+        for (prior_name, prior_rules) in &priors {
+            // Minimize the candidates against this prior (minimize
+            // validates via z3 as it selects)
+            let name = format!("LLM-{prior_name}-1");
+            let mut candidates_copy = candidates.clone();
+            let start = Instant::now();
+            let (sound, invalid) = candidates_copy
+                .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+            logger::log_line(
+                &format!("{dir}/log.txt"),
+                &format!(
+                    "{name}: {} selected ({} invalid) | {:.1?}",
+                    sound.len(),
+                    invalid.len(),
+                    start.elapsed()
+                ),
+            );
+            sound.to_file(&format!("{dir}/{name}.rules"));
+
+            logger::write_derivability(
+                dir,
+                &sound.union(prior_rules),
+                &name,
+                &halide_baseline,
+                "Halide",
+            );
+            for (p_name, p_rules) in &priors {
+                if p_rules.is_empty() {
+                    continue;
+                }
+                logger::write_derivability(dir, &sound.union(prior_rules), &name, p_rules, p_name);
+                logger::write_derivability(dir, p_rules, p_name, &sound, &name);
+            }
+
+            // Reprompt for rules missing from what we kept
+            let reprompt = format!("
+            You are generating rewrite rules for an equality saturation system.
+            The domain is boolean logic and integer arithmetic, as follows:
+                Values: integers. Comparisons and boolean operators return 1 (true) or 0 (false); any nonzero value is treated as true.
+                Unary Operators: - (negation), ! (logical not)
+                Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+                Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
+
+            The following rewrite rules are already in the ruleset:
+            {}
+            {}
+
+            Identify sound rewrite rules for this domain that are missing from the ruleset above, and print them.
+            Do not repeat rules from the list above, and do not print trivial variants of them (e.g. renamed variables or swapped arguments of commutative operators).
+            Terms are s-expressions in prefix notation; variables are ?x, ?y, and ?z, and the integer constants 0 and 1 may also appear.
+            A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL integer values of the variables. For example: (min ?x ?x) ==> ?x
+            If no rules are missing, print nothing.
+            Print only the rules, one rule per line.
+            Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+            ", sound.to_str_vec().join("\n"), prior_rules.to_str_vec().join("\n"));
+            let start = Instant::now();
+            let mut reprompted: Ruleset<Pred> = Ruleset::from_llm(&reprompt).await;
+            let name2 = format!("LLM-{prior_name}-2");
+            logger::log_line(
+                &format!("{dir}/log.txt"),
+                &format!(
+                    "{name2}: {} candidates (reprompted) | {:.1?}",
+                    reprompted.len(),
+                    start.elapsed()
+                ),
+            );
+            reprompted.to_file(&format!("{dir}/{name2}-candidates.rules"));
+
+            // Minimize the reprompted candidates against everything
+            // already selected
+            let start = Instant::now();
+            let (sound2, invalid2) = reprompted.minimize(
+                sound.union(prior_rules),
+                Scheduler::Compress(Limits::minimize()),
+            );
+            logger::log_line(
+                &format!("{dir}/log.txt"),
+                &format!(
+                    "{name2}: {} selected ({} invalid) | {:.1?}",
+                    sound2.len(),
+                    invalid2.len(),
+                    start.elapsed()
+                ),
+            );
+            sound2.to_file(&format!("{dir}/{name2}.rules"));
+
+            logger::write_derivability(
+                dir,
+                &sound2.union(&sound).union(prior_rules),
+                &name2,
+                &halide_baseline,
+                "Halide",
+            );
+            for (p_name, p_rules) in &priors {
+                if p_rules.is_empty() {
+                    continue;
+                }
+                logger::write_derivability(
+                    dir,
+                    &sound2.union(&sound).union(prior_rules),
+                    &name2,
+                    p_rules,
+                    p_name,
+                );
+                logger::write_derivability(dir, p_rules, p_name, &sound2.union(&sound), &name2);
+            }
+        }
+    }
 
     #[test]
     fn establish_baseline() {
