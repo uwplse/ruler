@@ -384,7 +384,7 @@ mod test {
     use std::time::{Duration, Instant};
 
     use ruler::{
-        enumo::{Metric, Ruleset, Scheduler},
+        enumo::{Metric, Ruleset, Scheduler, Workload},
         logger,
         recipe_utils::{recursive_rules, Lang},
         Limits,
@@ -576,6 +576,133 @@ mod test {
                 );
                 logger::write_derivability(dir, p_rules, p_name, &sound2.union(&sound), &name2);
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn case_study2() {
+        // Skip this test in github actions
+        if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
+            return;
+        }
+        dotenv::dotenv().ok();
+        // Skip (rather than fail) when no API key is configured locally
+        if std::env::var("OPENROUTER_API_KEY").is_err() {
+            eprintln!("Skipping case_study2: OPENROUTER_API_KEY not set");
+            return;
+        }
+        for f in [
+            "jfp/baseline/atoms5_halide.rules",
+            "jfp/baseline/enumo_halide.rules",
+            "jfp/cs1/halide/LLM-None-1.rules",
+            "jfp/cs1/halide/LLM-None-2.rules",
+        ] {
+            assert!(
+                std::path::Path::new(f).exists(),
+                "missing {}: run establish_baseline and case_study1 first",
+                f
+            );
+        }
+
+        let dir = "jfp/cs2/halide";
+        let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
+        let a5_baseline: Ruleset<Pred> = Ruleset::from_file("jfp/baseline/atoms5_halide.rules");
+        let enumo_baseline: Ruleset<Pred> = Ruleset::from_file("jfp/baseline/enumo_halide.rules");
+        let llm2: Ruleset<Pred> = Ruleset::from_file("jfp/cs1/halide/LLM-None-1.rules")
+            .union(&Ruleset::from_file("jfp/cs1/halide/LLM-None-2.rules"));
+
+        let prompt = "
+        You are generating a workload of terms from which rewrite rules will be inferred.
+        The domain is boolean logic and integer arithmetic, as follows:
+            Values: use only the integer constants 0 and 1
+            Variables: use only w, x, y, and z
+            Unary Operators: - (negation), ! (logical not)
+            Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+            Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
+
+        Terms must be written using s-expressions and prefix notation.
+        For example, (x + y) is not a valid term, but (+ x y) is a valid term.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Terms contain no ? marks. Do not use any operators, constants, or variables not listed here.
+
+        Example terms in the required format:
+        (min x (max y x))
+        (select (< x y) x y)
+        (+ (* x 1) (* y 0))
+
+        Rewrite rules will be inferred by finding pairs of equivalent terms in this workload, so:
+        - generate many pairs or clusters of terms that are likely to be equivalent to each other;
+        - vary the terms in size and nesting depth, from single operators up to terms with 3 or 4 nested operators;
+        - cover every operator, and mix operator families in the same term (e.g. comparisons inside select, arithmetic inside min and max, boolean combinations of comparisons).
+
+        Generate at least 1000 terms in total. As a guide, generate roughly 100 terms emphasizing each of the following groups: arithmetic (+, -, *); min and max; comparisons; boolean operators (&&, ||, ^, !); select; negation; arithmetic combined with min and max; comparisons combined with boolean operators; comparisons combined with select; and mixed terms using three or more operator families.
+        Do not print group labels or headers.
+        Do not stop early: your response must not contain `...` or any other indication that the list is incomplete.
+        Print only the terms, one term per line.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        ";
+        let start = Instant::now();
+        let wkld = Workload::from_llm(prompt)
+            .await
+            .as_lang_with_vars::<Pred>(vec!["w".into(), "x".into(), "y".into(), "z".into()]);
+        logger::log_line(
+            &format!("{dir}/log.txt"),
+            &format!(
+                "LLM workload: {} terms | {:.1?}",
+                wkld.force().len(),
+                start.elapsed()
+            ),
+        );
+        wkld.to_file(&format!("{dir}/llm-wkld.terms"));
+
+        let priors = [
+            ("None", Ruleset::default()),
+            ("A5", a5_baseline.clone()),
+            ("Enumo", enumo_baseline.clone()),
+            ("LLM-2", llm2),
+        ];
+
+        for (prior_name, prior_rules) in &priors {
+            let name = format!("w-{prior_name}");
+
+            // Workload -> e-graph, compressed by the prior rules
+            let start = Instant::now();
+            let egraph = wkld.to_egraph::<Pred>();
+            let compressed = Scheduler::Compress(Limits::synthesis()).run(&egraph, prior_rules);
+            let mut candidates = Ruleset::cvec_match(&compressed);
+            logger::log_line(
+                &format!("{dir}/log.txt"),
+                &format!(
+                    "{name}: {} eclasses, {} candidates | {:.1?}",
+                    compressed.number_of_classes(),
+                    candidates.len(),
+                    start.elapsed()
+                ),
+            );
+
+            // Minimize the candidates against the prior (minimize
+            // validates via z3 as it selects)
+            let start = Instant::now();
+            let (rules, invalid) =
+                candidates.minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+            logger::log_line(
+                &format!("{dir}/log.txt"),
+                &format!(
+                    "{name}: {} selected ({} invalid) | {:.1?}",
+                    rules.len(),
+                    invalid.len(),
+                    start.elapsed()
+                ),
+            );
+            rules.to_file(&format!("{dir}/{name}.rules"));
+
+            // Derivability of the baselines from the synthesized rules.
+            // Halide never appears as the deriving side: its TRS is not
+            // designed for eqsat.
+            let all_rules = rules.union(prior_rules);
+            logger::write_derivability(dir, &all_rules, &name, &halide_baseline, "Halide");
+            logger::write_derivability(dir, &all_rules, &name, &a5_baseline, "A5");
+            logger::write_derivability(dir, &all_rules, &name, &enumo_baseline, "Enumo");
         }
     }
 
