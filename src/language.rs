@@ -208,7 +208,7 @@ pub trait SynthLanguage: Language + Send + Sync + Display + FromOp + 'static {
     /// Given a node, construct a pattern node
     fn to_enode_or_var(self) -> ENodeOrVar<Self> {
         match self.to_var() {
-            Some(var) => ENodeOrVar::Var(format!("?{}", var).parse().unwrap()),
+            Some(var) => ENodeOrVar::Var(format!("?{var}").parse().unwrap()),
             None => ENodeOrVar::ENode(self),
         }
     }

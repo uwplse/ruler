@@ -1,5 +1,6 @@
 use egg::{AstSize, EClass, Extractor, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{io::Write, sync::Arc};
 
@@ -9,6 +10,18 @@ use crate::{
 };
 
 use super::{Rule, Scheduler};
+
+/// A progress bar for tracking long-running operations over `len` rules
+fn progress_bar(len: usize) -> ProgressBar {
+    let pb = ProgressBar::new(len as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+            .unwrap()
+            .progress_chars("##-"),
+    );
+    pb
+}
 
 /// A set of rewrite rules
 #[derive(Clone, Debug)]
@@ -69,11 +82,13 @@ impl<L: SynthLanguage> Ruleset<L> {
     {
         let mut map = IndexMap::default();
         for v in vals {
-            if let Ok((forwards, backwards)) = Rule::from_string(v.as_ref()) {
-                map.insert(forwards.name.clone(), forwards);
-                if let Some(backwards) = backwards {
-                    map.insert(backwards.name.clone(), backwards);
-                }
+            // Rulesets constructed from string literals are trusted input;
+            // a malformed rule is an author error, so fail loudly.
+            let (forwards, backwards) =
+                Rule::from_string(v.as_ref()).unwrap_or_else(|e| panic!("{}", e));
+            map.insert(forwards.name.clone(), forwards);
+            if let Some(backwards) = backwards {
+                map.insert(backwards.name.clone(), backwards);
             }
         }
         Ruleset(map)
@@ -183,7 +198,7 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
         for (name, _) in &self.0 {
-            writeln!(file, "{}", name).expect("Unable to write");
+            writeln!(file, "{name}").expect("Unable to write");
         }
     }
 
@@ -193,11 +208,19 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut all_rules = IndexMap::default();
         for line in std::io::BufRead::lines(reader) {
             let line = line.unwrap();
-            if let Ok((forwards, backwards)) = Rule::from_string(&line) {
-                all_rules.insert(forwards.name.clone(), forwards);
-                if let Some(backwards) = backwards {
-                    all_rules.insert(backwards.name.clone(), backwards);
+            if line.trim().is_empty() {
+                continue;
+            }
+            // Rule files may contain generated (e.g. LLM-produced) rules,
+            // so tolerate malformed lines, but report every skip.
+            match Rule::from_string(&line) {
+                Ok((forwards, backwards)) => {
+                    all_rules.insert(forwards.name.clone(), forwards);
+                    if let Some(backwards) = backwards {
+                        all_rules.insert(backwards.name.clone(), backwards);
+                    }
                 }
+                Err(e) => eprintln!("Skipping invalid rule in {filename}: {e}"),
             }
         }
         Self(all_rules)
@@ -427,11 +450,17 @@ impl<L: SynthLanguage> Ruleset<L> {
         let mut invalid: Ruleset<L> = Default::default();
         let mut chosen = prior.clone();
         let step_size = 1;
+        let pb = progress_bar(self.len());
         while !self.is_empty() {
+            let before = self.len();
             let selected = self.select(step_size, &mut invalid);
             chosen.extend(selected.clone());
             self.shrink(&chosen, scheduler);
+            // Increment progress bar by however many candidates were consumed this
+            // iteration (selected + discarded as invalid or redundant).
+            pb.inc(before.saturating_sub(self.len()) as u64);
         }
+        pb.finish();
         // Return only the new rules
         chosen.remove_all(prior);
 
@@ -475,7 +504,48 @@ impl<L: SynthLanguage> Ruleset<L> {
 
     /// Partition a ruleset into derivable / not-derivable with respect to this ruleset.
     pub fn derive(&self, derive_type: DeriveType, against: &Self, limits: Limits) -> (Self, Self) {
-        against.partition(|rule| self.can_derive(derive_type, rule, limits))
+        let pb = progress_bar(against.len());
+        let result = against.partition(|rule| {
+            let derivable = self.can_derive(derive_type, rule, limits);
+            pb.inc(1);
+            derivable
+        });
+        pb.finish();
+        result
+    }
+
+    /// Partition `candidates` into those this ruleset can prove and those
+    /// it cannot: a single e-graph is seeded with the lhs and rhs of every
+    /// candidate, this ruleset is run and a
+    /// candidate is verified iff its two sides end up in the same e-class.
+    ///
+    /// This is a batched (much cheaper) alternative to `derive`: one eqsat
+    /// run checks all candidates at once, at the cost of sharing the
+    /// scheduler's resource limits across all of them.
+    pub fn derive_all(&self, candidates: &Self, scheduler: Scheduler) -> (Self, Self) {
+        let mut egraph: EGraph<L, SynthAnalysis> = Default::default();
+        for rule in candidates.iter() {
+            egraph.add_expr(&L::instantiate(&rule.lhs));
+            egraph.add_expr(&L::instantiate(&rule.rhs));
+        }
+        let out_egraph = scheduler.run(&egraph, self);
+
+        let mut verified = Self::default();
+        let mut unverified = Self::default();
+        for rule in candidates.iter() {
+            let l_id = out_egraph
+                .lookup_expr(&L::instantiate(&rule.lhs))
+                .unwrap_or_else(|| panic!("Did not find {}", rule.lhs));
+            let r_id = out_egraph
+                .lookup_expr(&L::instantiate(&rule.rhs))
+                .unwrap_or_else(|| panic!("Did not find {}", rule.rhs));
+            if l_id == r_id {
+                verified.add(rule.clone());
+            } else {
+                unverified.add(rule.clone());
+            }
+        }
+        (verified, unverified)
     }
 
     pub fn print_derive(derive_type: DeriveType, one: &str, two: &str) {

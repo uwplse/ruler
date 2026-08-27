@@ -1,7 +1,7 @@
 use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
-use crate::{SynthAnalysis, SynthLanguage};
+use crate::{IndexSet, SynthAnalysis, SynthLanguage};
 use std::io::Write;
 
 /// Workloads are sets of terms from a domain
@@ -40,7 +40,7 @@ impl Workload {
         let mut file = std::fs::File::create(filename)
             .unwrap_or_else(|_| panic!("Failed to open '{}'", filename));
         for name in &self.force() {
-            writeln!(file, "{}", name).expect("Unable to write");
+            writeln!(file, "{name}").expect("Unable to write");
         }
     }
 
@@ -49,9 +49,56 @@ impl Workload {
         let reader = std::io::BufReader::new(infile);
         let mut sexps = vec![];
         for line in std::io::BufRead::lines(reader) {
-            sexps.push(line.unwrap().parse().unwrap());
+            let line = line.unwrap();
+            if line.trim().is_empty() {
+                continue;
+            }
+            // Tolerate malformed terms, but report
+            match line.parse() {
+                Ok(sexp) => sexps.push(sexp),
+                Err(e) => eprintln!("Skipping invalid term in {filename}: {e}"),
+            }
         }
         Self::Set(sexps)
+    }
+
+    /// Filter the workload down to terms that parse in the language `L`
+    /// (with no restriction on which variables appear). Workload terms are
+    /// untyped s-expressions, and `to_egraph` panics on terms outside `L`;
+    /// use this to safely ingest terms from untrusted sources
+    pub fn as_lang<L: SynthLanguage>(&self) -> Self {
+        self.as_lang_with_vars::<L>(vec![])
+    }
+
+    /// Filter the workload down to terms that parse in the language `L`
+    /// and (if `expected_vars` is non-empty) mention only those variables.
+    /// Filtered-out terms are reported to stderr.
+    pub fn as_lang_with_vars<L: SynthLanguage>(&self, expected_vars: Vec<String>) -> Self {
+        Workload::Set(
+            self.force()
+                .iter()
+                .filter(|sexp| match sexp.to_string().parse::<RecExpr<L>>() {
+                    Ok(expr) => expr.as_ref().iter().all(|node| {
+                        if let ENodeOrVar::Var(v) = node.clone().to_enode_or_var() {
+                            let mut v = v.to_string();
+                            v.remove(0); // strip the leading '?'
+                            let ok = expected_vars.is_empty() || expected_vars.contains(&v);
+                            if !ok {
+                                eprintln!("Skipping term with unexpected var '{v}': {sexp}");
+                            }
+                            ok
+                        } else {
+                            true
+                        }
+                    }),
+                    Err(_) => {
+                        eprintln!("Skipping term that does not parse in the language: {sexp}");
+                        false
+                    }
+                })
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Materialize the workload into an e-graph
@@ -108,18 +155,21 @@ impl Workload {
                 set
             }
             Workload::Append(workloads) => {
-                let mut set = vec![];
+                // Deduplicate across the appended workloads. IndexSet
+                // preserves insertion order, which matters downstream
+                // (e.g. variable initialization order in to_egraph).
+                let mut set: IndexSet<Sexp> = IndexSet::default();
                 for w in workloads {
                     set.extend(w.force());
                 }
-                set
+                set.into_iter().collect()
             }
         }
     }
 
     pub fn pretty_print(&self) {
         for t in self.force() {
-            println!("{}", t);
+            println!("{t}");
         }
     }
 
@@ -137,10 +187,11 @@ impl Workload {
         let into: Workload = workload.into();
         match (self, into) {
             (Workload::Set(xs), Workload::Set(ys)) => {
-                let mut all = vec![];
+                // Deduplicate, preserving first-occurrence order
+                let mut all: IndexSet<Sexp> = IndexSet::default();
                 all.extend(xs);
                 all.extend(ys);
-                Workload::Set(all)
+                Workload::Set(all.into_iter().collect())
             }
             (Workload::Append(xs), Workload::Append(ys)) => {
                 let mut all = vec![];
@@ -263,6 +314,19 @@ mod test {
         for t in expected.force() {
             assert!(actual.contains(&t));
         }
+    }
+
+    #[test]
+    fn append_dups() {
+        // Appending two Sets dedups, preserving first-occurrence order
+        let w1 = Workload::new(["a", "b", "x"]);
+        let w2 = Workload::new(["c", "x", "d", "d"]);
+        let appended = w1.append(w2).force();
+        assert_eq!(appended, Workload::new(["a", "b", "x", "c", "d"]).force());
+
+        // Forcing an Append also dedups
+        let apps = Workload::Append(vec![Workload::new(["a", "b"]), Workload::new(["b", "c"])]);
+        assert_eq!(apps.force(), Workload::new(["a", "b", "c"]).force());
     }
 
     #[test]

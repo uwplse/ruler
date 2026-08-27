@@ -3,7 +3,7 @@ use std::str::FromStr;
 use super::*;
 
 /// S-expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Sexp {
     Atom(String),
     List(Vec<Self>),
@@ -14,19 +14,21 @@ impl FromStr for Sexp {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use symbolic_expressions::parser::parse_str;
-        let sexp = parse_str(s).unwrap();
-        Ok(Self::from_symbolic_expr(sexp))
+        match parse_str(s) {
+            Ok(sexp) => Ok(Self::from_symbolic_expr(sexp)),
+            Err(e) => Err(format!("Failed to parse '{s}': {e}")),
+        }
     }
 }
 
 impl std::fmt::Display for Sexp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Sexp::Atom(x) => write!(f, "{}", x),
+            Sexp::Atom(x) => write!(f, "{x}"),
             Sexp::List(l) => {
                 write!(f, "(").expect("not written");
                 for x in l {
-                    write!(f, "{} ", x).expect("not written");
+                    write!(f, "{x} ").expect("not written");
                 }
                 write!(f, ")").expect("not written");
                 Ok(())

@@ -37,6 +37,9 @@ pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
 pub type HashSet<K> = rustc_hash::FxHashSet<K>;
 /// IndexMap data implementation used in rustc
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
+/// IndexSet with the same hasher as IndexMap; preserves insertion order,
+/// so deduplication with it is deterministic
+pub type IndexSet<K> = indexmap::IndexSet<K, BuildHasherDefault<rustc_hash::FxHasher>>;
 
 /// Whether a rule is sound.
 #[derive(Debug, Clone)]

@@ -24,41 +24,32 @@ impl<L: SynthLanguage> Display for Rule<L> {
 }
 
 impl<L: SynthLanguage> Rule<L> {
+    /// Parse a rule from a string (either `l ==> r` or `l <=> r`).
+    /// Returns an error instead of panicking on malformed input (bad
+    /// patterns, or a rewrite that cannot be built, e.g. because the rhs
+    /// has variables unbound on the lhs) so that callers ingesting
+    /// untrusted rules can decide how to handle it.
     pub fn from_string(s: &str) -> Result<(Self, Option<Self>), String> {
         if let Some((l, r)) = s.split_once("=>") {
-            let l_pat: Pattern<L> = l.parse().unwrap();
-            let r_pat: Pattern<L> = r.parse().unwrap();
+            let l_pat: Pattern<L> = l
+                .parse()
+                .map_err(|e| format!("Failed to parse lhs of '{s}': {e:?}"))?;
+            let r_pat: Pattern<L> = r
+                .parse()
+                .map_err(|e| format!("Failed to parse rhs of '{s}': {e:?}"))?;
 
-            let forwards = Self {
-                name: format!("{} ==> {}", l_pat, r_pat).into(),
-                lhs: l_pat.clone(),
-                rhs: r_pat.clone(),
-                rewrite: Rewrite::new(
-                    format!("{} ==> {}", l_pat, r_pat),
-                    l_pat.clone(),
-                    Rhs { rhs: r_pat.clone() },
-                )
-                .unwrap(),
-            };
-
-            if s.contains("<=>") {
-                let backwards = Self {
-                    name: format!("{} ==> {}", r_pat, l_pat).into(),
-                    lhs: r_pat.clone(),
-                    rhs: l_pat.clone(),
-                    rewrite: Rewrite::new(
-                        format!("{} ==> {}", r_pat, l_pat),
-                        r_pat,
-                        Rhs { rhs: l_pat },
-                    )
-                    .unwrap(),
-                };
-                Ok((forwards, Some(backwards)))
+            let forwards = Self::build(&l_pat, &r_pat)?;
+            let backwards = if s.contains("<=>") {
+                // A bidirectional rule whose backward direction cannot be
+                // built is malformed; report it rather than silently
+                // keeping only the forward direction.
+                Some(Self::build(&r_pat, &l_pat)?)
             } else {
-                Ok((forwards, None))
-            }
+                None
+            };
+            Ok((forwards, backwards))
         } else {
-            Err(format!("Failed to parse {}", s))
+            Err(format!("Failed to parse '{s}': missing '=>'"))
         }
     }
 }
@@ -100,17 +91,25 @@ impl<L: SynthLanguage> Applier<L, SynthAnalysis> for Rhs<L> {
 }
 
 impl<L: SynthLanguage> Rule<L> {
-    pub fn new(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Option<Self> {
-        let name = format!("{} ==> {}", l_pat, r_pat);
+    /// Construct a rule from a pair of patterns, or explain why the
+    /// rewrite cannot be built (e.g. the rhs has variables unbound on
+    /// the lhs).
+    fn build(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Result<Self, String> {
+        let name = format!("{l_pat} ==> {r_pat}");
         let rhs = Rhs { rhs: r_pat.clone() };
-        let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs).ok();
+        let rewrite = Rewrite::new(name.clone(), l_pat.clone(), rhs)
+            .map_err(|e| format!("Failed to build rewrite '{name}': {e}"))?;
 
-        rewrite.map(|rw| Rule {
+        Ok(Rule {
             name: name.into(),
             lhs: l_pat.clone(),
             rhs: r_pat.clone(),
-            rewrite: rw,
+            rewrite,
         })
+    }
+
+    pub fn new(l_pat: &Pattern<L>, r_pat: &Pattern<L>) -> Option<Self> {
+        Self::build(l_pat, r_pat).ok()
     }
 
     /// A rule is saturating if applying it is guaranteed not to add any
@@ -187,5 +186,17 @@ mod test {
         assert!(backwards.is_some());
         assert_eq!(backwards.unwrap().name.to_string(), "(* c d) ==> (* a b)");
         assert_eq!(forwards.name.to_string(), "(* a b) ==> (* c d)");
+    }
+
+    #[test]
+    fn parse_errors() {
+        // Missing arrow
+        assert!(Rule::<egg::SymbolLang>::from_string("(* a b) (* c d)").is_err());
+        // Malformed lhs (unbalanced parens)
+        assert!(Rule::<egg::SymbolLang>::from_string("(* a b ==> (* c d)").is_err());
+        // Rhs has a variable unbound on the lhs
+        assert!(Rule::<egg::SymbolLang>::from_string("?x ==> (* ?x ?y)").is_err());
+        // Bidirectional rule whose backward direction is unbuildable
+        assert!(Rule::<egg::SymbolLang>::from_string("(* ?x ?y) <=> ?x").is_err());
     }
 }
