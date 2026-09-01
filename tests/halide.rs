@@ -473,7 +473,8 @@ mod test {
 
         for (stem, prior_rules) in &priors {
             // Minimize the candidates against this prior (minimize
-            // validates via z3 as it selects)
+            // validates via z3 as it selects, so `invalid` counts the
+            // rules it flagged along the way)
             let name = format!("{stem}-1");
             let mut candidates_copy = candidates.clone();
             let start = Instant::now();
@@ -481,9 +482,10 @@ mod test {
                 .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
             let min_time = start.elapsed();
             log.line(&format!(
-                "{name}: {} selected ({} invalid) | {min_time:.1?}",
+                "{name}: {} selected ({} invalid) of {} candidates | {min_time:.1?}",
                 sound.len(),
-                invalid.len()
+                invalid.len(),
+                candidates.len()
             ));
             sound.to_file(&format!("{dir}/{name}.rules"));
             log.record_synthesized(&name, sound.len(), query_time + min_time);
@@ -519,9 +521,9 @@ mod test {
             let start = Instant::now();
             let mut reprompted: Ruleset<Pred> = Ruleset::from_llm(&reprompt, &log, &name2).await;
             let reprompt_time = start.elapsed();
+            let n_reprompted = reprompted.len();
             log.line(&format!(
-                "{name2}: {} candidates (reprompted) | {reprompt_time:.1?}",
-                reprompted.len()
+                "{name2}: {n_reprompted} candidates (reprompted) | {reprompt_time:.1?}"
             ));
             reprompted.to_file(&format!("{dir}/{name2}-candidates.rules"));
 
@@ -534,7 +536,7 @@ mod test {
             );
             let min2_time = start.elapsed();
             log.line(&format!(
-                "{name2}: {} selected ({} invalid) | {min2_time:.1?}",
+                "{name2}: {} selected ({} invalid) of {n_reprompted} candidates | {min2_time:.1?}",
                 sound2.len(),
                 invalid2.len()
             ));
