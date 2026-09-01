@@ -31,6 +31,15 @@ fi
 if [ -n "$(git status --porcelain)" ]; then
     echo "warning: working tree is already dirty; provenance headers will say -dirty." >&2
 fi
+# complex.rules is a hand-curated input the clean step must preserve and
+# nothing regenerates. Refuse to start (before deleting anything) if it is
+# missing, rather than wiping the other results and failing mid-run.
+if [ ! -f jfp/cs1/trig/complex.rules ]; then
+    echo "error: jfp/cs1/trig/complex.rules is missing." >&2
+    echo "It is a required input, not a generated file; restore it from git" >&2
+    echo "(git checkout -- jfp/cs1/trig/complex.rules) before replicating." >&2
+    exit 1
+fi
 
 # Compile everything up front so build time isn't attributed to a stage.
 cargo test --no-run
