@@ -136,6 +136,12 @@ mod test {
         let rules = make_rules();
         log.record_synthesized("ENUMO", rules.len(), start.elapsed());
         rules.to_file("jfp/baseline/exp/enumo_exp.rules");
+
+        // The ENUMO row's expert-baseline cell in the case-study table;
+        // union with RAT so the deriving side matches the row's other
+        // cells in case_study1.
+        let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
+        log.derivability(&rules.union(&rational_rules()), "ENUMO", &herbie, "HERBIE");
         log.finish();
     }
 

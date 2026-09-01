@@ -531,6 +531,13 @@ mod test {
         let rules = trig_rules();
         log.record_synthesized("ENUMO", rules.len(), start.elapsed());
         rules.to_file("jfp/baseline/trig/enumo_trig.rules");
+
+        // The ENUMO row's expert-baseline cell in the case-study table;
+        // union with the arithmetic rules so the deriving side matches
+        // the row's other cells in case_study1.
+        let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
+        let complex: Ruleset<Trig> = Ruleset::from_file("jfp/cs1/trig/complex.rules");
+        log.derivability(&rules.union(&complex), "ENUMO", &herbie, "HERBIE");
         log.finish();
     }
 
