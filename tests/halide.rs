@@ -414,7 +414,7 @@ mod test {
         }
 
         let dir = "jfp/cs1/halide";
-        let log = logger::RunLog::start(dir, "case_study1");
+        let mut log = logger::RunLog::start(dir, "case_study1");
         let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
 
         let prompt = "
@@ -452,49 +452,47 @@ mod test {
         ";
         let start = Instant::now();
         let candidates: Ruleset<Pred> = Ruleset::from_llm(prompt, &log, "LLM-1").await;
+        let query_time = start.elapsed();
         log.line(&format!(
-            "LLM-1: {} candidates | {:.1?}",
-            candidates.len(),
-            start.elapsed()
+            "LLM-1: {} candidates | {query_time:.1?}",
+            candidates.len()
         ));
         candidates.to_file(&format!("{dir}/LLM-1-candidates.rules"));
 
+        let a5_baseline: Ruleset<Pred> =
+            Ruleset::from_file("jfp/baseline/halide/atoms5_halide.rules");
+        let enumo_baseline: Ruleset<Pred> =
+            Ruleset::from_file("jfp/baseline/halide/enumo_halide.rules");
+        // Ruleset name stems match the paper's table names: the plain
+        // "LLM" rulesets are the ones minimized with no prior rules.
         let priors = [
-            ("None", Ruleset::default()),
-            (
-                "A5",
-                Ruleset::from_file("jfp/baseline/halide/atoms5_halide.rules"),
-            ),
-            (
-                "Enumo",
-                Ruleset::from_file("jfp/baseline/halide/enumo_halide.rules"),
-            ),
+            ("LLM", Ruleset::default()),
+            ("LLM-A5", a5_baseline.clone()),
+            ("LLM-ENUMO", enumo_baseline.clone()),
         ];
 
-        for (prior_name, prior_rules) in &priors {
+        for (stem, prior_rules) in &priors {
             // Minimize the candidates against this prior (minimize
             // validates via z3 as it selects)
-            let name = format!("LLM-{prior_name}-1");
+            let name = format!("{stem}-1");
             let mut candidates_copy = candidates.clone();
             let start = Instant::now();
             let (sound, invalid) = candidates_copy
                 .minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+            let min_time = start.elapsed();
             log.line(&format!(
-                "{name}: {} selected ({} invalid) | {:.1?}",
+                "{name}: {} selected ({} invalid) | {min_time:.1?}",
                 sound.len(),
-                invalid.len(),
-                start.elapsed()
+                invalid.len()
             ));
             sound.to_file(&format!("{dir}/{name}.rules"));
+            log.record_synthesized(&name, sound.len(), query_time + min_time);
 
-            log.derivability(&sound.union(prior_rules), &name, &halide_baseline, "Halide");
-            for (p_name, p_rules) in &priors {
-                if p_rules.is_empty() {
-                    continue;
-                }
-                log.derivability(&sound.union(prior_rules), &name, p_rules, p_name);
-                log.derivability(p_rules, p_name, &sound, &name);
-            }
+            log.derivability(&sound.union(prior_rules), &name, &halide_baseline, "HALIDE");
+            log.derivability(&sound.union(prior_rules), &name, &a5_baseline, "A5");
+            log.derivability(&sound.union(prior_rules), &name, &enumo_baseline, "ENUMO");
+            log.derivability(&a5_baseline, "A5", &sound, &name);
+            log.derivability(&enumo_baseline, "ENUMO", &sound, &name);
 
             // Reprompt for rules missing from what we kept
             let reprompt = format!("
@@ -517,13 +515,13 @@ mod test {
             Print only the rules, one rule per line.
             Plain text only - no markdown, no code fences, no numbering, no extra commentary.
             ", sound.to_str_vec().join("\n"), prior_rules.to_str_vec().join("\n"));
-            let name2 = format!("LLM-{prior_name}-2");
+            let name2 = format!("{stem}-2");
             let start = Instant::now();
             let mut reprompted: Ruleset<Pred> = Ruleset::from_llm(&reprompt, &log, &name2).await;
+            let reprompt_time = start.elapsed();
             log.line(&format!(
-                "{name2}: {} candidates (reprompted) | {:.1?}",
-                reprompted.len(),
-                start.elapsed()
+                "{name2}: {} candidates (reprompted) | {reprompt_time:.1?}",
+                reprompted.len()
             ));
             reprompted.to_file(&format!("{dir}/{name2}-candidates.rules"));
 
@@ -534,32 +532,21 @@ mod test {
                 sound.union(prior_rules),
                 Scheduler::Compress(Limits::minimize()),
             );
+            let min2_time = start.elapsed();
             log.line(&format!(
-                "{name2}: {} selected ({} invalid) | {:.1?}",
+                "{name2}: {} selected ({} invalid) | {min2_time:.1?}",
                 sound2.len(),
-                invalid2.len(),
-                start.elapsed()
+                invalid2.len()
             ));
             sound2.to_file(&format!("{dir}/{name2}.rules"));
+            log.record_synthesized(&name2, sound2.len(), reprompt_time + min2_time);
 
-            log.derivability(
-                &sound2.union(&sound).union(prior_rules),
-                &name2,
-                &halide_baseline,
-                "Halide",
-            );
-            for (p_name, p_rules) in &priors {
-                if p_rules.is_empty() {
-                    continue;
-                }
-                log.derivability(
-                    &sound2.union(&sound).union(prior_rules),
-                    &name2,
-                    p_rules,
-                    p_name,
-                );
-                log.derivability(p_rules, p_name, &sound2.union(&sound), &name2);
-            }
+            let all2 = sound2.union(&sound).union(prior_rules);
+            log.derivability(&all2, &name2, &halide_baseline, "HALIDE");
+            log.derivability(&all2, &name2, &a5_baseline, "A5");
+            log.derivability(&all2, &name2, &enumo_baseline, "ENUMO");
+            log.derivability(&a5_baseline, "A5", &sound2.union(&sound), &name2);
+            log.derivability(&enumo_baseline, "ENUMO", &sound2.union(&sound), &name2);
         }
 
         log.finish();
@@ -580,8 +567,8 @@ mod test {
         for f in [
             "jfp/baseline/halide/atoms5_halide.rules",
             "jfp/baseline/halide/enumo_halide.rules",
-            "jfp/cs1/halide/LLM-None-1.rules",
-            "jfp/cs1/halide/LLM-None-2.rules",
+            "jfp/cs1/halide/LLM-1.rules",
+            "jfp/cs1/halide/LLM-2.rules",
         ] {
             assert!(
                 std::path::Path::new(f).exists(),
@@ -591,14 +578,14 @@ mod test {
         }
 
         let dir = "jfp/cs2/halide";
-        let log = logger::RunLog::start(dir, "case_study2");
+        let mut log = logger::RunLog::start(dir, "case_study2");
         let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
         let a5_baseline: Ruleset<Pred> =
             Ruleset::from_file("jfp/baseline/halide/atoms5_halide.rules");
         let enumo_baseline: Ruleset<Pred> =
             Ruleset::from_file("jfp/baseline/halide/enumo_halide.rules");
-        let llm2: Ruleset<Pred> = Ruleset::from_file("jfp/cs1/halide/LLM-None-1.rules")
-            .union(&Ruleset::from_file("jfp/cs1/halide/LLM-None-2.rules"));
+        let llm2: Ruleset<Pred> = Ruleset::from_file("jfp/cs1/halide/LLM-1.rules")
+            .union(&Ruleset::from_file("jfp/cs1/halide/LLM-2.rules"));
 
         let prompt = "
         You are generating a workload of terms from which rewrite rules will be inferred.
@@ -634,33 +621,28 @@ mod test {
         let wkld = Workload::from_llm(prompt, &log, "llm-wkld")
             .await
             .as_lang_with_vars::<Pred>(vec!["w".into(), "x".into(), "y".into(), "z".into()]);
-        log.line(&format!(
-            "LLM workload: {} terms | {:.1?}",
-            wkld.force().len(),
-            start.elapsed()
-        ));
+        log.record_synthesized("llm-wkld", wkld.force().len(), start.elapsed());
         wkld.to_file(&format!("{dir}/llm-wkld.terms"));
 
+        // Ruleset names match the paper's table names: LLM-W-<prior>.
         let priors = [
-            ("None", Ruleset::default()),
-            ("A5", a5_baseline.clone()),
-            ("Enumo", enumo_baseline.clone()),
-            ("LLM-2", llm2),
+            ("LLM-W", Ruleset::default()),
+            ("LLM-W-A5", a5_baseline.clone()),
+            ("LLM-W-ENUMO", enumo_baseline.clone()),
+            ("LLM-W-LLM-2", llm2),
         ];
 
-        for (prior_name, prior_rules) in &priors {
-            let name = format!("w-{prior_name}");
-
+        for (name, prior_rules) in &priors {
             // Workload -> e-graph, compressed by the prior rules
             let start = Instant::now();
             let egraph = wkld.to_egraph::<Pred>();
             let compressed = Scheduler::Compress(Limits::synthesis()).run(&egraph, prior_rules);
             let mut candidates = Ruleset::cvec_match(&compressed);
+            let t1 = start.elapsed();
             log.line(&format!(
-                "{name}: {} eclasses, {} candidates | {:.1?}",
+                "{name}: {} eclasses, {} candidates | {t1:.1?}",
                 compressed.number_of_classes(),
-                candidates.len(),
-                start.elapsed()
+                candidates.len()
             ));
 
             // Minimize the candidates against the prior (minimize
@@ -668,21 +650,22 @@ mod test {
             let start = Instant::now();
             let (rules, invalid) =
                 candidates.minimize(prior_rules.clone(), Scheduler::Compress(Limits::minimize()));
+            let t2 = start.elapsed();
             log.line(&format!(
-                "{name}: {} selected ({} invalid) | {:.1?}",
+                "{name}: {} selected ({} invalid) | {t2:.1?}",
                 rules.len(),
-                invalid.len(),
-                start.elapsed()
+                invalid.len()
             ));
             rules.to_file(&format!("{dir}/{name}.rules"));
+            log.record_synthesized(name, rules.len(), t1 + t2);
 
             // Derivability of the baselines from the synthesized rules.
             // Halide never appears as the deriving side: its TRS is not
             // designed for eqsat.
             let all_rules = rules.union(prior_rules);
-            log.derivability(&all_rules, &name, &halide_baseline, "Halide");
-            log.derivability(&all_rules, &name, &a5_baseline, "A5");
-            log.derivability(&all_rules, &name, &enumo_baseline, "Enumo");
+            log.derivability(&all_rules, name, &halide_baseline, "HALIDE");
+            log.derivability(&all_rules, name, &a5_baseline, "A5");
+            log.derivability(&all_rules, name, &enumo_baseline, "ENUMO");
         }
 
         log.finish();
@@ -694,7 +677,7 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
-        let log = logger::RunLog::start("jfp/baseline/halide", "establish_baseline");
+        let mut log = logger::RunLog::start("jfp/baseline/halide", "establish_baseline");
 
         let halide_baseline: Ruleset<Pred> = Ruleset::from_file("baseline/halide.rules");
 
@@ -716,30 +699,22 @@ mod test {
             ),
             Ruleset::default(),
         );
-        log.line(&format!(
-            "ATOMS5 HALIDE | {} rules | {:.1?}",
-            a5.len(),
-            start.elapsed()
-        ));
+        log.record_synthesized("A5", a5.len(), start.elapsed());
         a5.to_file("jfp/baseline/halide/atoms5_halide.rules");
 
         // Enumo: rules from the halide recipe
         let start = Instant::now();
         let enumo: Ruleset<Pred> = halide_rules();
-        log.line(&format!(
-            "ENUMO HALIDE | {} rules | {:.1?}",
-            enumo.len(),
-            start.elapsed()
-        ));
+        log.record_synthesized("ENUMO", enumo.len(), start.elapsed());
         enumo.to_file("jfp/baseline/halide/enumo_halide.rules");
 
         // Baseline-vs-baseline derivability (skipping Halide).
-        log.derivability(&a5, "A5", &halide_baseline, "Halide");
+        log.derivability(&a5, "A5", &halide_baseline, "HALIDE");
         log.derivability(&a5, "A5", &a5, "A5");
-        log.derivability(&a5, "A5", &enumo, "Enumo");
-        log.derivability(&enumo, "Enumo", &halide_baseline, "Halide");
-        log.derivability(&enumo, "Enumo", &a5, "A5");
-        log.derivability(&enumo, "Enumo", &enumo, "Enumo");
+        log.derivability(&a5, "A5", &enumo, "ENUMO");
+        log.derivability(&enumo, "ENUMO", &halide_baseline, "HALIDE");
+        log.derivability(&enumo, "ENUMO", &a5, "A5");
+        log.derivability(&enumo, "ENUMO", &enumo, "ENUMO");
         log.finish();
     }
 

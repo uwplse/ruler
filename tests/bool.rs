@@ -222,11 +222,18 @@ mod test {
         let against: Ruleset<Bool> =
             Ruleset::new(&["(& ?x ?y) ==> (& ?y ?x)", "(^ ?x ?y) ==> (^ ?y ?x)"]);
         // out/ is gitignored
-        let log = logger::RunLog::start("out/test-derive", "write_derivability_files");
+        let mut log = logger::RunLog::start("out/test-derive", "write_derivability_files");
         log.derivability(&rules, "A", &against, "B");
         log.raw_prompt("T", "a prompt");
         log.raw_response("T", "org/model", 1, "a response");
+        log.record_synthesized("A", 1, std::time::Duration::from_millis(1500));
         log.finish();
+
+        let results = std::fs::read_to_string("out/test-derive/results.json").unwrap();
+        let r: serde_json::Value = serde_json::from_str(&results).unwrap();
+        assert_eq!(r["name"], "write_derivability_files");
+        assert_eq!(r["synthesized"]["A"]["count"], 1);
+        assert_eq!(r["synthesized"]["A"]["time"], 1.5);
 
         let prompt = std::fs::read_to_string("out/test-derive/raw/T-prompt.txt").unwrap();
         assert_eq!(prompt, "a prompt");

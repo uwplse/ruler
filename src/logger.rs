@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::{count_lines, enumo::Ruleset, DeriveType, Limits, Phase, SynthLanguage};
 
@@ -75,7 +75,11 @@ fn provenance() -> String {
 pub struct RunLog {
     dir: String,
     name: String,
+    provenance: String,
     started: Instant,
+    /// Synthesized artifacts recorded so far (see `record_synthesized`),
+    /// written to `results.json` at `finish`.
+    synthesized: Map<String, Value>,
 }
 
 impl RunLog {
@@ -89,11 +93,13 @@ impl RunLog {
         let run = Self {
             dir: dir.to_string(),
             name: name.to_string(),
+            provenance: provenance(),
             started: Instant::now(),
+            synthesized: Map::new(),
         };
         fs::write(run.log_path(), "")
             .unwrap_or_else(|_| panic!("Failed to truncate '{}'", run.log_path()));
-        run.line(&format!("=== {name} @ {dir} | {} ===", provenance()));
+        run.line(&format!("=== {name} @ {dir} | {} ===", run.provenance));
         run
     }
 
@@ -179,9 +185,34 @@ impl RunLog {
             .unwrap_or_else(|_| panic!("Failed to write '{}'", path));
     }
 
-    /// End the run with a footer line reporting total wall-clock time.
-    /// Consumes the log, so nothing can be written after the footer.
+    /// Record a synthesized artifact (a ruleset or workload):
+    /// its final size and the synthesis time the paper reports for it.
+    /// Callers accumulate the time across the phases the paper counts
+    /// (e.g. LLM queries + validation + minimization). Logged now, and
+    /// written to `results.json` at `finish`.
+    pub fn record_synthesized(&mut self, name: &str, count: usize, time: Duration) {
+        self.line(&format!("{name}: {count} synthesized | total {time:.1?}"));
+        self.synthesized.insert(
+            name.to_string(),
+            json!({"count": count, "time": time.as_secs_f64()}),
+        );
+    }
+
+    /// End the run: write `<dir>/results.json` (provenance plus every
+    /// `synthesized` artifact's size and time — the numbers the paper's
+    /// tables cite that derive.json files don't carry) and a footer
+    /// line reporting total wall-clock time. Consumes the log, so
+    /// nothing can be recorded after it.
     pub fn finish(self) {
+        let v = json!({
+            "name": self.name,
+            "provenance": self.provenance,
+            "total_time": self.started.elapsed().as_secs_f64(),
+            "synthesized": Value::Object(self.synthesized.clone()),
+        });
+        let path = format!("{}/results.json", self.dir);
+        fs::write(&path, serde_json::to_string_pretty(&v).unwrap())
+            .unwrap_or_else(|_| panic!("Failed to write '{}'", path));
         self.line(&format!(
             "=== {} complete | {:.1?} ===",
             self.name,

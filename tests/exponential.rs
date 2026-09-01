@@ -130,15 +130,11 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
-        let log = ruler::logger::RunLog::start("jfp/baseline/exp", "establish_baseline");
+        let mut log = ruler::logger::RunLog::start("jfp/baseline/exp", "establish_baseline");
 
         let start = Instant::now();
         let rules = make_rules();
-        log.line(&format!(
-            "ENUMO EXP | {} rules | {:.1?}",
-            rules.len(),
-            start.elapsed()
-        ));
+        log.record_synthesized("ENUMO", rules.len(), start.elapsed());
         rules.to_file("jfp/baseline/exp/enumo_exp.rules");
         log.finish();
     }
@@ -193,7 +189,7 @@ mod test {
         );
 
         let dir = "jfp/cs1/exp";
-        let log = ruler::logger::RunLog::start(dir, "case_study1");
+        let mut log = ruler::logger::RunLog::start(dir, "case_study1");
         let rational = rational_rules();
         let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
         let enumo_baseline: Ruleset = Ruleset::from_file("jfp/baseline/exp/enumo_exp.rules");
@@ -231,6 +227,7 @@ mod test {
         Print only the rules, one rule per line, in the exact `l ==> r` syntax shown above.
         Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
+        let t_synth = Instant::now();
         let t = Instant::now();
         let candidates = Ruleset::from_llm(prompt, &log, "LLM-1").await;
         log.line(&format!(
@@ -267,15 +264,11 @@ mod test {
             t.elapsed()
         ));
         llm1.to_file(&format!("{dir}/LLM-1.rules"));
+        log.record_synthesized("LLM-1", llm1.len(), t_synth.elapsed());
 
-        log.derivability(
-            &llm1.union(&rational),
-            "LLM-1-RAT",
-            &enumo_baseline,
-            "Enumo",
-        );
-        log.derivability(&llm1.union(&rational), "LLM-1-RAT", &herbie, "Herbie");
-        log.derivability(&enumo_baseline.union(&rational), "Enumo", &llm1, "LLM-1");
+        log.derivability(&llm1.union(&rational), "LLM-1", &enumo_baseline, "ENUMO");
+        log.derivability(&llm1.union(&rational), "LLM-1", &herbie, "HERBIE");
+        log.derivability(&enumo_baseline.union(&rational), "ENUMO", &llm1, "LLM-1");
 
         let reprompt = format!("
         You are generating rewrite rules for an equality saturation system.
@@ -298,6 +291,7 @@ mod test {
         ",
             llm1.to_str_vec().join("\n")
         );
+        let t_synth = Instant::now();
         let t = Instant::now();
         let reprompted = Ruleset::from_llm(&reprompt, &log, "LLM-2").await;
         log.line(&format!(
@@ -336,15 +330,11 @@ mod test {
         ));
         let llm2 = llm1.union(&min2);
         llm2.to_file(&format!("{dir}/LLM-2.rules"));
+        log.record_synthesized("LLM-2", llm2.len(), t_synth.elapsed());
 
-        log.derivability(
-            &llm2.union(&rational),
-            "LLM-2-RAT",
-            &enumo_baseline,
-            "Enumo",
-        );
-        log.derivability(&llm2.union(&rational), "LLM-2-RAT", &herbie, "Herbie");
-        log.derivability(&enumo_baseline.union(&rational), "Enumo", &llm2, "LLM-2");
+        log.derivability(&llm2.union(&rational), "LLM-2", &enumo_baseline, "ENUMO");
+        log.derivability(&llm2.union(&rational), "LLM-2", &herbie, "HERBIE");
+        log.derivability(&enumo_baseline.union(&rational), "ENUMO", &llm2, "LLM-2");
 
         log.finish();
     }
