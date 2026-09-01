@@ -4,7 +4,6 @@
 //! studies load it from a `.env` file, which is gitignored).
 
 use std::env;
-use std::io::Write;
 use std::time::Instant;
 
 use openai_api_rs::v1::{
@@ -45,11 +44,18 @@ pub fn models() -> Vec<String> {
 
 /// Send `prompt` to `model` and return the response as cleaned lines:
 /// anything after a `;` is treated as a comment and stripped, and blank
-/// lines are dropped. The cleaned response is also written to
-/// `llm/out/<model>-q<attempt>-response.txt` for offline inspection, and
-/// the outcome (including errors, which return no lines) is appended to
-/// the query log.
-pub async fn query(prompt: &str, model: &str, attempt: usize) -> Vec<String> {
+/// lines are dropped. The raw (uncleaned) response is recorded in
+/// `<dir>/raw/<name>-<model>-q<attempt>.txt`, where `dir` is the case
+/// study's output directory and `name` distinguishes the queries within
+/// it (e.g. "LLM-1"). The outcome (including errors, which return no
+/// lines) is appended to the query log.
+pub async fn query(
+    prompt: &str,
+    model: &str,
+    attempt: usize,
+    dir: &str,
+    name: &str,
+) -> Vec<String> {
     println!("Querying {model} (query {attempt})");
     let start = Instant::now();
     let api_key = env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY not set");
@@ -84,21 +90,22 @@ pub async fn query(prompt: &str, model: &str, attempt: usize) -> Vec<String> {
                 return vec![];
             };
 
+            let raw_dir = format!("{dir}/raw");
+            std::fs::create_dir_all(&raw_dir)
+                .unwrap_or_else(|_| panic!("Failed to create '{}'", raw_dir));
+            let raw_path = format!(
+                "{raw_dir}/{name}-{}-q{attempt}.txt",
+                model.replace('/', "-")
+            );
+            std::fs::write(&raw_path, &content)
+                .unwrap_or_else(|_| panic!("Failed to write '{}'", raw_path));
+
             let lines: Vec<String> = content
                 .lines()
                 .map(|line| line.split(';').next().unwrap_or("").trim())
                 .filter(|line| !line.is_empty())
                 .map(String::from)
                 .collect();
-
-            std::fs::create_dir_all("llm/out").expect("Failed to create llm/out");
-            let filename = format!(
-                "llm/out/{}-q{attempt}-response.txt",
-                model.replace('/', "-")
-            );
-            let mut file = std::fs::File::create(&filename)
-                .unwrap_or_else(|_| panic!("Failed to create '{}'", filename));
-            writeln!(file, "{}", lines.join("\n")).expect("Unable to write");
 
             crate::logger::log_line(
                 QUERY_LOG,
@@ -143,7 +150,7 @@ mod tests {
         let prompt =
             "What are the standard Boolean Algebra Axioms? Print one axiom per line, plain text.";
         for model in models() {
-            let response = query(prompt, &model, 1).await;
+            let response = query(prompt, &model, 1, "llm/out", "test").await;
             assert!(!response.is_empty(), "empty response from {}", model);
         }
     }

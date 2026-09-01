@@ -70,15 +70,16 @@ impl Workload {
     /// skipped; terms are deduplicated across models, preserving
     /// first-seen order. Note that the terms are *not* checked against any
     /// particular language here — chain with `as_lang`/`as_lang_with_vars`
-    /// for that.
-    pub async fn from_llm(prompt: &str) -> Self {
+    /// for that. Each query's raw response is recorded in `<dir>/raw/`,
+    /// tagged with `name` (see `llm::query`).
+    pub async fn from_llm(prompt: &str, dir: &str, name: &str) -> Self {
         let mut terms: IndexSet<Sexp> = IndexSet::default();
         for model in llm::models() {
             for attempt in 1..=2 {
                 let start = Instant::now();
                 let before = terms.len();
                 let mut invalid = 0;
-                for line in llm::query(prompt, &model, attempt).await {
+                for line in llm::query(prompt, &model, attempt, dir, name).await {
                     match line.parse() {
                         Ok(sexp) => {
                             terms.insert(sexp);

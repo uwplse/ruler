@@ -234,15 +234,17 @@ impl<L: SynthLanguage> Ruleset<L> {
     /// candidates in *both* directions (whenever each direction can be
     /// built); minimization later decides which direction(s) to keep.
     /// Lines that yield no candidate are reported and skipped. Candidates
-    /// are deduplicated across models (by rule name).
-    pub async fn from_llm(prompt: &str) -> Self {
+    /// are deduplicated across models (by rule name). Each query's raw
+    /// response is recorded in `<dir>/raw/`, tagged with `name` (see
+    /// `llm::query`).
+    pub async fn from_llm(prompt: &str, dir: &str, name: &str) -> Self {
         let mut all = Self::default();
         for model in llm::models() {
             for attempt in 1..=2 {
                 let start = Instant::now();
                 let before = all.len();
                 let mut invalid = 0;
-                for line in llm::query(prompt, &model, attempt).await {
+                for line in llm::query(prompt, &model, attempt, dir, name).await {
                     let pats = line
                         .split_once("=>")
                         .map(|(l, r)| (l.parse::<Pattern<L>>(), r.parse::<Pattern<L>>()));

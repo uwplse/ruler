@@ -450,7 +450,7 @@ mod test {
         Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let start = Instant::now();
-        let candidates: Ruleset<Pred> = Ruleset::from_llm(prompt).await;
+        let candidates: Ruleset<Pred> = Ruleset::from_llm(prompt, dir, "LLM-1").await;
         logger::log_line(
             &format!("{dir}/log.txt"),
             &format!(
@@ -525,9 +525,9 @@ mod test {
             Print only the rules, one rule per line.
             Plain text only - no markdown, no code fences, no numbering, no extra commentary.
             ", sound.to_str_vec().join("\n"), prior_rules.to_str_vec().join("\n"));
-            let start = Instant::now();
-            let mut reprompted: Ruleset<Pred> = Ruleset::from_llm(&reprompt).await;
             let name2 = format!("LLM-{prior_name}-2");
+            let start = Instant::now();
+            let mut reprompted: Ruleset<Pred> = Ruleset::from_llm(&reprompt, dir, &name2).await;
             logger::log_line(
                 &format!("{dir}/log.txt"),
                 &format!(
@@ -642,7 +642,7 @@ mod test {
         Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let start = Instant::now();
-        let wkld = Workload::from_llm(prompt)
+        let wkld = Workload::from_llm(prompt, dir, "llm-wkld")
             .await
             .as_lang_with_vars::<Pred>(vec!["w".into(), "x".into(), "y".into(), "z".into()]);
         logger::log_line(

@@ -414,7 +414,7 @@ mod test {
         Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let t = Instant::now();
-        let candidates = Ruleset::from_llm(prompt).await;
+        let candidates = Ruleset::from_llm(prompt, dir, "LLM-1").await;
         ruler::logger::log_line(
             &format!("{dir}/log.txt"),
             &format!(
@@ -476,7 +476,7 @@ mod test {
             llm1.to_str_vec().join("\n")
         );
         let t = Instant::now();
-        let reprompted = Ruleset::from_llm(&reprompt).await;
+        let reprompted = Ruleset::from_llm(&reprompt, dir, "LLM-2").await;
         ruler::logger::log_line(
             &format!("{dir}/log.txt"),
             &format!(
