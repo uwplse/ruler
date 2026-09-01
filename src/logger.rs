@@ -144,11 +144,10 @@ impl RunLog {
         let start = Instant::now();
         let (can, cannot) = rules.derive(DeriveType::LhsAndRhs, against, Limits::deriving());
         let elapsed = start.elapsed();
+        let percent = 100.0 * can.len() as f64 / against.len() as f64;
 
         self.line(&format!(
-            "{rules_name}->{against_name} | {:.1}% ({:.1?})",
-            100.0 * can.len() as f64 / against.len() as f64,
-            elapsed
+            "{rules_name}->{against_name} | {percent:.1}% ({elapsed:.1?})"
         ));
 
         let v = json!({
@@ -156,6 +155,9 @@ impl RunLog {
             "against_name": against_name,
             "num_rules": rules.len(),
             "num_against": against.len(),
+            "num_can": can.len(),
+            "num_cannot": cannot.len(),
+            "percent_derivable": percent,
             "time": elapsed.as_secs_f64(),
             "can": can.to_str_vec(),
             "cannot": cannot.to_str_vec()

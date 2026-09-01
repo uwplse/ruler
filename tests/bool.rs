@@ -230,6 +230,9 @@ mod test {
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(v["num_rules"], 1);
         assert_eq!(v["num_against"], 2);
+        assert_eq!(v["num_can"], 1);
+        assert_eq!(v["num_cannot"], 1);
+        assert_eq!(v["percent_derivable"], 50.0);
         assert_eq!(v["can"].as_array().unwrap().len(), 1);
         assert_eq!(v["cannot"].as_array().unwrap().len(), 1);
     }
