@@ -85,12 +85,12 @@ stage "case_study1: exponential (~10 min)" \
     cargo test --test exponential case_study1 -- --nocapture
 stage "case_study1: trig (~6 min)" \
     cargo test --test trig case_study1 -- --nocapture
-# stage "case_study1: halide (~50 min)" \
-#     cargo test --test halide case_study1 -- --nocapture
+stage "case_study1: halide (~50 min)" \
+    cargo test --test halide case_study1 -- --nocapture
 
 # --- case study 2 (needs case_study1 halide; ~3 h) -----------------------
-# stage "case_study2: halide (~3 h, derivability-dominated)" \
-#     cargo test --test halide case_study2 -- --nocapture
+stage "case_study2: halide (~3 h, derivability-dominated)" \
+    cargo test --test halide case_study2 -- --nocapture
 
 # --- verify every run finished -------------------------------------------
 echo
