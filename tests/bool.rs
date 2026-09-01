@@ -224,7 +224,14 @@ mod test {
         // out/ is gitignored
         let log = logger::RunLog::start("out/test-derive", "write_derivability_files");
         log.derivability(&rules, "A", &against, "B");
+        log.raw_prompt("T", "a prompt");
+        log.raw_response("T", "org/model", 1, "a response");
         log.finish();
+
+        let prompt = std::fs::read_to_string("out/test-derive/raw/T-prompt.txt").unwrap();
+        assert_eq!(prompt, "a prompt");
+        let response = std::fs::read_to_string("out/test-derive/raw/T-org-model-q1.txt").unwrap();
+        assert_eq!(response, "a response");
 
         let json = std::fs::read_to_string("out/test-derive/A-B-derive.json").unwrap();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();

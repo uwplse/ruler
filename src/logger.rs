@@ -116,17 +116,29 @@ impl RunLog {
         println!("{line}");
     }
 
+    fn raw_file(&self, filename: &str, content: &str) {
+        let raw_dir = format!("{}/raw", self.dir);
+        fs::create_dir_all(&raw_dir).unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+        let path = format!("{raw_dir}/{filename}");
+        fs::write(&path, content).unwrap_or_else(|_| panic!("Failed to write '{}'", path));
+    }
+
+    /// Record the exact prompt sent for the run's `name` queries in
+    /// `<dir>/raw/<name>-prompt.txt`. Reprompts embed rules synthesized
+    /// earlier in the same run, so prompt text is run-specific evidence,
+    /// not a constant recoverable from the source.
+    pub fn raw_prompt(&self, name: &str, prompt: &str) {
+        self.raw_file(&format!("{name}-prompt.txt"), prompt);
+    }
+
     /// Record the raw (uncleaned) text of one LLM response in
     /// `<dir>/raw/<name>-<model>-q<attempt>.txt`, where `name`
     /// distinguishes the queries within a run (e.g. "LLM-1").
     pub fn raw_response(&self, name: &str, model: &str, attempt: usize, content: &str) {
-        let raw_dir = format!("{}/raw", self.dir);
-        fs::create_dir_all(&raw_dir).unwrap_or_else(|e| panic!("Error creating dir: {}", e));
-        let path = format!(
-            "{raw_dir}/{name}-{}-q{attempt}.txt",
-            model.replace('/', "-")
+        self.raw_file(
+            &format!("{name}-{}-q{attempt}.txt", model.replace('/', "-")),
+            content,
         );
-        fs::write(&path, content).unwrap_or_else(|_| panic!("Failed to write '{}'", path));
     }
 
     /// Compute LhsAndRhs derivability of `against` from `rules` and

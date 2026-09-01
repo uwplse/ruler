@@ -28,6 +28,7 @@ pub async fn query_each(
     name: &str,
     mut add: impl FnMut(&str) -> Option<usize>,
 ) {
+    log.raw_prompt(name, prompt);
     for model in models() {
         for attempt in 1..=2 {
             let start = Instant::now();
