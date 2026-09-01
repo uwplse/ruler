@@ -6,29 +6,50 @@
 use std::env;
 use std::time::Instant;
 
+use crate::logger::RunLog;
+
 use openai_api_rs::v1::{
     api::OpenAIClient,
     chat_completion::{self, ChatCompletionRequest},
 };
 
-/// Per-query audit log: every query's outcome (line count or error) is
-/// appended here, so a failed model query leaves a durable trace even
-/// when the caller's stdout is lost.
-pub const QUERY_LOG: &str = "llm/out/queries.txt";
-
-/// Append per-query parse statistics (from `from_llm` callers) to the
-/// query log.
-pub fn log_query_stats(
-    model: &str,
-    attempt: usize,
-    new: usize,
-    invalid: usize,
-    elapsed: std::time::Duration,
+/// Prompt every model in `models()` with `prompt` (twice per model),
+/// feeding each cleaned response line to `add`. `add` returns how many
+/// items the line contributed to the caller's collection (0 for a
+/// duplicate), or `None` if the line could not be parsed (such lines
+/// are reported and counted). One stats line per query — response
+/// size, yield, and time — is appended to the run's log, so every
+/// query's outcome leaves a durable trace even when the caller's
+/// stdout is lost; each raw response is recorded under `name` (see
+/// `RunLog::raw_response`).
+pub async fn query_each(
+    prompt: &str,
+    log: &RunLog,
+    name: &str,
+    mut add: impl FnMut(&str) -> Option<usize>,
 ) {
-    crate::logger::log_line(
-        QUERY_LOG,
-        &format!("{model} (query {attempt}) | {new} new ({invalid} invalid lines) | {elapsed:.1?}"),
-    );
+    for model in models() {
+        for attempt in 1..=2 {
+            let start = Instant::now();
+            let lines = query(prompt, &model, attempt, log, name).await;
+            let mut new = 0;
+            let mut invalid = 0;
+            for line in &lines {
+                match add(line) {
+                    Some(n) => new += n,
+                    None => {
+                        invalid += 1;
+                        eprintln!("Skipping invalid line from {model}: {line}");
+                    }
+                }
+            }
+            log.line(&format!(
+                "{model} (query {attempt}) | {} lines | {new} new ({invalid} invalid) | {:.1?}",
+                lines.len(),
+                start.elapsed()
+            ));
+        }
+    }
 }
 
 /// The models to query. Each `Ruleset::from_llm` / `Workload::from_llm`
@@ -44,16 +65,16 @@ pub fn models() -> Vec<String> {
 
 /// Send `prompt` to `model` and return the response as cleaned lines:
 /// anything after a `;` is treated as a comment and stripped, and blank
-/// lines are dropped. The raw (uncleaned) response is recorded in
-/// `<dir>/raw/<name>-<model>-q<attempt>.txt`, where `dir` is the case
-/// study's output directory and `name` distinguishes the queries within
-/// it (e.g. "LLM-1"). The outcome (including errors, which return no
-/// lines) is appended to the query log.
+/// lines are dropped. The raw (uncleaned) response is recorded in the
+/// run's `raw/` directory (see `RunLog::raw_response`), with `name`
+/// distinguishing the queries within the run (e.g. "LLM-1"). Errors
+/// (which return no lines) are appended to the run's log; success
+/// stats are logged by `query_each`.
 pub async fn query(
     prompt: &str,
     model: &str,
     attempt: usize,
-    dir: &str,
+    log: &RunLog,
     name: &str,
 ) -> Vec<String> {
     println!("Querying {model} (query {attempt})");
@@ -80,25 +101,14 @@ pub async fn query(
         Ok(res) => {
             let content = res.choices.first().and_then(|c| c.message.content.clone());
             let Some(content) = content else {
-                crate::logger::log_line(
-                    QUERY_LOG,
-                    &format!(
-                        "{model} (query {attempt}) | ERROR: empty response | {:.1?}",
-                        start.elapsed()
-                    ),
-                );
+                log.line(&format!(
+                    "{model} (query {attempt}) | ERROR: empty response | {:.1?}",
+                    start.elapsed()
+                ));
                 return vec![];
             };
 
-            let raw_dir = format!("{dir}/raw");
-            std::fs::create_dir_all(&raw_dir)
-                .unwrap_or_else(|_| panic!("Failed to create '{}'", raw_dir));
-            let raw_path = format!(
-                "{raw_dir}/{name}-{}-q{attempt}.txt",
-                model.replace('/', "-")
-            );
-            std::fs::write(&raw_path, &content)
-                .unwrap_or_else(|_| panic!("Failed to write '{}'", raw_path));
+            log.raw_response(name, model, attempt, &content);
 
             let lines: Vec<String> = content
                 .lines()
@@ -107,24 +117,13 @@ pub async fn query(
                 .map(String::from)
                 .collect();
 
-            crate::logger::log_line(
-                QUERY_LOG,
-                &format!(
-                    "{model} (query {attempt}) | {} lines | {:.1?}",
-                    lines.len(),
-                    start.elapsed()
-                ),
-            );
             lines
         }
         Err(e) => {
-            crate::logger::log_line(
-                QUERY_LOG,
-                &format!(
-                    "{model} (query {attempt}) | ERROR: {e:?} | {:.1?}",
-                    start.elapsed()
-                ),
-            );
+            log.line(&format!(
+                "{model} (query {attempt}) | ERROR: {e:?} | {:.1?}",
+                start.elapsed()
+            ));
             vec![]
         }
     }
@@ -149,9 +148,11 @@ mod tests {
 
         let prompt =
             "What are the standard Boolean Algebra Axioms? Print one axiom per line, plain text.";
+        let log = RunLog::start("llm/out", "test_query");
         for model in models() {
-            let response = query(prompt, &model, 1, "llm/out", "test").await;
+            let response = query(prompt, &model, 1, &log, "test").await;
             assert!(!response.is_empty(), "empty response from {}", model);
         }
+        log.finish();
     }
 }

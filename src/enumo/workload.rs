@@ -2,7 +2,7 @@ use egg::{EGraph, ENodeOrVar, RecExpr};
 
 use super::*;
 use crate::{llm, IndexSet, SynthAnalysis, SynthLanguage};
-use std::{io::Write, time::Instant};
+use std::io::Write;
 
 /// Workloads are sets of terms from a domain
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -70,39 +70,16 @@ impl Workload {
     /// skipped; terms are deduplicated across models, preserving
     /// first-seen order. Note that the terms are *not* checked against any
     /// particular language here — chain with `as_lang`/`as_lang_with_vars`
-    /// for that. Each query's raw response is recorded in `<dir>/raw/`,
-    /// tagged with `name` (see `llm::query`).
-    pub async fn from_llm(prompt: &str, dir: &str, name: &str) -> Self {
+    /// for that. Each query's raw response is recorded in the run's
+    /// `raw/` directory, tagged with `name` (see `RunLog::raw_response`).
+    pub async fn from_llm(prompt: &str, log: &crate::logger::RunLog, name: &str) -> Self {
         let mut terms: IndexSet<Sexp> = IndexSet::default();
-        for model in llm::models() {
-            for attempt in 1..=2 {
-                let start = Instant::now();
-                let before = terms.len();
-                let mut invalid = 0;
-                for line in llm::query(prompt, &model, attempt, dir, name).await {
-                    match line.parse() {
-                        Ok(sexp) => {
-                            terms.insert(sexp);
-                        }
-                        Err(e) => {
-                            invalid += 1;
-                            eprintln!("Skipping invalid term from {model}: {e}");
-                        }
-                    }
-                }
-                llm::log_query_stats(
-                    &model,
-                    attempt,
-                    terms.len() - before,
-                    invalid,
-                    start.elapsed(),
-                );
-            }
-        }
-        crate::logger::log_line(
-            llm::QUERY_LOG,
-            &format!("Combined LLM workload: {} terms", terms.len()),
-        );
+        llm::query_each(prompt, log, name, |line| match line.parse::<Sexp>() {
+            Ok(sexp) => Some(terms.insert(sexp) as usize),
+            Err(_) => None,
+        })
+        .await;
+        log.line(&format!("Combined LLM workload: {} terms", terms.len()));
         Workload::Set(terms.into_iter().collect())
     }
 

@@ -38,5 +38,3 @@ out/
 !scripts/oopsla21/ablation/submitted-plots/**/*.json
 # JFP case-study
 !jfp/**/*.txt
-!llm/out/
-!llm/out/queries.txt

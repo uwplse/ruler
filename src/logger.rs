@@ -38,59 +38,142 @@ fn add_json_to_file(json: Value) {
         .expect("Unable to write to json file");
 }
 
-/// Append a line to a log file (creating parent directories as needed),
-/// echoing it to stdout so long runs are observable with --nocapture.
-pub fn log_line(path: &str, line: &str) {
-    use std::io::Write;
-    if let Some(parent) = std::path::Path::new(path).parent() {
-        fs::create_dir_all(parent).unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+/// Stdout of `cmd args...`, trimmed; None if the command fails to run
+/// or exits nonzero.
+fn command_stdout(cmd: &str, args: &[&str]) -> Option<String> {
+    let out = std::process::Command::new(cmd).args(args).output().ok()?;
+    if !out.status.success() {
+        return None;
     }
-    let mut file = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(path)
-        .unwrap_or_else(|_| panic!("Failed to open '{}'", path));
-    writeln!(file, "{line}").expect("Unable to write");
-    println!("{line}");
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// Compute LhsAndRhs derivability of `against` from `rules` and record it
-/// under `dir`: a summary line is appended to `<dir>/log.txt`, and the
-/// full result is written to `<dir>/<rules_name>-<against_name>-derive.json`
-/// (truncating any previous run's file, so the json stays valid across
-/// re-runs).
-pub fn write_derivability<L: SynthLanguage>(
-    dir: &str,
-    rules: &Ruleset<L>,
-    rules_name: &str,
-    against: &Ruleset<L>,
-    against_name: &str,
-) {
-    let start = Instant::now();
-    let (can, cannot) = rules.derive(DeriveType::LhsAndRhs, against, Limits::deriving());
-    let elapsed = start.elapsed();
+/// Provenance half of a run header: wall-clock date and git commit
+/// (`-dirty` when the tree has uncommitted changes). Both degrade to
+/// "unknown" rather than failing a run.
+fn provenance() -> String {
+    let date = command_stdout("date", &["+%Y-%m-%d %H:%M:%S %Z"])
+        .unwrap_or_else(|| "unknown date".to_string());
+    let sha = command_stdout("git", &["rev-parse", "--short", "HEAD"])
+        .unwrap_or_else(|| "unknown".to_string());
+    let dirty = match command_stdout("git", &["status", "--porcelain"]) {
+        Some(s) if !s.is_empty() => "-dirty",
+        _ => "",
+    };
+    format!("{date} | git {sha}{dirty}")
+}
 
-    log_line(
-        &format!("{dir}/log.txt"),
-        &format!(
+/// The evidence log for one run of a case study or baseline: log lines
+/// (including per-query LLM stats), derivability results, and raw LLM
+/// responses all land in the run's directory, and only a `RunLog` can
+/// write them. Constructing one truncates the previous run's log and
+/// writes a provenance header (so every log says when and from what
+/// code it was produced), and `finish` writes a footer (so a log
+/// without one is visibly from an interrupted run). Each run directory
+/// must have exactly one writing test; that is what makes truncation
+/// safe.
+pub struct RunLog {
+    dir: String,
+    name: String,
+    started: Instant,
+}
+
+impl RunLog {
+    /// Start a fresh run: truncate `<dir>/log.txt` and stamp it with a
+    /// provenance header (date and git commit), so the log always
+    /// describes exactly the run that produced the other artifacts in
+    /// `dir` (which re-runs overwrite). Construct only after a test's
+    /// skip guards and asserts, so a skipped run doesn't wipe the log.
+    pub fn start(dir: &str, name: &str) -> Self {
+        fs::create_dir_all(dir).unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+        let run = Self {
+            dir: dir.to_string(),
+            name: name.to_string(),
+            started: Instant::now(),
+        };
+        fs::write(run.log_path(), "")
+            .unwrap_or_else(|_| panic!("Failed to truncate '{}'", run.log_path()));
+        run.line(&format!("=== {name} @ {dir} | {} ===", provenance()));
+        run
+    }
+
+    fn log_path(&self) -> String {
+        format!("{}/log.txt", self.dir)
+    }
+
+    /// Append a line to this run's log, echoing it to stdout so long
+    /// runs are observable with --nocapture. (`start` already created
+    /// the run directory.)
+    pub fn line(&self, line: &str) {
+        use std::io::Write;
+        let path = self.log_path();
+        let mut file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&path)
+            .unwrap_or_else(|_| panic!("Failed to open '{}'", path));
+        writeln!(file, "{line}").expect("Unable to write");
+        println!("{line}");
+    }
+
+    /// Record the raw (uncleaned) text of one LLM response in
+    /// `<dir>/raw/<name>-<model>-q<attempt>.txt`, where `name`
+    /// distinguishes the queries within a run (e.g. "LLM-1").
+    pub fn raw_response(&self, name: &str, model: &str, attempt: usize, content: &str) {
+        let raw_dir = format!("{}/raw", self.dir);
+        fs::create_dir_all(&raw_dir).unwrap_or_else(|e| panic!("Error creating dir: {}", e));
+        let path = format!(
+            "{raw_dir}/{name}-{}-q{attempt}.txt",
+            model.replace('/', "-")
+        );
+        fs::write(&path, content).unwrap_or_else(|_| panic!("Failed to write '{}'", path));
+    }
+
+    /// Compute LhsAndRhs derivability of `against` from `rules` and
+    /// record it: a summary line is appended to the run's log, and the
+    /// full result is written to
+    /// `<dir>/<rules_name>-<against_name>-derive.json` (truncating any
+    /// previous run's file, so the json stays valid across re-runs).
+    pub fn derivability<L: SynthLanguage>(
+        &self,
+        rules: &Ruleset<L>,
+        rules_name: &str,
+        against: &Ruleset<L>,
+        against_name: &str,
+    ) {
+        let start = Instant::now();
+        let (can, cannot) = rules.derive(DeriveType::LhsAndRhs, against, Limits::deriving());
+        let elapsed = start.elapsed();
+
+        self.line(&format!(
             "{rules_name}->{against_name} | {:.1}% ({:.1?})",
             100.0 * can.len() as f64 / against.len() as f64,
             elapsed
-        ),
-    );
+        ));
 
-    let v = json!({
-        "rules_name": rules_name,
-        "against_name": against_name,
-        "num_rules": rules.len(),
-        "num_against": against.len(),
-        "time": elapsed.as_secs_f64(),
-        "can": can.to_str_vec(),
-        "cannot": cannot.to_str_vec()
-    });
-    let path = format!("{dir}/{rules_name}-{against_name}-derive.json");
-    fs::write(&path, serde_json::to_string_pretty(&v).unwrap())
-        .unwrap_or_else(|_| panic!("Failed to write '{}'", path));
+        let v = json!({
+            "rules_name": rules_name,
+            "against_name": against_name,
+            "num_rules": rules.len(),
+            "num_against": against.len(),
+            "time": elapsed.as_secs_f64(),
+            "can": can.to_str_vec(),
+            "cannot": cannot.to_str_vec()
+        });
+        let path = format!("{}/{rules_name}-{against_name}-derive.json", self.dir);
+        fs::write(&path, serde_json::to_string_pretty(&v).unwrap())
+            .unwrap_or_else(|_| panic!("Failed to write '{}'", path));
+    }
+
+    /// End the run with a footer line reporting total wall-clock time.
+    /// Consumes the log, so nothing can be written after the footer.
+    pub fn finish(self) {
+        self.line(&format!(
+            "=== {} complete | {:.1?} ===",
+            self.name,
+            self.started.elapsed()
+        ));
+    }
 }
 
 /// Whether to skip computing "a derives b" when writing baseline rows.

@@ -130,18 +130,17 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
+        let log = ruler::logger::RunLog::start("jfp/baseline/exp", "establish_baseline");
 
         let start = Instant::now();
         let rules = make_rules();
-        ruler::logger::log_line(
-            "jfp/baseline/log.txt",
-            &format!(
-                "ENUMO EXP | {} rules | {:.1?}",
-                rules.len(),
-                start.elapsed()
-            ),
-        );
-        rules.to_file("jfp/baseline/enumo_exp.rules");
+        log.line(&format!(
+            "ENUMO EXP | {} rules | {:.1?}",
+            rules.len(),
+            start.elapsed()
+        ));
+        rules.to_file("jfp/baseline/exp/enumo_exp.rules");
+        log.finish();
     }
 
     #[test]
@@ -189,14 +188,15 @@ mod test {
             return;
         }
         assert!(
-            std::path::Path::new("jfp/baseline/enumo_exp.rules").exists(),
-            "missing jfp/baseline/enumo_exp.rules: run establish_baseline first"
+            std::path::Path::new("jfp/baseline/exp/enumo_exp.rules").exists(),
+            "missing jfp/baseline/exp/enumo_exp.rules: run establish_baseline first"
         );
 
         let dir = "jfp/cs1/exp";
+        let log = ruler::logger::RunLog::start(dir, "case_study1");
         let rational = rational_rules();
         let herbie: Ruleset = Ruleset::from_file("baseline/herbie-exp.rules");
-        let enumo_baseline: Ruleset = Ruleset::from_file("jfp/baseline/enumo_exp.rules");
+        let enumo_baseline: Ruleset = Ruleset::from_file("jfp/baseline/exp/enumo_exp.rules");
         let start = start_rules();
 
         let prompt = "
@@ -232,15 +232,12 @@ mod test {
         Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let t = Instant::now();
-        let candidates = Ruleset::from_llm(prompt, dir, "LLM-1").await;
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-1: {} candidates | {:.1?}",
-                candidates.len(),
-                t.elapsed()
-            ),
-        );
+        let candidates = Ruleset::from_llm(prompt, &log, "LLM-1").await;
+        log.line(&format!(
+            "LLM-1: {} candidates | {:.1?}",
+            candidates.len(),
+            t.elapsed()
+        ));
         candidates.to_file(&format!("{dir}/LLM-1-candidates.rules"));
 
         // Validate the candidates by derivation from the start rules
@@ -249,16 +246,13 @@ mod test {
             &candidates,
             enumo::Scheduler::Saturating(Limits::deriving()),
         );
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-1: {} sound / {} unverified of {} candidates | {:.1?}",
-                sound.len(),
-                unverified.len(),
-                candidates.len(),
-                t.elapsed()
-            ),
-        );
+        log.line(&format!(
+            "LLM-1: {} sound / {} unverified of {} candidates | {:.1?}",
+            sound.len(),
+            unverified.len(),
+            candidates.len(),
+            t.elapsed()
+        ));
         sound.to_file(&format!("{dir}/LLM-1-sound.rules"));
 
         // Minimize the sound rules against the rational rules
@@ -267,33 +261,21 @@ mod test {
             rational.clone(),
             enumo::Scheduler::Compress(Limits::minimize()),
         );
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!("LLM-1: {} minimized | {:.1?}", llm1.len(), t.elapsed()),
-        );
+        log.line(&format!(
+            "LLM-1: {} minimized | {:.1?}",
+            llm1.len(),
+            t.elapsed()
+        ));
         llm1.to_file(&format!("{dir}/LLM-1.rules"));
 
-        ruler::logger::write_derivability(
-            dir,
+        log.derivability(
             &llm1.union(&rational),
             "LLM-1-RAT",
             &enumo_baseline,
             "Enumo",
         );
-        ruler::logger::write_derivability(
-            dir,
-            &llm1.union(&rational),
-            "LLM-1-RAT",
-            &herbie,
-            "Herbie",
-        );
-        ruler::logger::write_derivability(
-            dir,
-            &enumo_baseline.union(&rational),
-            "Enumo",
-            &llm1,
-            "LLM-1",
-        );
+        log.derivability(&llm1.union(&rational), "LLM-1-RAT", &herbie, "Herbie");
+        log.derivability(&enumo_baseline.union(&rational), "Enumo", &llm1, "LLM-1");
 
         let reprompt = format!("
         You are generating rewrite rules for an equality saturation system.
@@ -317,15 +299,12 @@ mod test {
             llm1.to_str_vec().join("\n")
         );
         let t = Instant::now();
-        let reprompted = Ruleset::from_llm(&reprompt, dir, "LLM-2").await;
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-2: {} candidates (reprompted) | {:.1?}",
-                reprompted.len(),
-                t.elapsed()
-            ),
-        );
+        let reprompted = Ruleset::from_llm(&reprompt, &log, "LLM-2").await;
+        log.line(&format!(
+            "LLM-2: {} candidates (reprompted) | {:.1?}",
+            reprompted.len(),
+            t.elapsed()
+        ));
         reprompted.to_file(&format!("{dir}/LLM-2-candidates.rules"));
 
         // Validate the reprompted candidates by derivation from the
@@ -335,16 +314,13 @@ mod test {
             &reprompted,
             enumo::Scheduler::Saturating(Limits::deriving()),
         );
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-2: {} sound / {} unverified of {} candidates | {:.1?}",
-                sound2.len(),
-                unverified2.len(),
-                reprompted.len(),
-                t.elapsed()
-            ),
-        );
+        log.line(&format!(
+            "LLM-2: {} sound / {} unverified of {} candidates | {:.1?}",
+            sound2.len(),
+            unverified2.len(),
+            reprompted.len(),
+            t.elapsed()
+        ));
         sound2.to_file(&format!("{dir}/LLM-2-sound.rules"));
 
         // Minimize against everything already selected
@@ -353,34 +329,24 @@ mod test {
             rational.union(&llm1),
             enumo::Scheduler::Compress(Limits::minimize()),
         );
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!("LLM-2: {} minimized | {:.1?}", min2.len(), t.elapsed()),
-        );
+        log.line(&format!(
+            "LLM-2: {} minimized | {:.1?}",
+            min2.len(),
+            t.elapsed()
+        ));
         let llm2 = llm1.union(&min2);
         llm2.to_file(&format!("{dir}/LLM-2.rules"));
 
-        ruler::logger::write_derivability(
-            dir,
+        log.derivability(
             &llm2.union(&rational),
             "LLM-2-RAT",
             &enumo_baseline,
             "Enumo",
         );
-        ruler::logger::write_derivability(
-            dir,
-            &llm2.union(&rational),
-            "LLM-2-RAT",
-            &herbie,
-            "Herbie",
-        );
-        ruler::logger::write_derivability(
-            dir,
-            &enumo_baseline.union(&rational),
-            "Enumo",
-            &llm2,
-            "LLM-2",
-        );
+        log.derivability(&llm2.union(&rational), "LLM-2-RAT", &herbie, "Herbie");
+        log.derivability(&enumo_baseline.union(&rational), "Enumo", &llm2, "LLM-2");
+
+        log.finish();
     }
 
     pub fn starting_exponential_rules() -> Ruleset {

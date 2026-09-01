@@ -222,7 +222,9 @@ mod test {
         let against: Ruleset<Bool> =
             Ruleset::new(&["(& ?x ?y) ==> (& ?y ?x)", "(^ ?x ?y) ==> (^ ?y ?x)"]);
         // out/ is gitignored
-        logger::write_derivability("out/test-derive", &rules, "A", &against, "B");
+        let log = logger::RunLog::start("out/test-derive", "write_derivability_files");
+        log.derivability(&rules, "A", &against, "B");
+        log.finish();
 
         let json = std::fs::read_to_string("out/test-derive/A-B-derive.json").unwrap();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();

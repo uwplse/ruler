@@ -2,7 +2,7 @@ use egg::{AstSize, EClass, Extractor, RecExpr};
 use indexmap::map::{IntoIter, Iter, IterMut, Values, ValuesMut};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::{io::Write, sync::Arc, time::Instant};
+use std::{io::Write, sync::Arc};
 
 use crate::{
     llm, CVec, DeriveType, EGraph, ExtractableAstSize, HashMap, Id, IndexMap, Limits, Pattern,
@@ -235,48 +235,34 @@ impl<L: SynthLanguage> Ruleset<L> {
     /// built); minimization later decides which direction(s) to keep.
     /// Lines that yield no candidate are reported and skipped. Candidates
     /// are deduplicated across models (by rule name). Each query's raw
-    /// response is recorded in `<dir>/raw/`, tagged with `name` (see
-    /// `llm::query`).
-    pub async fn from_llm(prompt: &str, dir: &str, name: &str) -> Self {
+    /// response is recorded in the run's `raw/` directory, tagged with
+    /// `name` (see `RunLog::raw_response`).
+    pub async fn from_llm(prompt: &str, log: &crate::logger::RunLog, name: &str) -> Self {
         let mut all = Self::default();
-        for model in llm::models() {
-            for attempt in 1..=2 {
-                let start = Instant::now();
-                let before = all.len();
-                let mut invalid = 0;
-                for line in llm::query(prompt, &model, attempt, dir, name).await {
-                    let pats = line
-                        .split_once("=>")
-                        .map(|(l, r)| (l.parse::<Pattern<L>>(), r.parse::<Pattern<L>>()));
-                    let mut added = false;
-                    if let Some((Ok(l_pat), Ok(r_pat))) = pats {
-                        if let Some(forwards) = Rule::new(&l_pat, &r_pat) {
-                            all.add(forwards);
-                            added = true;
-                        }
-                        if let Some(backwards) = Rule::new(&r_pat, &l_pat) {
-                            all.add(backwards);
-                            added = true;
-                        }
-                    }
-                    if !added {
-                        invalid += 1;
-                        eprintln!("Skipping invalid rule from {model}: {line}");
-                    }
+        llm::query_each(prompt, log, name, |line| {
+            let before = all.len();
+            let pats = line
+                .split_once("=>")
+                .map(|(l, r)| (l.parse::<Pattern<L>>(), r.parse::<Pattern<L>>()));
+            let mut parsed = false;
+            if let Some((Ok(l_pat), Ok(r_pat))) = pats {
+                if let Some(forwards) = Rule::new(&l_pat, &r_pat) {
+                    all.add(forwards);
+                    parsed = true;
                 }
-                llm::log_query_stats(
-                    &model,
-                    attempt,
-                    all.len() - before,
-                    invalid,
-                    start.elapsed(),
-                );
+                if let Some(backwards) = Rule::new(&r_pat, &l_pat) {
+                    all.add(backwards);
+                    parsed = true;
+                }
             }
-        }
-        crate::logger::log_line(
-            llm::QUERY_LOG,
-            &format!("Combined LLM ruleset: {} rules", all.len()),
-        );
+            if parsed {
+                Some(all.len() - before)
+            } else {
+                None
+            }
+        })
+        .await;
+        log.line(&format!("Combined LLM ruleset: {} rules", all.len()));
         all
     }
 

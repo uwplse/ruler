@@ -371,14 +371,15 @@ mod test {
             return;
         }
         assert!(
-            std::path::Path::new("jfp/baseline/enumo_trig.rules").exists(),
-            "missing jfp/baseline/enumo_trig.rules: run establish_baseline first"
+            std::path::Path::new("jfp/baseline/trig/enumo_trig.rules").exists(),
+            "missing jfp/baseline/trig/enumo_trig.rules: run establish_baseline first"
         );
 
         let dir = "jfp/cs1/trig";
+        let log = ruler::logger::RunLog::start(dir, "case_study1");
         let complex: Ruleset<Trig> = Ruleset::from_file("jfp/cs1/trig/complex.rules");
         let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
-        let enumo: Ruleset<Trig> = Ruleset::from_file("jfp/baseline/enumo_trig.rules");
+        let enumo: Ruleset<Trig> = Ruleset::from_file("jfp/baseline/trig/enumo_trig.rules");
         let start = start_rules();
 
         let prompt = "
@@ -414,45 +415,40 @@ mod test {
         Plain text only - no markdown, no code fences, no numbering, no extra commentary.
         ";
         let t = Instant::now();
-        let candidates = Ruleset::from_llm(prompt, dir, "LLM-1").await;
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-1: {} candidates | {:.1?}",
-                candidates.len(),
-                t.elapsed()
-            ),
-        );
+        let candidates = Ruleset::from_llm(prompt, &log, "LLM-1").await;
+        log.line(&format!(
+            "LLM-1: {} candidates | {:.1?}",
+            candidates.len(),
+            t.elapsed()
+        ));
         candidates.to_file(&format!("{dir}/LLM-1-candidates.rules"));
 
         // Validate the candidates by derivation from the start rules
         let t = Instant::now();
         let (mut sound, unverified) =
             start.derive_all(&candidates, Scheduler::Saturating(Limits::deriving()));
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-1: {} sound / {} unverified of {} candidates | {:.1?}",
-                sound.len(),
-                unverified.len(),
-                candidates.len(),
-                t.elapsed()
-            ),
-        );
+        log.line(&format!(
+            "LLM-1: {} sound / {} unverified of {} candidates | {:.1?}",
+            sound.len(),
+            unverified.len(),
+            candidates.len(),
+            t.elapsed()
+        ));
         sound.to_file(&format!("{dir}/LLM-1-sound.rules"));
 
         // Minimize the sound rules against the complex rules
         let t = Instant::now();
         let (llm1, _) = sound.minimize(complex.clone(), Scheduler::Compress(Limits::minimize()));
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!("LLM-1: {} minimized | {:.1?}", llm1.len(), t.elapsed()),
-        );
+        log.line(&format!(
+            "LLM-1: {} minimized | {:.1?}",
+            llm1.len(),
+            t.elapsed()
+        ));
         llm1.to_file(&format!("{dir}/LLM-1.rules"));
 
-        ruler::logger::write_derivability(dir, &llm1.union(&complex), "LLM-1-C", &enumo, "Enumo");
-        ruler::logger::write_derivability(dir, &llm1.union(&complex), "LLM-1-C", &herbie, "Herbie");
-        ruler::logger::write_derivability(dir, &enumo.union(&complex), "Enumo", &llm1, "LLM-1");
+        log.derivability(&llm1.union(&complex), "LLM-1-C", &enumo, "Enumo");
+        log.derivability(&llm1.union(&complex), "LLM-1-C", &herbie, "Herbie");
+        log.derivability(&enumo.union(&complex), "Enumo", &llm1, "LLM-1");
 
         let reprompt = format!("
         You are generating rewrite rules for an equality saturation system.
@@ -476,15 +472,12 @@ mod test {
             llm1.to_str_vec().join("\n")
         );
         let t = Instant::now();
-        let reprompted = Ruleset::from_llm(&reprompt, dir, "LLM-2").await;
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-2: {} candidates (reprompted) | {:.1?}",
-                reprompted.len(),
-                t.elapsed()
-            ),
-        );
+        let reprompted = Ruleset::from_llm(&reprompt, &log, "LLM-2").await;
+        log.line(&format!(
+            "LLM-2: {} candidates (reprompted) | {:.1?}",
+            reprompted.len(),
+            t.elapsed()
+        ));
         reprompted.to_file(&format!("{dir}/LLM-2-candidates.rules"));
 
         // Validate the reprompted candidates by derivation from the
@@ -492,16 +485,13 @@ mod test {
         let t = Instant::now();
         let (mut sound2, unverified2) =
             start.derive_all(&reprompted, Scheduler::Saturating(Limits::deriving()));
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!(
-                "LLM-2: {} sound / {} unverified of {} candidates | {:.1?}",
-                sound2.len(),
-                unverified2.len(),
-                reprompted.len(),
-                t.elapsed()
-            ),
-        );
+        log.line(&format!(
+            "LLM-2: {} sound / {} unverified of {} candidates | {:.1?}",
+            sound2.len(),
+            unverified2.len(),
+            reprompted.len(),
+            t.elapsed()
+        ));
         sound2.to_file(&format!("{dir}/LLM-2-sound.rules"));
 
         // Minimize against everything already selected
@@ -510,16 +500,19 @@ mod test {
             complex.union(&llm1),
             Scheduler::Compress(Limits::minimize()),
         );
-        ruler::logger::log_line(
-            &format!("{dir}/log.txt"),
-            &format!("LLM-2: {} minimized | {:.1?}", min2.len(), t.elapsed()),
-        );
+        log.line(&format!(
+            "LLM-2: {} minimized | {:.1?}",
+            min2.len(),
+            t.elapsed()
+        ));
         let llm2 = llm1.union(&min2);
         llm2.to_file(&format!("{dir}/LLM-2.rules"));
 
-        ruler::logger::write_derivability(dir, &llm2.union(&complex), "LLM-2-C", &enumo, "Enumo");
-        ruler::logger::write_derivability(dir, &llm2.union(&complex), "LLM-2-C", &herbie, "Herbie");
-        ruler::logger::write_derivability(dir, &enumo.union(&complex), "Enumo", &llm2, "LLM-2");
+        log.derivability(&llm2.union(&complex), "LLM-2-C", &enumo, "Enumo");
+        log.derivability(&llm2.union(&complex), "LLM-2-C", &herbie, "Herbie");
+        log.derivability(&enumo.union(&complex), "Enumo", &llm2, "LLM-2");
+
+        log.finish();
     }
 
     #[test]
@@ -528,18 +521,17 @@ mod test {
         if std::env::var("CI").is_ok() && std::env::var("SKIP_RECIPES").is_ok() {
             return;
         }
+        let log = ruler::logger::RunLog::start("jfp/baseline/trig", "establish_baseline");
 
         let start = Instant::now();
         let rules = trig_rules();
-        ruler::logger::log_line(
-            "jfp/baseline/log.txt",
-            &format!(
-                "ENUMO TRIG | {} rules | {:.1?}",
-                rules.len(),
-                start.elapsed()
-            ),
-        );
-        rules.to_file("jfp/baseline/enumo_trig.rules");
+        log.line(&format!(
+            "ENUMO TRIG | {} rules | {:.1?}",
+            rules.len(),
+            start.elapsed()
+        ));
+        rules.to_file("jfp/baseline/trig/enumo_trig.rules");
+        log.finish();
     }
 
     #[test]
