@@ -1,0 +1,30 @@
+=== case_study1 @ jfp/cs1/exp | 2026-09-01 13:59:29 PDT | git ed61dcf-dirty ===
+google/gemini-3.6-flash (query 1) | 54 lines | 69 new (0 invalid) | 18.4s
+google/gemini-3.6-flash (query 2) | 51 lines | 1 new (0 invalid) | 21.2s
+openai/gpt-5.6-luna (query 1) | 30 lines | 12 new (0 invalid) | 33.5s
+openai/gpt-5.6-luna (query 2) | 33 lines | 10 new (1 invalid) | 31.6s
+anthropic/claude-sonnet-5 (query 1) | 38 lines | 4 new (0 invalid) | 148.7s
+anthropic/claude-sonnet-5 (query 2) | 37 lines | 2 new (0 invalid) | 67.0s
+Combined LLM ruleset: 98 rules
+LLM-1: 98 candidates | 320.4s
+LLM-1: 39 sound / 59 unverified of 98 candidates | 195.6s
+LLM-1: 28 minimized | 23.2ms
+LLM-1: 28 synthesized | total 516.0s
+LLM-1->ENUMO | 65.0% (495.1ms)
+LLM-1->HERBIE | 52.4% (1.7s)
+ENUMO->LLM-1 | 89.3% (1.0s)
+google/gemini-3.6-flash (query 1) | 34 lines | 34 new (0 invalid) | 28.7s
+google/gemini-3.6-flash (query 2) | 30 lines | 0 new (0 invalid) | 23.3s
+openai/gpt-5.6-luna (query 1) | 24 lines | 18 new (0 invalid) | 23.8s
+openai/gpt-5.6-luna (query 2) | 22 lines | 4 new (0 invalid) | 30.0s
+anthropic/claude-sonnet-5 (query 1) | 22 lines | 2 new (0 invalid) | 112.2s
+anthropic/claude-sonnet-5 (query 2) | 14 lines | 0 new (0 invalid) | 106.6s
+Combined LLM ruleset: 58 rules
+LLM-2: 58 candidates (reprompted) | 324.6s
+LLM-2: 10 sound / 48 unverified of 58 candidates | 74.7s
+LLM-2: 4 minimized | 2.5ms
+LLM-2: 32 synthesized | total 399.3s
+LLM-2->ENUMO | 70.0% (481.8ms)
+LLM-2->HERBIE | 53.7% (1.5s)
+ENUMO->LLM-2 | 90.6% (1.0s)
+=== case_study1 complete | 921.6s ===

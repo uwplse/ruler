@@ -1,0 +1,30 @@
+
+        You are generating a workload of terms from which rewrite rules will be inferred.
+        The domain is boolean logic and integer arithmetic, as follows:
+            Values: use only the integer constants 0 and 1
+            Variables: use only w, x, y, and z
+            Unary Operators: - (negation), ! (logical not)
+            Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+            Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
+
+        Terms must be written using s-expressions and prefix notation.
+        For example, (x + y) is not a valid term, but (+ x y) is a valid term.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Terms contain no ? marks. Do not use any operators, constants, or variables not listed here.
+
+        Example terms in the required format:
+        (min x (max y x))
+        (select (< x y) x y)
+        (+ (* x 1) (* y 0))
+
+        Rewrite rules will be inferred by finding pairs of equivalent terms in this workload, so:
+        - generate many pairs or clusters of terms that are likely to be equivalent to each other;
+        - vary the terms in size and nesting depth, from single operators up to terms with 3 or 4 nested operators;
+        - cover every operator, and mix operator families in the same term (e.g. comparisons inside select, arithmetic inside min and max, boolean combinations of comparisons).
+
+        Generate at least 1000 terms in total. As a guide, generate roughly 100 terms emphasizing each of the following groups: arithmetic (+, -, *); min and max; comparisons; boolean operators (&&, ||, ^, !); select; negation; arithmetic combined with min and max; comparisons combined with boolean operators; comparisons combined with select; and mixed terms using three or more operator families.
+        Do not print group labels or headers.
+        Do not stop early: your response must not contain `...` or any other indication that the list is incomplete.
+        Print only the terms, one term per line.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        

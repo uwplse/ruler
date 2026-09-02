@@ -1,0 +1,34 @@
+=== case_study2 @ jfp/cs2/halide | 2026-09-01 15:28:41 PDT | git ed61dcf-dirty ===
+google/gemini-3.6-flash (query 1) | 1962 lines | 1323 new (0 invalid) | 106.5s
+google/gemini-3.6-flash (query 2) | 1445 lines | 972 new (0 invalid) | 142.7s
+openai/gpt-5.6-luna (query 1) | 1490 lines | 1202 new (0 invalid) | 125.5s
+openai/gpt-5.6-luna (query 2) | 1705 lines | 1386 new (1 invalid) | 137.8s
+anthropic/claude-sonnet-5 (query 1) | 1104 lines | 663 new (0 invalid) | 243.2s
+anthropic/claude-sonnet-5 (query 2) | 1007 lines | 406 new (0 invalid) | 217.5s
+Combined LLM workload: 5952 terms
+llm-wkld: 5878 synthesized | total 973.3s
+LLM-W: 6633 eclasses, 189208 candidates | 5.1s
+LLM-W: 2181 selected (0 invalid) | 5505.7s
+LLM-W: 2181 synthesized | total 5510.8s
+LLM-W->HALIDE | 28.1% (3291.6s)
+LLM-W->A5 | 35.8% (2359.6s)
+LLM-W->ENUMO | 25.4% (6965.6s)
+LLM-W-A5: 3499 eclasses, 7195 candidates | 4.5s
+LLM-W-A5: 369 selected (0 invalid) | 44.6s
+LLM-W-A5: 369 synthesized | total 49.1s
+LLM-W-A5->HALIDE | 69.7% (1006.6s)
+LLM-W-A5->A5 | 100.0% (15.8ms)
+LLM-W-A5->ENUMO | 74.4% (214.8s)
+LLM-W-ENUMO: 3832 eclasses, 17434 candidates | 6.0s
+LLM-W-ENUMO: 332 selected (0 invalid) | 68.9s
+LLM-W-ENUMO: 332 synthesized | total 74.9s
+LLM-W-ENUMO->HALIDE | 91.6% (783.1s)
+LLM-W-ENUMO->A5 | 90.4% (608.7s)
+LLM-W-ENUMO->ENUMO | 100.0% (36.6ms)
+LLM-W-LLM-2: 3283 eclasses, 6149 candidates | 8.7s
+LLM-W-LLM-2: 200 selected (0 invalid) | 19.2s
+LLM-W-LLM-2: 200 synthesized | total 27.9s
+LLM-W-LLM-2->HALIDE | 93.1% (40.9s)
+LLM-W-LLM-2->A5 | 78.1% (48.4s)
+LLM-W-LLM-2->ENUMO | 73.9% (99.8s)
+=== case_study2 complete | 22055.5s ===

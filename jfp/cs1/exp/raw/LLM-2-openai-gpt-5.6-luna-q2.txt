@@ -1,0 +1,22 @@
+(sqrt (exp ?x)) ==> (exp (/ ?x 2))
+(exp (/ ?x 2)) ==> (sqrt (exp ?x))
+(cbrt (exp ?x)) ==> (exp (/ ?x 3))
+(exp (/ ?x 3)) ==> (cbrt (exp ?x))
+(log (sqrt ?x)) ==> (/ (log ?x) 2)
+(/ (log ?x) 2) ==> (log (sqrt ?x))
+(log (cbrt ?x)) ==> (/ (log ?x) 3)
+(/ (log ?x) 3) ==> (log (cbrt ?x))
+(pow (sqrt ?x) 2) ==> ?x
+?x ==> (pow (sqrt ?x) 2)
+(pow (cbrt ?x) 3) ==> ?x
+?x ==> (pow (cbrt ?x) 3)
+(cbrt (pow ?x 3)) ==> ?x
+?x ==> (cbrt (pow ?x 3))
+(sqrt (cbrt ?x)) ==> (cbrt (sqrt ?x))
+(cbrt (sqrt ?x)) ==> (sqrt (cbrt ?x))
+(log (/ 1 ?x)) ==> (- (log ?x))
+(- (log ?x)) ==> (log (/ 1 ?x))
+(sqrt (/ 1 ?x)) ==> (/ 1 (sqrt ?x))
+(/ 1 (sqrt ?x)) ==> (sqrt (/ 1 ?x))
+(cbrt (/ 1 ?x)) ==> (/ 1 (cbrt ?x))
+(/ 1 (cbrt ?x)) ==> (cbrt (/ 1 ?x))

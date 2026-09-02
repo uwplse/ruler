@@ -1,0 +1,7 @@
+We identify missing sound rewrite rules in boolean logic and integer arithmetic, focusing on identity patterns involving addition and subtraction cancellation.
+
+(- (+ ?x ?y) ?x) ==> ?y
+(+ ?x (- ?y ?x)) ==> ?y
+(- ?x (- ?x ?y)) ==> ?y
+(* ?x (- ?y ?z)) ==> (- (* ?x ?y) (* ?x ?z))
+(- (* ?x ?y) (* ?x ?z)) ==> (* ?x (- ?y ?z))

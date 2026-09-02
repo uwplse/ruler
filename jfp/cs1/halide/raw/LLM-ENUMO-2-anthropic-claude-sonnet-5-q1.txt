@@ -1,0 +1,10 @@
+Looking at the ruleset, I notice that subtraction and comparison operators have asymmetric coverage when distributing over min/max: some combinations of {min,max} × {left-argument, right-argument} are present, but their counterparts are missing.
+
+(- (min ?x ?y) ?z) ==> (min (- ?x ?z) (- ?y ?z))
+(min (- ?x ?z) (- ?y ?z)) ==> (- (min ?x ?y) ?z)
+(- ?z (max ?x ?y)) ==> (min (- ?z ?x) (- ?z ?y))
+(min (- ?z ?x) (- ?z ?y)) ==> (- ?z (max ?x ?y))
+(< (max ?x ?y) ?z) ==> (&& (< ?x ?z) (< ?y ?z))
+(&& (< ?x ?z) (< ?y ?z)) ==> (< (max ?x ?y) ?z)
+(<= (min ?x ?y) ?z) ==> (|| (<= ?x ?z) (<= ?y ?z))
+(|| (<= ?x ?z) (<= ?y ?z)) ==> (<= (min ?x ?y) ?z)

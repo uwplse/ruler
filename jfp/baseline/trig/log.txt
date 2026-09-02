@@ -1,0 +1,4 @@
+=== establish_baseline @ jfp/baseline/trig | 2026-09-01 13:44:40 PDT | git ed61dcf-dirty ===
+ENUMO: 56 synthesized | total 692.4s
+ENUMO->HERBIE | 35.6% (14.0s)
+=== establish_baseline complete | 706.4s ===

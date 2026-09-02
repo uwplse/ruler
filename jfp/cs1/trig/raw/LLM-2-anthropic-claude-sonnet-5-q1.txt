@@ -1,0 +1,13 @@
+(sin (- ?x)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (- ?x))
+(tan (- ?x)) ==> (- (tan ?x))
+(- (tan ?x)) ==> (tan (- ?x))
+(+ (sqr (sin ?x)) (sqr (cos ?x))) ==> 1
+(sin (+ ?x ?y)) ==> (+ (* (sin ?x) (cos ?y)) (* (cos ?x) (sin ?y)))
+(cos (+ ?x ?y)) ==> (- (* (cos ?x) (cos ?y)) (* (sin ?x) (sin ?y)))
+(sin (- ?x ?y)) ==> (- (* (sin ?x) (cos ?y)) (* (cos ?x) (sin ?y)))
+(cos (- ?x ?y)) ==> (+ (* (cos ?x) (cos ?y)) (* (sin ?x) (sin ?y)))
+(sin (+ ?x (/ PI 2))) ==> (cos ?x)
+(cos (+ ?x (/ PI 2))) ==> (- (sin ?x))
+(sin (- (/ PI 2) ?x)) ==> (cos ?x)
+(cos (- (/ PI 2) ?x)) ==> (sin ?x)

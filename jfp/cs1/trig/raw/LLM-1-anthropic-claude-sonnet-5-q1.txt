@@ -1,0 +1,56 @@
+(sin 0) ==> 0
+(cos 0) ==> 1
+(tan 0) ==> 0
+(sin PI) ==> 0
+(cos PI) ==> -1
+(tan PI) ==> 0
+(sin (/ PI 2)) ==> 1
+(cos (/ PI 2)) ==> 0
+(sin (/ PI 6)) ==> (/ 1 2)
+(cos (/ PI 3)) ==> (/ 1 2)
+(tan (/ PI 4)) ==> 1
+(sqr (sin (/ PI 4))) ==> (/ 1 2)
+(sqr (cos (/ PI 4))) ==> (/ 1 2)
+(sqr (sin (/ PI 3))) ==> (/ 3 4)
+(sqr (cos (/ PI 6))) ==> (/ 3 4)
+(sqr (tan (/ PI 3))) ==> 3
+(sqr (tan (/ PI 6))) ==> (/ 1 3)
+(sin (- ?x)) ==> (- (sin ?x))
+(cos (- ?x)) ==> (cos ?x)
+(tan (- ?x)) ==> (- (tan ?x))
+(sin (+ ?x (/ PI 2))) ==> (cos ?x)
+(cos (+ ?x (/ PI 2))) ==> (- (sin ?x))
+(sin (- ?x (/ PI 2))) ==> (- (cos ?x))
+(cos (- ?x (/ PI 2))) ==> (sin ?x)
+(sin (+ ?x PI)) ==> (- (sin ?x))
+(cos (+ ?x PI)) ==> (- (cos ?x))
+(tan (+ ?x PI)) ==> (tan ?x)
+(tan (+ ?x (/ PI 2))) ==> (- (/ 1 (tan ?x)))
+(tan (- ?x (/ PI 2))) ==> (- (/ 1 (tan ?x)))
+(+ (sqr (sin ?x)) (sqr (cos ?x))) ==> 1
+(- 1 (sqr (sin ?x))) ==> (sqr (cos ?x))
+(- 1 (sqr (cos ?x))) ==> (sqr (sin ?x))
+(+ 1 (sqr (tan ?x))) ==> (/ 1 (sqr (cos ?x)))
+(tan ?x) ==> (/ (sin ?x) (cos ?x))
+(sin (+ ?x ?y)) ==> (+ (* (sin ?x) (cos ?y)) (* (cos ?x) (sin ?y)))
+(sin (- ?x ?y)) ==> (- (* (sin ?x) (cos ?y)) (* (cos ?x) (sin ?y)))
+(cos (+ ?x ?y)) ==> (- (* (cos ?x) (cos ?y)) (* (sin ?x) (sin ?y)))
+(cos (- ?x ?y)) ==> (+ (* (cos ?x) (cos ?y)) (* (sin ?x) (sin ?y)))
+(tan (+ ?x ?y)) ==> (/ (+ (tan ?x) (tan ?y)) (- 1 (* (tan ?x) (tan ?y))))
+(tan (- ?x ?y)) ==> (/ (- (tan ?x) (tan ?y)) (+ 1 (* (tan ?x) (tan ?y))))
+(sin (* 2 ?x)) ==> (* 2 (* (sin ?x) (cos ?x)))
+(cos (* 2 ?x)) ==> (- (sqr (cos ?x)) (sqr (sin ?x)))
+(cos (* 2 ?x)) ==> (- (* 2 (sqr (cos ?x))) 1)
+(cos (* 2 ?x)) ==> (- 1 (* 2 (sqr (sin ?x))))
+(tan (* 2 ?x)) ==> (/ (* 2 (tan ?x)) (- 1 (sqr (tan ?x))))
+(sqr (sin (/ ?x 2))) ==> (/ (- 1 (cos ?x)) 2)
+(sqr (cos (/ ?x 2))) ==> (/ (+ 1 (cos ?x)) 2)
+(sqr (tan (/ ?x 2))) ==> (/ (- 1 (cos ?x)) (+ 1 (cos ?x)))
+(* (sin ?x) (cos ?y)) ==> (/ (+ (sin (+ ?x ?y)) (sin (- ?x ?y))) 2)
+(* (cos ?x) (sin ?y)) ==> (/ (- (sin (+ ?x ?y)) (sin (- ?x ?y))) 2)
+(* (cos ?x) (cos ?y)) ==> (/ (+ (cos (- ?x ?y)) (cos (+ ?x ?y))) 2)
+(* (sin ?x) (sin ?y)) ==> (/ (- (cos (- ?x ?y)) (cos (+ ?x ?y))) 2)
+(+ (sin ?x) (sin ?y)) ==> (* 2 (* (sin (/ (+ ?x ?y) 2)) (cos (/ (- ?x ?y) 2))))
+(- (sin ?x) (sin ?y)) ==> (* 2 (* (cos (/ (+ ?x ?y) 2)) (sin (/ (- ?x ?y) 2))))
+(+ (cos ?x) (cos ?y)) ==> (* 2 (* (cos (/ (+ ?x ?y) 2)) (cos (/ (- ?x ?y) 2))))
+(- (cos ?x) (cos ?y)) ==> (* -2 (* (sin (/ (+ ?x ?y) 2)) (sin (/ (- ?x ?y) 2))))

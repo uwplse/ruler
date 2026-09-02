@@ -1,0 +1,4 @@
+(min ?a (< 0 ?a)) ==> (min ?a 1)
+(min ?a 1) ==> (min ?a (< 0 ?a))
+(min ?a (!= ?a 0)) ==> (min ?a 1)
+(min ?a 1) ==> (min ?a (!= ?a 0))

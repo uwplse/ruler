@@ -1,0 +1,11 @@
+{
+  "name": "establish_baseline",
+  "provenance": "2026-09-01 13:44:40 PDT | git ed61dcf-dirty",
+  "total_time": 706.356616292,
+  "synthesized": {
+    "ENUMO": {
+      "count": 56,
+      "time": 692.358330667
+    }
+  }
+}

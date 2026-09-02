@@ -1,0 +1,33 @@
+
+        You are generating rewrite rules for an equality saturation system.
+        The domain is boolean logic and integer arithmetic, as follows:
+            Values: integers. Comparisons and boolean operators return 1 (true) or 0 (false); any nonzero value is treated as true.
+            Unary Operators: - (negation), ! (logical not)
+            Binary Operators: <, <=, ==, !=, &&, ||, ^ (xor), +, - (subtraction), *, min, max
+            Ternary Operators: select ((select c t f) evaluates to t if c is nonzero, and f otherwise)
+
+        Terms must be written using s-expressions and prefix notation.
+        Every operator takes exactly the number of operands stated above: (+ 1 2 3) is not a valid term, but (+ 1 (+ 2 3)) is.
+        Variables are ?x, ?y, and ?z. The integer constants 0 and 1 may also appear in rules.
+        Do not use any operators or syntax not listed here.
+
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL integer values of the variables. For example:
+        (+ ?x ?y) ==> (+ ?y ?x)
+        (min ?x ?x) ==> ?x
+        (select 1 ?x ?y) ==> ?x
+
+        Generate a comprehensive set of sound rewrite rules for this domain, covering at least the following categories:
+        - identity and annihilator rules for each operator (e.g. adding 0, multiplying by 0 or 1)
+        - commutativity and associativity of +, *, min, max, &&, ||, ^, and commutativity of == and !=
+        - distributivity rules (e.g. * over +, && over ||, min and max over +, min over max)
+        - negation and logical-not rules (double negation, De Morgan's laws, ! of a comparison as the flipped comparison)
+        - relationships among <, <=, ==, and != (e.g. swapping argument order, complements)
+        - absorption and idempotence rules for min, max, &&, ||
+        - select rules (constant condition, equal branches, pushing operators into select, nested selects)
+        - rules connecting comparisons with min and max (e.g. (<= (min ?x ?y) ?x) ==> 1)
+
+        Generate at least 200 rules.
+        Every rule must be sound: both sides must be equal for every assignment of integer values to the variables, including 0 and negative values.
+        Print only the rules, one rule per line, in the exact `l ==> r` syntax shown above.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        

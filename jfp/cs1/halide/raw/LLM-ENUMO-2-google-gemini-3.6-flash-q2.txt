@@ -1,0 +1,12 @@
+High-level summary of reasoning: The ruleset was analyzed against standard equivalences for boolean logic, integer arithmetic, min/max, and select operations. Several fundamental sound rewrite rules involving negation over addition, multiplication of negated terms, relative ordering complementation, and max semantics via strictly-less-than comparisons were identified as missing from the provided set.
+
+(- (+ ?x ?y)) ==> (+ (- ?x) (- ?y))
+(+ (- ?x) (- ?y)) ==> (- (+ ?x ?y))
+(* (- ?x) (- ?y)) ==> (* ?x ?y)
+(* ?x ?y) ==> (* (- ?x) (- ?y))
+(== (<= ?x ?y) 0) ==> (< ?y ?x)
+(< ?y ?x) ==> (== (<= ?x ?y) 0)
+(select (< ?x ?y) ?y ?x) ==> (max ?x ?y)
+(max ?x ?y) ==> (select (< ?x ?y) ?y ?x)
+(select (< ?x ?y) ?x ?y) ==> (min ?x ?y)
+(min ?x ?y) ==> (select (< ?x ?y) ?x ?y)

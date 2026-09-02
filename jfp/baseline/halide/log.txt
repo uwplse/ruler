@@ -1,0 +1,10 @@
+=== establish_baseline @ jfp/baseline/halide | 2026-09-01 13:56:27 PDT | git ed61dcf-dirty ===
+A5: 480 synthesized | total 15.7s
+ENUMO: 840 synthesized | total 49.2s
+A5->HALIDE | 45.1% (10.6s)
+A5->A5 | 100.0% (12.0ms)
+A5->ENUMO | 69.3% (26.5s)
+ENUMO->HALIDE | 90.9% (22.1s)
+ENUMO->A5 | 88.3% (56.6s)
+ENUMO->ENUMO | 100.0% (30.2ms)
+=== establish_baseline complete | 180.7s ===

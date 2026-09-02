@@ -1,0 +1,15 @@
+{
+  "name": "case_study1",
+  "provenance": "2026-09-01 13:59:29 PDT | git ed61dcf-dirty",
+  "total_time": 921.57381125,
+  "synthesized": {
+    "LLM-1": {
+      "count": 28,
+      "time": 516.030728167
+    },
+    "LLM-2": {
+      "count": 32,
+      "time": 399.2780025
+    }
+  }
+}

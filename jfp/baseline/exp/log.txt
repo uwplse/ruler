@@ -1,0 +1,4 @@
+=== establish_baseline @ jfp/baseline/exp | 2026-09-01 13:44:33 PDT | git ed61dcf ===
+ENUMO: 40 synthesized | total 4.6s
+ENUMO->HERBIE | 43.9% (2.7s)
+=== establish_baseline complete | 7.3s ===

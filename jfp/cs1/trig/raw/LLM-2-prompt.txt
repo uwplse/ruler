@@ -1,0 +1,40 @@
+
+        You are generating rewrite rules for an equality saturation system.
+        The domain is trigonometric functions, as follows:
+        Values: real numbers, and the constant PI
+        Unary operators: - (negation), sin, cos, tan, sqr (square)
+        Binary operators: +, - (subtraction), *, /
+
+        The following rewrite rules are already in the ruleset:
+        (sin (/ PI 2)) ==> 1
+1 ==> (sin (/ PI 2))
+(cos (/ PI 2)) ==> 0
+0 ==> (cos (/ PI 2))
+(tan 0) ==> 0
+0 ==> (tan 0)
+(tan PI) ==> 0
+0 ==> (tan PI)
+(cos PI) ==> -1
+-1 ==> (cos PI)
+(tan ?x) ==> (/ (sin ?x) (cos ?x))
+(/ (sin ?x) (cos ?x)) ==> (tan ?x)
+(sin (+ ?x PI)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (+ ?x PI))
+(cos (+ ?x PI)) ==> (- (cos ?x))
+(- (cos ?x)) ==> (cos (+ ?x PI))
+(sin (- ?x PI)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (- ?x PI))
+(cos (- ?x PI)) ==> (- (cos ?x))
+(- (cos ?x)) ==> (cos (- ?x PI))
+(cos (- ?x)) ==> (cos ?x)
+(cos ?x) ==> (cos (- ?x))
+
+        Identify sound rewrite rules for this domain that are missing from the ruleset above, and print them.
+        Do not repeat rules from the list above, and do not print trivial variants of them (e.g. renamed variables or swapped arguments of commutative operators).
+        Every rule must involve sin, cos, or tan; rules for pure arithmetic already exist.
+        Terms are s-expressions in prefix notation; variables are ?x, ?y, and ?z.
+        A rewrite rule has the form `l ==> r` where `l` and `r` are terms that are equal for ALL real values of the variables. For example: (sin (- ?x)) ==> (- (sin ?x))
+        If no rules are missing, print nothing.
+        Print only the rules, one rule per line.
+        Plain text only - no markdown, no code fences, no numbering, no extra commentary.
+        

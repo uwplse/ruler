@@ -1,0 +1,27 @@
+{
+  "name": "case_study2",
+  "provenance": "2026-09-01 15:28:41 PDT | git ed61dcf-dirty",
+  "total_time": 22055.45901575,
+  "synthesized": {
+    "llm-wkld": {
+      "count": 5878,
+      "time": 973.296704625
+    },
+    "LLM-W": {
+      "count": 2181,
+      "time": 5510.772157375
+    },
+    "LLM-W-A5": {
+      "count": 369,
+      "time": 49.106270333
+    },
+    "LLM-W-ENUMO": {
+      "count": 332,
+      "time": 74.854764958
+    },
+    "LLM-W-LLM-2": {
+      "count": 200,
+      "time": 27.899124334
+    }
+  }
+}

@@ -1,0 +1,15 @@
+(sin (- ?x)) ==> (- (sin ?x))
+(- (sin ?x)) ==> (sin (- ?x))
+(tan (- ?x)) ==> (- (tan ?x))
+(- (tan ?x)) ==> (tan (- ?x))
+(+ (sqr (sin ?x)) (sqr (cos ?x))) ==> 1
+(sin 0) ==> 0
+0 ==> (sin 0)
+(cos 0) ==> 1
+1 ==> (cos 0)
+(sin PI) ==> 0
+0 ==> (sin PI)
+(sin (- (/ PI 2) ?x)) ==> (cos ?x)
+(cos (- (/ PI 2) ?x)) ==> (sin ?x)
+(sin (+ (/ PI 2) ?x)) ==> (cos ?x)
+(cos (+ (/ PI 2) ?x)) ==> (- (sin ?x))
