@@ -519,6 +519,16 @@ mod test {
         let rules = make_rules();
         let duration = start.elapsed();
 
-        logger::write_baseline(&rules, "exponential", &herbie, "herbie", duration);
+        // The rational rules the exponential rules were minimized against;
+        // unioned into both deriving sides of the derivability comparison
+        // (the method behind Table 3, and the same rules case_study1 uses).
+        logger::write_baseline_with_prior(
+            &rules,
+            "exponential",
+            &herbie,
+            "herbie",
+            &rational_rules(),
+            duration,
+        );
     }
 }

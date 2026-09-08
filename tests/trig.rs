@@ -559,12 +559,16 @@ mod test {
         }
 
         let herbie: Ruleset<Trig> = Ruleset::from_file("baseline/herbie-trig.rules");
+        // The arithmetic rules the trig rules were minimized against; unioned
+        // into both deriving sides of the derivability comparison (the
+        // method behind Table 3, and the same file case_study1 uses).
+        let complex: Ruleset<Trig> = Ruleset::from_file("jfp/cs1/trig/complex.rules");
 
         let start = Instant::now();
         let rules = trig_rules();
         let duration = start.elapsed();
 
-        logger::write_baseline(&rules, "trig", &herbie, "herbie", duration);
+        logger::write_baseline_with_prior(&rules, "trig", &herbie, "herbie", &complex, duration);
     }
 
     #[test]

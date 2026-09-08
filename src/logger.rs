@@ -244,13 +244,8 @@ pub fn skip_derive(a: &str, b: &str) -> bool {
 
 /**
  * Constructs a JSON object that corresponds to a single row of the baseline
- * derivability table (Tables 2 and 3)
- * spec_name: Name of enumo recipe file
- * baseline_name: Baseline to compare against
- * loc: # of lines in enumo recipe
- * rules: array of rules
- * time: time in seconds
- * derivability: JSON object containing dervability in both directions for both derive types
+ * derivability table (Tables 2 and 3) for a domain synthesized without
+ * prior rules. See `write_baseline_with_prior` for the field descriptions.
  */
 pub fn write_baseline<L: SynthLanguage>(
     ruleset: &Ruleset<L>,
@@ -259,16 +254,55 @@ pub fn write_baseline<L: SynthLanguage>(
     baseline_name: &str,
     time: Duration,
 ) {
+    write_baseline_with_prior(
+        ruleset,
+        spec_name,
+        baseline,
+        baseline_name,
+        &Ruleset::default(),
+        time,
+    )
+}
+
+/**
+ * Constructs a JSON object that corresponds to a single row of the baseline
+ * derivability table (Tables 2 and 3)
+ * spec_name: Name of enumo recipe file
+ * baseline_name: Baseline to compare against
+ * prior: rules the ruleset was synthesized relative to (the arithmetic rules
+ *   for the trig and exponential domains). Derivability in *both* directions
+ *   unions the prior into the deriving ruleset and never into the target:
+ *   the synthesized rules were minimized against the prior, so arithmetic
+ *   variants were deliberately dropped from them, and the baseline never
+ *   applies its rules without arithmetic either. Pass an empty ruleset for
+ *   domains without a prior (or use `write_baseline`).
+ * loc: # of lines in enumo recipe
+ * rules: array of rules (the prior is not included)
+ * prior_rules: array of prior rules
+ * time: time in seconds
+ * derivability: JSON object containing dervability in both directions for both derive types
+ */
+pub fn write_baseline_with_prior<L: SynthLanguage>(
+    ruleset: &Ruleset<L>,
+    spec_name: &str,
+    baseline: &Ruleset<L>,
+    baseline_name: &str,
+    prior: &Ruleset<L>,
+    time: Duration,
+) {
     let loc = count_lines(spec_name)
         .map(|x| x.to_string())
         .unwrap_or_else(|| "-".to_string());
+
+    let ruleset_with_prior = ruleset.union(prior);
+    let baseline_with_prior = baseline.union(prior);
 
     let enumo_derives_baseline = if skip_derive(spec_name, baseline_name) {
         json!({})
     } else {
         json!({
-            "lhs": get_derivability(ruleset, baseline, DeriveType::Lhs),
-            "lhs_rhs": get_derivability(ruleset, baseline, DeriveType::LhsAndRhs)
+            "lhs": get_derivability(&ruleset_with_prior, baseline, DeriveType::Lhs),
+            "lhs_rhs": get_derivability(&ruleset_with_prior, baseline, DeriveType::LhsAndRhs)
         })
     };
 
@@ -276,8 +310,8 @@ pub fn write_baseline<L: SynthLanguage>(
         json!({})
     } else {
         json!({
-            "lhs": get_derivability(baseline, ruleset, DeriveType::Lhs),
-            "lhs_rhs": get_derivability(baseline, ruleset, DeriveType::LhsAndRhs)
+            "lhs": get_derivability(&baseline_with_prior, ruleset, DeriveType::Lhs),
+            "lhs_rhs": get_derivability(&baseline_with_prior, ruleset, DeriveType::LhsAndRhs)
         })
     };
 
@@ -287,6 +321,7 @@ pub fn write_baseline<L: SynthLanguage>(
       "baseline_name": baseline_name,
       "loc": loc,
       "rules": ruleset.to_str_vec(),
+      "prior_rules": prior.to_str_vec(),
       "time": time.as_secs_f64(),
       "derivability": json!({
         "enumo_derives_baseline": enumo_derives_baseline,
